@@ -217,6 +217,7 @@
 | 89 | Cache Hierarchies (CPU, App, Distributed) | L1/L2 CPU → in-process → Redis/Memcached → CDN | [ByteByteGo — Cache Layers](https://blog.bytebytego.com/) | [Meta — TAO Cache](https://engineering.fb.com/) |
 | 90 | Hot vs Cold Data | Access frequency analysis, tiered storage, data lifecycle | [DDIA Ch. 3](https://dataintensive.net/) | [Netflix — Data Tiering](https://netflixtechblog.com/) |
 | 91 | Cache Performance Metrics | Hit rate, miss rate, eviction rate, latency percentiles | [Redis Docs](https://redis.io/docs/) | [Pinterest — Cache Metrics](https://medium.com/pinterest-engineering) |
+| 91 |Redis |Persistance[AOF, Snapshots], Use cases | [Redis Docs](https://redis.io/docs/) | [ByteByteG - Top 5 Redis Use cases]([https://medium.com/pinterest-engineering](https://www.youtube.com/watch?v=a4yX7RUgTxI)) |
 
 ### 5.2 Caching Patterns and Strategies
 
