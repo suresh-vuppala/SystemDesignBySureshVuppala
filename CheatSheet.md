@@ -5,7 +5,7 @@
 
 ---
 
-##  Quick Navigation
+## Quick Navigation
 
 | Category | Key Topics |
 |---|---|
@@ -250,11 +250,11 @@ Postgres full-text search exists but Elasticsearch is superior at scale.
 
 ---
 
-## ⚡ FUNDAMENTALS & NETWORKING
+## FUNDAMENTALS & NETWORKING
 
 ---
 
-###  TCP/UDP {#tcpudp}
+### TCP/UDP {#tcpudp}
 > **Transport layer protocols: TCP (reliable, ordered), UDP (fast, unreliable)**
 
 | **TCP (Transmission Control Protocol)** | **UDP (User Datagram Protocol)** |
@@ -289,7 +289,7 @@ Client                          Server
 
 ---
 
-###  HTTP/HTTPS {#httphttps}
+### HTTP/HTTPS {#httphttps}
 > **Application layer: HTTP (plaintext), HTTPS (encrypted with TLS/SSL)**
 
 | **HTTP** | **HTTPS** |
@@ -348,7 +348,7 @@ Client                          Server
 
 ---
 
-###  Authentication {#authentication}
+### Authentication {#authentication}
 > **Verifying identity: "Who are you?" (Login & Credentials)**
 
 **Authentication Methods:**
@@ -398,7 +398,7 @@ Signature: HMAC(HS256, Header.Payload, secret_key)
 
 ---
 
-###  Authorization {#authorization}
+### Authorization {#authorization}
 > **Verifying permissions: "What are you allowed to do?" (Access Control)**
 
 **Authorization Models:**
@@ -455,7 +455,7 @@ Rule: Allow if
 
 ---
 
-###  Change Data Capture (CDC) {#cdc}
+### Change Data Capture (CDC) {#cdc}
 > **Streaming database changes to downstream systems (Event-driven data sync)**
 
 **How CDC Works:**
@@ -512,7 +512,7 @@ Database Change Log:
 
 ---
 
-###  Fault Tolerance & Reliability {#fault-tolerance}
+### Fault Tolerance & Reliability {#fault-tolerance}
 > **Building systems that survive failures without losing functionality**
 
 **Fault vs Failure:**
@@ -613,11 +613,11 @@ Resume normal traffic
 
 ---
 
-## ⚡ APIs & COMMUNICATION
+## APIs & COMMUNICATION
 
 ---
 
-###  REST API {#rest}
+### REST API {#rest}
 > **Stateless HTTP-based architecture using standard methods (GET, POST, PUT, DELETE)**
 
 | STRENGTHS | WEAKNESSES |
@@ -647,7 +647,7 @@ DELETE /api/v1/orders/456         → Cancel order
 
 ---
 
-###  gRPC {#grpc}
+### gRPC {#grpc}
 > **High-performance RPC framework using HTTP/2 and Protocol Buffers (binary serialization)**
 
 | STRENGTHS | WEAKNESSES |
@@ -679,7 +679,7 @@ service TradeService {
 
 ---
 
-###  GraphQL {#graphql}
+### GraphQL {#graphql}
 > **Query language for APIs; client specifies exactly which fields it needs**
 
 | STRENGTHS | WEAKNESSES |
@@ -726,7 +726,7 @@ Mitigation: Depth limiting, query cost analysis, rate limiting per query complex
 
 ---
 
-###  Real-time Communication {#realtime}
+### Real-time Communication {#realtime}
 > **Technologies for pushing data from server to client (vs polling)**
 
 #### Short Polling
@@ -861,11 +861,11 @@ Client A ←────P2P───► Client B
 
 ---
 
-## ⚡ CACHING
+## CACHING
 
 ---
 
-###  Caching {#caching}
+### Caching {#caching}
 > Strategies: Cache-Aside, Write-Through, Write-Behind, Read-Through
 
 | GOOD AT | LIMITATIONS |
@@ -890,7 +890,7 @@ Client A ←────P2P───► Client B
 
 ---
 
-###  Redis {#redis}
+### Redis {#redis}
 > **In-memory data store: Lightning-fast cache, message broker, and data structure server**
 
 | STRENGTHS | WEAKNESSES |
@@ -1068,7 +1068,7 @@ EVAL [[
 
 ---
 
-###  CDN {#cdn}
+### CDN {#cdn}
 > **Examples:** Cloudflare, AWS CloudFront, Fastly, Akamai
 
 | GOOD AT | LIMITATIONS |
@@ -1084,11 +1084,11 @@ EVAL [[
 
 ---
 
-## ⚡ MESSAGING
+## MESSAGING
 
 ---
 
-###  Message Queue (RabbitMQ / SQS) {#messagequeues}
+### Message Queue (RabbitMQ / SQS) {#messagequeues}
 > **Examples:** RabbitMQ, AWS SQS, Azure Service Bus
 
 | GOOD AT | LIMITATIONS |
@@ -1104,7 +1104,7 @@ EVAL [[
 
 ---
 
-###  Apache Kafka {#kafka}
+### Apache Kafka {#kafka}
 > **Distributed log: event streaming platform at massive scale (LinkedIn: 4+ trillion events/day)**
 
 | STRENGTHS | WEAKNESSES |
@@ -1198,7 +1198,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Pub/Sub (Google Pub/Sub / SNS) {#pubsub}
+### Pub/Sub (Google Pub/Sub / SNS) {#pubsub}
 > **Examples:** Google Cloud Pub/Sub, AWS SNS, Azure Event Grid
 
 | GOOD AT | LIMITATIONS |
@@ -1214,11 +1214,11 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-## ⚡ COMPUTE
+## COMPUTE
 
 ---
 
-###  Microservices {#microservices}
+### Microservices {#microservices}
 
 | GOOD AT | LIMITATIONS |
 |---|---|
@@ -1233,7 +1233,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Serverless {#serverless}
+### Serverless {#serverless}
 > **Examples:** AWS Lambda, Google Cloud Functions, Cloudflare Workers
 
 | GOOD AT | LIMITATIONS |
@@ -1249,7 +1249,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Service Mesh {#servicemesh}
+### Service Mesh {#servicemesh}
 > **Examples:** Istio, Linkerd, Consul Connect
 
 | GOOD AT | LIMITATIONS |
@@ -1265,11 +1265,11 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-## ⚡ NETWORKING
+## NETWORKING
 
 ---
 
-###  Load Balancer {#loadbalancer}
+### Load Balancer {#loadbalancer}
 > **Types:** L4 (TCP/UDP), L7 (HTTP); Examples: AWS ALB/NLB, NGINX, HAProxy
 
 | GOOD AT | LIMITATIONS |
@@ -1287,7 +1287,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  API Gateway {#apigateway}
+### API Gateway {#apigateway}
 > **Examples:** AWS API Gateway, Kong, Apigee, Nginx
 
 | GOOD AT | LIMITATIONS |
@@ -1303,7 +1303,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Forward & Reverse Proxy {#proxy}
+### Forward & Reverse Proxy {#proxy}
 > **Network intermediaries: Forward Proxy (client-side), Reverse Proxy (server-side)**
 
 **Forward Proxy (Client Perspective):**
@@ -1378,11 +1378,11 @@ Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
 
 ---
 
-## ⚡ CONSISTENCY & DISTRIBUTED SYSTEMS
+## CONSISTENCY & DISTRIBUTED SYSTEMS
 
 ---
 
-###  CAP Theorem {#cap}
+### CAP Theorem {#cap}
 
 > A distributed system can guarantee only **2 of 3**: **C**onsistency, **A**vailability, **P**artition Tolerance.
 > Since network partitions are unavoidable, the real trade-off is **CP vs AP**.
@@ -1396,7 +1396,7 @@ Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
 
 ---
 
-###  Consistency Models {#consistency}
+### Consistency Models {#consistency}
 
 | Model | Guarantee | Use When |
 |---|---|---|
@@ -1410,7 +1410,7 @@ Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
 
 ---
 
-###  Concurrency Control {#concurrency}
+### Concurrency Control {#concurrency}
 > **How multiple transactions access the same data without corruption**
 
 #### Pessimistic Locking
@@ -1496,7 +1496,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Distributed Transactions {#transactions}
+### Distributed Transactions {#transactions}
 
 
 
@@ -1513,11 +1513,11 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-## ⚡ SCALABILITY PATTERNS
+## SCALABILITY PATTERNS
 
 ---
 
-###  Sharding {#sharding}
+### Sharding {#sharding}
 
 | GOOD AT | LIMITATIONS |
 |---|---|
@@ -1540,7 +1540,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Replication {#replication}
+### Replication {#replication}
 
 | Type | Description | Use Case |
 |---|---|---|
@@ -1556,7 +1556,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Rate Limiting {#ratelimit}
+### Rate Limiting {#ratelimit}
 
 | Algorithm | How It Works | Best For |
 |---|---|---|
@@ -1749,7 +1749,7 @@ User gets slow order response (3 seconds expected, but took 5s)
 
 ---
 
-###  Bloom Filters {#bloomfilters}
+### Bloom Filters {#bloomfilters}
 > **Probabilistic data structure for membership testing (does value exist in set?)**
 
 **How it works:**
@@ -1792,7 +1792,7 @@ Result: "bob" definitely NOT in set
 
 ---
 
-###  Circuit Breaker {#circuitbreaker}
+### Circuit Breaker {#circuitbreaker}
 > **Prevent cascading failures by fast-failing when downstream service is broken**
 
 ```
@@ -1850,11 +1850,11 @@ With Circuit Breaker:
 
 
 
-## ⚡ INFRASTRUCTURE
+## INFRASTRUCTURE
 
 ---
 
-###  Blob Storage (S3 / GCS) {#blobstorage}
+### Blob Storage (S3 / GCS) {#blobstorage}
 > **Examples:** AWS S3, Google Cloud Storage, Azure Blob
 
 | GOOD AT | LIMITATIONS |
@@ -1870,7 +1870,7 @@ With Circuit Breaker:
 
 ---
 
-###  DNS {#dns}
+### DNS {#dns}
 
 | GOOD AT | LIMITATIONS |
 |---|---|
@@ -1886,7 +1886,7 @@ With Circuit Breaker:
 
 ---
 
-###  Data Warehouse {#warehouse}
+### Data Warehouse {#warehouse}
 > **Examples:** BigQuery, Snowflake, Redshift, ClickHouse
 
 | GOOD AT | LIMITATIONS |
@@ -1911,7 +1911,7 @@ With Circuit Breaker:
 
 ---
 
-## ⚡ KEY NUMBERS TO KNOW
+## KEY NUMBERS TO KNOW
 
 ```
 Latency Reference (approximate):
@@ -1966,7 +1966,7 @@ Storage Reference:
 
 **When to use:** Transactions, financial data, anything needing strong consistency and joins.
 
-[↑ Back to top](#-sql-relational-db)
+[↑ Back to top](#sql)
 
 ---
 
@@ -1997,7 +1997,7 @@ Storage Reference:
 - Most offer tunable consistency: eventual by default, strong available at cost.
 - Cassandra: `QUORUM` reads/writes for stronger consistency.
 
-[↑ Back to top](#-nosql)
+[↑ Back to top](#nosql)
 
 ---
 
@@ -2015,7 +2015,7 @@ Storage Reference:
 
 **When to choose:** You need global ACID with SQL and can tolerate slightly higher latency and cost.
 
-[↑ Back to top](#-newsql)
+[↑ Back to top](#newsql)
 
 ---
 
@@ -2035,7 +2035,7 @@ Storage Reference:
 
 **When to choose:** Any workload where the primary access pattern is "give me metric X between time T1 and T2."
 
-[↑ Back to top](#-time-series-db)
+[↑ Back to top](#timeseries)
 
 ---
 
@@ -2058,7 +2058,7 @@ Storage Reference:
 
 **When to choose:** Any feature requiring full-text search, fuzzy matching, or faceted filtering.
 
-[↑ Back to top](#-search-engine-elasticsearch--solr)
+[↑ Back to top](#search)
 
 ---
 
@@ -2096,7 +2096,7 @@ Storage Reference:
 
 **Thundering Herd:** Many requests hit DB simultaneously when cache expires. Mitigate with: probabilistic early expiration, mutex/lock on cache miss, background refresh.
 
-[↑ Back to top](#-caching)
+[↑ Back to top](#caching)
 
 ---
 
@@ -2126,7 +2126,7 @@ Storage Reference:
 - Acquire lock on majority of N independent Redis nodes.
 - TTL prevents deadlock. Release with Lua script (atomic check + delete).
 
-[↑ Back to top](#-redis)
+[↑ Back to top](#redis)
 
 ---
 
@@ -2151,7 +2151,7 @@ Storage Reference:
 - Run logic at CDN edge — auth, A/B testing, personalization, request transformation.
 - Reduces round-trips to origin.
 
-[↑ Back to top](#-cdn)
+[↑ Back to top](#cdn)
 
 ---
 
@@ -2177,7 +2177,7 @@ Storage Reference:
 
 **When to use over Kafka:** Smaller scale, task queues, complex routing, when message replay is not needed.
 
-[↑ Back to top](#-message-queue-rabitmq--sqs)
+[↑ Back to top](#messagequeues)
 
 ---
 
@@ -2203,7 +2203,7 @@ See the dedicated [Kafka Internals Guide](kafka_internals.md) for full detail.
 - Very high throughput (>100K events/sec).
 - Building event sourcing or CDC pipelines.
 
-[↑ Back to top](#-apache-kafka)
+[↑ Back to top](#kafka)
 
 ---
 
@@ -2226,7 +2226,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 
 **vs Kafka:** Pub/Sub is fully managed and simpler; Kafka has replay and much higher throughput. For event streaming at scale, use Kafka.
 
-[↑ Back to top](#-pubsub-google-pub--sub--sns)
+[↑ Back to top](#pubsub)
 
 ---
 
@@ -2250,7 +2250,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 - **Data consistency:** Use Saga pattern for cross-service transactions.
 - **Testing:** Contract testing (Pact) for service-to-service API contracts.
 
-[↑ Back to top](#-microservices)
+[↑ Back to top](#microservices)
 
 ---
 
@@ -2271,7 +2271,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 - Heavy stateful computation.
 - Low-latency SLAs where cold starts are unacceptable.
 
-[↑ Back to top](#-serverless)
+[↑ Back to top](#serverless)
 
 ---
 
@@ -2290,7 +2290,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 
 **vs API Gateway:** API Gateway handles external → internal traffic. Service Mesh handles internal → internal traffic.
 
-[↑ Back to top](#-service-mesh)
+[↑ Back to top](#servicemesh)
 
 ---
 
@@ -2313,7 +2313,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 - Route users to nearest healthy region (GeoDNS or Anycast IP).
 - Examples: AWS Global Accelerator, Google Cloud Global LB, Cloudflare.
 
-[↑ Back to top](#-load-balancer)
+[↑ Back to top](#loadbalancer)
 
 ---
 
@@ -2335,7 +2335,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 - Single endpoint; resolver stitches data from multiple services.
 - Trade-off: Complex query execution, caching is harder.
 
-[↑ Back to top](#-api-gateway)
+[↑ Back to top](#apigateway)
 
 ---
 
@@ -2353,7 +2353,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 - CAP applies only during a network partition — not in normal operation.
 - "Consistency" in CAP = linearizability, not ACID consistency.
 
-[↑ Back to top](#-cap-theorem)
+[↑ Back to top](#cap)
 
 ---
 
@@ -2375,7 +2375,7 @@ Each downstream service gets its own queue with its own retry/DLQ logic.
 - Examples: G-Counter (increment-only counter), OR-Set (add/remove set).
 - Used in: Redis CRDT, collaborative editing (Figma, Google Docs).
 
-[↑ Back to top](#-consistency-models)
+[↑ Back to top](#consistency)
 
 ---
 
@@ -2404,7 +2404,7 @@ On failure: compensating transactions run in reverse
 ```
 Ensures events are never lost even if the broker is temporarily down.
 
-[↑ Back to top](#-distributed-transactions)
+[↑ Back to top](#transactions)
 
 ---
 
@@ -2426,7 +2426,7 @@ Ensures events are never lost even if the broker is temporarily down.
 - Doubling shards (2x strategy) minimizes data movement — only half of each shard moves.
 - Live resharding: Shadow new shards, dual-write, verify, cut over.
 
-[↑ Back to top](#-sharding)
+[↑ Back to top](#sharding)
 
 ---
 
@@ -2448,7 +2448,7 @@ Ensures events are never lost even if the broker is temporarily down.
 - **Vector clocks:** Track causal history; detect true conflicts.
 - **CRDTs:** Merge concurrent updates automatically.
 
-[↑ Back to top](#-replication)
+[↑ Back to top](#replication)
 
 ---
 
@@ -2486,7 +2486,7 @@ X-RateLimit-Reset: 1716921600
 Retry-After: 60
 ```
 
-[↑ Back to top](#-rate-limiting)
+[↑ Back to top](#ratelimit)
 
 ---
 
@@ -2509,7 +2509,7 @@ Retry-After: 60
 | Glacier Instant | Quarterly access | Instant |
 | Glacier Deep Archive | Archival | 12 hours |
 
-[↑ Back to top](#-blob-storage-s3--gcs)
+[↑ Back to top](#blobstorage)
 
 ---
 
@@ -2532,7 +2532,7 @@ Browser → OS cache → Resolver (ISP) → Root NS → TLD NS (.com) → Author
 - Return multiple A records (round-robin DNS).
 - Problem: Clients cache DNS; can't detect backend health. Prefer L4/L7 LB for health-aware balancing.
 
-[↑ Back to top](#-dns)
+[↑ Back to top](#dns)
 
 ---
 
@@ -2557,7 +2557,7 @@ Browser → OS cache → Resolver (ISP) → Root NS → TLD NS (.com) → Author
 - **Serving layer:** Merges batch + speed views for queries.
 - Modern alternative: **Kappa Architecture** — everything is streaming (Kafka + Flink only).
 
-[↑ Back to top](#-data-warehouse)
+[↑ Back to top](#warehouse)
 
 ---
 
@@ -2614,7 +2614,7 @@ GET /posts?sort=createdAt&cursor=abc123   ← Cursor (best for scroll)
 
 **Best practice:** Versioning through URL for breaking changes; minor additions backward-compatible.
 
-[↑ Back to top](#-rest-api)
+[↑ Back to top](#rest)
 
 ---
 
@@ -2680,7 +2680,7 @@ Benchmark: REST ~10ms, gRPC ~1ms (10x faster for internal services).
 - Normal (REST): LB sees many short connections. Trivial to balance.
 - gRPC: Long-lived connections. LB must use connection-level hashing or Layer 7 (proxy).
 
-[↑ Back to top](#-grpc)
+[↑ Back to top](#grpc)
 
 ---
 
@@ -2770,7 +2770,7 @@ const resolvers = {
 };
 ```
 
-[↑ Back to top](#-graphql)
+[↑ Back to top](#graphql)
 
 ---
 
@@ -2806,7 +2806,7 @@ function reconnect() {
 ws.onclose = reconnect;
 ```
 
-[↑ Back to top](#-real-time-communication)
+[↑ Back to top](#realtime)
 
 ---
 
@@ -2855,7 +2855,7 @@ Prevention:
 - Use optimistic locking instead.
 ```
 
-[↑ Back to top](#-concurrency-control)
+[↑ Back to top](#concurrency)
 
 ---
 
@@ -2912,7 +2912,7 @@ class CircuitBreaker {
 }
 ```
 
-[↑ Back to top](#-design-patterns)
+[↑ Back to top](#circuitbreaker)
 
 ---
 
