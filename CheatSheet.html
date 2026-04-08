@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design Cheatsheet — Senior SWE Interviews</title>
+<style>
+  :root {
+    --purple-50: #EEEDFE; --purple-100: #CECBF6; --purple-200: #AFA9EC; --purple-400: #7F77DD; --purple-600: #534AB7; --purple-800: #3C3489; --purple-900: #26215C;
+    --teal-50: #E1F5EE; --teal-100: #9FE1CB; --teal-200: #5DCAA5; --teal-400: #1D9E75; --teal-600: #0F6E56; --teal-800: #085041; --teal-900: #04342C;
+    --coral-50: #FAECE7; --coral-100: #F5C4B3; --coral-200: #F0997B; --coral-400: #D85A30; --coral-600: #993C1D; --coral-800: #712B13; --coral-900: #4A1B0C;
+    --blue-50: #E6F1FB; --blue-100: #B5D4F4; --blue-200: #85B7EB; --blue-400: #378ADD; --blue-600: #185FA5; --blue-800: #0C447C; --blue-900: #042C53;
+    --green-50: #EAF3DE; --green-100: #C0DD97; --green-200: #97C459; --green-400: #639922; --green-600: #3B6D11; --green-800: #27500A;
+    --amber-50: #FAEEDA; --amber-100: #FAC775; --amber-200: #EF9F27; --amber-400: #BA7517; --amber-600: #854F0B; --amber-800: #633806;
+    --red-50: #FCEBEB; --red-100: #F7C1C1; --red-200: #F09595; --red-400: #E24B4A; --red-600: #A32D2D; --red-800: #791F1F;
+    --gray-50: #F1EFE8; --gray-100: #D3D1C7; --gray-200: #B4B2A9; --gray-400: #888780; --gray-600: #5F5E5A; --gray-800: #444441; --gray-900: #2C2C2A;
+    --pink-50: #FBEAF0; --pink-100: #F4C0D1; --pink-200: #ED93B1; --pink-400: #D4537E; --pink-600: #993556; --pink-800: #72243E;
+    --bg: #ffffff;
+    --bg2: #f8f7f4;
+    --bg3: #f1efe8;
+    --text: #1a1a1a;
+    --text2: #5f5e5a;
+    --text3: #888780;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --bg2: #222220; --bg3: #2a2a28;
+      --text: #f0ede6; --text2: #b4b2a9; --text3: #888780;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+      --purple-50: #26215C; --purple-100: #3C3489; --purple-200: #534AB7; --purple-400: #7F77DD; --purple-600: #AFA9EC; --purple-800: #CECBF6; --purple-900: #EEEDFE;
+      --teal-50: #04342C; --teal-100: #085041; --teal-200: #0F6E56; --teal-400: #1D9E75; --teal-600: #5DCAA5; --teal-800: #9FE1CB; --teal-900: #E1F5EE;
+      --coral-50: #4A1B0C; --coral-100: #712B13; --coral-200: #993C1D; --coral-400: #D85A30; --coral-600: #F0997B; --coral-800: #F5C4B3; --coral-900: #FAECE7;
+      --blue-50: #042C53; --blue-100: #0C447C; --blue-200: #185FA5; --blue-400: #378ADD; --blue-600: #85B7EB; --blue-800: #B5D4F4; --blue-900: #E6F1FB;
+      --green-50: #173404; --green-100: #27500A; --green-200: #3B6D11; --green-400: #639922; --green-600: #97C459; --green-800: #C0DD97;
+      --amber-50: #412402; --amber-100: #633806; --amber-200: #854F0B; --amber-400: #BA7517; --amber-600: #EF9F27; --amber-800: #FAC775;
+      --red-50: #501313; --red-100: #791F1F; --red-200: #A32D2D; --red-400: #E24B4A; --red-600: #F09595; --red-800: #F7C1C1;
+      --gray-50: #2C2C2A; --gray-100: #444441; --gray-200: #5F5E5A; --gray-400: #888780; --gray-600: #B4B2A9; --gray-800: #D3D1C7; --gray-900: #F1EFE8;
+      --pink-50: #4B1528; --pink-100: #72243E; --pink-200: #993556; --pink-400: #D4537E; --pink-600: #ED93B1; --pink-800: #F4C0D1;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px; line-height: 1.6;
+    color: var(--text); background: var(--bg);
+    max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem;
+  }
+
+  /* Typography */
+  h1 { font-size: 26px; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+  h2 { font-size: 20px; font-weight: 600; color: var(--text); margin: 2.5rem 0 1rem; padding-top: 0.5rem; }
+  h3 { font-size: 16px; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+  h4 { font-size: 14px; font-weight: 600; color: var(--text2); margin: 1rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  p { margin-bottom: 0.75rem; color: var(--text); }
+  a { color: var(--blue-400); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 13px; background: var(--bg3); padding: 1px 5px; border-radius: 4px; color: var(--coral-400); }
+  pre { background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem; overflow-x: auto; margin: 0.75rem 0 1rem; font-size: 12.5px; line-height: 1.55; }
+  pre code { background: none; padding: 0; color: var(--text2); }
+
+  /* Page header */
+  .page-header { padding: 1.5rem 0 2rem; border-bottom: 0.5px solid var(--border2); margin-bottom: 2rem; }
+  .subtitle { color: var(--text2); font-size: 14px; margin-top: 0.25rem; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; margin-left: 8px; background: var(--purple-50); color: var(--purple-800); border: 0.5px solid var(--purple-200); vertical-align: middle; }
+
+  /* Top nav */
+  .top-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 2.5rem; }
+  .top-nav a {
+    font-size: 12.5px; font-weight: 500; padding: 5px 12px;
+    border-radius: 20px; border: 0.5px solid var(--border2);
+    color: var(--text2); background: var(--bg2);
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+  }
+  .top-nav a:hover { color: var(--text); background: var(--bg3); border-color: var(--border2); text-decoration: none; }
+
+  /* Quick ref table */
+  .quick-ref { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 2.5rem; }
+  .quick-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 0.85rem 1rem; }
+  .quick-card-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .quick-card-links { display: flex; flex-wrap: wrap; gap: 4px; }
+  .quick-card-links a { font-size: 12px; color: var(--blue-400); }
+  .quick-card-links a:hover { text-decoration: underline; }
+  .sep { color: var(--text3); font-size: 11px; }
+
+  /* Section headers with color accents */
+  .section-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0.6rem 1rem; border-radius: var(--radius);
+    margin: 2.5rem 0 1.25rem;
+    font-size: 17px; font-weight: 600;
+    border-left: 3px solid;
+  }
+  .sh-storage { background: var(--purple-50); color: var(--purple-800); border-color: var(--purple-400); }
+  .sh-networking { background: var(--blue-50); color: var(--blue-800); border-color: var(--blue-400); }
+  .sh-security { background: var(--coral-50); color: var(--coral-800); border-color: var(--coral-400); }
+  .sh-caching { background: var(--amber-50); color: var(--amber-800); border-color: var(--amber-400); }
+  .sh-messaging { background: var(--teal-50); color: var(--teal-800); border-color: var(--teal-400); }
+  .sh-apis { background: var(--blue-50); color: var(--blue-800); border-color: var(--blue-600); }
+  .sh-compute { background: var(--green-50); color: var(--green-800); border-color: var(--green-400); }
+  .sh-infra { background: var(--gray-50); color: var(--gray-800); border-color: var(--gray-400); }
+  .sh-consistency { background: var(--pink-50); color: var(--pink-800); border-color: var(--pink-400); }
+  .sh-scalability { background: var(--teal-50); color: var(--teal-800); border-color: var(--teal-400); }
+  .sh-observability { background: var(--amber-50); color: var(--amber-800); border-color: var(--amber-400); }
+  .sh-patterns { background: var(--purple-50); color: var(--purple-800); border-color: var(--purple-400); }
+  .sh-deepdive { background: var(--gray-50); color: var(--gray-800); border-color: var(--gray-600); }
+
+  /* Topic card */
+  .topic-card {
+    background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
+  }
+  .topic-card h3 { margin-top: 0; font-size: 15px; }
+  .topic-tagline { font-size: 13px; color: var(--text2); margin-bottom: 1rem; font-style: italic; border-left: 2px solid var(--border2); padding-left: 10px; }
+
+  /* Pros/cons grid */
+  .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0.75rem 0; }
+  .pros, .cons { background: var(--bg2); border-radius: var(--radius); padding: 0.75rem; }
+  .pros { border-top: 2px solid var(--teal-400); }
+  .cons { border-top: 2px solid var(--coral-400); }
+  .pros-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--teal-600); margin-bottom: 0.5rem; }
+  .cons-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--coral-600); margin-bottom: 0.5rem; }
+  .pros ul, .cons ul { padding-left: 1rem; margin: 0; }
+  .pros li, .cons li { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+
+  /* Use-when list */
+  .use-when { background: var(--blue-50); border-radius: var(--radius); padding: 0.7rem 1rem; margin: 0.75rem 0; }
+  .use-when-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--blue-800); margin-bottom: 0.4rem; }
+  .use-when ul { padding-left: 1rem; margin: 0; }
+  .use-when li { font-size: 13px; color: var(--blue-800); margin-bottom: 3px; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; margin: 0.75rem 0; border-radius: var(--radius); border: 0.5px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--bg3); color: var(--text2); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 12px; text-align: left; border-bottom: 0.5px solid var(--border2); }
+  td { padding: 8px 12px; border-bottom: 0.5px solid var(--border); vertical-align: top; color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg2); }
+
+  /* Deep dive link */
+  .dive-link { display: inline-block; margin-top: 0.75rem; font-size: 12.5px; font-weight: 500; color: var(--purple-600); background: var(--purple-50); padding: 4px 12px; border-radius: 20px; border: 0.5px solid var(--purple-200); }
+  .dive-link:hover { text-decoration: none; background: var(--purple-100); }
+
+  /* Back link */
+  .back-link { display: inline-block; font-size: 12px; color: var(--text3); margin-bottom: 1rem; }
+  .back-link:hover { color: var(--text2); text-decoration: none; }
+
+  /* Key numbers box */
+  .numbers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin: 1rem 0; }
+  .numbers-box { background: var(--bg2); border-radius: var(--radius); padding: 0.85rem 1rem; }
+  .numbers-box h4 { margin-top: 0; color: var(--text2); }
+
+  /* Inline tag pills */
+  .tag { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; margin-right: 4px; }
+  .tag-purple { background: var(--purple-50); color: var(--purple-800); }
+  .tag-teal { background: var(--teal-50); color: var(--teal-800); }
+  .tag-coral { background: var(--coral-50); color: var(--coral-800); }
+  .tag-blue { background: var(--blue-50); color: var(--blue-800); }
+  .tag-amber { background: var(--amber-50); color: var(--amber-800); }
+  .tag-green { background: var(--green-50); color: var(--green-800); }
+
+  /* Divider */
+  hr { border: none; border-top: 0.5px solid var(--border); margin: 2rem 0; }
+
+  /* Deep dive section */
+  .deep-dive-card {
+    background: var(--bg); border: 0.5px solid var(--border2);
+    border-left: 3px solid var(--gray-400);
+    border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+  }
+  .deep-dive-card h3 { margin-top: 0; font-size: 15px; color: var(--text); }
+
+  /* TOC sidebar (on wide screens) */
+  @media (min-width: 1100px) {
+    body { max-width: 1100px; }
+  }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .pros-cons { grid-template-columns: 1fr; }
+    .quick-ref { grid-template-columns: 1fr; }
+    body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>System Design Cheatsheet <span class="badge">FAANG / Senior SWE</span></h1>
+  <p class="subtitle">Quick-scan cards up top &nbsp;&middot;&nbsp; Full deep dives below &nbsp;&middot;&nbsp; Click any link to jump</p>
+</div>
+
+<!-- TOP NAV -->
+<nav class="top-nav" aria-label="Section navigation">
+  <a href="#storage">Storage</a>
+  <a href="#networking">Networking</a>
+  <a href="#security">Security</a>
+  <a href="#caching">Caching</a>
+  <a href="#messaging">Messaging</a>
+  <a href="#apis">APIs</a>
+  <a href="#compute">Compute</a>
+  <a href="#infra">Infrastructure</a>
+  <a href="#consistency">Consistency</a>
+  <a href="#scalability">Scalability</a>
+  <a href="#observability">Observability</a>
+  <a href="#patterns">Patterns</a>
+  <a href="#numbers">Key Numbers</a>
+  <a href="#deep-dives">Deep Dives</a>
+</nav>
+
+<!-- QUICK REFERENCE -->
+<div class="quick-ref">
+  <div class="quick-card">
+    <div class="quick-card-title" style="color: var(--purple-800);">Storage</div>
+    <div class="quick-card-links">
+      <a href="#sql">SQL</a><span class="sep"> &middot; </span>
+      <a href="#nosql">NoSQL</a><span class="sep"> &middot; </span>
+      <a href="#newsql">NewSQL</a><span class="sep"> &middot; </span>
+      <a href="#timeseries">Time-Series</a><span class="sep"> &middot; </span>
+      <a href="#search">Search</a>
+    </div>
+  </div>
+  <div class="quick-card">
+    <div class="quick-card-title" style="color: var(--blue-800);">Networking &amp; Security</div>
+    <div class="quick-card-links">
+      <a href="#tcpudp">TCP/UDP</a><span class="sep"> &middot; </span>
+      <a href="#http">HTTP/HTTPS</a><span class="sep"> &middot; </span>
+      <a href="#dns">DNS</a><span class="sep"> &middot; </span>
+      <a href="#authentication">Auth</a><span class="sep"> &middot; </span>
+      <a href="#authorization">AuthZ</a>
+    </div>
+  </div>
+  <div class="quick-card">
+    <div class="quick-card-title" style="color: var(--amber-800);">Caching &amp; Messaging</div>
+    <div class="quick-card-links">
+      <a href="#cache-strategies">Strategies</a><span class="sep"> &middot; </span>
+      <a href="#redis">Redis</a><span class="sep"> &middot; </span>
+      <a href="#cdn">CDN</a><span class="sep"> &middot; </span>
+      <a href="#mq">Message Queue</a><span class="sep"> &middot; </span>
+      <a href="#kafka">Kafka</a><span class="sep"> &middot; </span>
+      <a href="#pubsub">Pub/Sub</a>
+    </div>
+  </div>
+  <div class="quick-card">
+    <div class="quick-card-title" style="color: var(--teal-800);">APIs &amp; Compute</div>
+    <div class="quick-card-links">
+      <a href="#rest">REST</a><span class="sep"> &middot; </span>
+      <a href="#grpc">gRPC</a><span class="sep"> &middot; </span>
+      <a href="#graphql">GraphQL</a><span class="sep"> &middot; </span>
+      <a href="#realtime">Real-time</a><span class="sep"> &middot; </span>
+      <a href="#microservices">Microservices</a><span class="sep"> &middot; </span>
+      <a href="#serverless">Serverless</a>
+    </div>
+  </div>
+  <div class="quick-card">
+    <div class="quick-card-title" style="color: var(--pink-800);">Consistency &amp; Scale</div>
+    <div class="quick-card-links">
+      <a href="#cap">CAP</a><span class="sep"> &middot; </span>
+      <a href="#consistency-models">Consistency Models</a><span class="sep"> &middot; </span>
+      <a href="#concurrency">Concurrency</a><span class="sep"> &middot; </span>
+      <a href="#transactions">Transactions</a><span class="sep"> &middot; </span>
+      <a href="#sharding">Sharding</a><span class="sep"> &middot; </span>
+      <a href="#replication">Replication</a><span class="sep"> &middot; </span>
+      <a href="#ratelimit">Rate Limiting</a>
+    </div>
+  </div>
+  <div class="quick-card">
+    <div class="quick-card-title" style="color: var(--coral-800);">Observability &amp; Patterns</div>
+    <div class="quick-card-links">
+      <a href="#logging">Logging</a><span class="sep"> &middot; </span>
+      <a href="#metrics">Metrics</a><span class="sep"> &middot; </span>
+      <a href="#tracing">Tracing</a><span class="sep"> &middot; </span>
+      <a href="#monitoring">Monitoring</a><span class="sep"> &middot; </span>
+      <a href="#bloomfilters">Bloom Filters</a><span class="sep"> &middot; </span>
+      <a href="#circuitbreaker">Circuit Breaker</a><span class="sep"> &middot; </span>
+      <a href="#blobstorage">Blob Storage</a><span class="sep"> &middot; </span>
+      <a href="#datawarehouse">Data Warehouse</a>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- STORAGE -->
+<!-- ======================================================== -->
+<h2 id="storage"><span class="section-header sh-storage">Storage Systems</span></h2>
+
+<!-- SQL -->
+<div class="topic-card" id="sql">
+  <h3>SQL — Relational Databases</h3>
+  <p class="topic-tagline">PostgreSQL, MySQL, Cloud Spanner &nbsp;&mdash;&nbsp; ACID guarantees, complex queries, vertical scaling</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>ACID transactions — all-or-nothing writes</li>
+        <li>Complex joins — no manual denormalization</li>
+        <li>Strong consistency — reads see latest write</li>
+        <li>Foreign key constraints enforce integrity</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Write bottleneck — ~3K writes/sec on Postgres</li>
+        <li>Resharding is painful</li>
+        <li>Rigid schema — ALTER on 100GB table = lock</li>
+        <li>Not built for massive unstructured data</li>
+      </ul>
+    </div>
+  </div>
+  <div class="use-when">
+    <div class="use-when-label">Reach for SQL when</div>
+    <ul>
+      <li>Financial systems — banking, payments, stocks</li>
+      <li>E-commerce with orders, inventory, transactions</li>
+      <li>Booking systems where double-booking is a disaster</li>
+      <li>Anything needing strong consistency + complex queries</li>
+    </ul>
+  </div>
+  <h4>The 4 ACID Promises</h4>
+  <p style="font-size:13px;color:var(--text2)"><strong>Atomicity</strong> — All or nothing. No half-baked writes. &nbsp; <strong>Consistency</strong> — Constraints always hold. &nbsp; <strong>Isolation</strong> — Concurrent transactions don't see each other's dirty work (MVCC). &nbsp; <strong>Durability</strong> — Committed data survives crashes via WAL replay.</p>
+  <pre><code>BEGIN;
+SELECT * FROM inventory WHERE product_id=5 FOR UPDATE;  -- lock the row
+UPDATE inventory SET quantity=9 WHERE product_id=5;
+INSERT INTO orders (user_id, product_id, price) VALUES (123, 5, 50);
+COMMIT;  -- either BOTH succeed or NEITHER does</code></pre>
+  <a href="#dd-sql" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<!-- NoSQL -->
+<div class="topic-card" id="nosql">
+  <h3>NoSQL</h3>
+  <p class="topic-tagline">DynamoDB, Cassandra, MongoDB, HBase &nbsp;&mdash;&nbsp; Horizontal scale, flexible schema, eventual consistency</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Horizontal scaling — add nodes = add capacity</li>
+        <li>No schema migration — add fields anytime</li>
+        <li>High write throughput — multi-master replication</li>
+        <li>Flexible — store anything, schema optional</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>No complex joins</li>
+        <li>Eventual consistency — stale reads possible</li>
+        <li>No multi-doc ACID (single doc is atomic)</li>
+        <li>Must model data for access patterns upfront</li>
+      </ul>
+    </div>
+  </div>
+  <h4>The NoSQL Zoo</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Type</th><th>Structure</th><th>Use Case</th><th>Examples</th></tr>
+      <tr><td>Key-Value</td><td>key → value</td><td>Session store, cache</td><td>DynamoDB, Redis</td></tr>
+      <tr><td>Document</td><td>JSON-like nesting</td><td>User profiles, catalogs</td><td>MongoDB, Firestore</td></tr>
+      <tr><td>Wide-Column</td><td>Sparse columns per row</td><td>Time-series, analytics</td><td>Cassandra, HBase</td></tr>
+      <tr><td>Graph</td><td>Nodes + edges</td><td>Social networks, fraud</td><td>Neo4j, Neptune</td></tr>
+    </table>
+  </div>
+  <a href="#dd-nosql" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<!-- NewSQL -->
+<div class="topic-card" id="newsql">
+  <h3>NewSQL</h3>
+  <p class="topic-tagline">Google Spanner, CockroachDB, TiDB &nbsp;&mdash;&nbsp; ACID at global scale. Best of both worlds — at a price.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>ACID globally — multi-region transactions</li>
+        <li>Familiar SQL interface, no retraining</li>
+        <li>Horizontal write scaling across regions</li>
+        <li>No eventual consistency surprises</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Consensus latency — 5–10ms single-region, 100ms+ multi-region</li>
+        <li>Cost premium — Spanner is ~10x more than Postgres</li>
+        <li>Overkill for single-region deployments</li>
+        <li>Requires distributed systems expertise</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>Hot take:</strong> Most apps don't need this. Sagas + Eventual Consistency is usually enough. Use CockroachDB (cheaper, Postgres-compatible) if you genuinely need NewSQL.</p>
+  <a href="#dd-newsql" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<!-- Time-Series -->
+<div class="topic-card" id="timeseries">
+  <h3>Time-Series Databases</h3>
+  <p class="topic-tagline">InfluxDB, Prometheus, TimescaleDB, Druid &nbsp;&mdash;&nbsp; Optimized for time-stamped data at massive ingest rates</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>High ingest — millions of events/sec</li>
+        <li>10:1 compression — columnar + similar values</li>
+        <li>Auto-retention via TTL — no cleanup scripts</li>
+        <li>Lightning-fast range queries — ordered by time</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Limited query flexibility</li>
+        <li>Not for mutable data — updates/deletes are slow</li>
+        <li>No general-purpose queries</li>
+        <li>Cross-metric joins not supported</li>
+      </ul>
+    </div>
+  </div>
+  <div class="use-when">
+    <div class="use-when-label">Reach for Time-Series when</div>
+    <ul>
+      <li>Metrics and monitoring (Prometheus scraping services)</li>
+      <li>IoT sensors — temperature, pressure, location</li>
+      <li>APM — response times, error rates</li>
+      <li>Stock prices, OHLCV candles</li>
+    </ul>
+  </div>
+  <a href="#dd-timeseries" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<!-- Search -->
+<div class="topic-card" id="search">
+  <h3>Search Engines</h3>
+  <p class="topic-tagline">Elasticsearch, OpenSearch, Solr &nbsp;&mdash;&nbsp; Full-text search at scale. Not a primary data store.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Full-text search with stemming and tokenization</li>
+        <li>Fuzzy / typo-tolerant matching</li>
+        <li>Faceting, filtering, ranked results (BM25)</li>
+        <li>Autocomplete, aggregations</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Not ACID — no transactions</li>
+        <li>Eventual indexing — new docs not immediately searchable</li>
+        <li>Not a source of truth — must reindex from primary DB</li>
+        <li>Mapping explosion with too many unique fields</li>
+      </ul>
+    </div>
+  </div>
+  <h4>3 pitfalls that bite everyone</h4>
+  <p style="font-size:13px;color:var(--text2)">1. <strong>Mapping explosion</strong> — use <code>dynamic: false</code>. &nbsp; 2. <strong>Deep pagination</strong> — use <code>search_after</code> not <code>from: 10000</code>. &nbsp; 3. <strong>Hot shards</strong> — fix your distribution key.</p>
+  <a href="#dd-search" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- NETWORKING -->
+<!-- ======================================================== -->
+<h2 id="networking"><span class="section-header sh-networking">Networking Fundamentals</span></h2>
+
+<div class="topic-card" id="tcpudp">
+  <h3>TCP vs UDP</h3>
+  <p class="topic-tagline">Transport layer — TCP (reliable, ordered) vs UDP (fast, fire-and-forget)</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Aspect</th><th>TCP</th><th>UDP</th></tr>
+      <tr><td>Connection</td><td>Handshake required</td><td>Connectionless — send immediately</td></tr>
+      <tr><td>Ordering</td><td>Guaranteed sequence</td><td>Packets may arrive scrambled</td></tr>
+      <tr><td>Delivery</td><td>Retransmits lost packets</td><td>Best-effort — lost = gone</td></tr>
+      <tr><td>Speed</td><td>Slower (ACK overhead)</td><td>Faster (minimal overhead)</td></tr>
+      <tr><td>Use when</td><td>Banking, email, HTTPS, file transfer</td><td>Live video, gaming, DNS, VoIP</td></tr>
+    </table>
+  </div>
+  <h4>TCP Handshake</h4>
+  <pre><code>Client                    Server
+  │── SYN (seq=100) ──────►│
+  │◄── SYN-ACK (seq=300) ──│
+  │── ACK (ack=301) ────────►│
+  └───────── Connected! ─────┘</code></pre>
+  <a href="#dd-tcpudp" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="http">
+  <h3>HTTP / HTTPS</h3>
+  <p class="topic-tagline">HTTP = plaintext on port 80. HTTPS = TLS-encrypted on port 443. Use HTTPS everywhere in production.</p>
+  <h4>HTTP Methods</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Method</th><th>Idempotent?</th><th>Cacheable?</th><th>Use for</th></tr>
+      <tr><td><code>GET</code></td><td>Yes</td><td>Yes</td><td>Read (safe)</td></tr>
+      <tr><td><code>POST</code></td><td>No</td><td>No</td><td>Create — calling twice creates two things</td></tr>
+      <tr><td><code>PUT</code></td><td>Yes</td><td>No</td><td>Replace — same result every time</td></tr>
+      <tr><td><code>PATCH</code></td><td>No</td><td>No</td><td>Partial update</td></tr>
+      <tr><td><code>DELETE</code></td><td>Yes</td><td>No</td><td>Remove</td></tr>
+    </table>
+  </div>
+  <h4>Status Codes to Know</h4>
+  <p style="font-size:13px;color:var(--text2)"><span class="tag tag-green">200</span> OK &nbsp; <span class="tag tag-green">201</span> Created &nbsp; <span class="tag tag-green">204</span> No Content &nbsp; <span class="tag tag-blue">301</span> Moved Permanently &nbsp; <span class="tag tag-blue">304</span> Not Modified &nbsp; <span class="tag tag-amber">400</span> Bad Request &nbsp; <span class="tag tag-amber">401</span> Unauthorized &nbsp; <span class="tag tag-amber">403</span> Forbidden &nbsp; <span class="tag tag-amber">404</span> Not Found &nbsp; <span class="tag tag-amber">409</span> Conflict &nbsp; <span class="tag tag-amber">429</span> Rate Limited &nbsp; <span class="tag tag-coral">500</span> Internal Error &nbsp; <span class="tag tag-coral">502</span> Bad Gateway &nbsp; <span class="tag tag-coral">503</span> Unavailable &nbsp; <span class="tag tag-coral">504</span> Timeout</p>
+  <a href="#dd-http" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="dns">
+  <h3>DNS</h3>
+  <p class="topic-tagline">The internet's phone book — maps names to IPs</p>
+  <h4>Resolution chain</h4>
+  <pre><code>Browser → OS cache → ISP Resolver → Root NS → TLD NS (.com) → Authoritative NS → IP</code></pre>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Record</th><th>Purpose</th></tr>
+      <tr><td><code>A</code></td><td>IPv4 address</td></tr>
+      <tr><td><code>AAAA</code></td><td>IPv6 address</td></tr>
+      <tr><td><code>CNAME</code></td><td>Alias to another name</td></tr>
+      <tr><td><code>MX</code></td><td>Mail servers</td></tr>
+      <tr><td><code>TXT</code></td><td>Verification, SPF, DKIM</td></tr>
+      <tr><td><code>SRV</code></td><td>Service discovery</td></tr>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>TTL trade-off:</strong> Low TTL (60s) = fast failover, high query load. High TTL (86400s) = less load, slow propagation.</p>
+  <a href="#dd-dns" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- SECURITY -->
+<!-- ======================================================== -->
+<h2 id="security"><span class="section-header sh-security">Security</span></h2>
+
+<div class="topic-card" id="authentication">
+  <h3>Authentication — "Who are you?"</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Method</th><th>How</th><th>Best For</th><th>Security</th></tr>
+      <tr><td>Basic Auth</td><td>Base64(user:pass)</td><td>Internal APIs</td><td>Low — HTTPS mandatory</td></tr>
+      <tr><td>API Key</td><td>X-API-Key header</td><td>Service-to-service</td><td>Medium — needs rotation</td></tr>
+      <tr><td>Session Cookie</td><td>Server creates session</td><td>Web apps</td><td>Medium — add CSRF protection</td></tr>
+      <tr><td>JWT</td><td>Bearer token</td><td>Stateless APIs, microservices</td><td>High — use RS256</td></tr>
+      <tr><td>OAuth 2.0</td><td>"Sign in with Google"</td><td>Third-party login</td><td>High</td></tr>
+      <tr><td>SAML</td><td>XML-based enterprise</td><td>Corporate SSO</td><td>High</td></tr>
+    </table>
+  </div>
+  <h4>JWT Structure</h4>
+  <pre><code>Header.Payload.Signature
+Header:  {"alg": "RS256", "typ": "JWT"}
+Payload: {"sub": "user123", "exp": 1704086400}
+Sig:     RSA_Sign(Header.Payload, private_key)
+-- Payload is BASE64 encoded, NOT encrypted. Never put sensitive data here.</code></pre>
+  <h4>Security Golden Rules</h4>
+  <p style="font-size:13px;color:var(--text2)">Store JWT in <strong>httpOnly cookie</strong> (not localStorage — XSS steals it instantly). Always HTTPS. Short-lived access tokens (15 min) + long-lived refresh tokens (7 days). Server-side blacklist on logout.</p>
+  <a href="#dd-authentication" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="authorization">
+  <h3>Authorization — "What can you do?"</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Model</th><th>How</th><th>Complexity</th><th>Use Case</th></tr>
+      <tr><td>RBAC</td><td>Users → Roles → Permissions</td><td>Low</td><td>Most systems</td></tr>
+      <tr><td>ABAC</td><td>Rules based on attributes</td><td>High</td><td>Healthcare, finance</td></tr>
+      <tr><td>ACL</td><td>Per-resource permission list</td><td>Medium</td><td>File systems, S3</td></tr>
+      <tr><td>Policy-Based</td><td>JSON policies (AWS IAM)</td><td>High</td><td>Cloud platforms</td></tr>
+    </table>
+  </div>
+  <h4>5 Rules That Save You from Auth Bugs</h4>
+  <p style="font-size:13px;color:var(--text2)">1. <strong>Deny by default</strong> — permissions explicitly granted, never implicit. &nbsp; 2. <strong>Least privilege.</strong> &nbsp; 3. <strong>Separation of duties.</strong> &nbsp; 4. <strong>Audit everything</strong> — log who accessed what. &nbsp; 5. <strong>Test blocked access too</strong> — not just that admins CAN, but that users CANNOT.</p>
+  <a href="#dd-authorization" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- CACHING -->
+<!-- ======================================================== -->
+<h2 id="caching"><span class="section-header sh-caching">Caching</span></h2>
+
+<div class="topic-card" id="cache-strategies">
+  <h3>Cache Strategies</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Strategy</th><th>Pattern</th><th>Use When</th></tr>
+      <tr><td>Cache-Aside</td><td>App checks cache → miss → load DB → populate cache</td><td>Read-heavy, app controls logic</td></tr>
+      <tr><td>Write-Through</td><td>Write to cache → cache writes to DB synchronously</td><td>Cache + DB always in sync</td></tr>
+      <tr><td>Write-Behind</td><td>Write to cache → DB updated async</td><td>High write throughput</td></tr>
+      <tr><td>Read-Through</td><td>Cache fetches from DB transparently on miss</td><td>Cache acts as the data layer</td></tr>
+    </table>
+  </div>
+  <h4>Thundering Herd Problem</h4>
+  <pre><code>Cache entry expires at 12:00:00
+1000 requests hit at 12:00:01 → ALL miss → ALL hit DB → DB falls over
+
+Fixes:
+  1. Probabilistic early expiration
+  2. Mutex on cache miss
+  3. Background refresh before TTL expires</code></pre>
+  <a href="#dd-caching" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="redis">
+  <h3>Redis</h3>
+  <p class="topic-tagline">In-memory Swiss Army knife — cache, message broker, data structure server. 100K–1M ops/sec.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Sub-millisecond latency — 100x faster than a DB read</li>
+        <li>Rich data structures — Strings, Lists, Sets, ZSets, Hashes, Streams</li>
+        <li>Atomic operations — INCR, ZADD are thread-safe</li>
+        <li>Pub/Sub + Streams built in</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>RAM-bound — memory is expensive</li>
+        <li>Not a primary DB</li>
+        <li>Single-threaded core</li>
+        <li>Data loss risk without AOF or RDB configured</li>
+      </ul>
+    </div>
+  </div>
+  <h4>Data Structures → Real Problems</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Structure</th><th>Command</th><th>Use Case</th></tr>
+      <tr><td>String</td><td><code>SET session:abc token EX 3600</code></td><td>Session tokens, counters</td></tr>
+      <tr><td>List</td><td><code>LPUSH queue:emails msg</code></td><td>Job queues, activity feeds</td></tr>
+      <tr><td>Set</td><td><code>SADD followers:user1 user2</code></td><td>Unique visitors, followers</td></tr>
+      <tr><td>Sorted Set</td><td><code>ZADD leaderboard 1500 player1</code></td><td>Leaderboards, priority queues</td></tr>
+      <tr><td>Hash</td><td><code>HSET user:1 name Alice age 30</code></td><td>User profiles, config maps</td></tr>
+      <tr><td>HyperLogLog</td><td><code>PFADD uniques ip1 ip2</code></td><td>Approx unique count (~12KB)</td></tr>
+      <tr><td>Bitmap</td><td><code>SETBIT dau:2024-01-15 12345 1</code></td><td>Daily active users, feature flags</td></tr>
+    </table>
+  </div>
+  <a href="#dd-redis" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="cdn">
+  <h3>CDN</h3>
+  <p class="topic-tagline">Cloudflare, CloudFront, Fastly, Akamai &nbsp;&mdash;&nbsp; Bring content to users, not users to content</p>
+  <h4>How it works</h4>
+  <pre><code>User in Mumbai → DNS → Nearest CDN PoP (Mumbai)
+→ Cache hit? Return immediately (&lt;10ms)
+→ Cache miss? Fetch from origin (Oregon) → cache → return
+→ Next user in Mumbai: instant cache hit</code></pre>
+  <p style="font-size:13px;color:var(--text2)"><strong>Use for:</strong> Images, video, JS/CSS bundles, static sites, HLS streaming segments. &nbsp; <strong>Not for:</strong> Dynamic, personalized content (use edge compute for that).</p>
+  <a href="#dd-cdn" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- MESSAGING -->
+<!-- ======================================================== -->
+<h2 id="messaging"><span class="section-header sh-messaging">Messaging</span></h2>
+
+<div class="topic-card" id="mq">
+  <h3>Message Queue</h3>
+  <p class="topic-tagline">RabbitMQ, AWS SQS, Azure Service Bus &nbsp;&mdash;&nbsp; Decouple producers from consumers</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Decoupling — producer doesn't care about consumers</li>
+        <li>Work distribution across workers</li>
+        <li>Retry + Dead Letter Queue built in</li>
+        <li>At-least-once delivery guaranteed</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>No replay — messages deleted after consumption</li>
+        <li>Not designed for millions/sec streaming</li>
+        <li>No native fan-out (use Pub/Sub)</li>
+        <li>No long-term retention</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>Use for:</strong> Order processing, email/SMS sending, background jobs, image resize pipelines, notification dispatch.</p>
+  <a href="#dd-mq" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="kafka">
+  <h3>Apache Kafka</h3>
+  <p class="topic-tagline">The distributed commit log. LinkedIn: 4+ trillion events/day.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Extreme throughput — 1M+ events/sec per cluster</li>
+        <li>Durable + replayable — rewind to any point in time</li>
+        <li>Fan-out — multiple consumer groups read independently</li>
+        <li>Event sourcing — rebuild any state from the log</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Operational overhead — needs cluster management</li>
+        <li>Overkill for low volume</li>
+        <li>Ordering per partition only — not across partitions</li>
+        <li>At-least-once by default — idempotent consumers needed</li>
+      </ul>
+    </div>
+  </div>
+  <h4>Core Mental Model</h4>
+  <pre><code>Topic "orders"
+├─ Partition 0 → Consumer Group A: Consumer 1
+├─ Partition 1 → Consumer Group A: Consumer 2
+└─ Partition 2 → Consumer Group A: Consumer 3
+                ↕
+Consumer Group B reads ALL partitions independently (different offset)</code></pre>
+  <h4>When to use Kafka vs alternatives</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Use Case</th><th>Kafka</th><th>RabbitMQ/SQS</th><th>Pub/Sub</th></tr>
+      <tr><td>High-volume (&gt;100K/sec)</td><td>Yes</td><td>No</td><td>~</td></tr>
+      <tr><td>Replay / rewind</td><td>Yes</td><td>No</td><td>~</td></tr>
+      <tr><td>Fan-out many consumers</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+      <tr><td>Simple work queue</td><td>~</td><td>Yes</td><td>No</td></tr>
+      <tr><td>Operational simplicity</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+    </table>
+  </div>
+  <a href="#dd-kafka" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="pubsub">
+  <h3>Pub/Sub</h3>
+  <p class="topic-tagline">Google Cloud Pub/Sub, AWS SNS &nbsp;&mdash;&nbsp; Fan-out events to many subscribers simultaneously</p>
+  <h4>SNS + SQS Fan-out Pattern</h4>
+  <pre><code>SNS Topic "order-created"
+  ├── SQS Queue → Email Service (own retry/DLQ)
+  ├── SQS Queue → Analytics Service
+  └── SQS Queue → Audit Service</code></pre>
+  <p style="font-size:13px;color:var(--text2)"><strong>Use for:</strong> Mobile push notification fan-out, triggering downstream services, cross-region event propagation, webhook dispatch.</p>
+  <a href="#dd-pubsub" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- APIS -->
+<!-- ======================================================== -->
+<h2 id="apis"><span class="section-header sh-apis">APIs &amp; Communication</span></h2>
+
+<div class="topic-card" id="rest">
+  <h3>REST</h3>
+  <p class="topic-tagline">Stateless, HTTP-native, universally understood. The default choice.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Universal — browser, mobile, IoT all speak it</li>
+        <li>HTTP caching built in (CDN, browser cache)</li>
+        <li>Simple semantics — GET/POST/PUT/DELETE</li>
+        <li>Stateless — easy to load-balance</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Over-fetching — all fields even if you need 3</li>
+        <li>Under-fetching — multiple requests for related data</li>
+        <li>Versioning tax — /v1/, /v2/ churn</li>
+        <li>N+1 queries require client-side aggregation</li>
+      </ul>
+    </div>
+  </div>
+  <h4>Pagination Patterns</h4>
+  <pre><code>?page=2&amp;limit=10            → simple, but slow at high offsets
+?offset=20&amp;limit=10         → same problem
+?cursor=abc123&amp;limit=10     → cursor-based (best for infinite scroll)</code></pre>
+  <a href="#dd-rest" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="grpc">
+  <h3>gRPC</h3>
+  <p class="topic-tagline">High-performance RPC over HTTP/2 with binary serialization. ~10x faster than REST.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Protobuf — 3–5x smaller than JSON</li>
+        <li>Strong typing — .proto file is the contract</li>
+        <li>Bidirectional streaming</li>
+        <li>HTTP/2 multiplexing over one connection</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Browser hostile — can't call from browser directly</li>
+        <li>Harder to debug — no curl</li>
+        <li>Smaller ecosystem than REST</li>
+        <li>Overkill for simple CRUD</li>
+      </ul>
+    </div>
+  </div>
+  <h4>4 Call Types</h4>
+  <pre><code>1. Unary:            1 request → 1 response        (like REST)
+2. Server streaming: 1 request → N responses       (stock feed)
+3. Client streaming: N requests → 1 response       (batch upload)
+4. Bidirectional:    N requests ↔ N responses      (chat, multiplayer)</code></pre>
+  <p style="font-size:13px;color:var(--text2)"><strong>Best for:</strong> Internal microservice-to-microservice calls, real-time bidirectional streams, performance-critical paths (10K+ RPS).</p>
+  <a href="#dd-grpc" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="graphql">
+  <h3>GraphQL</h3>
+  <p class="topic-tagline">Client asks for exactly what it needs. No more, no less.</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>No over/under-fetching — client shapes the response</li>
+        <li>Single endpoint — no versioning hell</li>
+        <li>Strongly typed schema — auto-docs, playground</li>
+        <li>Great developer experience via introspection</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Caching is hard — every query is unique</li>
+        <li>N+1 queries — naive resolvers destroy the DB</li>
+        <li>Query complexity attacks can DoS your backend</li>
+        <li>Per-field auth is complex to implement</li>
+      </ul>
+    </div>
+  </div>
+  <h4>N+1 Problem — and the Fix</h4>
+  <pre><code>// BAD: 1 query + 100 queries = 101 DB hits
+User: { posts: (user) => db.query('SELECT * FROM posts WHERE user_id = ?', user.id) }
+
+// GOOD: DataLoader batches → 2 total DB hits
+const postLoader = new DataLoader(userIds =>
+  db.query('SELECT * FROM posts WHERE user_id IN (?)', userIds)
+);</code></pre>
+  <a href="#dd-graphql" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="realtime">
+  <h3>Real-time Communication</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Technology</th><th>Direction</th><th>Latency</th><th>Complexity</th><th>Use When</th></tr>
+      <tr><td>Short Polling</td><td>Client pulls</td><td>~5–30s</td><td>Very low</td><td>Simple dashboards</td></tr>
+      <tr><td>Long Polling</td><td>Client pulls (held)</td><td>~1–2s</td><td>Low</td><td>Legacy browser support</td></tr>
+      <tr><td>WebSocket</td><td>Bidirectional</td><td>&lt;100ms</td><td>Medium</td><td>Chat, live feeds, collaboration</td></tr>
+      <tr><td>SSE</td><td>Server → Client only</td><td>&lt;100ms</td><td>Low</td><td>Notifications, progress bars</td></tr>
+      <tr><td>WebRTC</td><td>Peer-to-peer</td><td>&lt;50ms</td><td>Very high</td><td>Video/audio calls</td></tr>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>WebRTC secret:</strong> The server only handles the initial handshake (~10KB). After that, media is peer-to-peer. Zoom's bandwidth bill isn't what you think.</p>
+  <a href="#dd-realtime" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- COMPUTE -->
+<!-- ======================================================== -->
+<h2 id="compute"><span class="section-header sh-compute">Compute</span></h2>
+
+<div class="topic-card" id="microservices">
+  <h3>Microservices</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Independent deploy and scale per service</li>
+        <li>Team autonomy — own service, own DB, own pipeline</li>
+        <li>Technology diversity — best tool per job</li>
+        <li>Fault isolation — one service down ≠ everything down</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Distributed complexity — debugging across services</li>
+        <li>Network latency — every call is a network hop</li>
+        <li>Cross-service transactions are hard</li>
+        <li>Need correlation IDs and distributed tracing</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>Golden rule:</strong> Each service owns its own DB. No shared DB between services. Ever.</p>
+  <a href="#dd-microservices" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="serverless">
+  <h3>Serverless</h3>
+  <p class="topic-tagline">AWS Lambda, Google Cloud Functions, Cloudflare Workers</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Strengths</div>
+      <ul>
+        <li>Zero infra management — deploy code, not servers</li>
+        <li>Auto-scale to zero — pay only for what you use</li>
+        <li>Event-driven — natural fit for async workloads</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Weaknesses</div>
+      <ul>
+        <li>Cold start latency — 100ms–5s on first invocation</li>
+        <li>Not for long-running tasks — Lambda max 15 min</li>
+        <li>No GPU / high-memory workloads</li>
+      </ul>
+    </div>
+  </div>
+  <a href="#dd-serverless" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="servicemesh">
+  <h3>Service Mesh</h3>
+  <p class="topic-tagline">Istio, Linkerd, Consul Connect &nbsp;&mdash;&nbsp; Infrastructure layer for microservice networking</p>
+  <p style="font-size:13px;color:var(--text2)">Envoy sidecar proxy runs alongside every service pod, intercepts all traffic. The service has no idea — it just sees plain HTTP. mTLS, retries, circuit breaking, and tracing are all handled transparently.</p>
+  <p style="font-size:13px;color:var(--text2)"><strong>vs API Gateway:</strong> API Gateway handles North-South traffic (external → cluster). Service Mesh handles East-West traffic (service A → service B inside cluster). They complement each other.</p>
+  <a href="#dd-servicemesh" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- INFRASTRUCTURE -->
+<!-- ======================================================== -->
+<h2 id="infra"><span class="section-header sh-infra">Infrastructure</span></h2>
+
+<div class="topic-card" id="loadbalancer">
+  <h3>Load Balancer</h3>
+  <p class="topic-tagline">AWS ALB/NLB, NGINX, HAProxy &nbsp;&mdash;&nbsp; L4 (TCP) or L7 (HTTP)</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Algorithm</th><th>How</th><th>Best For</th></tr>
+      <tr><td>Round Robin</td><td>Rotate evenly across servers</td><td>Homogeneous servers, short-lived requests</td></tr>
+      <tr><td>Least Connections</td><td>Route to server with fewest active connections</td><td>Long-lived connections (WebSocket, gRPC)</td></tr>
+      <tr><td>IP Hash</td><td>hash(client_IP) % N → same server always</td><td>Sticky sessions without cookies</td></tr>
+      <tr><td>Weighted</td><td>server1 weight=3, server2 weight=1</td><td>Canary deployments, heterogeneous hardware</td></tr>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>L4:</strong> Routes by IP + port. Fast. No content inspection. For databases, game servers. &nbsp; <strong>L7:</strong> Routes by URL, headers, cookies. Smarter. For web apps.</p>
+  <p style="font-size:13px;color:var(--text2)"><strong>Sticky sessions considered harmful:</strong> Use an external session store (Redis) instead. Stickiness creates hot spots and breaks when instances die.</p>
+  <a href="#dd-loadbalancer" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="apigateway">
+  <h3>API Gateway</h3>
+  <p class="topic-tagline">AWS API Gateway, Kong, Apigee, NGINX &nbsp;&mdash;&nbsp; Single entry point for all external traffic</p>
+  <p style="font-size:13px;color:var(--text2)">Handles auth, rate limiting, SSL termination, and routing in one place. Adds latency (~1 extra hop) and must scale with traffic. <strong>Business logic does not belong here.</strong></p>
+  <h4>BFF Pattern</h4>
+  <pre><code>Mobile API Gateway  → lighter, fewer fields
+Web API Gateway     → richer, more data
+Partner API Gateway → different auth, rate limits</code></pre>
+  <a href="#dd-apigateway" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="proxy">
+  <h3>Forward vs Reverse Proxy</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Aspect</th><th>Forward Proxy</th><th>Reverse Proxy</th></tr>
+      <tr><td>Who sets it up</td><td>Client-side</td><td>Server-side</td></tr>
+      <tr><td>IP hidden</td><td>Client IP hidden from server</td><td>Backend server IPs hidden from client</td></tr>
+      <tr><td>Primary use</td><td>Privacy, content filtering</td><td>Load balancing, SSL, DDoS protection</td></tr>
+      <tr><td>Examples</td><td>Corporate proxy, VPN</td><td>NGINX, HAProxy, AWS ALB</td></tr>
+    </table>
+  </div>
+  <a href="#dd-proxy" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- CONSISTENCY -->
+<!-- ======================================================== -->
+<h2 id="consistency"><span class="section-header sh-consistency">Consistency &amp; Distributed Systems</span></h2>
+
+<div class="topic-card" id="cap">
+  <h3>CAP Theorem</h3>
+  <p class="topic-tagline">Pick 2 of 3. Since partition tolerance (P) is non-negotiable, you're really choosing CP vs AP.</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Type</th><th>During a Partition...</th><th>Examples</th></tr>
+      <tr><td>CP</td><td>Returns error rather than stale data</td><td>HBase, Zookeeper, Spanner</td></tr>
+      <tr><td>AP</td><td>Returns possibly stale data, stays available</td><td>Cassandra, DynamoDB, CouchDB</td></tr>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>Real insight:</strong> CAP only applies during a network partition. The question is: what do you sacrifice when the network splits? PACELC is more useful in practice: during a Partition → A or C. Else (normal) → Latency or Consistency.</p>
+  <a href="#dd-cap" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="consistency-models">
+  <h3>Consistency Models</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Model</th><th>Guarantee</th><th>Use When</th></tr>
+      <tr><td>Strong / Linearizable</td><td>All reads see latest write, real-time ordering</td><td>Distributed locks, counters, payments</td></tr>
+      <tr><td>Eventual</td><td>Replicas converge... eventually</td><td>Social likes, DNS, shopping carts</td></tr>
+      <tr><td>Read-your-writes</td><td>You always see your own writes</td><td>User profile updates</td></tr>
+      <tr><td>Causal</td><td>Causally related writes are ordered</td><td>Comments/replies, collaborative editing</td></tr>
+    </table>
+  </div>
+  <a href="#dd-consistency" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="concurrency">
+  <h3>Concurrency Control</h3>
+  <h4>Pessimistic Locking — assume conflict, lock first</h4>
+  <pre><code>BEGIN;
+SELECT * FROM inventory WHERE product_id = 5 FOR UPDATE; -- lock
+UPDATE inventory SET quantity = quantity - 1 WHERE product_id = 5;
+COMMIT; -- lock released
+-- Safe. Slow under contention. Deadlock risk.</code></pre>
+  <h4>Optimistic Locking — assume no conflict, verify on write</h4>
+  <pre><code>-- Read with version
+SELECT quantity, version FROM inventory WHERE product_id = 5; -- version=5
+-- Update only if version unchanged
+UPDATE inventory SET quantity = 9, version = 6
+WHERE product_id = 5 AND version = 5;
+-- 0 rows updated = conflict → retry
+-- Fast, no blocking. Bad under high contention.</code></pre>
+  <p style="font-size:13px;color:var(--text2)"><strong>Simple rule:</strong> High contention (concert tickets) → Pessimistic. Low contention (user profile edits) → Optimistic.</p>
+  <a href="#dd-concurrency" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="transactions">
+  <h3>Distributed Transactions</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Pattern</th><th>Mechanism</th><th>Trade-off</th></tr>
+      <tr><td>2PC</td><td>Coordinator: prepare then commit</td><td>Blocking if coordinator fails</td></tr>
+      <tr><td>Saga</td><td>Chain of local txns + compensating actions</td><td>Eventual consistency, complex rollback</td></tr>
+      <tr><td>Outbox Pattern</td><td>Write event to DB outbox table + CDC to publish</td><td>Reliable event publishing without 2PC</td></tr>
+      <tr><td>TCC</td><td>Reserve → Confirm or Cancel</td><td>High overhead, used in fintech</td></tr>
+    </table>
+  </div>
+  <h4>Saga Pattern (most practical)</h4>
+  <pre><code>Order created → Charge card → Reserve inventory
+If inventory fails:
+  Refund card → Cancel order  (compensating transactions run in reverse)</code></pre>
+  <a href="#dd-transactions" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="fault-tolerance">
+  <h3>Fault Tolerance &amp; Reliability</h3>
+  <h4>Availability Math — memorize this</h4>
+  <pre><code>99.0%   → 87.6 hours downtime/year   (hobby project)
+99.9%   → 8.76 hours downtime/year   (enterprise standard)
+99.99%  → 52 minutes downtime/year   (high-availability)
+99.999% → 5 minutes downtime/year    (Google/AWS-grade)</code></pre>
+  <h4>The 5 Resilience Patterns</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Pattern</th><th>What it does</th></tr>
+      <tr><td>Timeouts</td><td>Don't wait forever — fail fast after N seconds</td></tr>
+      <tr><td>Retries + Backoff</td><td>Exponential delay between retries — let transient faults heal</td></tr>
+      <tr><td>Circuit Breaker</td><td>Stop hammering a broken service — fail fast while it recovers</td></tr>
+      <tr><td>Bulkheads</td><td>Isolate thread pools — one bad service can't starve others</td></tr>
+      <tr><td>Health Checks</td><td>Liveness (is it alive?) + Readiness (can it serve traffic?)</td></tr>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>Cardinal rule:</strong> No SPOFs. Always run at least 2 of everything (2 DBs, 2 LBs, 2 regions).</p>
+  <a href="#dd-fault-tolerance" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- SCALABILITY -->
+<!-- ======================================================== -->
+<h2 id="scalability"><span class="section-header sh-scalability">Scalability Patterns</span></h2>
+
+<div class="topic-card" id="cdc">
+  <h3>Change Data Capture (CDC)</h3>
+  <p class="topic-tagline">Stream every DB change to downstream systems in real-time</p>
+  <pre><code>DB Transaction Log
+  ↓ (CDC tails it continuously)
+Kafka Topic
+  ├── Elasticsearch  → search index stays fresh
+  ├── BigQuery       → analytics warehouse synced
+  ├── Redis          → cache invalidated
+  └── Replica DB     → read replica stays in sync</code></pre>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Tool</th><th>Best For</th></tr>
+      <tr><td>Debezium</td><td>Open-source, on-prem, any major DB → Kafka</td></tr>
+      <tr><td>AWS DMS</td><td>AWS-native, serverless, managed</td></tr>
+      <tr><td>Fivetran</td><td>Zero-code, 200+ sources, commercial</td></tr>
+    </table>
+  </div>
+  <a href="#dd-cdc" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="sharding">
+  <h3>Sharding</h3>
+  <p class="topic-tagline">Horizontal partitioning — split data across multiple DB nodes</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Strategy</th><th>How</th><th>Watch Out</th></tr>
+      <tr><td>Range sharding</td><td>Shard by value range (A–M, N–Z)</td><td>Sequential writes create hot spots</td></tr>
+      <tr><td>Hash sharding</td><td><code>hash(key) % N</code></td><td>Resharding requires remapping all keys</td></tr>
+      <tr><td>Directory sharding</td><td>Lookup table maps key → shard</td><td>Lookup table = single point of failure</td></tr>
+      <tr><td>Geo sharding</td><td>Shard by region</td><td>Cross-region queries are expensive</td></tr>
+    </table>
+  </div>
+  <h4>Consistent Hashing</h4>
+  <pre><code>Hash ring 0 to 2³²
+Nodes placed at hash(node_id) positions
+Key assigned to first node clockwise from hash(key)
+Add/remove a node → only adjacent keys move (minimal resharding)
+Virtual nodes → each physical node = multiple ring positions (even distribution)</code></pre>
+  <a href="#dd-sharding" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="replication">
+  <h3>Replication</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Type</th><th>Description</th><th>Use Case</th></tr>
+      <tr><td>Leader-Follower</td><td>One writer, many readers</td><td>Read-heavy — MySQL, Postgres</td></tr>
+      <tr><td>Multi-Leader</td><td>Multiple writers, need conflict resolution</td><td>Multi-region writes, Google Docs</td></tr>
+      <tr><td>Leaderless</td><td>Any node accepts writes (quorum)</td><td>High availability — Cassandra, Dynamo</td></tr>
+    </table>
+  </div>
+  <h4>Quorum Math</h4>
+  <pre><code>N = total replicas, W = write quorum, R = read quorum
+W + R > N → Strong consistency guaranteed
+N=3, W=2, R=2 → Strong (classic config)
+N=3, W=1, R=1 → Fast + high availability, eventual consistency</code></pre>
+  <a href="#dd-replication" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="ratelimit">
+  <h3>Rate Limiting</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Algorithm</th><th>How</th><th>Best For</th></tr>
+      <tr><td>Token Bucket</td><td>Tokens added at fixed rate, each request consumes one</td><td>Bursty traffic — most common</td></tr>
+      <tr><td>Leaky Bucket</td><td>Requests processed at fixed rate, excess queued/dropped</td><td>Smooth output rate</td></tr>
+      <tr><td>Fixed Window</td><td>Count requests per fixed time window</td><td>Simple — edge-burst vulnerable</td></tr>
+      <tr><td>Sliding Window Counter</td><td>Weighted blend of current + previous window</td><td>Accurate + memory efficient</td></tr>
+    </table>
+  </div>
+  <h4>Standard Response Headers</h4>
+  <pre><code>X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1716921600
+Retry-After: 60</code></pre>
+  <a href="#dd-ratelimit" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- OBSERVABILITY -->
+<!-- ======================================================== -->
+<h2 id="observability"><span class="section-header sh-observability">Observability &amp; Monitoring</span></h2>
+
+<div class="topic-card" id="logging">
+  <h3>Logging</h3>
+  <h4>Log Levels</h4>
+  <p style="font-size:13px;color:var(--text2)"><span class="tag tag-blue">DEBUG</span> Variable dumps, dev only &nbsp; <span class="tag tag-teal">INFO</span> Normal operational events &nbsp; <span class="tag tag-amber">WARN</span> Something's off but not broken &nbsp; <span class="tag tag-coral">ERROR</span> Something failed &nbsp; <span class="tag tag-coral">FATAL</span> System is dying</p>
+  <h4>Always log structured JSON</h4>
+  <pre><code>{
+  "timestamp": "2026-04-08T10:15:30Z",
+  "level": "ERROR",
+  "service": "payment",
+  "trace_id": "abc-123-def",
+  "user_id": "user789",
+  "error": "payment_gateway_timeout",
+  "duration_ms": 5000
+}</code></pre>
+  <p style="font-size:13px;color:var(--text2)"><strong>Cost trick:</strong> Log 100% of WARN/ERROR/FATAL. Sample 1% of INFO/DEBUG. &nbsp; <strong>Never log:</strong> passwords, credit cards, API keys, SSNs.</p>
+  <a href="#dd-logging" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="metrics">
+  <h3>Metrics — Google SRE's 4 Golden Signals</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Signal</th><th>What</th><th>Example</th><th>Alert Threshold</th></tr>
+      <tr><td>Latency</td><td>Time to serve a request</td><td>p99 = 200ms</td><td>p99 &gt; 500ms</td></tr>
+      <tr><td>Traffic</td><td>Requests per second</td><td>10K RPS</td><td>&gt; 15K RPS</td></tr>
+      <tr><td>Errors</td><td>% requests that failed</td><td>0.1% error rate</td><td>&gt; 1%</td></tr>
+      <tr><td>Saturation</td><td>How "full" the system is</td><td>CPU 75%</td><td>CPU &gt; 90%</td></tr>
+    </table>
+  </div>
+  <h4>Cardinality Trap</h4>
+  <pre><code>BAD:  http_requests_total{user_id="12345"}  → 1B users = 1B time series = cluster dies
+GOOD: http_requests_total{endpoint, method, status} → ~100 unique combos</code></pre>
+  <a href="#dd-metrics" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="tracing">
+  <h3>Distributed Tracing</h3>
+  <p class="topic-tagline">Follow a single request across every service it touched</p>
+  <pre><code>User request → API Gateway (trace_id=abc123)
+  ├── OrderService     span_id=1 (50ms)
+  │   ├── DB Query     span_id=1.1 (10ms)
+  │   └── POST /pay    span_id=1.2 (35ms)
+  └── PaymentService   span_id=2 (4500ms) ← BOTTLENECK
+      └── Bank API     span_id=2.1 (4490ms) ← Root cause</code></pre>
+  <p style="font-size:13px;color:var(--text2)"><strong>Tools:</strong> Jaeger (open-source), Zipkin (simpler), AWS X-Ray, Datadog APM. &nbsp; <strong>Sampling:</strong> 100% of errors. 0.1% of successes. Prefer tail-based over head-based sampling.</p>
+  <a href="#dd-tracing" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="monitoring">
+  <h3>Monitoring &amp; Alerting</h3>
+  <h4>Alert Quality Rules</h4>
+  <pre><code>BAD:  CPU > 85% for 1 second     → noisy, flappy
+GOOD: CPU > 90% avg over 5 min   → actionable
+
+BAD:  Any single error            → pages at 3am for 1 error
+GOOD: Error rate > 1% for 2 consecutive minutes</code></pre>
+  <h4>Incident Severity</h4>
+  <p style="font-size:13px;color:var(--text2)"><span class="tag tag-coral">P1 Critical</span> Page immediately, resolve &lt;15 min (payment down) &nbsp; <span class="tag tag-amber">P2 High</span> Page, resolve &lt;1 hour &nbsp; <span class="tag tag-blue">P3 Medium</span> Ticket, resolve &lt;4 hours &nbsp; <span class="tag tag-teal">P4 Low</span> Log it, fix next sprint</p>
+  <a href="#dd-monitoring" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- PATTERNS -->
+<!-- ======================================================== -->
+<h2 id="patterns"><span class="section-header sh-patterns">Design Patterns</span></h2>
+
+<div class="topic-card" id="bloomfilters">
+  <h3>Bloom Filters</h3>
+  <p class="topic-tagline">Probabilistic membership test — "is this item definitely NOT in the set?" — in ~1.25MB</p>
+  <h4>Memory Win</h4>
+  <pre><code>1M URLs in a Hash Set:     ~125 MB
+1M URLs in a Bloom Filter: ~1.25 MB  (100x smaller, ~1% false positive rate)</code></pre>
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-label">Advantages</div>
+      <ul>
+        <li>Tiny memory footprint</li>
+        <li>O(K) constant-time lookup</li>
+        <li>No false negatives (if bit not set, item is definitely absent)</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-label">Limitations</div>
+      <ul>
+        <li>False positives (tunable, not eliminatable)</li>
+        <li>Can't delete items (use Counting Bloom Filter)</li>
+        <li>False positive rate grows as filter fills</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>In the wild:</strong> Cassandra/Bigtable (skip SSTables on disk), malware URL detection, cache miss prevention.</p>
+  <a href="#dd-bloomfilters" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="circuitbreaker">
+  <h3>Circuit Breaker</h3>
+  <p class="topic-tagline">Fail fast. Don't cascade. Heal automatically.</p>
+  <pre><code>[CLOSED] → requests pass through normally
+    ↓ (5 failures)
+[OPEN]   → requests fail immediately (don't call broken service)
+    ↓ (wait 30s)
+[HALF-OPEN] → let 1 test request through
+    ├── success → [CLOSED]
+    └── failure → [OPEN]</code></pre>
+  <h4>Without vs With Circuit Breaker</h4>
+  <pre><code>Without: Payment service down → Order service calls it (5s timeout)
+         1000 req/s × 5s = 5000 stuck threads → Order service dies → cascade
+
+With:    5 timeouts → circuit opens → requests 6-∞ fail in &lt;1ms
+         Order service stays healthy → Payment service recovers quietly</code></pre>
+  <a href="#dd-circuitbreaker" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="blobstorage">
+  <h3>Blob Storage</h3>
+  <p class="topic-tagline">AWS S3, Google Cloud Storage, Azure Blob &nbsp;&mdash;&nbsp; For the big stuff</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>S3 Class</th><th>Use Case</th><th>Retrieval</th></tr>
+      <tr><td>Standard</td><td>Frequently accessed</td><td>Instant</td></tr>
+      <tr><td>Infrequent Access</td><td>Monthly access</td><td>Instant</td></tr>
+      <tr><td>Glacier Instant</td><td>Quarterly access</td><td>Instant</td></tr>
+      <tr><td>Glacier Deep Archive</td><td>Long-term archival</td><td>12 hours</td></tr>
+    </table>
+  </div>
+  <p style="font-size:13px;color:var(--text2)"><strong>Use for:</strong> User image/video uploads, ML training datasets, backups, static site hosting, log archival. &nbsp; <strong>Not for:</strong> Low-latency random reads, database-like queries, frequent small writes.</p>
+  <a href="#dd-blobstorage" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<div class="topic-card" id="datawarehouse">
+  <h3>Data Warehouse</h3>
+  <p class="topic-tagline">BigQuery, Snowflake, Redshift, ClickHouse &nbsp;&mdash;&nbsp; Analytics at scale</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Aspect</th><th>OLTP (SQL DB)</th><th>OLAP (Data Warehouse)</th></tr>
+      <tr><td>Purpose</td><td>Transactions</td><td>Analytics</td></tr>
+      <tr><td>Queries</td><td>Simple, fast, many</td><td>Complex, slow, few</td></tr>
+      <tr><td>Data scope</td><td>Current state</td><td>Historical</td></tr>
+      <tr><td>Examples</td><td>PostgreSQL, MySQL</td><td>BigQuery, Snowflake</td></tr>
+    </table>
+  </div>
+  <h4>Why Columnar Storage Wins for Analytics</h4>
+  <pre><code>"Give me SUM(revenue) for all orders"
+Row store:    Read ALL columns for ALL rows → wasteful
+Column store: Read ONLY the revenue column → 10x faster + 10:1 compression</code></pre>
+  <a href="#dd-datawarehouse" class="dive-link">Deep dive &rarr;</a>
+</div>
+
+<hr>
+
+<!-- ======================================================== -->
+<!-- KEY NUMBERS -->
+<!-- ======================================================== -->
+<h2 id="numbers"><span class="section-header sh-patterns">Key Numbers to Memorize</span></h2>
+
+<div class="numbers-grid">
+  <div class="numbers-box">
+    <h4>Latency Reference</h4>
+    <pre style="margin:0;font-size:12px"><code>L1 cache:          ~1 ns
+L2 cache:          ~4 ns
+Main memory:       ~100 ns
+SSD random read:   ~100 µs
+HDD seek:          ~10 ms
+Datacenter RTT:    ~0.5 ms
+Cross-region RTT:  ~100–150 ms</code></pre>
+  </div>
+  <div class="numbers-box">
+    <h4>Throughput Reference</h4>
+    <pre style="margin:0;font-size:12px"><code>Postgres:    ~10K QPS reads, ~1–3K QPS writes
+Redis:       ~100K–1M ops/sec
+Kafka:       ~1M+ messages/sec (cluster)
+S3:          ~3,500 PUT/sec, ~5,500 GET/sec per prefix</code></pre>
+  </div>
+  <div class="numbers-box">
+    <h4>Storage Reference</h4>
+    <pre style="margin:0;font-size:12px"><code>1 char = 1 byte
+1 int  = 4 bytes
+UUID   = 16 bytes
+
+1M users × 1KB profile = ~1 GB
+1B users × 1KB profile = ~1 TB</code></pre>
+  </div>
+</div>
+
+<hr>
+<hr>
+
+<!-- ======================================================== -->
+<!-- DEEP DIVES -->
+<!-- ======================================================== -->
+<h2 id="deep-dives"><span class="section-header sh-deepdive">Deep Dives</span></h2>
+
+<!-- DD: SQL -->
+<div class="deep-dive-card" id="dd-sql">
+  <a href="#sql" class="back-link">&uarr; Back to SQL</a>
+  <h3>SQL — Deep Dive</h3>
+  <h4>B-Tree Indexes</h4>
+  <p style="font-size:13px;color:var(--text2)">Almost all SQL indexes are B-Trees. Index columns used in WHERE, JOIN, ORDER BY. Put the most selective column first in composite indexes. Too many indexes = slow writes. Use partial indexes (<code>WHERE status = 'active'</code>) to index subsets.</p>
+  <h4>Write-Ahead Log (WAL)</h4>
+  <p style="font-size:13px;color:var(--text2)">Every write is first logged to WAL (sequential disk write = fast). Data pages updated asynchronously. On crash: replay WAL to restore committed state. This is why COMMIT is durable even if the OS crashes mid-write.</p>
+  <h4>Scaling SQL</h4>
+  <pre><code>1. Vertical         → Bigger machine. Easiest, limited ceiling.
+2. Read replicas    → Async replication to followers. Reads scale, writes don't.
+3. Connection pool  → PgBouncer/ProxySQL. DB connections are expensive — reuse them.
+4. Sharding         → Partition by shard key. Complex queries suffer.</code></pre>
+</div>
+
+<!-- DD: NoSQL -->
+<div class="deep-dive-card" id="dd-nosql">
+  <a href="#nosql" class="back-link">&uarr; Back to NoSQL</a>
+  <h3>NoSQL — Deep Dive</h3>
+  <h4>Cassandra Data Modeling Mantra</h4>
+  <p style="font-size:13px;color:var(--text2)">"Model around your queries, not your data." Table per query. If you need 3 access patterns, build 3 tables. Data duplication is acceptable — disk is cheap, joins aren't.</p>
+  <h4>Cassandra Consistency Tuning</h4>
+  <pre><code>QUORUM write + QUORUM read: W+R > N → Strong consistency
+ONE write + ONE read:       Fastest, eventual consistency
+ALL write + ONE read:       Durable writes, but write latency = slowest replica</code></pre>
+  <h4>DynamoDB Access Patterns</h4>
+  <p style="font-size:13px;color:var(--text2)">Primary key = partition key + optional sort key. GSI (Global Secondary Index) = alternate access patterns without changing table design. LSI (Local Secondary Index) = different sort key on same partition key.</p>
+</div>
+
+<!-- DD: NewSQL -->
+<div class="deep-dive-card" id="dd-newsql">
+  <a href="#newsql" class="back-link">&uarr; Back to NewSQL</a>
+  <h3>NewSQL — Deep Dive</h3>
+  <h4>Google Spanner's TrueTime</h4>
+  <p style="font-size:13px;color:var(--text2)">Atomic clocks + GPS receivers in every datacenter. Returns a time range [earliest, latest] instead of a point. If transaction A's latest &lt; transaction B's earliest → guaranteed ordering. No NTP clock skew issues. Ever.</p>
+  <h4>CockroachDB (open-source Spanner)</h4>
+  <p style="font-size:13px;color:var(--text2)">PostgreSQL-compatible wire protocol. Distributed ACID via Raft consensus. Automatic sharding and rebalancing. ~10x cheaper than Spanner with the same guarantees (mostly).</p>
+</div>
+
+<!-- DD: Time-Series -->
+<div class="deep-dive-card" id="dd-timeseries">
+  <a href="#timeseries" class="back-link">&uarr; Back to Time-Series</a>
+  <h3>Time-Series DB — Deep Dive</h3>
+  <h4>InfluxDB Data Model</h4>
+  <pre><code>Measurement: cpu_usage
+Tags (indexed): host=server1, region=us-east   ← for filtering
+Fields (not indexed): value=72.4               ← actual metric
+Timestamp: 2026-04-08T10:15:30Z</code></pre>
+  <h4>Downsampling Pipeline</h4>
+  <pre><code>Raw data (1s):    stored 7 days    → recent accuracy
+Downsampled (1m): stored 30 days   → good for trends
+Downsampled (1h): stored 1 year    → historical overview
+Raw deleted after 7 days → fraction of original storage cost</code></pre>
+</div>
+
+<!-- DD: Search -->
+<div class="deep-dive-card" id="dd-search">
+  <a href="#search" class="back-link">&uarr; Back to Search</a>
+  <h3>Search Engine — Deep Dive</h3>
+  <h4>Indexing Pipeline</h4>
+  <pre><code>"Blue Running Shoes"
+→ Tokenize:   ["Blue", "Running", "Shoes"]
+→ Lowercase:  ["blue", "running", "shoes"]
+→ Stem:       ["blue", "run", "shoe"]
+→ Index:      {"blue": [doc1], "run": [doc1], "shoe": [doc1]}</code></pre>
+  <h4>Pagination: search_after vs from/size</h4>
+  <pre><code>from=10000, size=10 → Elasticsearch fetches 10,010 docs, discards 10,000 → slow
+search_after=lastDocId → seeks directly → fast at any depth</code></pre>
+  <h4>Elasticsearch Architecture</h4>
+  <p style="font-size:13px;color:var(--text2)">Index → Shards (Lucene indexes for scale) → Primary shard + Replica shard. Node roles: Master (cluster state), Data (stores shards), Coordinator (routes queries, merges results).</p>
+</div>
+
+<!-- DD: TCP/UDP -->
+<div class="deep-dive-card" id="dd-tcpudp">
+  <a href="#tcpudp" class="back-link">&uarr; Back to TCP/UDP</a>
+  <h3>TCP/UDP — Deep Dive</h3>
+  <h4>TCP Congestion Control</h4>
+  <p style="font-size:13px;color:var(--text2)">Slow start: exponentially increase from 1 MSS. Congestion avoidance: linear increase after threshold. Fast retransmit: 3 duplicate ACKs = infer loss → retransmit immediately. CUBIC: better for high-bandwidth long-distance links.</p>
+  <h4>Why UDP for DNS</h4>
+  <p style="font-size:13px;color:var(--text2)">DNS query fits in 1 packet (~50 bytes). TCP handshake = 1.5 RTT overhead before the query even sends. UDP: send query, get response = 0.5 RTT. If packet lost? Just send another — much faster than TCP retry.</p>
+  <h4>Why UDP for Gaming</h4>
+  <p style="font-size:13px;color:var(--text2)">A lost packet = old position data (irrelevant in 16ms). TCP would stall waiting for retransmission. UDP: just process the next packet — older position data is stale anyway.</p>
+</div>
+
+<!-- DD: HTTP -->
+<div class="deep-dive-card" id="dd-http">
+  <a href="#http" class="back-link">&uarr; Back to HTTP/HTTPS</a>
+  <h3>HTTP/HTTPS — Deep Dive</h3>
+  <h4>Certificate Chain</h4>
+  <pre><code>Root CA (embedded in browser by OS)
+  └── Intermediate CA (signed by Root)
+        └── Your server cert (signed by Intermediate)
+Browser checks: server cert → Intermediate (valid?) → Root (in trust store?) → OK</code></pre>
+  <h4>HTTP/2 vs HTTP/1.1 vs HTTP/3</h4>
+  <p style="font-size:13px;color:var(--text2)">HTTP/1.1: one request per connection, head-of-line blocking. HTTP/2: multiplexing many streams on one TCP connection, binary framing, HPACK header compression. HTTP/3: QUIC (UDP-based), faster handshake, survives IP changes (mobile switching WiFi → cellular).</p>
+</div>
+
+<!-- DD: Authentication -->
+<div class="deep-dive-card" id="dd-authentication">
+  <a href="#authentication" class="back-link">&uarr; Back to Authentication</a>
+  <h3>Authentication — Deep Dive</h3>
+  <h4>RS256 vs HS256</h4>
+  <p style="font-size:13px;color:var(--text2)">HS256: single shared secret. If it leaks → every token ever issued is forgeable. RS256: private key signs (stays on auth server), public key verifies (freely shared). Even if a microservice is compromised, it cannot forge tokens — it has no private key.</p>
+  <h4>Token Storage Comparison</h4>
+  <pre><code>localStorage:      Easy. XSS steals it → game over.
+sessionStorage:    Same as localStorage for security.
+httpOnly cookie:   XSS can't read it. Add SameSite=Strict → CSRF prevented.
+Memory (JS):       Lost on refresh. Safest but requires refresh token API.</code></pre>
+  <h4>The Refresh Token Dance</h4>
+  <pre><code>Login → access_token (15 min) + refresh_token (7 days)
+After 15 min → send refresh_token → get new pair
+Old refresh_token is invalidated (one-time use)</code></pre>
+</div>
+
+<!-- DD: Authorization -->
+<div class="deep-dive-card" id="dd-authorization">
+  <a href="#authorization" class="back-link">&uarr; Back to Authorization</a>
+  <h3>Authorization — Deep Dive</h3>
+  <h4>Resource-Level Authorization (Often Missed)</h4>
+  <pre><code>User Bob wants DELETE /posts/456
+1. Is Bob authenticated? Yes
+2. Does Bob have "Editor" role? Yes (has delete permission)
+3. Is post 456 owned by Bob? NO (owned by Alice)
+4. DENY. Even though Bob is an Editor.</code></pre>
+  <h4>Authorization Testing Checklist</h4>
+  <p style="font-size:13px;color:var(--text2)">Admin can do X. User cannot do X (privilege escalation test). User can do Y on their own resource. User cannot do Y on another user's resource. Access revoked after role removal.</p>
+</div>
+
+<!-- DD: CDC -->
+<div class="deep-dive-card" id="dd-cdc">
+  <a href="#cdc" class="back-link">&uarr; Back to CDC</a>
+  <h3>CDC — Deep Dive</h3>
+  <h4>How Debezium Reads Postgres</h4>
+  <pre><code>Postgres writes to WAL (Write-Ahead Log) first
+Debezium connects as a "logical replication slot"
+→ Reads WAL stream in real-time
+→ Converts to Kafka messages with before/after states
+→ Zero impact on DB performance (reads log, not tables)</code></pre>
+  <h4>Event Schema</h4>
+  <pre><code>{
+  "op": "u",        // i=insert, u=update, d=delete
+  "before": {"qty": 10, "version": 5},
+  "after":  {"qty": 9,  "version": 6},
+  "source": {"table": "inventory", "ts_ms": 1704000000}
+}</code></pre>
+</div>
+
+<!-- DD: Fault Tolerance -->
+<div class="deep-dive-card" id="dd-fault-tolerance">
+  <a href="#fault-tolerance" class="back-link">&uarr; Back to Fault Tolerance</a>
+  <h3>Fault Tolerance — Deep Dive</h3>
+  <h4>Exponential Backoff with Jitter</h4>
+  <pre><code>Without jitter: 100 clients fail at T=0 → all retry at T=1s → thundering herd
+With jitter:    delay = random(0, min(cap, base × 2^attempt)) → spread retries</code></pre>
+  <h4>RTO vs RPO</h4>
+  <p style="font-size:13px;color:var(--text2)"><strong>RTO</strong> (Recovery Time Objective): How long until the service is back? <strong>RPO</strong> (Recovery Point Objective): How much data loss is acceptable? Example: RTO=1min, RPO=0sec → need active-active setup with synchronous replication.</p>
+  <h4>Chaos Engineering (Netflix)</h4>
+  <p style="font-size:13px;color:var(--text2)">Chaos Monkey: randomly terminates EC2 instances during business hours. Chaos Gorilla: terminates entire Availability Zones. Chaos Kong: takes down entire AWS regions. Forces genuine resilience — "if it can happen randomly, we've already handled it."</p>
+</div>
+
+<!-- DD: REST -->
+<div class="deep-dive-card" id="dd-rest">
+  <a href="#rest" class="back-link">&uarr; Back to REST</a>
+  <h3>REST — Deep Dive</h3>
+  <h4>Idempotency Keys for POST</h4>
+  <pre><code>POST /api/payments
+Idempotency-Key: client-generated-uuid-abc123
+
+First call:  Creates payment, returns 201
+Second call: Returns same 201 (no duplicate charge)
+Server stores (idempotency_key → response) for 24h</code></pre>
+  <h4>ETag-Based Caching</h4>
+  <pre><code>GET /api/products/123
+← ETag: "abc123"
+
+Later: GET /api/products/123 + If-None-Match: "abc123"
+← 304 Not Modified (nothing transferred if unchanged)
+← 200 OK + new ETag (if changed)</code></pre>
+  <h4>REST API Design Checklist</h4>
+  <p style="font-size:13px;color:var(--text2)">Nouns not verbs in URLs (<code>/users</code> not <code>/getUsers</code>). Plural collection names. Use HTTP methods for action. Return <code>Location</code> header on 201 Created. Use <code>409 Conflict</code> for business rule violations. <code>422 Unprocessable Entity</code> for validation errors. Idempotency keys on POST for payments.</p>
+</div>
+
+<!-- DD: gRPC -->
+<div class="deep-dive-card" id="dd-grpc">
+  <a href="#grpc" class="back-link">&uarr; Back to gRPC</a>
+  <h3>gRPC — Deep Dive</h3>
+  <h4>Protobuf Backward Compatibility</h4>
+  <pre><code>message User {
+  int32 id = 1;
+  string name = 2;
+  // REMOVED: string email = 3; -- DON'T reuse field number 3!
+  string phone = 4;   // new field — old clients just ignore it
+  reserved 3;         // prevents accidental reuse
+}</code></pre>
+  <h4>gRPC Load Balancing Quirk</h4>
+  <p style="font-size:13px;color:var(--text2)">HTTP/1.1: short-lived connections → LB sees many connections → trivial to balance. HTTP/2 (gRPC): long-lived connections → 1 connection per client → LB can't balance. Fix: client-side load balancing (gRPC built-in) or gRPC-aware proxy (Envoy, Istio).</p>
+  <h4>Benchmark</h4>
+  <pre><code>JSON payload:     72 bytes
+Protobuf payload: 26 bytes (3x smaller)
+REST internal:    ~8ms latency
+gRPC internal:    ~1ms latency
+At 100K RPS, that 7ms = massive CPU + bandwidth savings</code></pre>
+</div>
+
+<!-- DD: GraphQL -->
+<div class="deep-dive-card" id="dd-graphql">
+  <a href="#graphql" class="back-link">&uarr; Back to GraphQL</a>
+  <h3>GraphQL — Deep Dive</h3>
+  <h4>Query Depth Attack and Defense</h4>
+  <pre><code>Malicious: { user { posts { author { posts { author { posts ... } } } } } }
+
+Defense:
+  Max depth: 5 levels
+  Query cost analysis: each field has a cost, reject if total > threshold
+  Rate limiting: per-query complexity score
+  Persisted queries: only allow pre-approved hashes in production</code></pre>
+  <h4>Per-Field Authorization</h4>
+  <pre><code>User: {
+  email: (user, _, ctx) => {
+    if (ctx.viewer.id === user.id || ctx.viewer.role === 'admin')
+      return user.email;
+    throw new ForbiddenError('Cannot view email');
+  }
+}</code></pre>
+</div>
+
+<!-- DD: Real-time -->
+<div class="deep-dive-card" id="dd-realtime">
+  <a href="#realtime" class="back-link">&uarr; Back to Real-time</a>
+  <h3>Real-time Communication — Deep Dive</h3>
+  <h4>WebSocket Reconnection</h4>
+  <pre><code>let attempts = 0;
+function connect() {
+  const ws = new WebSocket('wss://api.example.com/ws');
+  ws.onopen  = () => { attempts = 0; };
+  ws.onclose = () => setTimeout(connect, Math.min(30000, 1000 * 2**attempts++));
+}
+// Always implement heartbeat to detect silent disconnects</code></pre>
+  <h4>SSE vs WebSocket — when SSE wins</h4>
+  <p style="font-size:13px;color:var(--text2)">SSE wins when: server → client only, works through HTTP proxies, browser auto-reconnect is needed, or simplicity matters. SSE loses when: client needs to send data too, binary data needed, or &gt;6 connections per domain.</p>
+  <h4>WebRTC ICE Negotiation</h4>
+  <pre><code>1. Signaling: exchange SDP via your server
+2. ICE gathering: both peers discover IP candidates (local, STUN, TURN)
+3. ICE checking: try each candidate pair until one works
+4. Connected: media flows peer-to-peer (your server = 0 bandwidth)
+STUN: helps peer discover public IP behind NAT
+TURN: relay if direct P2P connection is impossible</code></pre>
+</div>
+
+<!-- DD: Caching -->
+<div class="deep-dive-card" id="dd-caching">
+  <a href="#cache-strategies" class="back-link">&uarr; Back to Caching</a>
+  <h3>Caching — Deep Dive</h3>
+  <h4>Cache-Aside Implementation</h4>
+  <pre><code>def get_product(product_id):
+    cached = redis.get(f"product:{product_id}")
+    if cached:
+        return json.loads(cached)       # cache hit ~0.1ms
+    product = db.query("SELECT ...", product_id)
+    redis.setex(f"product:{product_id}", 3600, json.dumps(product))
+    return product                      # cache miss ~10ms, next hit fast</code></pre>
+  <h4>Thundering Herd — Three Solutions</h4>
+  <pre><code>1. Probabilistic early expiration:
+   if ttl < threshold and random() < probability: refresh now
+
+2. Mutex on miss:
+   if not redis.setnx("lock:product:123", "1"): return wait_for_cache()
+   # load, store, release lock
+
+3. Background refresh:
+   Cron refreshes cache before TTL expires (always warm)</code></pre>
+</div>
+
+<!-- DD: Redis -->
+<div class="deep-dive-card" id="dd-redis">
+  <a href="#redis" class="back-link">&uarr; Back to Redis</a>
+  <h3>Redis — Deep Dive</h3>
+  <h4>Distributed Lock with Redlock</h4>
+  <pre><code>-- Acquire on majority of N Redis nodes (N/2 + 1) within TTL
+-- Release (atomic Lua script):
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+else
+  return 0  -- Someone else's lock, don't delete it
+end</code></pre>
+  <h4>Persistence Config Recommendations</h4>
+  <pre><code>Development:  No persistence (fastest)
+Staging:      RDB snapshots every 5 min
+Production:   RDB + AOF with fsync=everysec (lose max 1s data)
+Critical:     AOF with fsync=always (slowest, zero data loss)</code></pre>
+  <h4>Pub/Sub vs Streams</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Feature</th><th>Pub/Sub</th><th>Streams</th></tr>
+      <tr><td>Persistence</td><td>No — lost if no subscribers</td><td>Yes — survives restarts</td></tr>
+      <tr><td>Replay</td><td>No</td><td>Yes — from any offset</td></tr>
+      <tr><td>Consumer groups</td><td>No</td><td>Yes — with offset tracking</td></tr>
+      <tr><td>Best for</td><td>Live notifications, chat</td><td>Event log, order processing</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- DD: CDN -->
+<div class="deep-dive-card" id="dd-cdn">
+  <a href="#cdn" class="back-link">&uarr; Back to CDN</a>
+  <h3>CDN — Deep Dive</h3>
+  <h4>Cache-Control Headers CDNs Respect</h4>
+  <pre><code>Cache-Control: max-age=86400              → browser + CDN cache 24h
+Cache-Control: s-maxage=3600             → CDN-only TTL
+Cache-Control: no-store                  → never cache (user-specific data)
+Cache-Control: stale-while-revalidate=60 → serve stale for 60s while refreshing
+Surrogate-Key: product-123 category-shoes → tag-based bulk invalidation</code></pre>
+  <h4>Edge Computing (Cloudflare Workers)</h4>
+  <p style="font-size:13px;color:var(--text2)">Without edge compute: auth check → round-trip to origin (200ms+). With Cloudflare Worker: auth check at nearest PoP (&lt;5ms) → reject bad requests at edge. Origin never sees unauthenticated traffic. A/B testing, personalization, geoblocking all at the edge.</p>
+</div>
+
+<!-- DD: Message Queue -->
+<div class="deep-dive-card" id="dd-mq">
+  <a href="#mq" class="back-link">&uarr; Back to Message Queue</a>
+  <h3>Message Queue — Deep Dive</h3>
+  <h4>Visibility Timeout — the Retry Mechanism</h4>
+  <pre><code>Consumer receives message → message becomes "invisible" for 30s
+Consumer processes successfully → sends ACK → message deleted
+Consumer crashes → visibility timeout expires → message reappears → another consumer retries</code></pre>
+  <h4>RabbitMQ Exchange Types</h4>
+  <pre><code>Direct:  Route to queue matching exact routing key
+Fanout:  Broadcast to all bound queues (1 event → all consumers)
+Topic:   Pattern matching ("order.#" matches "order.created", "order.cancelled")
+Headers: Route by message headers instead of routing key</code></pre>
+  <h4>SQS FIFO vs Standard</h4>
+  <p style="font-size:13px;color:var(--text2)">Standard: at-least-once delivery, best-effort ordering, unlimited throughput. FIFO: exactly-once, strict ordering, 3K msg/sec (30K with batching). Use FIFO for financial transactions where order and dedup matter.</p>
+</div>
+
+<!-- DD: Kafka -->
+<div class="deep-dive-card" id="dd-kafka">
+  <a href="#kafka" class="back-link">&uarr; Back to Kafka</a>
+  <h3>Kafka — Deep Dive</h3>
+  <h4>ISR (In-Sync Replicas)</h4>
+  <pre><code>Producer writes with acks=all:
+→ Leader (Broker 1) writes → waits for Broker 2 and 3 to ack
+→ Only then confirms to producer
+→ If Broker 2 falls behind → removed from ISR</code></pre>
+  <h4>Compacted Topics</h4>
+  <pre><code>Normal topic:    [key=user1:A, key=user2:B, key=user1:C, key=user1:D]
+Compacted topic: [key=user2:B, key=user1:D]  ← only latest per key kept
+Use case: CDC (latest state per row), user preferences (current value only)</code></pre>
+  <h4>Durability Config (Production)</h4>
+  <pre><code>acks=all + min.insync.replicas=2 → Zero message loss
++ enable.idempotence=true        → Exactly-once producer</code></pre>
+</div>
+
+<!-- DD: Pub/Sub -->
+<div class="deep-dive-card" id="dd-pubsub">
+  <a href="#pubsub" class="back-link">&uarr; Back to Pub/Sub</a>
+  <h3>Pub/Sub — Deep Dive</h3>
+  <h4>SNS + SQS Fan-out (the production pattern)</h4>
+  <pre><code>Order Service publishes → SNS topic "order-events"
+  ├── SQS Queue: EmailService (own DLQ, own retry config)
+  ├── SQS Queue: AnalyticsService (can fall behind)
+  └── SQS Queue: FraudDetectionService (high priority)
+Benefits:
+  - Each consumer has isolated failure domain
+  - Add new consumers without touching publisher
+  - Different retry/DLQ config per consumer</code></pre>
+  <h4>Push vs Pull</h4>
+  <p style="font-size:13px;color:var(--text2)">Pull: consumer calls Pub/Sub API to fetch. Good for variable-load consumers. Push: Pub/Sub calls your HTTP endpoint. Good for serverless (Lambda auto-invoked). Requires public HTTPS endpoint.</p>
+</div>
+
+<!-- DD: Microservices -->
+<div class="deep-dive-card" id="dd-microservices">
+  <a href="#microservices" class="back-link">&uarr; Back to Microservices</a>
+  <h3>Microservices — Deep Dive</h3>
+  <h4>Saga: Orchestration vs Choreography</h4>
+  <pre><code>Choreography (event-driven):
+  OrderCreated → PaymentService listens → charges card
+  PaymentSucceeded → InventoryService listens → reserves stock
+  Pro: Decoupled. Con: Hard to trace, cyclic dependency risk.
+
+Orchestration (central coordinator):
+  SagaOrchestrator → calls PaymentService directly
+  SagaOrchestrator → calls InventoryService directly
+  Pro: Clear flow, easy to trace. Con: Orchestrator = God object risk.</code></pre>
+  <h4>Service Discovery</h4>
+  <p style="font-size:13px;color:var(--text2)">Client-side: Service A queries registry (Consul/Eureka) → picks an instance → calls directly. No extra hop, but discovery logic in every client. Server-side: Service A calls Load Balancer → LB queries registry → routes. Clients are dumb but extra hop exists.</p>
+</div>
+
+<!-- DD: Serverless -->
+<div class="deep-dive-card" id="dd-serverless">
+  <a href="#serverless" class="back-link">&uarr; Back to Serverless</a>
+  <h3>Serverless — Deep Dive</h3>
+  <h4>Cold Start Anatomy</h4>
+  <pre><code>Container provision (0–500ms)
+  → Runtime init: Node.js ~50ms, Python ~100ms, JVM ~2000ms
+  → Handler code load (~50ms)
+  → Your code executes
+
+Mitigation:
+  - Provisioned concurrency: pre-warm N containers (costs money at 0 RPS)
+  - Keep-alive pings: invoke every 5 min to stay warm
+  - Lighter runtimes: Node.js/Python >> Java for cold starts</code></pre>
+  <h4>Lambda + RDS Problem</h4>
+  <p style="font-size:13px;color:var(--text2)">1000 concurrent Lambdas × 1 DB connection = 1000 connections → RDS falls over. Fix: RDS Proxy (connection pooling between Lambda and RDS).</p>
+</div>
+
+<!-- DD: Service Mesh -->
+<div class="deep-dive-card" id="dd-servicemesh">
+  <a href="#servicemesh" class="back-link">&uarr; Back to Service Mesh</a>
+  <h3>Service Mesh — Deep Dive</h3>
+  <h4>Sidecar Pattern</h4>
+  <pre><code>Service A (port 8080)
+  ↕ (loopback — same pod)
+Envoy sidecar (port 15001)
+  ↓ (network with mTLS)
+Envoy sidecar (port 15001)
+  ↕
+Service B (port 8080)
+Service A just calls http://service-b normally.
+Envoy intercepts, adds mTLS, retries, traces, metrics. Service A has zero knowledge.</code></pre>
+  <h4>mTLS — Mutual Authentication</h4>
+  <p style="font-size:13px;color:var(--text2)">Normal TLS: client verifies server only. mTLS (zero-trust): client verifies server AND server verifies client. Only known services can talk to each other. A compromised service can't impersonate others.</p>
+</div>
+
+<!-- DD: Load Balancer -->
+<div class="deep-dive-card" id="dd-loadbalancer">
+  <a href="#loadbalancer" class="back-link">&uarr; Back to Load Balancer</a>
+  <h3>Load Balancer — Deep Dive</h3>
+  <h4>Global Load Balancing</h4>
+  <pre><code>Option 1 — GeoDNS:
+  DNS returns different IPs per region.
+  Con: DNS TTL means failover is slow (seconds to minutes).
+
+Option 2 — Anycast (AWS Global Accelerator, Cloudflare):
+  Same IP announced from multiple PoPs globally.
+  BGP routes client to nearest PoP automatically.
+  Failover in seconds (BGP reconverges faster than DNS TTL).</code></pre>
+</div>
+
+<!-- DD: API Gateway -->
+<div class="deep-dive-card" id="dd-apigateway">
+  <a href="#apigateway" class="back-link">&uarr; Back to API Gateway</a>
+  <h3>API Gateway — Deep Dive</h3>
+  <h4>Request Transformation</h4>
+  <pre><code>Mobile client sends:    {"productId": "123", "qty": 2}
+API Gateway transforms: {"product_id": 123, "quantity": 2, "source": "mobile"}
+Backend sees consistent format regardless of client.
+→ Decouple client payload format from internal API contract</code></pre>
+  <h4>Rate Limiting Tiers</h4>
+  <pre><code>Per-user:  1000 req/hour (identified by API key or JWT sub)
+Per-IP:    100 req/min (prevent anonymous abuse)
+Per-tier:  Free=100/day, Pro=10000/day, Enterprise=unlimited</code></pre>
+</div>
+
+<!-- DD: Proxy -->
+<div class="deep-dive-card" id="dd-proxy">
+  <a href="#proxy" class="back-link">&uarr; Back to Proxy</a>
+  <h3>Proxy — Deep Dive</h3>
+  <h4>NGINX Reverse Proxy Config</h4>
+  <pre><code>upstream backend {
+    least_conn;
+    server 10.0.0.10:8080 weight=3;
+    server 10.0.0.11:8080 weight=1;  -- 25% (canary)
+    server 10.0.0.12:8080 backup;
+}
+server {
+    listen 443 ssl;
+    location /api/ {
+        proxy_pass http://backend;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+    location ~* \.(jpg|png|css|js)$ {
+        expires 1y;                   -- aggressive static caching
+    }
+}</code></pre>
+</div>
+
+<!-- DD: CAP -->
+<div class="deep-dive-card" id="dd-cap">
+  <a href="#cap" class="back-link">&uarr; Back to CAP</a>
+  <h3>CAP Theorem — Deep Dive</h3>
+  <h4>Why P is Non-Negotiable</h4>
+  <p style="font-size:13px;color:var(--text2)">In any distributed system across multiple machines: network cables can be cut, switches can fail, cloud regions can be isolated, BGP misconfigurations happen. If you don't tolerate partitions, you have a single-node system. So the real choice: during a partition, CP or AP?</p>
+  <h4>PACELC — More Practical than CAP</h4>
+  <pre><code>During Partition (P): choose Availability or Consistency
+Else (normal):        choose Latency or Consistency
+
+DynamoDB: PA/EL → Available during partition, Low latency normally
+Spanner:  PC/EC → Consistent during partition, Consistent normally (pays latency)
+Cassandra: PA/EL by default, tunable</code></pre>
+</div>
+
+<!-- DD: Consistency -->
+<div class="deep-dive-card" id="dd-consistency">
+  <a href="#consistency-models" class="back-link">&uarr; Back to Consistency Models</a>
+  <h3>Consistency Models — Deep Dive</h3>
+  <h4>The Consistency Spectrum</h4>
+  <pre><code>Linearizability: Operations appear instantaneous. Real-time ordering. Most restrictive.
+Sequential:      Operations appear in some sequential order. No real-time constraint.
+Causal:          Causally related ops ordered. Concurrent ops may differ across nodes.
+Eventual:        Replicas converge given no new writes. No time guarantee.</code></pre>
+  <h4>CRDTs — Automatic Conflict Resolution</h4>
+  <pre><code>G-Counter (increment only):
+  Node A: counter=5  |  Node B: counter=3 (concurrent increments)
+  Merge:  total = 5 + 3 = 8. No conflicts ever.
+
+Used by: Google Docs, Figma for collaborative editing.</code></pre>
+</div>
+
+<!-- DD: Concurrency -->
+<div class="deep-dive-card" id="dd-concurrency">
+  <a href="#concurrency" class="back-link">&uarr; Back to Concurrency</a>
+  <h3>Concurrency Control — Deep Dive</h3>
+  <h4>Deadlock — How It Happens and How to Prevent It</h4>
+  <pre><code>Transaction A:               Transaction B:
+Lock row user_id=1           Lock row user_id=2
+Try lock user_id=2 → wait    Try lock user_id=1 → wait
+           DEADLOCK! Both waiting forever.
+
+Prevention:
+1. Lock ordering: always acquire in same order (user_id ASC)
+2. Lock timeouts: after 100ms waiting, abort and retry
+3. Optimistic locking: no locks, no deadlocks</code></pre>
+  <h4>MVCC (Multi-Version Concurrency Control)</h4>
+  <p style="font-size:13px;color:var(--text2)">Every row has xmin (created by txn) and xmax (deleted by txn). Reader sees a snapshot at transaction start time. Writer creates new row version — doesn't overwrite. Readers never block writers. Writers never block readers. This is how Postgres achieves ACID with high concurrency.</p>
+</div>
+
+<!-- DD: Transactions -->
+<div class="deep-dive-card" id="dd-transactions">
+  <a href="#transactions" class="back-link">&uarr; Back to Distributed Transactions</a>
+  <h3>Distributed Transactions — Deep Dive</h3>
+  <h4>2PC — Why It's Avoided</h4>
+  <pre><code>Phase 1 (Prepare): Coordinator asks all participants "ready?"
+                   All participants log "yes, ready"
+Phase 2 (Commit):  Coordinator sends "commit!"
+Problem: Coordinator crashes after Phase 1
+         → Participants locked, waiting forever
+         → Blocking protocol. Why Sagas are preferred.</code></pre>
+  <h4>Outbox Pattern — Reliable Event Publishing</h4>
+  <pre><code>1. Write business record AND event to outbox table in ONE local transaction
+2. Poller/CDC reads outbox table
+3. Publishes event to broker
+4. Marks outbox record as done
+→ Events are never lost, even if broker is temporarily down</code></pre>
+</div>
+
+<!-- DD: Sharding -->
+<div class="deep-dive-card" id="dd-sharding">
+  <a href="#sharding" class="back-link">&uarr; Back to Sharding</a>
+  <h3>Sharding — Deep Dive</h3>
+  <h4>Resharding with Zero Downtime (Double-Shard Strategy)</h4>
+  <pre><code>1. Create 8 new shards (shadow)
+2. Dual-write: all new writes go to both old (4) and new (8) shards
+3. Backfill: copy existing data from old → new shards
+4. Verify: data in 8 shards matches 4 shards
+5. Cut over reads to new 8 shards
+6. Stop writes to old 4 shards, then delete them
+Result: Zero downtime, minimal data movement</code></pre>
+  <h4>Celebrity / Hotspot Mitigation</h4>
+  <pre><code>Problem: user_id=beyonce (300M followers) → all reads hit one shard
+
+Solution 1 — Key salting:
+  Write to: "user:beyonce:1", ..., "user:beyonce:100"
+  Read from: any of the 100 keys (or all 100 and sum)
+
+Solution 2 — Dedicated shard:
+  celebrity users → shard 0 (extra capacity)
+  regular users   → shards 1-N (hash-based)</code></pre>
+</div>
+
+<!-- DD: Replication -->
+<div class="deep-dive-card" id="dd-replication">
+  <a href="#replication" class="back-link">&uarr; Back to Replication</a>
+  <h3>Replication — Deep Dive</h3>
+  <h4>Replication Lag — The Silent Killer</h4>
+  <pre><code>Async replication: follower may be 1–100ms behind leader
+Read from follower: might get stale data
+
+Mitigations:
+- Read-your-writes: route to leader if user just wrote (sticky read for 5s)
+- Monotonic reads: route user's reads to same replica (no backward time travel)
+- Lag monitoring: alert if replica lag > 1s</code></pre>
+  <h4>Read Repair (Leaderless)</h4>
+  <pre><code>Read returns: [v5, v5, v3] → node 3 is behind
+System sends v5 to node 3 → heals the replica during reads</code></pre>
+</div>
+
+<!-- DD: Rate Limiting -->
+<div class="deep-dive-card" id="dd-ratelimit">
+  <a href="#ratelimit" class="back-link">&uarr; Back to Rate Limiting</a>
+  <h3>Rate Limiting — Deep Dive</h3>
+  <h4>Fixed Window Edge Case</h4>
+  <pre><code>Window: 0:00–1:00 (60 requests allowed)
+Attack: 60 req at 0:59 + 60 req at 1:01 → 120 req in 2 seconds!
+        Both windows are within limit → system overloaded.
+
+Fix: Sliding Window Counter
+  count = (prev_window × overlap%) + current_window
+  Attack: (60 × 1.5%) + 60 = ~61 → rejected</code></pre>
+  <h4>Redis Atomic Implementation</h4>
+  <pre><code>local count = redis.call('INCR', key)
+if count == 1 then redis.call('EXPIRE', key, window_seconds) end
+return count</code></pre>
+  <h4>Distributed Rate Limiting</h4>
+  <p style="font-size:13px;color:var(--text2)">Problem: 3 API nodes, each with local counter → client sends 100 req to each → 300 total but each node thinks it's fine. Solution 1: centralized Redis counter (single source of truth, Redis becomes bottleneck). Solution 2: local fast-path + global Redis authoritative check every Nth request.</p>
+</div>
+
+<!-- DD: Logging -->
+<div class="deep-dive-card" id="dd-logging">
+  <a href="#logging" class="back-link">&uarr; Back to Logging</a>
+  <h3>Logging — Deep Dive</h3>
+  <h4>Structured Logging Enables Powerful Queries</h4>
+  <pre><code># Find all payment failures for user 123 in the last hour
+jq 'select(.service=="payment" and .user_id=="123" and .level=="ERROR")'
+
+# Find all requests slower than 1s
+jq 'select(.duration_ms > 1000)'</code></pre>
+  <h4>Retention by Compliance</h4>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Standard</th><th>Retention</th></tr>
+      <tr><td>GDPR</td><td>Minimum 30 days, maximum by necessity</td></tr>
+      <tr><td>PCI-DSS</td><td>1 year online, 3 months immediately available</td></tr>
+      <tr><td>HIPAA</td><td>6 years</td></tr>
+      <tr><td>SOX</td><td>7 years</td></tr>
+      <tr><td>General SaaS</td><td>30–90 days hot, archive after</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- DD: Metrics -->
+<div class="deep-dive-card" id="dd-metrics">
+  <a href="#metrics" class="back-link">&uarr; Back to Metrics</a>
+  <h3>Metrics — Deep Dive</h3>
+  <h4>SLI / SLO / SLA Hierarchy</h4>
+  <pre><code>SLI: the actual measurement
+     "99.2% of requests completed in &lt;200ms this week"
+
+SLO: internal target
+     "We aim for 99% of requests &lt;200ms"
+     Missed → engineering investigates
+
+SLA: external commitment with consequences
+     "We guarantee 99% or customer gets 10% credit"
+     Missed → money leaves your account</code></pre>
+  <h4>Error Budget</h4>
+  <pre><code>SLO: 99.9% = 0.1% allowed downtime = 43.8 minutes/month
+Used: 20 minutes
+Remaining: 23.8 minutes
+
+Budget running low → freeze risky deploys
+Budget healthy     → move fast, take risks</code></pre>
+</div>
+
+<!-- DD: Tracing -->
+<div class="deep-dive-card" id="dd-tracing">
+  <a href="#tracing" class="back-link">&uarr; Back to Distributed Tracing</a>
+  <h3>Distributed Tracing — Deep Dive</h3>
+  <h4>Context Propagation</h4>
+  <pre><code>HTTP Header: traceparent: 00-abc123-def456-01
+  ↓ Service B extracts this header
+Service B creates child span with parent_id=def456
+  ↓ B calls Service C
+HTTP Header: traceparent: 00-abc123-xyz789-01 (same trace ID, new span ID)
+→ All spans linked by same trace_id=abc123</code></pre>
+  <h4>Tail-Based Sampling</h4>
+  <pre><code>Head-based: decide at request START whether to sample → miss important errors
+Tail-based: collect all spans, decide AFTER request completes
+  100% of errors → always sampled
+  0.1% of successes → sampled (cost control)
+  High-latency requests → always sampled</code></pre>
+</div>
+
+<!-- DD: Monitoring -->
+<div class="deep-dive-card" id="dd-monitoring">
+  <a href="#monitoring" class="back-link">&uarr; Back to Monitoring</a>
+  <h3>Monitoring — Deep Dive</h3>
+  <h4>Blameless Postmortem Structure</h4>
+  <pre><code>Incident: Payment service down 23 minutes (2026-04-08 10:00–10:23)
+
+Timeline:
+  10:00 - Deployment of v2.3.1 started
+  10:03 - Error rate rose from 0.1% to 15%
+  10:05 - Alert fired (error rate > 1% for 2 min)
+  10:07 - On-call engineer acknowledged
+  10:15 - Root cause: missing DB index in migration
+  10:23 - Rollback complete, error rate back to 0.1%
+
+Contributing factors:
+  - No staging environment with production-scale data
+  - Migration not reviewed by DB team
+  - 100% rollout instead of canary
+
+Action items:
+  - Production-scale DB in staging (due 2026-04-22)
+  - DB team review for migrations (due 2026-04-15)
+  - Automated migration dry-run in CI (due 2026-04-29)</code></pre>
+</div>
+
+<!-- DD: Bloom Filters -->
+<div class="deep-dive-card" id="dd-bloomfilters">
+  <a href="#bloomfilters" class="back-link">&uarr; Back to Bloom Filters</a>
+  <h3>Bloom Filters — Deep Dive</h3>
+  <h4>Tuning for Target False Positive Rate</h4>
+  <pre><code>m (bits) = -n × ln(p) / (ln 2)²
+k (hashes) = (m/n) × ln 2
+
+For 1M items, 1% false positive rate:
+  m = 9,585,058 bits = ~1.14 MB,  k = 7 hash functions
+
+For 1M items, 0.1% false positive rate:
+  m = 14,377,587 bits = ~1.72 MB, k = 10 hash functions (50% more memory, 10x better accuracy)</code></pre>
+  <h4>Cuckoo Filter — Better Bloom for Production</h4>
+  <p style="font-size:13px;color:var(--text2)">Supports deletion natively (unlike standard Bloom). Higher lookup performance (2 hash functions vs 7). Same memory at equivalent false positive rate. Preferred over Bloom Filter for new systems that need deletion.</p>
+</div>
+
+<!-- DD: Circuit Breaker -->
+<div class="deep-dive-card" id="dd-circuitbreaker">
+  <a href="#circuitbreaker" class="back-link">&uarr; Back to Circuit Breaker</a>
+  <h3>Circuit Breaker — Deep Dive</h3>
+  <h4>Production Implementation (Python)</h4>
+  <pre><code>class CircuitBreaker:
+    def __init__(self, failure_threshold=5, timeout=30):
+        self.state = "CLOSED"
+        self.failure_count = 0
+        self.last_failure_time = None
+
+    def call(self, func, *args, **kwargs):
+        if self.state == "OPEN":
+            if time.time() - self.last_failure_time > self.timeout:
+                self.state = "HALF_OPEN"
+            else:
+                raise CircuitOpenError("Fast failing")
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise
+
+    def _on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        if self.failure_count >= self.failure_threshold:
+            self.state = "OPEN"</code></pre>
+  <h4>Fallback Strategies When Circuit is Open</h4>
+  <pre><code>try:
+    return payment_service.charge(amount)
+except CircuitOpenError:
+    if is_idempotent_retry(request):
+        return queue_for_async_retry(request)   # retry later
+    elif has_cached_result(request):
+        return get_cached_result(request)        # serve stale
+    else:
+        return ServiceUnavailableResponse()      # fail gracefully</code></pre>
+</div>
+
+<!-- DD: Blob Storage -->
+<div class="deep-dive-card" id="dd-blobstorage">
+  <a href="#blobstorage" class="back-link">&uarr; Back to Blob Storage</a>
+  <h3>Blob Storage — Deep Dive</h3>
+  <h4>Pre-signed URLs — the Right Pattern for Uploads</h4>
+  <pre><code>Without pre-signed URLs:
+  Client → Your server (entire 500MB file) → S3
+  Your server is a bottleneck + pays bandwidth cost
+
+With pre-signed URLs:
+  Client → Your server: "I want to upload a 500MB file"
+  Your server → Client: pre-signed URL (valid 15 min)
+  Client → S3 directly (no server involvement, no bandwidth cost)
+
+url = s3.generate_presigned_url('put_object',
+  Params={'Bucket': 'my-bucket', 'Key': f'uploads/{user_id}/{filename}'},
+  ExpiresIn=900
+)</code></pre>
+  <h4>Multipart Upload for Large Files</h4>
+  <pre><code>File: 5GB video
+→ Split into 100 parts (50MB each)
+→ Upload parts in parallel
+→ S3 assembles parts server-side
+Benefits: resume after failure, parallel = faster, required for files > 5GB</code></pre>
+</div>
+
+<!-- DD: DNS -->
+<div class="deep-dive-card" id="dd-dns">
+  <a href="#dns" class="back-link">&uarr; Back to DNS</a>
+  <h3>DNS — Deep Dive</h3>
+  <h4>Resolution in Detail</h4>
+  <pre><code>You type: www.example.com
+1. Browser DNS cache: miss
+2. OS DNS cache: miss
+3. Recursive resolver asks Root NS: "Who handles .com?"
+   → Root NS: "Ask 192.5.6.30 (Verisign .com TLD)"
+4. Asks .com TLD: "Who handles example.com?"
+   → .com TLD: "Ask 205.251.196.1 (authoritative)"
+5. Asks authoritative NS: "What's www.example.com?"
+   → Returns: 93.184.216.34
+Total: ~50–100ms cold. &lt;1ms cached.</code></pre>
+  <h4>GeoDNS Routing</h4>
+  <pre><code>Client in India   → region = Asia   → returns Singapore IP
+Client in Germany → region = Europe  → returns Frankfurt IP
+Same domain, different IPs, each routed to nearest region.
+Used by: Netflix, Google, every major CDN.</code></pre>
+</div>
+
+<!-- DD: Data Warehouse -->
+<div class="deep-dive-card" id="dd-datawarehouse">
+  <a href="#datawarehouse" class="back-link">&uarr; Back to Data Warehouse</a>
+  <h3>Data Warehouse — Deep Dive</h3>
+  <h4>Partition Pruning</h4>
+  <pre><code>Table partitioned by month (2022-01 to 2026-04)
+Query: "SELECT * FROM orders WHERE month = '2026-04'"
+→ BigQuery reads ONLY April 2026 partition
+→ Skips 51 other months → 50x less data → 50x cheaper
+
+Cluster by user_id within partition:
+→ "WHERE user_id = 123" → reads only that user's block → another 10x improvement</code></pre>
+  <h4>ELT vs ETL</h4>
+  <pre><code>ETL (traditional): Extract → Transform (Python/Spark) → Load clean data
+  Problem: Transform step is bottleneck, hard to scale.
+
+ELT (modern): Extract → Load raw → Transform IN the warehouse (SQL)
+  BigQuery/Snowflake are powerful enough to transform in SQL.
+  dbt (Data Build Tool) = write SQL transforms, version control, test, deploy.</code></pre>
+</div>
+
+<hr>
+<p style="font-size:12px;color:var(--text3);text-align:center;padding:1rem 0 0">Last updated April 2026 &nbsp;&middot;&nbsp; Covers all major system design topics for Senior SWE interviews at FAANG / Google</p>
+
+</body>
+</html>
