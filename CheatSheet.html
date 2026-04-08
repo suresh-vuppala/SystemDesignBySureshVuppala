@@ -357,6 +357,9 @@ COMMIT;  -- either BOTH succeed or NEITHER does</code></pre>
       </ul>
     </div>
   </div>
+  <h4>Consistency Tuning (Cassandra)</h4>
+  <pre><code>QUORUM write (W=2/3) + QUORUM read (R=2/3) → Strong consistency (W+R > N)
+ONE write + ONE read → Blazing fast, but replicas may diverge</code></pre>
   <h4>The NoSQL Zoo</h4>
   <div class="table-wrap">
     <table>
@@ -394,6 +397,8 @@ COMMIT;  -- either BOTH succeed or NEITHER does</code></pre>
       </ul>
     </div>
   </div>
+  <h4>When You Actually Need NewSQL</h4>
+  <p style="font-size:13px;color:var(--text2)"><strong>Global financial transactions</strong> — insurance claims, settlements across regions. <strong>Multi-region inventory</strong> — buy in US, charge in EU, ship from APAC (all atomic). <strong>Ad bidding</strong> — multiple regions competing on same impression.</p>
   <p style="font-size:13px;color:var(--text2)"><strong>Hot take:</strong> Most apps don't need this. Sagas + Eventual Consistency is usually enough. Use CockroachDB (cheaper, Postgres-compatible) if you genuinely need NewSQL.</p>
   <a href="#dd-newsql" class="dive-link">Deep dive &rarr;</a>
 </div>
@@ -778,6 +783,12 @@ Consumer Group B reads ALL partitions independently (different offset)</code></p
       </ul>
     </div>
   </div>
+  <h4>Idempotency Cheat Sheet</h4>
+  <pre><code>GET    → Always safe and idempotent (read-only, retry freely)
+PUT    → Idempotent (same result every time — replaces whole resource)
+DELETE → Idempotent (deleting twice = same state)
+POST   → NOT idempotent (creates a new resource each call)
+PATCH  → NOT idempotent (partial update, state-dependent)</code></pre>
   <h4>Pagination Patterns</h4>
   <pre><code>?page=2&amp;limit=10            → simple, but slow at high offsets
 ?offset=20&amp;limit=10         → same problem
@@ -1072,6 +1083,15 @@ If inventory fails:
       <tr><td>Health Checks</td><td>Liveness (is it alive?) + Readiness (can it serve traffic?)</td></tr>
     </table>
   </div>
+  <h4>Bulkhead Pattern — Isolate Thread Pools</h4>
+  <pre><code>Without bulkheads:
+Payment service hangs → uses all 200 shared threads → Order, Inventory, User services all starve
+
+With bulkheads:
+Payment pool: 50 threads (max)
+Order pool: 50 threads (max)
+Inventory pool: 50 threads (max)
+Payment hangs → only its 50 threads blocked → others unaffected</code></pre>
   <p style="font-size:13px;color:var(--text2)"><strong>Cardinal rule:</strong> No SPOFs. Always run at least 2 of everything (2 DBs, 2 LBs, 2 regions).</p>
   <a href="#dd-fault-tolerance" class="dive-link">Deep dive &rarr;</a>
 </div>
@@ -1122,6 +1142,9 @@ Nodes placed at hash(node_id) positions
 Key assigned to first node clockwise from hash(key)
 Add/remove a node → only adjacent keys move (minimal resharding)
 Virtual nodes → each physical node = multiple ring positions (even distribution)</code></pre>
+  <h4>Hotspot Problem + Fix</h4>
+  <pre><code>Problem:  Celebrity user (100M followers) → all reads hit one shard
+Fix:      key = "celebrity_123" + random_suffix → spread across N shards → aggregate on read</code></pre>
   <a href="#dd-sharding" class="dive-link">Deep dive &rarr;</a>
 </div>
 
@@ -1154,6 +1177,14 @@ N=3, W=1, R=1 → Fast + high availability, eventual consistency</code></pre>
       <tr><td>Sliding Window Counter</td><td>Weighted blend of current + previous window</td><td>Accurate + memory efficient</td></tr>
     </table>
   </div>
+  <h4>Token Bucket — Handles Bursts Gracefully</h4>
+  <pre><code>Bucket: 100 tokens (burst capacity)
+Refill: 10 tokens/second (sustained rate)
+
+Normal traffic (5 req/s):  Always under limit, bucket stays ~95% full
+Burst (200 req/s for 10s): First 100 requests use bucket tokens → all served
+                            Remaining 1,900 requests: no tokens → rejected (429)
+Next 10 seconds:            Bucket refills (100 tokens) → ready for next burst</code></pre>
   <h4>Standard Response Headers</h4>
   <pre><code>X-RateLimit-Limit: 1000
 X-RateLimit-Remaining: 847
@@ -1240,6 +1271,18 @@ GOOD: Error rate > 1% for 2 consecutive minutes</code></pre>
 <div class="topic-card" id="bloomfilters">
   <h3>Bloom Filters</h3>
   <p class="topic-tagline">Probabilistic membership test — "is this item definitely NOT in the set?" — in ~1.25MB</p>
+  <h4>How It Works</h4>
+  <pre><code>Insert "alice":
+  hash1("alice") % 100 = 23 → bit[23] = 1
+  hash2("alice") % 100 = 45 → bit[45] = 1
+  hash3("alice") % 100 = 78 → bit[78] = 1
+
+Query "bob":
+  hash2("bob") % 100 = 60 → bit[60] = 0 ✗
+  → "bob" is DEFINITELY not in the set (no false negatives)
+
+Query "alice":
+  All bits set → "alice" PROBABLY in set (~1% chance it's a false positive)</code></pre>
   <h4>Memory Win</h4>
   <pre><code>1M URLs in a Hash Set:     ~125 MB
 1M URLs in a Bloom Filter: ~1.25 MB  (100x smaller, ~1% false positive rate)</code></pre>
@@ -1390,6 +1433,14 @@ ONE write + ONE read:       Fastest, eventual consistency
 ALL write + ONE read:       Durable writes, but write latency = slowest replica</code></pre>
   <h4>DynamoDB Access Patterns</h4>
   <p style="font-size:13px;color:var(--text2)">Primary key = partition key + optional sort key. GSI (Global Secondary Index) = alternate access patterns without changing table design. LSI (Local Secondary Index) = different sort key on same partition key.</p>
+  <h4>DynamoDB Session Store Example</h4>
+  <pre><code>PUT /sessions/user123
+{
+  "user_id": "user123",     -- Partition key
+  "session_id": "sess456",  -- Sort key
+  "last_activity": 1704003600,
+  "ttl": 1704086400         -- Auto-delete after 1 week. Zero cleanup code needed.
+}</code></pre>
 </div>
 
 <!-- DD: NewSQL -->
@@ -1508,6 +1559,14 @@ Debezium connects as a "logical replication slot"
   "after":  {"qty": 9,  "version": 6},
   "source": {"table": "inventory", "ts_ms": 1704000000}
 }</code></pre>
+  <h4>Exactly-Once with Kafka + DB</h4>
+  <pre><code>Consumer reads message (order_id=123)
+→ Write to DB: INSERT INTO processed WHERE order_id=123 (idempotent upsert)
+→ If process crashes BEFORE committing Kafka offset:
+   → Kafka retries → DB upsert = no-op (already processed)
+→ If process crashes AFTER committing Kafka offset:
+   → Message marked done → no retry
+→ Result: Exactly-once processing</code></pre>
 </div>
 
 <!-- DD: Fault Tolerance -->
@@ -1648,6 +1707,22 @@ if redis.call('GET', KEYS[1]) == ARGV[1] then
 else
   return 0  -- Someone else's lock, don't delete it
 end</code></pre>
+  <h4>Redis Streams Consumer Group Example</h4>
+  <pre><code>XADD orders * customer_id 5 amount 100 status pending
+
+-- 3 independent services read same stream, each at their own pace:
+XGROUP CREATE orders payment-svc 0
+XGROUP CREATE orders fulfillment-svc 0
+XGROUP CREATE orders analytics-svc 0
+
+-- Payment service reads and ACKs:
+XREADGROUP GROUP payment-svc worker1 STREAMS orders >
+-- Process payment...
+XACK orders payment-svc {entry_id}
+
+-- If worker1 crashes:
+XPENDING orders payment-svc          -- Find unacknowledged entries
+-- worker2 takes over unfinished work</code></pre>
   <h4>Persistence Config Recommendations</h4>
   <pre><code>Development:  No persistence (fastest)
 Staging:      RDB snapshots every 5 min
@@ -1709,6 +1784,19 @@ Headers: Route by message headers instead of routing key</code></pre>
   <pre><code>Normal topic:    [key=user1:A, key=user2:B, key=user1:C, key=user1:D]
 Compacted topic: [key=user2:B, key=user1:D]  ← only latest per key kept
 Use case: CDC (latest state per row), user preferences (current value only)</code></pre>
+  <h4>Consumer Offset Management</h4>
+  <pre><code>Consumer Group "analytics":
+  Partition 0 → Consumer A (last offset: 1000)
+  Partition 1 → Consumer B (last offset: 850)
+  Partition 2 → Consumer C (last offset: 920)
+
+Consumer A crashes:
+  → Rebalance: Partition 0 reassigned to Consumer D
+  → Consumer D starts from offset 1001 (no reprocessing, no gap)</code></pre>
+  <h4>Partition Key Strategy</h4>
+  <pre><code>Order by user: partition key = user_id → all events for user on same partition → ordered
+Order by order: partition key = order_id → events for one order are ordered
+Bad key: null → round-robin → no ordering guarantee anywhere</code></pre>
   <h4>Durability Config (Production)</h4>
   <pre><code>acks=all + min.insync.replicas=2 → Zero message loss
 + enable.idempotence=true        → Exactly-once producer</code></pre>
