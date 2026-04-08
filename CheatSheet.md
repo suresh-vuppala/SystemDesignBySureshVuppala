@@ -285,6 +285,8 @@ Client                          Server
 
 **Port numbers to know:** TCP (80:HTTP, 443:HTTPS, 3306:MySQL, 5432:Postgres) · UDP (53:DNS, 123:NTP, 161:SNMP).
 
+> See **Deep Dive: TCP/UDP** section for detailed implementation patterns
+
 ---
 
 ###  HTTP/HTTPS
@@ -338,9 +340,11 @@ Client                          Server
 
 **Real-world:** All major sites enforce HTTPS (HTTP → HTTPS 301 redirect). Let's Encrypt provides free certificates.
 
+> See **Deep Dive: HTTP/HTTPS** section for TLS handshake, HTTP/2, HTTP/3 details
+
 ---
 
-## ⚡ SECURITY
+## SECURITY
 
 ---
 
@@ -443,9 +447,11 @@ Rule: Allow if
 
 **Real-world:** GitHub uses RBAC (owner, maintainer, contributor, viewer roles). AWS IAM uses policy-based (JSON policies with conditions).
 
+> See **Deep Dive: Authorization** section for RBAC hierarchies, ABAC examples, resource-level authorization
+
 ---
 
-## ⚡ DATA PIPELINES
+## DATA PIPELINES
 
 ---
 
@@ -2907,6 +2913,643 @@ class CircuitBreaker {
 ```
 
 [↑ Back to top](#-design-patterns)
+
+---
+
+## Deep Dive: TCP/UDP
+
+**TCP Three-Way Handshake (Connection Establishment):**
+```
+1. CLIENT → SYN (seq=100)
+2. SERVER ← SYN-ACK (seq=300, ack=101)
+3. CLIENT → ACK (seq=101, ack=301)
+   Connection established; now send data
+```
+After handshake, reliable bidirectional communication.
+
+**TCP Flow Control (Sliding Window):**
+- Receiver tells sender: "I can accept 64KB"
+- Sender keeps track: can't send more than receiver buffer.
+- Prevents overwhelming slow receivers.
+
+**UDP Advantages:**
+- No setup (fire immediately).
+- Multiplexing: one socket handles many clients.
+- Lower CPU (no state tracking).
+- Real-time tolerance: losing a few packets is ok (game frame, video packet).
+
+**Real-world Applications:**
+- **TCP:** Finance (every dollar matters), email, HTTPS, file transfer.
+- **UDP:** Live streaming, gaming, DNS, VOIP, gaming lag matters less than latency.
+
+**Congestion Control (TCP):**
+- Slow start: exponentially increase send rate.
+- Congestion avoidance: linearly increase after hitting limit.
+- Fast retransmit: if 3 duplicate ACKs, assume loss; don't wait for timeout.
+- CUBIC (modern) vs Reno (traditional): CUBIC better for high-bandwidth links.
+
+[↑ Back to top](#tcpudp)
+
+---
+
+## Deep Dive: HTTP/HTTPS
+
+**TLS 1.3 Handshake (Faster than TLS 1.2):**
+```
+1. Client Hello (ciphers, key share)
+   ↓
+2. Server Hello (chosen cipher, certificate, key share)
+   ↓
+3. [encrypted handshake messages]
+   ↓
+4. Client sends Finished (encrypted with new keys)
+   ↓
+5. Both sides: Application Data (encrypted)
+```
+Total: ~1 RTT (TLS 1.2 was 2 RTT). For HTTPS connections, this matters.
+
+**Certificate Chain:**
+```
+Root CA (self-signed, embedded in browser)
+  ├─ Intermediate CA (signed by Root)
+  └─ Server Certificate (signed by Intermediate)
+```
+To verify: check server cert → validate Intermediate → validate Root in browser trust store.
+
+**HTTP/2 Multiplexing:**
+- Single TCP connection, multiple streams (not HTTP 1.1's head-of-line blocking).
+- Server push: push resources proactively.
+- Binary framing (not text like HTTP 1.1).
+
+**HTTP/3 (QUIC):**
+- Uses UDP instead of TCP (faster recovery from packet loss).
+- Faster handshake (less round trips).
+- Connection ID (survives IP changes; good for mobile).
+
+**Common Pitfalls:**
+- Expired certificate: browser blocks ("Your connection is not private").
+- Mixed content: HTTPS page loading HTTP resource → warning + blocked.
+- Self-signed cert: Trust warnings; use Let's Encrypt.
+
+[↑ Back to top](#httphttps)
+
+---
+
+## Deep Dive: Authentication
+
+**JWT (JSON Web Token) Deep Dive:**
+```
+Header.Payload.Signature
+
+Header: {"alg": "RS256", "typ": "JWT"}
+Payload: {"sub": "user123", "email": "user@ex.com", "iat": 1704000000, "exp": 1704086400}
+Signature: RSA_Sign(Header.Payload, private_key)
+```
+
+**RS256 (RSA) vs HS256 (HMAC):**
+| Feature | RS256 | HS256 |
+|---|---|---|
+| **Keys** | Public + Private | Single shared secret |
+| **Security** | If private leak, only auth server affected | If secret leak, all tokens forged everywhere |
+| **Use case** | Distributed systems (services verify via public key) | Monolith (only app server has secret) |
+| **Performance** | Slower (RSA crypto) | Faster (HMAC) |
+
+**Token Storage (Security):**
+- **localStorage:** Easy, but XSS can steal.
+- **httpOnly cookie:** Immune to XSS, but CSRF possible (use SameSite=Strict).
+- **Memory:** Lost on page refresh.
+- Best: httpOnly cookie + SameSite=Strict + secure flag (HTTPS only).
+
+**Refresh Token Pattern:**
+- Access token: 15 minutes, short-lived, in memory or httpOnly cookie.
+- Refresh token: 7 days, rotated on use, stored securely.
+```
+1. User login → return accessToken (15m) + refreshToken (7d)
+2. After 15m, accessToken expires
+3. Browser sends refreshToken → get new accessToken + refreshToken
+4. Old refreshToken invalidated (one-time use)
+```
+
+**MFA (Multi-Factor Authentication):**
+- Base: password (something you know).
+- Add: TOTP (Google Authenticator; time-based), push notifications, security keys (FIDO2).
+- Bypass: Backup codes (store safely).
+
+[↑ Back to top](#authentication)
+
+---
+
+## Deep Dive: Authorization
+
+**RBAC (Role-Based Access Control) Hierarchy:**
+```
+Admin
+  ├─ Permissions: create_user, delete_user, view_logs, manage_settings
+  └─ Inherits from: Moderator
+
+Moderator
+  ├─ Permissions: approve_content, edit_content, ban_user
+  └─ Inherits from: User
+
+User
+  ├─ Permissions: read_content, post_content, edit_own_profile
+  └─ Inherits from: Guest
+
+Guest
+  └─ Permissions: read_public_content
+```
+Benefits: Maintainability (roles, not per-user permissions), scaling.
+
+**ABAC (Attribute-Based Access Control) Example:**
+```
+Rule: Allow upload if
+  AND user.department == "Engineering"
+  AND time >= 09:00 AND time <= 17:00
+  AND ip_address IN [10.0.0.0/8]
+  AND resource.size <= 100MB
+```
+Result: Fine-grained control; used in healthcare (HIPAA), finance (PCI).
+
+**Resource-Level Authorization:**
+```
+User alice wants to DELETE /posts/123
+1. Check role: alice has "Editor" role? ✓
+2. Check resource: resource 123 owner == alice? ✓
+3. Check action: Editor can delete? ✓
+4. Allow ✓
+```
+
+**Testing Authorization:**
+```
+Test 1: Admin can delete → ✓
+Test 2: User CANNOT delete (but admin can) → catch permissions bypass
+Test 3: User CAN delete own post → check resource ownership
+Test 4: User from different department CANNOT access → check attributes
+```
+
+[↑ Back to top](#authorization)
+
+---
+
+## Deep Dive: Change Data Capture (CDC)
+
+**Log-Based CDC (Most Common):**
+```
+Database transaction log:
+  INSERT user='alice'
+    ↓ CDC tool (Debezium) tails log
+  Query: SELECT * FROM user WHERE id > offset
+    ↓
+  Kafka topic: operational_db.users
+    ↓ Consumers:
+    ├── Elasticsearch (full-text search index)
+    ├── BigQuery (analytics warehouse)
+    ├── Redis (cache invalidation)
+    └── Replica DB (read-only copy)
+```
+
+**CDC Patterns:**
+
+| Pattern | Use | Pros | Cons |
+|---|---|---|---|
+| **Log-based** | PostgreSQL, MySQL | Minimal app code changes | Requires log access |
+| **Query-based** | Any DB (polling) | Universal | High DB load, lag |
+| **Trigger-based** | Custom handling | Precise control | Complex to maintain |
+
+**Exactly-Once Delivery (with Kafka + DB):**
+```
+Message consumed: order_id=123
+Write: INSERT INTO processed_orders WHERE order_id=123, offset=1000
+If failure between Kafka offset commit and DB write:
+  → Kafka retries
+  → DB upsert prevents duplicates (idempotent)
+  → Consumer processed order only once
+```
+
+**Real-world: E-commerce Order Flow:**
+```
+1. ORDER service: INSERT INTO orders (user_id, product, amount)
+2. CDC captures: {"op": "insert", "table": "orders", "new": {...}}
+3. PAYMENT service: consumes, charges credit card
+4. CDC captures PAYMENT update
+5. FULFILLMENT service: consumes, ships product
+6. ANALYTICS service: consumes all, builds dashboards
+→ Single source of truth (orders table) feeds all systems
+```
+
+[↑ Back to top](#cdc)
+
+---
+
+## Deep Dive: Fault Tolerance & Reliability
+
+**Failure Types & Mitigation:**
+
+| Failure Type | Example | RTO | RPO | Mitigation |
+|---|---|---|---|---|
+| **Hardware** | Disk fails | Minutes | ~1 min | RAID, replicas |
+| **Network** | BGP misconfiguration | Hours | Varies | Multi-region, failover |
+| **Software** | OOM crash | Minutes | ~30s | Restarts, circuit breaker |
+| **Cascading** | Service A down → B starves → C down | Hours | Hours | Timeouts, bulkheads, fallbacks |
+
+**Redundancy Models:**
+
+| Model | Setup | Failover Time | Cost |
+|---|---|---|---|
+| **Active-Passive** | Primary in US, standby in EU | 30s–5m | ~2x hardware |
+| **Active-Active** | Primary + secondary both answer | 0s (instant) | ~3x hardware, complex conflict resolution |
+| **N+1** | N instances + 1 spare | 30s | ~(N+1)/N cost |
+
+**Availability Tiers:**
+
+| Availability | Downtime/Year | Example | Requires |
+|---|---|---|---|
+| **99.0%** | 87.6 hours | Single region, basic monitoring | 1 server |
+| **99.9%** | 8.76 hours | Multi-AZ, auto-failover | 2 servers, monitoring |
+| **99.99%** | 52 minutes | Multi-region, active-active, circuit breaker | 4+ servers, complexity |
+| **99.999%** | 5 minutes | Netflix-scale: multi-region chaos engineering | Enterprise setup |
+
+**Resilience Patterns:**
+- **Timeouts:** Don't wait forever; fail fast after Nth millis.
+- **Retries:** Exponential backoff (1s, 2s, 4s, 8s...); max 3 retries.
+- **Bulkheads:** Isolate thread pools; payment service can't starve order service.
+- **Health checks:** Every 10s pings; remove unhealthy instances.
+- **Chaos engineering:** Netflix kills random instances in production to test resilience.
+
+[↑ Back to top](#fault-tolerance)
+
+---
+
+## Deep Dive: Logging
+
+**Structured Logging Best Practices:**
+```json
+{
+  "timestamp": "2026-04-08T10:15:30.123Z",
+  "level": "ERROR",
+  "service": "payment",
+  "trace_id": "abc-123-def",
+  "user_id": "user789",
+  "endpoint": "/api/checkout",
+  "method": "POST",
+  "status_code": 500,
+  "error": "payment_gateway_timeout",
+  "duration_ms": 5000,
+  "stack_trace": "...",
+  "metadata": {"amount": 99.99, "currency": "USD"}
+}
+```
+
+**Log Levels in Context:**
+```
+DEBUG: Entering function X with args [a=1, b=2]        → Use only in dev
+INFO: User 123 logged in successfully                   → Operational events
+WARN: Cache hit rate dropped to 60% (was 90%)           → Monitor
+ERROR: Failed to charge card after 3 retries            → Always log
+FATAL: Out of memory; process exiting                   → System critical
+```
+
+**Sampling Strategy (Cost Reduction):**
+```
+Log 100% of: WARN, ERROR, FATAL
+Log 1% of: INFO, DEBUG
+Result: Catch errors, but don't log every request (99% × 1K req/s = 10 events/s instead of 1K)
+```
+
+**Retention Policy (Compliance):**
+- GDPR: Right to deletion (30+ days minimum, but can't prove deletion without audit trail).
+- SOX/HIPAA: 5–7 years mandatory.
+- Strategy: Hot storage (7 days, fast), archive (60 days, cheaper), delete after policy.
+
+[↑ Back to top](#logging)
+
+---
+
+## Deep Dive: Metrics
+
+**Time-Series Database Basics:**
+```
+Metric: http_request_duration_seconds
+Tags: method=POST, endpoint=/api/checkout, status=200
+Value: 0.125 (seconds)
+Timestamp: 2026-04-08T10:15:30Z
+
+Every 10s, collect from all services → store in Prometheus
+Query: avg(http_request_duration_seconds{endpoint="/checkout"}) → get average latency
+```
+
+**Cardinality Explosion (Common Mistake):**
+```
+BAD: Metric http_requests_total with label user_id=USER_ID
+→ If 1B users, cardinality = 1B (database collapses)
+
+GOOD: Metric http_requests_total with labels endpoint, method, status (cardinality ~100)
+→ Query: count by endpoint; get per-endpoint counts
+```
+
+**Sampling Rates (Telemetry):**
+```
+Trace 100% of errors
+Trace 0.1% of successful requests (1 per 1000)
+Result: 1000 req/s traffic → ~100 traces/s logged (manageable)
+```
+
+**SLI/SLO/SLA Metrics:**
+- **SLI** (Indicator): % of requests < 200ms latency (e.g., 99.5%)
+- **SLO** (Objective): We commit to 99% availability
+- **SLA** (Agreement): If we miss SLO, customer gets credits
+- Measurement: (successful_requests / total_requests) × 100
+
+[↑ Back to top](#metrics)
+
+---
+
+## Deep Dive: Distributed Tracing
+
+**Trace Instrumentation (Using Jaeger):**
+```python
+from jaeger_client import Config
+
+config = Config(
+    config={
+        'sampler': {'type': 'const', 'param': 1},
+        'local_agent': {'reporting_host': 'localhost', 'reporting_port': 6831}
+    },
+    service_name='order-service'
+)
+tracer = config.initialize_tracer()
+
+with tracer.start_active_span('process_order') as scope:
+    with tracer.start_active_span('validate_payment'):
+        # Call payment service; trace auto-propagates
+        response = requests.post('http://payment-service/charge')
+```
+
+**Trace Propagation (Context Passing):**
+```
+Request Header:
+  X-Trace-ID: abc-123-def
+  X-Span-ID: span-1
+  X-Parent-Span-ID: span-0
+
+Service B receives header → creates child span with Parent-Span-ID=span-1
+→ Entire chain linked in tracing backend
+```
+
+**Sampling Strategy:**
+- **Head-based:** Sampler decides at request start (probability: 1% of requests).
+- **Tail-based:** Sampler decides after request completes (error traces always included).
+- Tail-based better (can sample all errors even if <1% of traffic).
+
+**Common Tracing Problems:**
+```
+1. Span timeout: Span never closed → trace appears broken
+   Fix: Use try-finally to ensure span.close()
+   
+2. Context loss: Service doesn't pass trace header
+   Fix: Use middleware to auto-propagate headers
+   
+3. Cardinality explosion: Every unique user_id = new trace type
+   Fix: Sample by status (100% errors, 1% success)
+```
+
+[↑ Back to top](#tracing)
+
+---
+
+## Deep Dive: Monitoring & Alerting
+
+**Alert Tuning (Reduce Alert Fatigue):**
+
+| Alert Type | Bad | Good |
+|---|---|---|
+| **Threshold** | CPU > 85% for 1 sec | CPU > 90% average over 5 min |
+| **Rate** | Any error | Error rate > 0.5% for 2 min consecutive |
+| **Anomaly** | p99 latency change > 10% | p99 > baseline + 2σ (statistical) |
+
+**Alert Routing & Escalation:**
+```
+1. Alert fires: payment_service down
+2. PagerDuty pages: on-call engineer
+3. If no ack after 15 min: escalate to team lead
+4. If no ack after 30 min: escalate to manager
+5. Incident created: auto-notify Slack, create postmortem
+
+On-call response:
+P1: <15 min (system down)
+P2: <1 hour (feature broken)
+P3: <4 hours (degraded)
+P4: <next day (minor issue)
+```
+
+**Monitoring Checklist:**
+- [ ] Latency: p50, p95, p99 per service
+- [ ] Error rate: % errors, error codes breakdown
+- [ ] Saturation: CPU %, disk %, memory %, connections
+- [ ] Traffic: QPS, throughput, request size distribution
+- [ ] Custom: application-specific metrics (order count, payment success rate)
+
+**Incident Response Runbook Example:**
+```
+ALERT: High error rate on /checkout
+
+1. Check: Error rate dashboard; what's the percentage?
+2. Check: Recent deployments; was something released?
+3. Check: Database metrics; is DB running?
+4. Check: Downstream services; is payment service down?
+5. Action: Roll back recent deployment OR scale up servers
+6. Verify: Error rate drops
+7. Postmortem: Why did it happen? How to prevent?
+```
+
+[↑ Back to top](#monitoring)
+
+---
+
+## Deep Dive: Forward & Reverse Proxy
+
+**Forward Proxy (Client-Side):**
+```
+Client Request: GET http://google.com/search
+    ↓
+    Client → Forward Proxy (IP: 10.0.0.1)
+    ↓
+    Forward Proxy → Google (Client IP hidden; Google sees proxy IP)
+    ↓
+    Response → Forward Proxy → Client
+```
+
+**Use Cases:**
+- Corporate employee accessing the web (company monitors traffic).
+- Anonymity: Hide real IP address.
+- Geographic bypass: Proxy in another country.
+- Content filtering: Block adult sites, malicious domains.
+
+**Reverse Proxy (Server-Side):**
+```
+Client Request: GET https://example.com/api/users
+    ↓
+    Client → Reverse Proxy (public IP)
+    ↓
+    Reverse Proxy routes to:
+    ├── Backend 1 (IP: 10.0.0.10)
+    ├── Backend 2 (IP: 10.0.0.11)
+    └── Backend 3 (IP: 10.0.0.12)
+    ↓
+    Backend servers don't expose IPs (hidden)
+```
+
+**Reverse Proxy Features:**
+- **Load Balancing:** Distribute traffic across backends.
+- **SSL Termination:** Decrypt at proxy; talk plain HTTP to backends (backends don't need SSL certs).
+- **Caching:** Cache responses; don't hit backends.
+- **WAF (Web App Firewall):** Block SQL injection, XSS, DDoS.
+- **Rate Limiting:** 100 req/sec per IP.
+
+**Popular Reverse Proxies:**
+- NGINX: Fast, lightweight, used by 30% of web (load balancing, caching).
+- HAProxy: High-performance, extreme reliability (financial institutions).
+- AWS ALB: Managed, auto-scales, integrates with AWS services.
+- Envoy: Modern, used in service meshes (Istio), gRPC support.
+
+**Comparison: Forward vs Reverse:**
+
+| Aspect | Forward Proxy | Reverse Proxy |
+|---|---|---|
+| **Initiator** | Client | Server |
+| **Client sees** | Proxy IP | Reverse proxy IP (transparent to client) |
+| **Use** | Employee internet access | Load balancing, SSL termination |
+| **IP hiding** | Client IP hidden | Backend IP hidden |
+| **Examples** | Corporate proxy, VPN | NGINX, HAProxy, AWS ALB |
+
+[↑ Back to top](#proxy)
+
+---
+
+## Deep Dive: Bloom Filters (Detailed Implementation)
+
+**Bloom Filter vs Hash Set Memory Comparison:**
+
+```
+Scenario: Store 1M URLs (blacklist)
+
+Hash Set Approach:
+  URL length: ~100 bytes × 1M = 100 MB
+  HashSet overhead (~25%): +25 MB
+  Total: ~125 MB
+
+Bloom Filter Approach:
+  Bit array: 10 bits per item × 1M = 10M bits = 1.25 MB
+  Hash functions: 7 (small constant)
+  False positive rate: ~1%
+  Total: ~1.25 MB
+```
+
+**Implementation (Python):**
+```python
+import hashlib
+
+class BloomFilter:
+    def __init__(self, size_bits, num_hashes):
+        self.size = size_bits
+        self.bits = [0] * size_bits
+        self.num_hashes = num_hashes
+    
+    def add(self, item):
+        for i in range(self.num_hashes):
+            hash_val = int(hashlib.md5(f"{item}{i}".encode()).hexdigest(), 16)
+            index = hash_val % self.size
+            self.bits[index] = 1
+    
+    def contains(self, item):
+        for i in range(self.num_hashes):
+            hash_val = int(hashlib.md5(f"{item}{i}".encode()).hexdigest(), 16)
+            index = hash_val % self.size
+            if self.bits[index] == 0:
+                return False  # Definitely not in set
+        return True  # Probably in set (1% false positive)
+```
+
+**Cascading Bloom Filters (Scalability):**
+```
+Level 1 (newest 1M items): Check first
+  ├─ If found: return "probably in set"
+  ├─ If not: check Level 2
+Level 2 (1M–10M items): Check if not in Level 1
+  └─ If not found in both: return "definitely not in set"
+```
+Benefits: Add new filters without rehashing existing data.
+
+**Real-world: Cassandra's Bloom Filter:**
+```
+Cassandra stores LSM trees (levels). Each level has Bloom filter.
+Query: Find user_id=123
+1. Check Level 1 Bloom filter → not found
+2. Check Level 2 Bloom filter → found (probably)
+3. Do disk seek only for Level 2 (skip Levels 1, 3, 4)
+Result: 80% of disk seeks avoided (major CPU savings for LinkedIn-scale)
+```
+
+[↑ Back to top](#bloomfilters)
+
+---
+
+## Deep Dive: Circuit Breaker (Detailed Patterns)
+
+**State Transitions with Timeouts:**
+```
+[CLOSED] (normal state)
+  ├─ Every request succeeds → stay CLOSED
+  ├─ 5 failures in a row → transition to OPEN
+  
+[OPEN] (fail fast)
+  ├─ Duration: 30 seconds
+  ├─ After 30s → transition to HALF_OPEN (test recoveryy)
+  
+[HALF_OPEN] (test recovery)
+  ├─ Allow 1 test request
+  ├─ If successful → CLOSED (recovered)
+  ├─ If fails → OPEN (not ready)
+```
+
+**Circuit Breaker with Fallback:**
+```python
+class CircuitBreakerWithFallback:
+    def call(self, request):
+        try:
+            return self.protected_call(request)
+        except CircuitBreakerOpenException:
+            # Fallback strategy
+            if request.endpoint == "/payment/charge":
+                return self.queue_for_later(request)  # Eventual retry
+            elif request.endpoint == "/user/profile":
+                return self.get_cached_profile()  # Return stale data
+            else:
+                return {"error": "service_unavailable"}  # Return error
+```
+
+**Metrics from Circuit Breaker:**
+```
+CircuitBreaker_State: OPEN (time series: when transitions occur)
+CircuitBreaker_FailureRate: 0.85 (85% failures)
+CircuitBreaker_RequestsBlocked: 1200 (how many fast-failed)
+CircuitBreaker_Recovery: 1 (how many half-open tests succeeded)
+
+Alert: if CircuitBreaker_State == OPEN for > 5 min → page engineer
+```
+
+**Multi-level Circuit Breaker (Complex Systems):**
+```
+API Gateway Circuit Breaker (overall system)
+  ├─ Order Service Circuit Breaker (for payment service integration)
+  ├─ Order Service Circuit Breaker (for inventory service integration)
+  └─ ...
+
+Single failure (payment down) → Order service CB opens
+  But other services (inventory, fulfillment) unaffected
+```
+
+[↑ Back to top](#circuitbreaker)
 
 ---
 
