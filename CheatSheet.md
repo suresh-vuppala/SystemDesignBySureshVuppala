@@ -9,15 +9,17 @@
 
 | Category | Topics |
 |---|---|
+| **Fundamentals** | [TCP/UDP](#-tcpudp) · [HTTP/HTTPS](#-httphttps) · [DNS](#-dns) · [Fault Tolerance](#-fault-tolerance) |
+| **Security** | [Authentication](#-authentication) · [Authorization](#-authorization) |
 | **Storage** | [SQL](#-sql-relational-db) · [NoSQL](#-nosql) · [NewSQL](#-newsql) · [Time-Series DB](#-time-series-db) · [Search Engine](#-search-engine-elasticsearch--solr) |
 | **Caching** | [Cache Strategies](#-caching) · [Redis](#-redis) · [CDN](#-cdn) |
 | **Messaging** | [Message Queues](#-message-queue-rabitmq--sqs) · [Kafka](#-apache-kafka) · [Pub/Sub](#-pubsub-google-pub--sub--sns) |
 | **APIs & Comms** | [REST](#-rest-api) · [gRPC](#-grpc) · [GraphQL](#-graphql) · [Real-time](#-real-time-communication) |
 | **Compute** | [Microservices](#-microservices) · [Serverless](#-serverless) · [Service Mesh](#-service-mesh) |
-| **Networking** | [Load Balancer](#-load-balancer) · [API Gateway](#-api-gateway) · [Reverse Proxy](#-reverse-proxy) |
+| **Infrastructure** | [Load Balancer](#-load-balancer) · [API Gateway](#-api-gateway) · [Forward/Reverse Proxy](#-forward--reverse-proxy) |
 | **Consistency** | [CAP Theorem](#-cap-theorem) · [Consistency Models](#-consistency-models) · [Distributed Transactions](#-distributed-transactions) · [Concurrency Control](#-concurrency-control) |
-| **Patterns** | [Bloom Filters](#-bloom-filters) · [Circuit Breaker](#-circuit-breaker) · [Sharding](#-sharding) · [Replication](#-replication) · [Rate Limiting](#-rate-limiting) |
-| **Infra** | [Blob Storage](#-blob-storage-s3--gcs) · [DNS](#-dns) · [Data Warehouse](#-data-warehouse) |
+| **Data Pipelines** | [CDC](#-change-data-capture-cdc) · [Sharding](#-sharding) · [Replication](#-replication) · [Rate Limiting](#-rate-limiting) |
+| **Storage** | [Blob Storage](#-blob-storage-s3--gcs) · [Data Warehouse](#-data-warehouse) |
 
 ---
 
@@ -246,6 +248,363 @@ Query: "blue shoes under $100"
 Postgres full-text search exists but Elasticsearch is superior at scale.
 
 > 🔗 [Deep Dive: Search Engine](#deep-dive-search-engine)
+
+---
+
+## ⚡ FUNDAMENTALS & NETWORKING
+
+---
+
+### 🟦 TCP/UDP
+> **Transport layer protocols: TCP (reliable, ordered), UDP (fast, unreliable)**
+
+| **TCP (Transmission Control Protocol)** | **UDP (User Datagram Protocol)** |
+|---|---|
+| **Connection-oriented:** Handshake before data | **Connection-less:** Send immediately (no setup) |
+| **Ordered delivery:** Packets arrive in sequence | **Unordered:** Packets may arrive out-of-order |
+| **Guaranteed delivery:** Retransmits lost packets | **Best-effort:** Lost packets not retransmitted |
+| **Slow:** Acknowledgments + retries overhead | **Fast:** Minimal overhead (50+ Mbps vs 10+ Gbps UDP) |
+| **Flow control:** Prevents overwhelming receiver | **No flow control:** Sender controls pace entirely |
+
+**TCP Three-Way Handshake (SYN, SYN-ACK, ACK):**
+```
+Client                          Server
+  |                               |
+  |---- SYN (seq=100) --------→  |
+  |                               |
+  |  ←---- SYN-ACK (seq=300, ack=101) ----|
+  |                               |
+  |---- ACK (seq=101, ack=301) -→|
+  |                               |
+  └──────────── Connection Established ──────────────
+```
+**Guarantees:** 3-way handshake establishes connection, enables error detection, checksums verify data integrity.
+
+**When to use:**
+- **TCP:** Banking (transactions must be complete), email, HTTPS, file transfer, anything requiring reliability.
+- **UDP:** Live video/audio streaming (some loss ok), gaming, DNS queries, IoT sensors (fire-and-forget), VoIP.
+
+**Port numbers to know:** TCP (80:HTTP, 443:HTTPS, 3306:MySQL, 5432:Postgres) · UDP (53:DNS, 123:NTP, 161:SNMP).
+
+---
+
+### 🟦 HTTP/HTTPS
+> **Application layer: HTTP (plaintext), HTTPS (encrypted with TLS/SSL)**
+
+| **HTTP** | **HTTPS** |
+|---|---|
+| **Port 80** | **Port 443** |
+| **Plaintext:** Anyone can read (unencrypted) | **Encrypted:** TLS/SSL protects data |
+| **No authentication:** Server identity unverified | **Certificate-based:** Server proves identity (CA signed) |
+| **No integrity:** Data can be modified in transit | **Integrity:** Checksums prevent tampering |
+| **Fast:** No encryption overhead (~5% savings) | **Slight overhead:** Encryption + cert validation (~10ms) |
+
+**TLS Handshake (TLS 1.3):**
+```
+Client                          Server
+  |                               |
+  |---- Client Hello (ciphers, version) -→
+  |  ←--- Server Hello (cipher, certificate)
+  |  ←--- [encrypted extensions & finished]
+  |                              
+  |---- Finished (encrypted) -→  |
+  |                               |
+  └──────── Encrypted Connection ──────────────
+```
+
+**Core Guarantees:**
+- **Confidentiality:** Encrypted (AES-256).
+- **Integrity:** Tamper-proof (SHA-256 HMAC).
+- **Authenticity:** Server certificate verified by Certificate Authority.
+- **Forward secrecy:** Session key discarded after use (if using ECDHE).
+
+**HTTP Methods (recap):**
+- **GET** — Retrieve data (safe, idempotent, cacheable).
+- **POST** — Create data (not idempotent, side effects).
+- **PUT** — Replace data (idempotent, whole resource).
+- **PATCH** — Partial update (not idempotent, subset of fields).
+- **DELETE** — Remove data (idempotent, removes resource).
+- **HEAD** — Like GET but no body (for headers only).
+- **OPTIONS** — Describe communication options (CORS preflight).
+
+**HTTP Status Codes (common):**
+- **2xx Success:** 200 OK, 201 Created, 204 No Content.
+- **3xx Redirect:** 301 Moved, 302 Found, 304 Not Modified.
+- **4xx Client Error:** 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict.
+- **5xx Server Error:** 500 Internal, 502 Bad Gateway, 503 Unavailable, 504 Gateway Timeout.
+
+**When to use:**
+- **HTTP:** Internal networks, testing, non-sensitive data.
+- **HTTPS:** Everything in production. **Mandatory for:** Login, payments, health data, GDPR compliance, financial transactions.
+
+**Real-world:** All major sites enforce HTTPS (HTTP → HTTPS 301 redirect). Let's Encrypt provides free certificates.
+
+---
+
+## ⚡ SECURITY
+
+---
+
+### 🟥 Authentication
+> **Verifying identity: "Who are you?" (Login & Credentials)**
+
+**Authentication Methods:**
+
+| Method | Protocol | Best For | Security |
+|---|---|---|---|
+| **Basic Auth** | `Authorization: Basic base64(user:pass)` | Internal APIs | ⚠️ Low (use HTTPS only) |
+| **API Key** | `X-API-Key: abc123...` | Service-to-service, public APIs | ⚠️ Medium (needs rotation) |
+| **Session Cookie** | Server creates session; browser sends cookie | Web apps | ✓ Medium (CSRF protection needed) |
+| **Token (JWT)** | `Authorization: Bearer eyJh...` | Stateless APIs, microservices | ✓✓ High (if using RS256) |
+| **OAuth 2.0** | 3rd-party login (Google, GitHub) | "Sign in with..." features | ✓✓ High (delegated auth) |
+| **SAML** | XML-based enterprise auth | Corporate SSO | ✓✓ High (for enterprises) |
+| **Kerberos** | Ticket-based (mutual auth) | Windows networks | ✓✓ High |
+
+**JWT (JSON Web Token) Breakdown:**
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 (Header)
+.
+eyJzdWIiOiJ1c2VyMTIzIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ (Payload)
+.
+SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c (Signature)
+
+Header: {"alg": "HS256", "typ": "JWT"}
+Payload: {"sub": "user123", "name": "John Doe", "iat": 1516239022, "exp": 1516242622}
+Signature: HMAC(HS256, Header.Payload, secret_key)
+```
+
+**JWT Algorithms:**
+- **HS256 (HMAC):** Single server; shared secret. ⚠️ If secret leaked, all tokens forged.
+- **RS256 (RSA):** Distributed; public/private key. ✓✓ Private key on auth server only; public key on services.
+
+**Core Guarantees:**
+- **Identity:** Server verified it's actually the user.
+- **Token integrity:** Signature proves token wasn't tampered with.
+- **Expiration:** Token expires after N seconds (force re-auth).
+- **No replay:** Each token bound to session/timestamp.
+
+**Best Practices:**
+- Store JWT in **httpOnly cookie** (not localStorage; XSS-proof).
+- Use **RS256** for microservices; HS256 for monoliths.
+- **Always HTTPS** (JWT in plaintext = instantly compromised).
+- Implement **token refresh:** Short-lived access token (15 min) + long-lived refresh token (7 days).
+- **Invalidate on logout:** Server-side blacklist or short TTL.
+- **Include user context:** sub (subject/user ID), iat (issued at), exp (expiration).
+
+**Real-world:** Google generates JWT tokens for APIs. GitHub OAuth lets you "Sign in with GitHub" on third-party apps.
+
+---
+
+### 🟥 Authorization
+> **Verifying permissions: "What are you allowed to do?" (Access Control)**
+
+**Authorization Models:**
+
+| Model | Definition | Use Case | Complexity |
+|---|---|---|---|
+| **Role-Based (RBAC)** | Users assigned roles; roles have permissions | Most systems, teams | Low |
+| **Attribute-Based (ABAC)** | Rules based on attributes (user role, resource, time, location) | Fine-grained; healthcare, finance | High |
+| **Access Control Lists (ACL)** | Per-resource list: who can do what | File systems, S3 policies | Medium |
+| **Policy-Based** | JSON policies define rules (AWS IAM) | Cloud platforms, multi-tenant | High |
+
+**RBAC Example:**
+```
+User: john@example.com
+Role: Editor
+Permissions: read, write, delete (own posts), edit profile
+
+User: jane@example.com
+Role: Admin
+Permissions: read, write, delete (all), manage users, view logs, manage settings
+```
+
+**ABAC Example:**
+```
+Rule: Allow if
+  - user.department == "finance"
+  AND resource.type == "payroll"
+  AND time >= 9:00 AND time <= 17:00
+  AND ip_address in [192.168.0.0/16]
+→ Grant access (else deny)
+```
+**Benefit:** Very granular (can't access after hours from unknown IP).
+
+**Guarantees:**
+- **Least privilege:** Users only get minimal permissions needed.
+- **Deny by default:** Permissions explicitly granted (not implicit).
+- **Auditability:** Log who accessed what (GDPR, HIPAA, SOX compliance).
+- **No privilege escalation:** Can't promote yourself to admin.
+
+**Best Practices:**
+- **Separation of duties:** No one person approves + executes (payment approval, fund transfer).
+- **Role hierarchies:** Admin > Moderator > User > Guest (inherit permissions downward).
+- **Regular audits:** Remove unused permissions (quarterly).
+- **Test authorization:** Test blocked access too (user cannot access, admin can).
+- **Time-based access:** Revoke access after contract ends (auto-expire).
+
+**Real-world:** GitHub uses RBAC (owner, maintainer, contributor, viewer roles). AWS IAM uses policy-based (JSON policies with conditions).
+
+---
+
+## ⚡ DATA PIPELINES
+
+---
+
+### 🟦 Change Data Capture (CDC)
+> **Streaming database changes to downstream systems (Event-driven data sync)**
+
+**How CDC Works:**
+```
+Database Change Log:
+  INSERT user='alice', email='alice@ex.com'
+   ↓ (CDC tool reads continuously)
+  UPDATE user SET status='active' WHERE id=1
+   ↓
+  DELETE user WHERE id=2
+   ↓
+  → Message Broker (Kafka) or Event Stream
+       ↓ Consumers:
+       ├─ Search Index (Elasticsearch) - update search results
+       ├─ Analytics (BigQuery/Snowflake) - append to warehouse
+       ├─ Cache (Redis) - invalidate old cache
+       └─ Replica DB - replay to stay in sync
+```
+
+| ✅ Strengths | ❌ Weaknesses |
+|---|---|
+| **Single source of truth:** DB is authoritative | **Latency:** Event delivery not instant (ms to seconds) |
+| **Event ordering:** Changes in sequence (per partition) | **Eventually consistent:** Replicas lag behind |
+| **No app code changes:** DB handles change capture | **Complexity:** Need CDC tool (Debezium, etc.) |
+| **Multi-consumer:** Consumers independently process | **Schema evolution:** Backward compatibility required |
+
+**CDC Tools & Platforms:**
+
+| Tool | Sources | Destinations | Best For |
+|---|---|---|---|
+| **Debezium** | PostgreSQL, MySQL, MongoDB, Oracle, SQL Server | Kafka, S3, data lakes | Open-source, flexible, on-premise |
+| **AWS DMS** | Any DB | RDS, S3, Redshift, Kinesis | AWS-native, serverless |
+| **Fivetran** | 200+ SaaS & DB sources | Warehouses, data lakes | Zero-code, commercial |
+| **Striim** | Real-time DB sources | Kafka, data lakes | Complex transformations |
+| **Maxwell** | MySQL only | Kafka, files | Lightweight, MySQL-specific |
+
+**Core Guarantees:**
+- **Capture all changes:** At-least-once delivery (duplicates possible; consumer must be idempotent).
+- **Ordering per table:** Changes for a user always in order (within partition).
+- **Durability:** Changes logged in database transaction log before commit.
+
+**Example (E-commerce):**
+```
+1. Order Service: UPDATE inventory SET qty = qty - 1 WHERE id=5
+2. CDC captures: operational_db.inventory: {"op": "update", "before": {"qty": 10}, "after": {"qty": 9}}
+3. Consumers process:
+   - Real-time dashboard: qty now shows 9 (low stock warning)
+   - Analytics pipeline: Sends to Kafka → BigQuery
+   - Cache invalidation: Removes product from cache (force refresh on next view)
+   - Replica sync: Secondary DB receives update (stays in sync)
+```
+
+**Real-world:** LinkedIn uses CDC to sync data across multiple data warehouses (100+ Kafka topics). Shopify uses CDC for real-time inventory across regions. Uber uses CDC for rider/driver data consistency.
+
+---
+
+### 🟦 Fault Tolerance & Reliability
+> **Building systems that survive failures without losing functionality**
+
+**Fault vs Failure:**
+- **Fault:** Component breaks (disk fails, network drops, server crashes, software bug).
+- **Failure:** System stops working (users can't complete transactions, API returns 500).
+- **Goal:** Tolerate faults without system-wide failure.
+
+**Failure Types & Mitigations:**
+
+| Failure | Cause | Mitigation | RTO* | RPO** |
+|---|---|---|---|---|
+| **Hardware** | Disk corruption, server dies | Replication (2+ copies), RAID | 1 min | 0 sec |
+| **Network** | Packet loss, high latency, partition | Retry, circuit breaker, multi-region | 5 sec | 0 sec |
+| **Software** | Bug, memory leak, deadlock, OOM | Health checks, restart, canary deploy | 30 sec | 5 sec |
+| **Cascading** | One service down → dependent services fail | Timeout, bulkheads, fallbacks | 10 sec | 1 sec |
+| **Data corruption** | Silent data loss, encryption failure | Backup, replication, checksums | 1 hour | 15 min |
+
+*RTO = Recovery Time Objective (how long until service restored)  
+**RPO = Recovery Point Objective (how much data loss acceptable)
+
+**Redundancy Models:**
+
+| Model | Setup | Pros | Cons |
+|---|---|---|---|
+| **Active-Passive** | 1 primary, 1 standby (not serving traffic) | Simple failover | Standby machine idle; failover delay |
+| **Active-Active** | 2+ primaries both serving traffic | No idle capacity, fast failover | Complex (conflict resolution, state) |
+| **N+1** | N servers + 1 spare | Survives N failures | Extra cost (33% overhead) |
+
+**Availability Tiers:**
+```
+99.0%   → 87.6 hours downtime/year       (basic, home projects)
+99.9%   → 8.76 hours downtime/year       (enterprise standard)
+99.99%  → 52 minutes downtime/year       (high-availability)
+99.999% → 5 minutes downtime/year        (ultra-high; Google/AWS-grade; very costly)
+
+Formula: Downtime (min) = (1 - availability) × 365 × 24 × 60
+```
+
+**Resilience Patterns:**
+
+1. **Timeouts:** Don't wait forever for external calls.
+   ```
+   Call Payment API with 5s timeout
+   If timeout → Fail fast (don't retry indefinitely)
+   ```
+
+2. **Retries (Exponential Backoff):** Transient failures recover.
+   ```
+   Attempt 1: Immediate (0s)
+   Attempt 2: Wait 1s (database might have restarted)
+   Attempt 3: Wait 2s
+   Attempt 4: Wait 4s
+   Attempt 5: Wait 8s max (don't retry forever; max 3 attempts typical)
+   ```
+
+3. **Circuit Breaker:** Stop retrying when clearly broken.
+   ```
+   [CLOSED] ← Requests pass through
+     ↓ (5 failures)
+   [OPEN] ← Requests fail immediately (don't call downstream)
+     ↓ (wait 30s)
+   [HALF_OPEN] ← Try 1 request
+     ├─ Success → Back to CLOSED
+     └─ Failure → Back to OPEN
+   ```
+
+4. **Bulkheads:** Isolate thread pools; one service doesn't starve others.
+   ```
+   Thread pool 1: Service A (max 10 threads)
+   Thread pool 2: Service B (max 10 threads)
+   If Service A hangs, only its 10 threads blocked (Service B unaffected)
+   ```
+
+5. **Health Checks:**
+   - **Liveness:** Is service alive? (responds to /health).
+   - **Readiness:** Can it handle traffic? (dependencies ok, DB connected).
+
+**Example (Payment Service Failure):**
+```
+Order Service calls Payment Service:
+Attempt 1: timeout (payment service slow) → retry
+Attempt 2: timeout → retry
+Attempt 3: timeout → 4th attempt would wait 8s
+Circuit opens: Return "Payment temporarily unavailable" (fail fast)
+User sees: "Transaction failed; try again later"
+Payment service recovers (30s later)
+Circuit half-opens: Test 1 request
+Test succeeds: Circuit closes
+Resume normal traffic
+```
+
+**Guarantees:**
+- **No SPOF:** At least 2 of everything (2 DBs, 2 LBs, 2 regions).
+- **Graceful degradation:** Partial outage doesn't mean 100% failure (cache results, serve stale).
+- **Observability:** Monitor failures (metrics, logs, alerts).
+
+**Real-world:** Netflix Chaos Monkey deliberately breaks things to test resilience. AWS multi-AZ ensures zone-level failures don't affect service. Stripe uses bulkheads for payment processing (one failing region doesn't affect others).
 
 ---
 
@@ -555,39 +914,108 @@ Client A ←────P2P───► Client B
 | **Bitmap** | `SETBIT dau:2024-01-15 12345 1` | Daily active users, feature flags, attendance |
 | **HyperLogLog** | `PFADD unique:visitors ip1 ip2 ip3` | Approximate unique count (error: 0.81%) |
 
-**Redis Pub/Sub:**
-```
-Publisher: PUBLISH channel:notification "alert"
-Subscriber A: SUBSCRIBE channel:notification → receives "alert"
-Subscriber B: SUBSCRIBE channel:notification → receives "alert"
-Subscriber C: Not listening → misses message
+#### Redis Pub/Sub (Fire-and-Forget Broadcasting)
+**Pattern:** Publisher sends to channel; all current subscribers receive (no history, no persistence).
 
-Cons:
-- Messages not persisted → Subscriber 4 connecting later gets nothing
-- Fire-and-forget: no ack, no retry
-- Limited to pattern-based routing (PSUBSCRIBE)
 ```
-Best for: Real-time notifications, live updates, cache invalidation signals. NOT for reliable messaging.
+Publisher: PUBLISH chat:room1 "Hello everyone!"
+Subscriber A: SUBSCRIBE chat:room1 → receives "Hello everyone!"
+Subscriber B: SUBSCRIBE chat:room1 → receives "Hello everyone!"
+Subscriber C: Not listening → MISSES message (not stored)
+Subscriber D: Joins later → NO MESSAGE HISTORY (can't replay)
+```
 
-**Redis Streams (Kafka-like):**
-```
-XADD events * user_id 123 action "click"
-  → Entry ID: 1704067200000-0 (timestamp-sequence)
-  
-XREAD COUNT 1 STREAMS events 0
-  → Returns: [Entry 1, Entry 2, ...]
+| ✅ Strengths | ❌ Weaknesses |
+|---|---|
+| **Real-time:** Instant delivery to subscribers (~1ms) | **No persistence:** Messages lost if no subscribers |
+| **Fan-out:** One publish → all subscribers receive | **No replay:** Subscriber joining late misses all history |
+| **Pattern matching:** PSUBSCRIBE channel:* | **No ack/retry:** Fire-and-forget (can lose messages) |
+| **Low latency:** Minimal overhead | **Limited routing:** Can't do complex message routing |
 
-XGROUP CREATE events group1 0
-XREADGROUP GROUP group1 consumer1 STREAMS events >
-  → Only unread entries, tracks consumer offset
-  
-Guarantees:
-✓ Messages persisted (within retention window)
-✓ Replay via XREAD from any point
-✓ Consumer groups with offsets (exactly-once possible)
-✓ Blocking reads
+**Use cases:** Live chat notifications, real-time collaboration (Figma), cache invalidation signals, activity feeds (online status), sports live scores.
+
+**Example:**
 ```
-Best for: Event sourcing, activity logs, lightweight message streaming <100K events/sec.
+PUBLISH user:123:online "active"
+→ Multiple services listening get notification
+   - Messaging service sees user online → enables chat
+   - Presence service sees user online → updates status
+   - Analytics sees login → increments counter
+```
+
+---
+
+#### Redis Streams (Persistent Message Log with Consumer Groups)
+**Pattern:** Append-only log of entries; multiple consumer groups track progress independently.
+
+```
+XADD events * user_id 123 action "purchase" amount 99.99
+  → Returns: 1704067200000-0 (timestamp-sequence, auto-generated)
+
+XREAD COUNT 10 STREAMS events 0
+  → Returns all 10 entries; blocks if empty
+
+XGROUP CREATE events order-service 0  (group named "order-service")
+XREADGROUP GROUP order-service consumer1 STREAMS events >
+  → Returns unread entries (since group creation)
+  → Tracks: which consumer processed which entries
+
+If consumer1 crashes:
+  Consumer2 takes over: XREADGROUP GROUP order-service consumer2 STREAMS events >
+  → Gets entries consumer1 didn't finish (auto-rebalance)
+```
+
+| ✅ Strengths | ❌ Weaknesses |
+|---|---|
+| **Persistent:** Messages survive server restart (AOF/RDB) | **Single-threaded:** Can't parallelize per-entry processing (partition across multiple keys if needed) |
+| **Consumer groups:** Track offset per group (exactly-once semantics) | **No ordering across streams:** Different streams = different order |
+| **Replay:** Read from any offset (XREAD with ID, XRANGE) | **Not as fast as Kafka:** Single node <100K events/sec typical |
+| **Blocking reads:** XREAD BLOCK 0 (wait if empty) | **Manual consumer management:** No auto-scaling like Kafka |
+| **Range queries:** XRANGE events - + (all entries, with filtering) | **Cluster replication:** Must use Sentinel/Cluster (no built-in HA) |
+
+**Consumer Group Guarantees:**
+- **Exactly-once:** Once consumer ACKs (XACK), entry marked done.
+- **Auto-rebalance:** If consumer dies, other consumers auto-assigned (need to call XREADGROUP again).
+- **Pending entries:** XPENDING events group (shows unacknowledged entries).
+
+**Real-world use cases:** Activity logs (audit trail), event sourcing (rebuild state), order processing workflow, IoT sensor streams, real-time analytics pipelines.
+
+**Example (Order Processing):**
+```
+1. Order created:
+   XADD orders * customer_id 5 amount 100 status "pending"
+   
+2. Payment service:
+   XGROUP CREATE orders payment-service 0
+   XREADGROUP GROUP payment-service consumer1 STREAMS orders > (blocks)
+   → Gets order → Charges card → XACK orders payment-service {entry_id}
+   
+3. Fulfillment service (independent):
+   XGROUP CREATE orders fulfillment-service 0
+   XREADGROUP GROUP fulfillment-service consumer1 STREAMS orders > (blocks)
+   → Gets order → Ships → XACK
+   
+4. Analytics service (independent):
+   XGROUP CREATE orders analytics 0
+   XREADGROUP GROUP analytics consumer1 STREAMS orders > (blocks)
+   → Gets order → Logs to DW → XACK
+   
+5. Crash recovery:
+   If payment service crashes: Consumer2 processes pending entries (XPENDING)
+```
+
+**Redis Pub/Sub vs Streams:**
+
+| Feature | Pub/Sub | Streams |
+|---|---|---|
+| **Persistence** | ✗ | ✓ (within retention) |
+| **Replay** | ✗ | ✓ (from any offset) |
+| **Consumer groups** | ✗ | ✓ (with offset tracking) |
+| **Exactly-once** | ✗ | ✓ (with ACK) |
+| **Latency** | <1ms | <5ms |
+| **Best for** | Real-time notifications | Event log, queuing |
+
+---
 
 **Persistent Modes:**
 - **RDB (Snapshot):** Periodic `BGSAVE` → compact file. Fast restore, data loss since last snapshot possible.
@@ -870,18 +1298,78 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-### 🟥 Reverse Proxy
-> **Examples:** NGINX, HAProxy, Caddy, Cloudflare
+### 🟥 Forward & Reverse Proxy
+> **Network intermediaries: Forward Proxy (client-side), Reverse Proxy (server-side)**
 
-| ✅ Good At | ❌ Bad At |
+**Forward Proxy (Client Perspective):**
+```
+Client (Internal Network)
+  ↓ (forwards request through proxy)
+Forward Proxy
+  ↓ (makes request to external internet)
+External Server
+```
+Client talks to proxy; proxy fetches from internet on their behalf.
+
+| ✅ Strengths | ❌ Weaknesses |
 |---|---|
-| Hiding backend topology from clients | Not a replacement for a full API Gateway |
-| Caching, compression, SSL termination | Dynamic complex routing |
-| DDoS/abuse mitigation | |
+| **Privacy:** Hide client IP from internet | **Performance:** Extra hop adds latency |
+| **Content filtering:** Block malicious sites | **Single point of failure:** If proxy down, no internet |
+| **Caching:** Cache popular responses | **Complexity:** Must configure each client |
+| **Logging:** Monitor employee internet usage | **Not for high-volume:** Can become bottleneck |
 
-**Real-world use cases:** Static asset serving · SSL offloading · Rate limiting at edge · Backend for frontend (BFF) pattern
+**Use cases:** Corporate networks (employees behind proxy), accessing restricted regions, anonymity, bandwidth caching.
 
-> 🔗 [Deep Dive: Reverse Proxy](#deep-dive-reverse-proxy)
+---
+
+**Reverse Proxy (Server Perspective):**
+```
+Internet Clients
+  ↓ (external request)
+Reverse Proxy (Public IP)
+  ↓ (routes to backend)
+Backend Servers (Private IPs)
+```
+Clients talk to proxy; proxy forwards to internal backends (clients don't know internal topology).
+
+| ✅ Strengths | ❌ Weaknesses |
+|---|---|
+| **Hide backend:** Clients don't see internal IPs | **Added latency:** Extra hop through proxy |
+| **Load balancing:** Distribute traffic across servers | **Becomes bottleneck:** If proxy not scaled |
+| **SSL termination:** Decrypt HTTPS at proxy (backends use HTTP) | **Single point of failure:** Must be HA (2+ proxies) |
+| **Caching:** Cache responses before returning to client | **Complex**: State tracking, session persistence |
+| **DDoS protection:** Absorb attacks before reaching backends | |
+| **Rate limiting:** Throttle abusive clients | |
+| **Compression:** Compress responses (gzip) | |
+
+**Use cases:** Web server fleets (NGINX in front of 100 servers), microservice ingress, SSL offloading, CDN edge nodes.
+
+**Forward vs Reverse Proxy:**
+
+| Aspect | Forward Proxy | Reverse Proxy |
+|---|---|---|
+| **Initiator** | Client (knows about proxy) | Client (doesn't know about proxy) |
+| **IP visibility** | Client IP hidden from server | Server IPs hidden from client |
+| **Primary use** | Privacy, filtering, caching | Load balancing, SSL, DDoS protection |
+| **Setup** | Configure each client | Configure at server entry point |
+| **Scaling** | Hard (each client needs config) | Easy (single entry point scales) |
+| **Example** | Corporate/VPN proxy | AWS ALB, NGINX, Cloudflare |
+
+**Real-world example (Reverse Proxy):**
+```
+Client in Brazil: GET https://api.example.com/users
+
+Reverse Proxy (Cloudflare edge in Brazil):
+  1. Decrypt TLS (SSL termination)
+  2. Check cache (hit) → return stored response
+  3. Route to backend (miss) → forward to Oregon data center
+  4. Cache response locally (for next client)
+  5. Encrypt response → send to client
+
+Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
+```
+
+> 🔗 [Deep Dive: Forward/Reverse Proxy](#deep-dive-forward-reverse-proxy)
 
 ---
 
@@ -1272,95 +1760,6 @@ Storage Reference:
   1M users × 1KB profile = ~1 GB
   1B users × 1KB profile = ~1 TB
 ```
-
----
-
----
----
-
-# 📚 FUNDAMENTALS
-
----
-
-## System Design Fundamentals
-
-### Scaling Tiers
-**Vertical Scaling (up):** Bigger machine (more CPU, RAM, disk).
-- Pros: Simple (no code changes).
-- Cons: Hits ceiling; expensive; SPOF.
-
-**Horizontal Scaling (out):** More machines.
-- Pros: Unlimited (add more nodes). Cost-effective.
-- Cons: Complexity (coordination, consistency, partitioning).
-
-### Request Flow
-```
-User Request
-  → DNS (resolve domain → IP)
-  → LB (pick server)
-  → API Gateway (auth, rate limit, routing)
-  → Service (business logic)
-  → Cache (Redis? Hit → return)
-  → DB (hit → return)
-  → Response
-```
-
-### Replication Models
-**Leader-Follower (Primary-Secondary):**
-- Single writer (leader), many readers (followers).
-- Pros: Strong consistency on reads.
-- Cons: Leader bottleneck for writes.
-
-**Multi-Leader (Active-Active):**
-- Multiple writers (W1, W2, W3).
-- Pros: Write scalability, geo-distributed.
-- Cons: Conflict resolution complex.
-
-**Leaderless (Quorum-based):**
-- Any node accepts writes.
-- Quorum consensus ensures consistency.
-- Pros: High availability.
-- Cons: Complexity; tunable consistency (W+R > N required).
-
-### Consistency Models (Quick Recap)
-| Model | Guarantee | Example |
-|---|---|---|
-| **Strong** | All replicas identical always | SQL primary key consistency |
-| **Linearizable** | Real-time ordering of all ops | Distributed locks (Redlock) |
-| **Causal** | Related events ordered | Comment replies (B's reply after A's comment always) |
-| **Eventual** | Converge over time | Web cache, DNS |
-
-### Partition Strategies
-| Strategy | Pros | Cons |
-|---|---|---|
-| **Range** | Easy queries (e.g., "students A–M") | Hotspots (all Jan birthdays) |
-| **Hash** | Balanced distribution | Resharding hard (rehash every key) |
-| **Directory** | Flexible (remap without rehashing) | Directory = SPOF |
-| **Geo** | Data residency (EU data in EU) | Cross-geo queries expensive |
-
-### Monitoring & Metrics
-**Golden Signals (SRE book):**
-1. **Latency:** Response time (p50, p95, p99).
-2. **Traffic:** Requests/sec, throughput.
-3. **Errors:** Error rate (5xx responses, exceptions).
-4. **Saturation:** Resource utilization (CPU, disk, connections).
-
-Alert on: P99 latency up 2x, error rate > 1%, disk > 85%.
-
-### Trade-offs in System Design
-**CAP Theorem:** Choose 2 of 3 (Consistency, Availability, Partition-tolerance).
-
-**PACELC:** If Partition (choose A or C) Else Latency or Consistency.
-- Most systems: CP + low latency (not always possible).
-- Alternative: AP + high consistency (eventual).
-
-**Consistency vs Latency:**
-- Strong consistency = slower (sync replication).
-- Eventual consistency = faster (async replication).
-
-**Cost vs Performance:**
-- Premium: Spanner (ACID global), Kafka (durable), RDS multi-AZ.
-- Budget: DynamoDB on-demand, Cassandra (enough replicas), SQS.
 
 ---
 
