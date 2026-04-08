@@ -26,7 +26,7 @@
 
 ## STORAGE SYSTEMS
 
-### SQL (Relational DB)
+### SQL (Relational DB) {#sql}
 > **ACID guarantees + complex queries; vertical scaling only. Examples: PostgreSQL, MySQL, Cloud Spanner**
 
 | STRENGTHS | WEAKNESSES |
@@ -68,7 +68,7 @@ Either whole transaction succeeds or nothing (invoice + inventory both or neithe
 
 ---
 
-### NoSQL
+### NoSQL {#nosql}
 > **Horizontal scaling, flexible schema, eventual consistency. Examples: DynamoDB, Cassandra, MongoDB, HBase**
 
 | STRENGTHS | WEAKNESSES |
@@ -127,7 +127,7 @@ Can scale to billions of sessions; auto-cleanup with TTL.
 
 ---
 
-### NewSQL
+### NewSQL {#newsql}
 > **Global ACID at scale: SQL + NoSQL tradeoff. Examples: Google Spanner, CockroachDB, TiDB**
 
 | STRENGTHS | WEAKNESSES |
@@ -153,7 +153,7 @@ Can scale to billions of sessions; auto-cleanup with TTL.
 
 ---
 
-### Time-Series DB
+### Time-Series DB {#timeseries}
 > **Optimized for time-stamped data ingestion + range queries. Examples: InfluxDB, Prometheus, TimescaleDB, Druid**
 
 | STRENGTHS | WEAKNESSES |
@@ -198,7 +198,7 @@ Query 1 year ago: Use 1hour data (very approximate).
 
 ---
 
-### Search Engine (Elasticsearch / Solr)
+### Search Engine (Elasticsearch / Solr) {#search}
 > **Full-text search at scale; not a primary data store. Examples: Elasticsearch, OpenSearch, Solr**
 
 | STRENGTHS | WEAKNESSES |
@@ -254,7 +254,7 @@ Postgres full-text search exists but Elasticsearch is superior at scale.
 
 ---
 
-###  TCP/UDP
+###  TCP/UDP {#tcpudp}
 > **Transport layer protocols: TCP (reliable, ordered), UDP (fast, unreliable)**
 
 | **TCP (Transmission Control Protocol)** | **UDP (User Datagram Protocol)** |
@@ -289,7 +289,7 @@ Client                          Server
 
 ---
 
-###  HTTP/HTTPS
+###  HTTP/HTTPS {#httphttps}
 > **Application layer: HTTP (plaintext), HTTPS (encrypted with TLS/SSL)**
 
 | **HTTP** | **HTTPS** |
@@ -348,7 +348,7 @@ Client                          Server
 
 ---
 
-###  Authentication
+###  Authentication {#authentication}
 > **Verifying identity: "Who are you?" (Login & Credentials)**
 
 **Authentication Methods:**
@@ -398,7 +398,7 @@ Signature: HMAC(HS256, Header.Payload, secret_key)
 
 ---
 
-###  Authorization
+###  Authorization {#authorization}
 > **Verifying permissions: "What are you allowed to do?" (Access Control)**
 
 **Authorization Models:**
@@ -455,7 +455,7 @@ Rule: Allow if
 
 ---
 
-###  Change Data Capture (CDC)
+###  Change Data Capture (CDC) {#cdc}
 > **Streaming database changes to downstream systems (Event-driven data sync)**
 
 **How CDC Works:**
@@ -512,7 +512,7 @@ Database Change Log:
 
 ---
 
-###  Fault Tolerance & Reliability
+###  Fault Tolerance & Reliability {#fault-tolerance}
 > **Building systems that survive failures without losing functionality**
 
 **Fault vs Failure:**
@@ -617,7 +617,7 @@ Resume normal traffic
 
 ---
 
-###  REST API
+###  REST API {#rest}
 > **Stateless HTTP-based architecture using standard methods (GET, POST, PUT, DELETE)**
 
 | STRENGTHS | WEAKNESSES |
@@ -647,7 +647,7 @@ DELETE /api/v1/orders/456         → Cancel order
 
 ---
 
-###  gRPC
+###  gRPC {#grpc}
 > **High-performance RPC framework using HTTP/2 and Protocol Buffers (binary serialization)**
 
 | STRENGTHS | WEAKNESSES |
@@ -679,7 +679,7 @@ service TradeService {
 
 ---
 
-###  GraphQL
+###  GraphQL {#graphql}
 > **Query language for APIs; client specifies exactly which fields it needs**
 
 | STRENGTHS | WEAKNESSES |
@@ -726,7 +726,7 @@ Mitigation: Depth limiting, query cost analysis, rate limiting per query complex
 
 ---
 
-###  Real-time Communication
+###  Real-time Communication {#realtime}
 > **Technologies for pushing data from server to client (vs polling)**
 
 #### Short Polling
@@ -865,7 +865,7 @@ Client A ←────P2P───► Client B
 
 ---
 
-###  Caching
+###  Caching {#caching}
 > Strategies: Cache-Aside, Write-Through, Write-Behind, Read-Through
 
 | GOOD AT | LIMITATIONS |
@@ -890,7 +890,7 @@ Client A ←────P2P───► Client B
 
 ---
 
-###  Redis
+###  Redis {#redis}
 > **In-memory data store: Lightning-fast cache, message broker, and data structure server**
 
 | STRENGTHS | WEAKNESSES |
@@ -1068,7 +1068,7 @@ EVAL [[
 
 ---
 
-###  CDN
+###  CDN {#cdn}
 > **Examples:** Cloudflare, AWS CloudFront, Fastly, Akamai
 
 | GOOD AT | LIMITATIONS |
@@ -1088,7 +1088,7 @@ EVAL [[
 
 ---
 
-###  Message Queue (RabbitMQ / SQS)
+###  Message Queue (RabbitMQ / SQS) {#messagequeues}
 > **Examples:** RabbitMQ, AWS SQS, Azure Service Bus
 
 | GOOD AT | LIMITATIONS |
@@ -1104,7 +1104,7 @@ EVAL [[
 
 ---
 
-###  Apache Kafka
+###  Apache Kafka {#kafka}
 > **Distributed log: event streaming platform at massive scale (LinkedIn: 4+ trillion events/day)**
 
 | STRENGTHS | WEAKNESSES |
@@ -1198,7 +1198,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Pub/Sub (Google Pub/Sub / SNS)
+###  Pub/Sub (Google Pub/Sub / SNS) {#pubsub}
 > **Examples:** Google Cloud Pub/Sub, AWS SNS, Azure Event Grid
 
 | GOOD AT | LIMITATIONS |
@@ -1218,7 +1218,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Microservices
+###  Microservices {#microservices}
 
 | GOOD AT | LIMITATIONS |
 |---|---|
@@ -1233,7 +1233,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Serverless
+###  Serverless {#serverless}
 > **Examples:** AWS Lambda, Google Cloud Functions, Cloudflare Workers
 
 | GOOD AT | LIMITATIONS |
@@ -1249,7 +1249,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Service Mesh
+###  Service Mesh {#servicemesh}
 > **Examples:** Istio, Linkerd, Consul Connect
 
 | GOOD AT | LIMITATIONS |
@@ -1269,7 +1269,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Load Balancer
+###  Load Balancer {#loadbalancer}
 > **Types:** L4 (TCP/UDP), L7 (HTTP); Examples: AWS ALB/NLB, NGINX, HAProxy
 
 | GOOD AT | LIMITATIONS |
@@ -1287,7 +1287,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  API Gateway
+###  API Gateway {#apigateway}
 > **Examples:** AWS API Gateway, Kong, Apigee, Nginx
 
 | GOOD AT | LIMITATIONS |
@@ -1303,7 +1303,7 @@ Without Kafka (recreate same event ingestion):
 
 ---
 
-###  Forward & Reverse Proxy
+###  Forward & Reverse Proxy {#proxy}
 > **Network intermediaries: Forward Proxy (client-side), Reverse Proxy (server-side)**
 
 **Forward Proxy (Client Perspective):**
@@ -1382,7 +1382,7 @@ Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
 
 ---
 
-###  CAP Theorem
+###  CAP Theorem {#cap}
 
 > A distributed system can guarantee only **2 of 3**: **C**onsistency, **A**vailability, **P**artition Tolerance.
 > Since network partitions are unavoidable, the real trade-off is **CP vs AP**.
@@ -1396,7 +1396,7 @@ Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
 
 ---
 
-###  Consistency Models
+###  Consistency Models {#consistency}
 
 | Model | Guarantee | Use When |
 |---|---|---|
@@ -1410,7 +1410,7 @@ Benefit: Latency < 50ms (local) vs 150ms+ (cross-ocean to Oregon)
 
 ---
 
-###  Concurrency Control
+###  Concurrency Control {#concurrency}
 > **How multiple transactions access the same data without corruption**
 
 #### Pessimistic Locking
@@ -1496,7 +1496,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Distributed Transactions
+###  Distributed Transactions {#transactions}
 
 
 
@@ -1517,7 +1517,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Sharding
+###  Sharding {#sharding}
 
 | GOOD AT | LIMITATIONS |
 |---|---|
@@ -1540,7 +1540,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Replication
+###  Replication {#replication}
 
 | Type | Description | Use Case |
 |---|---|---|
@@ -1556,7 +1556,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-###  Rate Limiting
+###  Rate Limiting {#ratelimit}
 
 | Algorithm | How It Works | Best For |
 |---|---|---|
@@ -1578,7 +1578,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-### Logging
+### Logging {#logging}
 
 **Purpose:** Record detailed events and errors for debugging, auditing, and compliance.
 
@@ -1612,7 +1612,7 @@ But blocking caused 10s queue (unacceptable for web)
 
 ---
 
-### Metrics
+### Metrics {#metrics}
 
 **Purpose:** Aggregate measurements of system behavior over time (not individual events).
 
@@ -1657,7 +1657,7 @@ Application (Prometheus client) → Pushes metrics → Prometheus server (scrape
 
 ---
 
-### Distributed Tracing
+### Distributed Tracing {#tracing}
 
 **Purpose:** Track a single request flow across multiple services (end-to-end visibility).
 
@@ -1708,7 +1708,7 @@ User gets slow order response (3 seconds expected, but took 5s)
 
 ---
 
-### Monitoring & Alerting
+### Monitoring & Alerting {#monitoring}
 
 **Monitoring = Observability + Response:**
 1. **Collect** metrics, logs, traces
@@ -1749,7 +1749,7 @@ User gets slow order response (3 seconds expected, but took 5s)
 
 ---
 
-###  Bloom Filters
+###  Bloom Filters {#bloomfilters}
 > **Probabilistic data structure for membership testing (does value exist in set?)**
 
 **How it works:**
@@ -1792,7 +1792,7 @@ Result: "bob" definitely NOT in set
 
 ---
 
-###  Circuit Breaker
+###  Circuit Breaker {#circuitbreaker}
 > **Prevent cascading failures by fast-failing when downstream service is broken**
 
 ```
@@ -1854,7 +1854,7 @@ With Circuit Breaker:
 
 ---
 
-###  Blob Storage (S3 / GCS)
+###  Blob Storage (S3 / GCS) {#blobstorage}
 > **Examples:** AWS S3, Google Cloud Storage, Azure Blob
 
 | GOOD AT | LIMITATIONS |
@@ -1870,7 +1870,7 @@ With Circuit Breaker:
 
 ---
 
-###  DNS
+###  DNS {#dns}
 
 | GOOD AT | LIMITATIONS |
 |---|---|
@@ -1886,7 +1886,7 @@ With Circuit Breaker:
 
 ---
 
-###  Data Warehouse
+###  Data Warehouse {#warehouse}
 > **Examples:** BigQuery, Snowflake, Redshift, ClickHouse
 
 | GOOD AT | LIMITATIONS |
