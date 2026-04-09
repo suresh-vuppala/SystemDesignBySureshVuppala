@@ -987,17 +987,20 @@ Client A ←────P2P───► Client B
 ---
 
 ###  Caching
-> Strategies: Cache-Aside, Write-Through, Write-Behind, Read-Through
+> Store frequently accessed data in a faster storage layer to reduce latency and improve response time for subsequent requests.
 
 | GOOD AT | LIMITATIONS |
 |---|---|
-| Reducing DB load (read-heavy workloads) | Write-heavy workloads |
-| Sub-millisecond read latency | Cache invalidation (notoriously hard) |
-| Absorbing traffic spikes | Consistency with source of truth |
-| Reducing expensive computation | Large object storage (memory is expensive) |
-
-**Strategy quick-pick:**
-
+| Reducing **DB load** (especially **read-heavy workloads**) | Less effective for **write-heavy workloads** |
+| **Sub-millisecond** read latency | **Cache invalidation** complexity |
+| Absorbing **traffic spikes** and burst load | Maintaining **consistency** with source of truth |
+| Avoiding **repeated expensive computations** | Limited by **memory cost and capacity** |
+| Improving **scalability and throughput** | Risk of **stale or outdated data** |
+| **Geo-distribution** and **edge performance** (CDN caching) | **Cold start / cache warm-up latency** |
+| **Shielding backend systems** during partial outages | **Cache stampede** (thundering herd problem) |
+| Enabling **horizontal scaling** for read-heavy systems | **Eviction policy trade-offs** (LRU, LFU, etc.) |
+|  | **Serialization/deserialization overhead** |
+|  | **Operational complexity** (TTL tuning, monitoring, hit rate) |
 | Strategy | Use When |
 |---|---|
 | **Cache-Aside** | Read-heavy; app controls cache explicitly |
