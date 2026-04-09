@@ -1001,6 +1001,7 @@ Client A ←────P2P───► Client B
 | Enabling **horizontal scaling** for read-heavy systems | **Eviction policy trade-offs** (LRU, LFU, etc.) |
 |  | **Serialization/deserialization overhead** |
 |  | **Operational complexity** (TTL tuning, monitoring, hit rate) |
+
 | Strategy | Use When |
 |---|---|
 | **Cache-Aside** | Read-heavy; app controls cache explicitly |
