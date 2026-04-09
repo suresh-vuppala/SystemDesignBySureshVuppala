@@ -24,6 +24,328 @@
 
 ---
 
+## ⚡ FUNDAMENTALS & NETWORKING
+
+---
+
+###  TCP/UDP
+> **Transport layer protocols: TCP (reliable, ordered), UDP (fast, unreliable)**
+
+| **TCP (Transmission Control Protocol)** | **UDP (User Datagram Protocol)** |
+|---|---|
+| **Connection-oriented:** Handshake before data | **Connection-less:** Send immediately (no setup) |
+| **Ordered delivery:** Packets arrive in sequence | **Unordered:** Packets may arrive out-of-order |
+| **Guaranteed delivery:** Retransmits lost packets | **Best-effort:** Lost packets not retransmitted |
+| **Slow:** Acknowledgments + retries overhead | **Fast:** Minimal overhead (50+ Mbps vs 10+ Gbps UDP) |
+| **Flow control:** Prevents overwhelming receiver | **No flow control:** Sender controls pace entirely |
+
+**TCP Three-Way Handshake (SYN, SYN-ACK, ACK):**
+```
+Client                          Server
+  |                               |
+  |---- SYN (seq=100) --------→  |
+  |                               |
+  |  ←---- SYN-ACK (seq=300, ack=101) ----|
+  |                               |
+  |---- ACK (seq=101, ack=301) -→|
+  |                               |
+  └──────────── Connection Established ──────────────
+```
+**Guarantees:** 3-way handshake establishes connection, enables error detection, checksums verify data integrity.
+
+**When to use:**
+- **TCP:** Banking (transactions must be complete), email, HTTPS, file transfer, anything requiring reliability.
+- **UDP:** Live video/audio streaming (some loss ok), gaming, DNS queries, IoT sensors (fire-and-forget), VoIP.
+
+**Port numbers to know:** TCP (80:HTTP, 443:HTTPS, 3306:MySQL, 5432:Postgres) · UDP (53:DNS, 123:NTP, 161:SNMP).
+
+>  [Deep Dive: TCP/UDP](#deep-dive-tcpudp)
+
+---
+
+###  HTTP/HTTPS
+> **Application layer: HTTP (plaintext), HTTPS (encrypted with TLS/SSL)**
+
+| **HTTP** | **HTTPS** |
+|---|---|
+| **Port 80** | **Port 443** |
+| **Plaintext:** Anyone can read (unencrypted) | **Encrypted:** TLS/SSL protects data |
+| **No authentication:** Server identity unverified | **Certificate-based:** Server proves identity (CA signed) |
+| **No integrity:** Data can be modified in transit | **Integrity:** Checksums prevent tampering |
+| **Fast:** No encryption overhead (~5% savings) | **Slight overhead:** Encryption + cert validation (~10ms) |
+
+**TLS Handshake (TLS 1.3):**
+```
+Client                          Server
+  |                               |
+  |---- Client Hello (ciphers, version) -→
+  |  ←--- Server Hello (cipher, certificate)
+  |  ←--- [encrypted extensions & finished]
+  |                              
+  |---- Finished (encrypted) -→  |
+  |                               |
+  └──────── Encrypted Connection ──────────────
+```
+
+**Core Guarantees:**
+- **Confidentiality:** Encrypted (AES-256).
+- **Integrity:** Tamper-proof (SHA-256 HMAC).
+- **Authenticity:** Server certificate verified by Certificate Authority.
+- **Forward secrecy:** Session key discarded after use (if using ECDHE).
+
+**HTTP Methods (recap):**
+- **GET** — Retrieve data (safe, idempotent, cacheable).
+- **POST** — Create data (not idempotent, side effects).
+- **PUT** — Replace data (idempotent, whole resource).
+- **PATCH** — Partial update (not idempotent, subset of fields).
+- **DELETE** — Remove data (idempotent, removes resource).
+- **HEAD** — Like GET but no body (for headers only).
+- **OPTIONS** — Describe communication options (CORS preflight).
+
+**HTTP Status Codes (common):**
+- **2xx Success:** 200 OK, 201 Created, 204 No Content.
+- **3xx Redirect:** 301 Moved, 302 Found, 304 Not Modified.
+- **4xx Client Error:** 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict.
+- **5xx Server Error:** 500 Internal, 502 Bad Gateway, 503 Unavailable, 504 Gateway Timeout.
+
+**When to use:**
+- **HTTP:** Internal networks, testing, non-sensitive data.
+- **HTTPS:** Everything in production. **Mandatory for:** Login, payments, health data, GDPR compliance, financial transactions.
+
+**Real-world:** All major sites enforce HTTPS (HTTP → HTTPS 301 redirect). Let's Encrypt provides free certificates.
+
+>  [Deep Dive: HTTP/HTTPS](#deep-dive-httphttps)
+
+---
+
+###  DNS
+
+| GOOD AT | LIMITATIONS |
+|---|---|
+| Human-readable → IP address translation | Instant propagation (TTL delays) |
+| Global traffic routing (GeoDNS) | Dynamic, per-request routing |
+| Failover via health-checked records | Fine-grained load balancing |
+
+**Record types to know:** `A` (IPv4) · `AAAA` (IPv6) · `CNAME` (alias) · `MX` (mail) · `TXT` (verification) · `SRV` (service discovery)
+
+**Real-world use cases:** GeoDNS routing users to nearest region · DNS-based failover · Service discovery in microservices
+
+>  [Deep Dive: DNS](#deep-dive-dns)
+
+---
+
+###  Fault Tolerance & Reliability
+> **Building systems that survive failures without losing functionality**
+
+**Fault vs Failure:**
+- **Fault:** Component breaks (disk fails, network drops, server crashes, software bug).
+- **Failure:** System stops working (users can't complete transactions, API returns 500).
+- **Goal:** Tolerate faults without system-wide failure.
+
+**Failure Types & Mitigations:**
+
+| Failure | Cause | Mitigation | RTO* | RPO** |
+|---|---|---|---|---|
+| **Hardware** | Disk corruption, server dies | Replication (2+ copies), RAID | 1 min | 0 sec |
+| **Network** | Packet loss, high latency, partition | Retry, circuit breaker, multi-region | 5 sec | 0 sec |
+| **Software** | Bug, memory leak, deadlock, OOM | Health checks, restart, canary deploy | 30 sec | 5 sec |
+| **Cascading** | One service down → dependent services fail | Timeout, bulkheads, fallbacks | 10 sec | 1 sec |
+| **Data corruption** | Silent data loss, encryption failure | Backup, replication, checksums | 1 hour | 15 min |
+
+*RTO = Recovery Time Objective (how long until service restored)  
+**RPO = Recovery Point Objective (how much data loss acceptable)
+
+**Redundancy Models:**
+
+| Model | Setup | Pros | Cons |
+|---|---|---|---|
+| **Active-Passive** | 1 primary, 1 standby (not serving traffic) | Simple failover | Standby machine idle; failover delay |
+| **Active-Active** | 2+ primaries both serving traffic | No idle capacity, fast failover | Complex (conflict resolution, state) |
+| **N+1** | N servers + 1 spare | Survives N failures | Extra cost (33% overhead) |
+
+**Availability Tiers:**
+```
+99.0%   → 87.6 hours downtime/year       (basic, home projects)
+99.9%   → 8.76 hours downtime/year       (enterprise standard)
+99.99%  → 52 minutes downtime/year       (high-availability)
+99.999% → 5 minutes downtime/year        (ultra-high; Google/AWS-grade; very costly)
+
+Formula: Downtime (min) = (1 - availability) × 365 × 24 × 60
+```
+
+**Resilience Patterns:**
+
+1. **Timeouts:** Don't wait forever for external calls.
+   ```
+   Call Payment API with 5s timeout
+   If timeout → Fail fast (don't retry indefinitely)
+   ```
+
+2. **Retries (Exponential Backoff):** Transient failures recover.
+   ```
+   Attempt 1: Immediate (0s)
+   Attempt 2: Wait 1s (database might have restarted)
+   Attempt 3: Wait 2s
+   Attempt 4: Wait 4s
+   Attempt 5: Wait 8s max (don't retry forever; max 3 attempts typical)
+   ```
+
+3. **Circuit Breaker:** Stop retrying when clearly broken.
+   ```
+   [CLOSED] ← Requests pass through
+     ↓ (5 failures)
+   [OPEN] ← Requests fail immediately (don't call downstream)
+     ↓ (wait 30s)
+   [HALF_OPEN] ← Try 1 request
+     ├─ Success → Back to CLOSED
+     └─ Failure → Back to OPEN
+   ```
+
+4. **Bulkheads:** Isolate thread pools; one service doesn't starve others.
+   ```
+   Thread pool 1: Service A (max 10 threads)
+   Thread pool 2: Service B (max 10 threads)
+   If Service A hangs, only its 10 threads blocked (Service B unaffected)
+   ```
+
+5. **Health Checks:**
+   - **Liveness:** Is service alive? (responds to /health).
+   - **Readiness:** Can it handle traffic? (dependencies ok, DB connected).
+
+**Example (Payment Service Failure):**
+```
+Order Service calls Payment Service:
+Attempt 1: timeout (payment service slow) → retry
+Attempt 2: timeout → retry
+Attempt 3: timeout → 4th attempt would wait 8s
+Circuit opens: Return "Payment temporarily unavailable" (fail fast)
+User sees: "Transaction failed; try again later"
+Payment service recovers (30s later)
+Circuit half-opens: Test 1 request
+Test succeeds: Circuit closes
+Resume normal traffic
+```
+
+**Guarantees:**
+- **No SPOF:** At least 2 of everything (2 DBs, 2 LBs, 2 regions).
+- **Graceful degradation:** Partial outage doesn't mean 100% failure (cache results, serve stale).
+- **Observability:** Monitor failures (metrics, logs, alerts).
+
+**Real-world:** Netflix Chaos Monkey deliberately breaks things to test resilience. AWS multi-AZ ensures zone-level failures don't affect service. Stripe uses bulkheads for payment processing (one failing region doesn't affect others).
+
+>  [Deep Dive: Fault Tolerance](#deep-dive-fault-tolerance)
+
+---
+
+## ⚡ SECURITY
+
+---
+
+###  Authentication
+> **Verifying identity: "Who are you?" (Login & Credentials)**
+
+**Authentication Methods:**
+
+| Method | Protocol | Best For | Security |
+|---|---|---|---|
+| **Basic Auth** | `Authorization: Basic base64(user:pass)` | Internal APIs | ⚠️ Low (use HTTPS only) |
+| **API Key** | `X-API-Key: abc123...` | Service-to-service, public APIs | ⚠️ Medium (needs rotation) |
+| **Session Cookie** | Server creates session; browser sends cookie | Web apps | ✓ Medium (CSRF protection needed) |
+| **Token (JWT)** | `Authorization: Bearer eyJh...` | Stateless APIs, microservices | ✓✓ High (if using RS256) |
+| **OAuth 2.0** | 3rd-party login (Google, GitHub) | "Sign in with..." features | ✓✓ High (delegated auth) |
+| **SAML** | XML-based enterprise auth | Corporate SSO | ✓✓ High (for enterprises) |
+| **Kerberos** | Ticket-based (mutual auth) | Windows networks | ✓✓ High |
+
+**JWT (JSON Web Token) Breakdown:**
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 (Header)
+.
+eyJzdWIiOiJ1c2VyMTIzIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ (Payload)
+.
+SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c (Signature)
+
+Header: {"alg": "HS256", "typ": "JWT"}
+Payload: {"sub": "user123", "name": "John Doe", "iat": 1516239022, "exp": 1516242622}
+Signature: HMAC(HS256, Header.Payload, secret_key)
+```
+
+**JWT Algorithms:**
+- **HS256 (HMAC):** Single server; shared secret. ⚠️ If secret leaked, all tokens forged.
+- **RS256 (RSA):** Distributed; public/private key. ✓✓ Private key on auth server only; public key on services.
+
+**Core Guarantees:**
+- **Identity:** Server verified it's actually the user.
+- **Token integrity:** Signature proves token wasn't tampered with.
+- **Expiration:** Token expires after N seconds (force re-auth).
+- **No replay:** Each token bound to session/timestamp.
+
+**Best Practices:**
+- Store JWT in **httpOnly cookie** (not localStorage; XSS-proof).
+- Use **RS256** for microservices; HS256 for monoliths.
+- **Always HTTPS** (JWT in plaintext = instantly compromised).
+- Implement **token refresh:** Short-lived access token (15 min) + long-lived refresh token (7 days).
+- **Invalidate on logout:** Server-side blacklist or short TTL.
+- **Include user context:** sub (subject/user ID), iat (issued at), exp (expiration).
+
+**Real-world:** Google generates JWT tokens for APIs. GitHub OAuth lets you "Sign in with GitHub" on third-party apps.
+
+>  [Deep Dive: Authentication](#deep-dive-authentication)
+
+---
+
+###  Authorization
+> **Verifying permissions: "What are you allowed to do?" (Access Control)**
+
+**Authorization Models:**
+
+| Model | Definition | Use Case | Complexity |
+|---|---|---|---|
+| **Role-Based (RBAC)** | Users assigned roles; roles have permissions | Most systems, teams | Low |
+| **Attribute-Based (ABAC)** | Rules based on attributes (user role, resource, time, location) | Fine-grained; healthcare, finance | High |
+| **Access Control Lists (ACL)** | Per-resource list: who can do what | File systems, S3 policies | Medium |
+| **Policy-Based** | JSON policies define rules (AWS IAM) | Cloud platforms, multi-tenant | High |
+
+**RBAC Example:**
+```
+User: john@example.com
+Role: Editor
+Permissions: read, write, delete (own posts), edit profile
+
+User: jane@example.com
+Role: Admin
+Permissions: read, write, delete (all), manage users, view logs, manage settings
+```
+
+**ABAC Example:**
+```
+Rule: Allow if
+  - user.department == "finance"
+  AND resource.type == "payroll"
+  AND time >= 9:00 AND time <= 17:00
+  AND ip_address in [192.168.0.0/16]
+→ Grant access (else deny)
+```
+**Benefit:** Very granular (can't access after hours from unknown IP).
+
+**Guarantees:**
+- **Least privilege:** Users only get minimal permissions needed.
+- **Deny by default:** Permissions explicitly granted (not implicit).
+- **Auditability:** Log who accessed what (GDPR, HIPAA, SOX compliance).
+- **No privilege escalation:** Can't promote yourself to admin.
+
+**Best Practices:**
+- **Separation of duties:** No one person approves + executes (payment approval, fund transfer).
+- **Role hierarchies:** Admin > Moderator > User > Guest (inherit permissions downward).
+- **Regular audits:** Remove unused permissions (quarterly).
+- **Test authorization:** Test blocked access too (user cannot access, admin can).
+- **Time-based access:** Revoke access after contract ends (auto-expire).
+
+**Real-world:** GitHub uses RBAC (owner, maintainer, contributor, viewer roles). AWS IAM uses policy-based (JSON policies with conditions).
+
+>  [Deep Dive: Authorization](#deep-dive-authorization)
+
+---
+
 ## STORAGE SYSTEMS
 
 ### SQL (Relational DB)
@@ -248,202 +570,7 @@ Postgres full-text search exists but Elasticsearch is superior at scale.
 
 >  [Deep Dive: Search Engine](#deep-dive-search-engine)
 
----
 
-## ⚡ FUNDAMENTALS & NETWORKING
-
----
-
-###  TCP/UDP
-> **Transport layer protocols: TCP (reliable, ordered), UDP (fast, unreliable)**
-
-| **TCP (Transmission Control Protocol)** | **UDP (User Datagram Protocol)** |
-|---|---|
-| **Connection-oriented:** Handshake before data | **Connection-less:** Send immediately (no setup) |
-| **Ordered delivery:** Packets arrive in sequence | **Unordered:** Packets may arrive out-of-order |
-| **Guaranteed delivery:** Retransmits lost packets | **Best-effort:** Lost packets not retransmitted |
-| **Slow:** Acknowledgments + retries overhead | **Fast:** Minimal overhead (50+ Mbps vs 10+ Gbps UDP) |
-| **Flow control:** Prevents overwhelming receiver | **No flow control:** Sender controls pace entirely |
-
-**TCP Three-Way Handshake (SYN, SYN-ACK, ACK):**
-```
-Client                          Server
-  |                               |
-  |---- SYN (seq=100) --------→  |
-  |                               |
-  |  ←---- SYN-ACK (seq=300, ack=101) ----|
-  |                               |
-  |---- ACK (seq=101, ack=301) -→|
-  |                               |
-  └──────────── Connection Established ──────────────
-```
-**Guarantees:** 3-way handshake establishes connection, enables error detection, checksums verify data integrity.
-
-**When to use:**
-- **TCP:** Banking (transactions must be complete), email, HTTPS, file transfer, anything requiring reliability.
-- **UDP:** Live video/audio streaming (some loss ok), gaming, DNS queries, IoT sensors (fire-and-forget), VoIP.
-
-**Port numbers to know:** TCP (80:HTTP, 443:HTTPS, 3306:MySQL, 5432:Postgres) · UDP (53:DNS, 123:NTP, 161:SNMP).
-
----
-
-###  HTTP/HTTPS
-> **Application layer: HTTP (plaintext), HTTPS (encrypted with TLS/SSL)**
-
-| **HTTP** | **HTTPS** |
-|---|---|
-| **Port 80** | **Port 443** |
-| **Plaintext:** Anyone can read (unencrypted) | **Encrypted:** TLS/SSL protects data |
-| **No authentication:** Server identity unverified | **Certificate-based:** Server proves identity (CA signed) |
-| **No integrity:** Data can be modified in transit | **Integrity:** Checksums prevent tampering |
-| **Fast:** No encryption overhead (~5% savings) | **Slight overhead:** Encryption + cert validation (~10ms) |
-
-**TLS Handshake (TLS 1.3):**
-```
-Client                          Server
-  |                               |
-  |---- Client Hello (ciphers, version) -→
-  |  ←--- Server Hello (cipher, certificate)
-  |  ←--- [encrypted extensions & finished]
-  |                              
-  |---- Finished (encrypted) -→  |
-  |                               |
-  └──────── Encrypted Connection ──────────────
-```
-
-**Core Guarantees:**
-- **Confidentiality:** Encrypted (AES-256).
-- **Integrity:** Tamper-proof (SHA-256 HMAC).
-- **Authenticity:** Server certificate verified by Certificate Authority.
-- **Forward secrecy:** Session key discarded after use (if using ECDHE).
-
-**HTTP Methods (recap):**
-- **GET** — Retrieve data (safe, idempotent, cacheable).
-- **POST** — Create data (not idempotent, side effects).
-- **PUT** — Replace data (idempotent, whole resource).
-- **PATCH** — Partial update (not idempotent, subset of fields).
-- **DELETE** — Remove data (idempotent, removes resource).
-- **HEAD** — Like GET but no body (for headers only).
-- **OPTIONS** — Describe communication options (CORS preflight).
-
-**HTTP Status Codes (common):**
-- **2xx Success:** 200 OK, 201 Created, 204 No Content.
-- **3xx Redirect:** 301 Moved, 302 Found, 304 Not Modified.
-- **4xx Client Error:** 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict.
-- **5xx Server Error:** 500 Internal, 502 Bad Gateway, 503 Unavailable, 504 Gateway Timeout.
-
-**When to use:**
-- **HTTP:** Internal networks, testing, non-sensitive data.
-- **HTTPS:** Everything in production. **Mandatory for:** Login, payments, health data, GDPR compliance, financial transactions.
-
-**Real-world:** All major sites enforce HTTPS (HTTP → HTTPS 301 redirect). Let's Encrypt provides free certificates.
-
----
-
-## ⚡ SECURITY
-
----
-
-###  Authentication
-> **Verifying identity: "Who are you?" (Login & Credentials)**
-
-**Authentication Methods:**
-
-| Method | Protocol | Best For | Security |
-|---|---|---|---|
-| **Basic Auth** | `Authorization: Basic base64(user:pass)` | Internal APIs | ⚠️ Low (use HTTPS only) |
-| **API Key** | `X-API-Key: abc123...` | Service-to-service, public APIs | ⚠️ Medium (needs rotation) |
-| **Session Cookie** | Server creates session; browser sends cookie | Web apps | ✓ Medium (CSRF protection needed) |
-| **Token (JWT)** | `Authorization: Bearer eyJh...` | Stateless APIs, microservices | ✓✓ High (if using RS256) |
-| **OAuth 2.0** | 3rd-party login (Google, GitHub) | "Sign in with..." features | ✓✓ High (delegated auth) |
-| **SAML** | XML-based enterprise auth | Corporate SSO | ✓✓ High (for enterprises) |
-| **Kerberos** | Ticket-based (mutual auth) | Windows networks | ✓✓ High |
-
-**JWT (JSON Web Token) Breakdown:**
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 (Header)
-.
-eyJzdWIiOiJ1c2VyMTIzIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ (Payload)
-.
-SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c (Signature)
-
-Header: {"alg": "HS256", "typ": "JWT"}
-Payload: {"sub": "user123", "name": "John Doe", "iat": 1516239022, "exp": 1516242622}
-Signature: HMAC(HS256, Header.Payload, secret_key)
-```
-
-**JWT Algorithms:**
-- **HS256 (HMAC):** Single server; shared secret. ⚠️ If secret leaked, all tokens forged.
-- **RS256 (RSA):** Distributed; public/private key. ✓✓ Private key on auth server only; public key on services.
-
-**Core Guarantees:**
-- **Identity:** Server verified it's actually the user.
-- **Token integrity:** Signature proves token wasn't tampered with.
-- **Expiration:** Token expires after N seconds (force re-auth).
-- **No replay:** Each token bound to session/timestamp.
-
-**Best Practices:**
-- Store JWT in **httpOnly cookie** (not localStorage; XSS-proof).
-- Use **RS256** for microservices; HS256 for monoliths.
-- **Always HTTPS** (JWT in plaintext = instantly compromised).
-- Implement **token refresh:** Short-lived access token (15 min) + long-lived refresh token (7 days).
-- **Invalidate on logout:** Server-side blacklist or short TTL.
-- **Include user context:** sub (subject/user ID), iat (issued at), exp (expiration).
-
-**Real-world:** Google generates JWT tokens for APIs. GitHub OAuth lets you "Sign in with GitHub" on third-party apps.
-
----
-
-###  Authorization
-> **Verifying permissions: "What are you allowed to do?" (Access Control)**
-
-**Authorization Models:**
-
-| Model | Definition | Use Case | Complexity |
-|---|---|---|---|
-| **Role-Based (RBAC)** | Users assigned roles; roles have permissions | Most systems, teams | Low |
-| **Attribute-Based (ABAC)** | Rules based on attributes (user role, resource, time, location) | Fine-grained; healthcare, finance | High |
-| **Access Control Lists (ACL)** | Per-resource list: who can do what | File systems, S3 policies | Medium |
-| **Policy-Based** | JSON policies define rules (AWS IAM) | Cloud platforms, multi-tenant | High |
-
-**RBAC Example:**
-```
-User: john@example.com
-Role: Editor
-Permissions: read, write, delete (own posts), edit profile
-
-User: jane@example.com
-Role: Admin
-Permissions: read, write, delete (all), manage users, view logs, manage settings
-```
-
-**ABAC Example:**
-```
-Rule: Allow if
-  - user.department == "finance"
-  AND resource.type == "payroll"
-  AND time >= 9:00 AND time <= 17:00
-  AND ip_address in [192.168.0.0/16]
-→ Grant access (else deny)
-```
-**Benefit:** Very granular (can't access after hours from unknown IP).
-
-**Guarantees:**
-- **Least privilege:** Users only get minimal permissions needed.
-- **Deny by default:** Permissions explicitly granted (not implicit).
-- **Auditability:** Log who accessed what (GDPR, HIPAA, SOX compliance).
-- **No privilege escalation:** Can't promote yourself to admin.
-
-**Best Practices:**
-- **Separation of duties:** No one person approves + executes (payment approval, fund transfer).
-- **Role hierarchies:** Admin > Moderator > User > Guest (inherit permissions downward).
-- **Regular audits:** Remove unused permissions (quarterly).
-- **Test authorization:** Test blocked access too (user cannot access, admin can).
-- **Time-based access:** Revoke access after contract ends (auto-expire).
-
-**Real-world:** GitHub uses RBAC (owner, maintainer, contributor, viewer roles). AWS IAM uses policy-based (JSON policies with conditions).
-
----
 
 ## ⚡ DATA PIPELINES
 
