@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13. Observability — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-12"><span class="e">📊</span> 13 · OBSERVABILITY</div>
+
+<div class="T" id="logging">
+<h2>Logging</h2><p class="su">Structured JSON logs with correlation IDs. Levels: DEBUG → INFO → WARN → ERROR → FATAL</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Immutability</span> (forensics, compliance). <span class="hg">Searchability</span>. <span class="hg">Correlation IDs</span> trace flow across services. Never log passwords/PII. Tools: <span class="hg">ELK</span>, Splunk, Loki, CloudWatch. Sample: 100% errors, 1-10% normal.</div>
+</div>
+
+<div class="T" id="metrics">
+<h2>Metrics</h2>
+<p class="su"><span class="hg">Golden Signals</span> (Google SRE): Latency · Traffic · Errors · Saturation</p>
+<table>
+<tr><th>Signal</th><th>What It Measures</th><th>Key Metrics</th><th>Alert When</th></tr>
+<tr><td><span class="hi">Latency</span></td><td>Time to serve a request</td><td><span class="hg">p50</span> · <span class="hg">p95</span> · <span class="hg">p99</span> · <span class="hg">p999</span>. Never use avg — <span class="hr">hides tail latency</span></td><td>p99 &gt; SLA threshold</td></tr>
+<tr><td><span class="hi">Traffic</span></td><td>Demand on the system</td><td><span class="hg">RPS</span> · <span class="hg">TPS</span> · bytes/sec · active connections</td><td>Sudden spike or unexpected drop</td></tr>
+<tr><td><span class="hi">Errors</span></td><td>Rate of failed requests</td><td><span class="hg">Error rate %</span> · 5xx count · timeout count · <span class="hg">DLQ depth</span></td><td>Error rate &gt; 1% or any 5xx spike</td></tr>
+<tr><td><span class="hi">Saturation</span></td><td>How full / overloaded the system is</td><td><span class="hg">CPU %</span> · <span class="hg">Memory %</span> · <span class="hg">Disk I/O</span> · <span class="hg">Thread pool queue depth</span></td><td>CPU &gt; 80% sustained</td></tr>
+</table>
+<table>
+<tr><th>Method</th><th>Full Form</th><th>Best For</th><th>Metrics</th></tr>
+<tr><td><span class="hi">RED</span></td><td><span class="hg">Rate · Errors · Duration</span></td><td>Microservices, APIs</td><td>Requests/sec · Error % · p99 response time</td></tr>
+<tr><td><span class="hi">USE</span></td><td><span class="hg">Utilization · Saturation · Errors</span></td><td>Infrastructure — CPU, memory, disk, network</td><td>CPU % · queue depth · device error count</td></tr>
+</table>
+<div class="b bg"><span class="hi">p-values explained:</span> <span class="hg">p50</span> — median. <span class="hg">p95</span> — 95% of requests faster. <span class="hg">p99</span> — SLA boundary. <span class="hg">p999</span> — worst-case outliers. Average <span class="hr">hides outliers</span>.</div>
+<div class="b bg"><span class="hi">SLI / SLO / SLA:</span> <span class="hg">SLI</span> (indicator) — actual measured metric. <span class="hg">SLO</span> (objective) — internal target. <span class="hg">SLA</span> (agreement) — contractual commitment with penalty. SLO should be <span class="hg">stricter than SLA</span>.</div>
+<div class="b by"><span class="hi">Tools:</span> <span class="hg">Prometheus</span> — scrape + store time-series. <span class="hg">Grafana</span> — dashboards + alerting. <span class="hg">Datadog</span> — managed APM. <span class="hg">CloudWatch</span> — AWS native. <span class="hg">OpenTelemetry</span> — vendor-neutral standard.</div>
+<div class="b bb"><span class="hi">One-liner:</span> Track <span class="hg">p99 not average</span> — use <span class="hg">RED for services</span>, <span class="hg">USE for infra</span>, alert on Golden Signals, define SLOs stricter than SLA.</div>
+</div>
+
+<div class="T" id="tracing">
+<h2>Distributed Tracing</h2><p class="su">Track single request across services. Trace ID → Spans → Parent-child relationships → Latency breakdown.</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Request correlation</span> across all services. <span class="hg">Bottleneck identification</span>. <span class="hg">Dependency mapping</span>. Tools: <span class="hg">OpenTelemetry</span>, Jaeger, Zipkin, Datadog APM. Sample: 100% errors, 1-5% successes.</div>
+</div>
+
+<div class="T" id="monitoring">
+<h2>Monitoring &amp; Alerting</h2><p class="su">Collect → Alert → Respond → Root Cause Analysis</p>
+<div class="b bg"><span class="hi">Alert Rules:</span> Only page if <span class="hg">human action needed</span>. Good: "error rate >1% for 2min". Bad: "any single error". <span class="hi">Error Budget:</span> 100% - SLO = budget for experimentation/risk. Tools: PagerDuty, Opsgenie, Grafana OnCall.</div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

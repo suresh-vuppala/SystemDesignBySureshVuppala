@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6. Storage Systems — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-3"><span class="e">💾</span> 6 · STORAGE SYSTEMS</div>
+
+<div class="T" id="db-choice">
+<h2>Database Choice Guide</h2><p class="su">Choose based on <span class="hg">access patterns</span>, <span class="hi">guarantees</span>, and <span class="ho">scale</span></p>
+<table>
+<tr><th>Need</th><th>Choose</th><th>Why</th><th>Examples</th></tr>
+<tr><td>ACID + complex joins</td><td><span class="hg">SQL</span></td><td>Strong consistency, referential integrity</td><td>Postgres, MySQL, Aurora</td></tr>
+<tr><td>High write throughput</td><td><span class="hg">Wide-Column</span></td><td>LSM-tree, masterless, tunable consistency</td><td>Cassandra, ScyllaDB</td></tr>
+<tr><td>Flexible schema</td><td><span class="hg">Document</span></td><td>JSON-like, single-doc ACID</td><td>MongoDB, Firestore</td></tr>
+<tr><td>Sub-ms key lookup</td><td><span class="hg">Key-Value</span></td><td>O(1) get/put, in-memory option</td><td>Redis, DynamoDB</td></tr>
+<tr><td>Relationship traversal</td><td><span class="hg">Graph</span></td><td>Fast traversal without joins</td><td>Neo4j, Neptune</td></tr>
+<tr><td>Full-text search</td><td><span class="hg">Search Engine</span></td><td>Inverted index, BM25 ranking</td><td>Elasticsearch, OpenSearch</td></tr>
+<tr><td>Global ACID at scale</td><td><span class="hg">NewSQL</span></td><td>SQL + distributed consensus</td><td>Spanner, CockroachDB</td></tr>
+<tr><td>Analytics (OLAP)</td><td><span class="hg">Columnar</span></td><td>Column-oriented, fast aggregations</td><td>BigQuery, ClickHouse, Apache Pinot</td></tr>
+</table>
+</div>
+
+<div class="T" id="db-internals">
+<h2>Database Internals</h2><p class="su">How databases store and retrieve data — <span class="hg">B-Trees, LSM Trees, WAL</span></p>
+<table>
+<tr><th>Structure</th><th>How</th><th>Used By</th><th>Optimized For</th></tr>
+<tr><td><span class="hi">B+Tree</span></td><td>Balanced tree, sorted keys, data in leaves. O(log N).</td><td>Postgres, MySQL InnoDB</td><td><span class="hg">Reads</span> (point + range)</td></tr>
+<tr><td><span class="hi">LSM Tree</span></td><td>Memtable → flush to SSTables → compaction merges.</td><td>Cassandra, RocksDB, LevelDB</td><td><span class="hg">Writes</span> (sequential I/O)</td></tr>
+<tr><td><span class="hi">WAL</span></td><td>Log changes before applying. Replay on crash.</td><td>Postgres, MySQL, etcd, Kafka</td><td><span class="hg">Durability</span></td></tr>
+</table>
+<div class="b bb"><span class="hi">Indexing(Speed Up Reads):</span> <span class="hg">Clustered</span> (data sorted by index, 1/table) · <span class="hg">Non-clustered</span> (pointer to data) · <span class="hg">Composite</span> (multi-column, leftmost prefix) · <span class="hg">Covering</span> (all query columns in index) · <span class="hg">Partial</span> (subset of rows). <span class="hi">DB Locks(Control concurrent writes):</span> <span class="hg">Row-level</span> (InnoDB default, fine-grained) · <span class="hg">Table-level</span> (MyISAM, coarse) · <span class="hg">Intent locks</span> (signal intent to lock rows) · <span class="hg">Advisory locks</span> (app-level coordination).</div>
+<div class="b bg"><span class="hi">Schema:</span> <span class="hg">Normalization</span> (3NF, eliminate redundancy, needs JOINs) vs <span class="hg">Denormalization</span> (duplicate for read speed, no JOINs). <span class="hi">ACID vs BASE:</span> ACID = strong consistency (SQL). BASE = Basically Available, Soft state, Eventually consistent (NoSQL).</div>
+</div>
+
+<div class="T" id="sql">
+<h2>SQL (PostgreSQL, MySQL)</h2><p class="su"><span class="hg">ACID</span> transactions + complex queries. The <span class="hi">default choice</span> when you need consistency</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Atomicity</span> — all or nothing. <span class="hg">Consistency</span> — constraints(PK, FK, UNIQUE) always enforced. <span class="hg">Isolation</span> — locks / MVCC prevent dirty reads. <span class="hg">Durability</span> — WAL survives crashes. These guarantees mean <span class="hg">partial updates are impossible</span> and <span class="hg">committed data is never lost</span>.</div>
+<table>
+<tr><th>Postgres Feature</th><th>Detail</th></tr>
+<tr><td><span class="hi">MVCC</span></td><td>Multi-version — readers see snapshot, writers create new version. No read locks.</td></tr>
+<tr><td><span class="hi">Indexes</span></td><td>B-Tree (default), GIN (full-text/JSONB), GiST (geo), BRIN (large sequential)</td></tr>
+<tr><td><span class="hi">JSONB</span></td><td>Binary JSON with indexing — bridge SQL and document model</td></tr>
+<tr><td><span class="hi">Partitioning</span></td><td>Range/list/hash. Partition pruning speeds queries on large tables.</td></tr>
+<tr><td><span class="hi">Extensions</span></td><td>PostGIS (geo), TimescaleDB (time-series), Citus (distributed), pg_trgm (fuzzy)</td></tr>
+</table>
+<div class="b bb"><span class="hi">Scaling:</span> <span class="hg">Read replicas</span> (followers serve reads) · <span class="hg">PgBouncer</span> (connection pooling) · <span class="hg">Citus</span>/Vitess (sharding) · Vertical (bigger machine)</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Write bottleneck</span> — single leader (~1-3K writes/sec). <span class="hr">Resharding is painful</span>. <span class="hr">Rigid schema</span> — ALTER on large tables can lock. <span class="hr">Vertical scaling ceiling</span>.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Instagram</strong> — sharded Postgres. <strong>Stripe</strong> — Postgres for payments. <strong>Supabase</strong> — "Firebase on Postgres".</div>
+</div>
+
+<div class="T" id="nosql">
+<h2>NoSQL</h2><p class="su"><span class="hg">Horizontal scaling</span>, flexible schema, tunable consistency</p>
+<table>
+<tr><th>Type</th><th>Examples</th><th>Guarantee</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Key-Value</span></td><td>Redis, DynamoDB</td><td>O(1) lookup, partition tolerant</td><td>Sessions, cache</td></tr>
+<tr><td><span class="hi">Document</span></td><td>MongoDB, Firestore</td><td>Single-doc ACID, flexible schema</td><td>Profiles, catalogs</td></tr>
+<tr><td><span class="hi">Wide-Column</span></td><td>Cassandra, HBase</td><td>Write-optimized, tunable consistency</td><td>Time-series, IoT</td></tr>
+<tr><td><span class="hi">Graph</span></td><td>Neo4j, Neptune</td><td>O(1) edge traversal</td><td>Social, fraud, recommendations</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cassandra Guarantees:</span> <span class="hg">Masterless ring</span> — no SPOF. <span class="hg">Tunable consistency</span> — QUORUM (W+R>N = strong) or ONE (fast, eventual). <span class="hg">Anti-entropy:</span> Read repair, Merkle trees, hinted handoff keep replicas in sync.</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">No complex joins</span>. <span class="hr">No multi-row ACID</span>. <span class="hr">Eventual consistency by default</span>. <span class="hr">Must model around queries</span>. <span class="hr">Tombstone overhead</span>.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Discord</strong> — Cassandra (migrated to ScyllaDB). <strong>Netflix</strong> — Cassandra for viewing history. <strong>Uber</strong> — Cassandra for location data.</div>
+</div>
+
+<div class="T" id="newsql">
+<h2>NewSQL</h2><p class="su"><span class="hg">Global ACID</span> at scale. Spanner (TrueTime + Paxos), CockroachDB (Raft), TiDB</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Serializability</span> globally — strongest isolation. <span class="hg">SQL interface</span> — familiar tools work. Trade-off: <span class="hr">consensus latency</span> (100ms+ multi-region) and <span class="hr">10x cost</span> vs Postgres. Most apps don't need this.</div>
+</div>
+
+<div class="T" id="timeseries">
+<h2>Time-Series DBs</h2><p class="su">InfluxDB, Prometheus, TimescaleDB — optimized for <span class="hg">append-heavy + range queries</span></p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">High ingest</span> (millions/sec). <span class="hg">Auto-retention</span> (TTL cleanup). <span class="hg">Downsampling</span> (1s→1min→1hr). Prometheus = pull-based scraping. TimescaleDB = Postgres extension (SQL for time-series).</div>
+</div>
+
+<div class="T" id="search">
+<h2>Search (Elasticsearch)</h2><p class="su"><span class="hg">Inverted index</span>, BM25 ranking, fuzzy matching. <span class="hr">NOT a primary data store</span></p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Sub-second full-text search</span> across billions of docs. <span class="hg">Shard resilience</span> — replicas survive node failure. ELK Stack: Elasticsearch + Logstash + Kibana.</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Not ACID</span> — eventually consistent. <span class="hr">Not a source of truth</span>. <span class="hr">Mapping explosion</span>. <span class="hr">Deep pagination expensive</span> — use <code>search_after</code>.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Wikipedia</strong>, <strong>GitHub code search</strong>, <strong>Uber trip search</strong>, <strong>Netflix log analysis</strong>.</div>
+</div>
+
+<div class="T" id="blob">
+<h2>Blob Storage (S3)</h2><p class="su"><span class="hg">99.999999999% durability</span> (11 nines). Cheap, infinite scale. Pre-signed URLs for direct access.</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Strong read-after-write consistency</span> (S3, since Dec 2020). <span class="hg">Versioning</span> protects against accidental deletes. Lifecycle policies auto-tier: Standard → IA → Glacier.</div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

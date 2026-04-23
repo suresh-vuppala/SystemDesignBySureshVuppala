@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1. Foundations — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-1"><span class="e">⚡</span> 1 · FOUNDATIONS</div>
+
+<div class="T" id="sd-framework">
+<h2>System Design Framework</h2><p class="su">The structured approach to tackle any design interview (45-60 min)</p>
+<pre><code>1. REQUIREMENTS (5 min)  — Clarify scope. Ask questions. Define FR + NFR.
+2. ESTIMATION (5 min)    — Users, QPS, storage, bandwidth (back-of-envelope).
+3. HIGH-LEVEL DESIGN (10 min) — Draw: clients → LB → services → DB → cache.
+4. DETAILED DESIGN (20 min)   — Deep dive 2-3 critical components.
+5. TRADE-OFFS (5 min)    — Alternatives, bottlenecks, failure modes.
+6. SCALING (5 min)       — How to handle 10x, 100x growth.</code></pre>
+</div>
+
+<div class="T" id="fr-nfr">
+<h2>Functional vs Non-Functional Requirements</h2><p class="su">What the system does vs how well it does it</p>
+<table>
+<tr><th>Functional (FR)</th><th>Non-Functional (NFR)</th></tr>
+<tr><td>User can post tweet, follow, view timeline</td><td><span class="hg">Latency</span> &lt;200ms p99</td></tr>
+<tr><td>User can upload/download files</td><td><span class="hg">Availability</span> 99.99% (52 min downtime/year)</td></tr>
+<tr><td>User can search products</td><td><span class="hg">Throughput</span> 10K RPS, <span class="hg">Durability</span> 11 nines</td></tr>
+<tr><td>User can make payments</td><td><span class="hg">Consistency</span> (strong for payments, eventual for likes)</td></tr>
+</table>
+<div class="b bb"><span class="hi">Core Challenges:</span> <span class="hg">Too many users</span> → horizontal scaling, LB, caching. <span class="hg">Too much data</span> → sharding, tiered storage. <span class="hg">Low latency</span> → caching, CDN, geo-distribution. <span class="hg">High availability</span> → replication, multi-region, graceful degradation.</div>
+</div>
+
+<div class="T" id="scaling-basics">
+<h2>Scaling Basics</h2><p class="su">Vertical vs Horizontal — the fundamental scaling decision</p>
+<table>
+<tr><th>Vertical (Scale Up)</th><th>Horizontal (Scale Out)</th></tr>
+<tr><td>Bigger machine (more CPU/RAM/IOPS)</td><td>More machines behind a load balancer</td></tr>
+<tr><td><span class="hg">Simple</span> — no code changes</td><td><span class="hg">Unlimited</span> — add nodes as needed</td></tr>
+<tr><td><span class="hr">Has ceiling</span> — biggest machine has limits</td><td><span class="hr">Complex</span> — distributed state, consistency</td></tr>
+<tr><td>Single point of failure</td><td>Fault tolerant (node dies → others serve)</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantee:</span> Horizontal scaling provides <span class="hg">linear throughput growth</span> — doubling nodes roughly doubles capacity, because each node handles an independent subset of traffic.</div>
+</div>
+
+<div class="T" id="stateless-stateful">
+<h2>Stateless vs Stateful</h2>
+<p class="su"><span class="hg">Stateless</span> — no memory between requests, every request is a stranger · <span class="hi">Stateful</span> — server remembers past interactions</p>
+<table>
+<tr><th>Aspect</th><th>Stateless</th><th>Stateful</th></tr>
+<tr><td>Memory</td><td><span class="hg">No memory</span> — every request self-contained</td><td><span class="hi">Remembers</span> — keeps session, knows past actions</td></tr>
+<tr><td>Scaling</td><td><span class="hg">Just add servers</span> — any instance handles any request</td><td><span class="hr">Sticky sessions</span> + coordination — same user → same server</td></tr>
+<tr><td>Failure</td><td><span class="hg">Any server takes over</span> — no state lost on crash</td><td><span class="hr">State lost on crash</span> — needs replication or persistence</td></tr>
+<tr><td>State lives in</td><td><span class="hg">Redis / DB / JWT</span> — externalized, not on server</td><td><span class="hi">Server memory</span> — tied to specific instance</td></tr>
+<tr><td>Examples</td><td>REST APIs · HTTP services · Auth via <span class="hg">JWT</span> · App servers with Redis</td><td>WebSocket (chat) · Game servers · DB connections · Login sessions in memory</td></tr>
+<tr><td>Load Balancer</td><td><span class="hg">Round Robin</span> — any server, no special routing</td><td><span class="hr">IP Hash / Cookie</span> — must route to same server</td></tr>
+</table>
+<div class="b bg"><span class="hi">Stateless → Stateful conversion:</span> Move session to <span class="hg">Redis</span> (shared store) → all servers read same session → service becomes stateless. Move auth to <span class="hg">JWT</span> (token carries user context) → no server-side session needed. This is how companies <span class="hg">horizontally scale</span> without sticky sessions.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Netflix</strong> — stateless API servers + session in Redis. <strong>WhatsApp</strong> — stateful WebSocket (connection pinned to server) + Redis for presence. <strong>Kubernetes Pods</strong> — stateless by design, killed/restarted anytime. <strong>Game servers</strong> — stateful, entire match state in memory → hard to migrate mid-game.</div>
+<div class="b bb"><span class="hi">One-liner:</span> <span class="hg">Stateless = no memory, infinite scale</span> (REST API) · <span class="hr">Stateful = memory, scaling pain</span> (game server, sessions) → best practice: <span class="hg">externalize state</span>, make services stateless.</div>
+</div>
+
+<div class="T" id="serialization">
+<h2>Serialization &amp; Deserialization</h2><p class="su">Converting objects in memory to bytes/JSON/Binary (serialize) and back (deserialize) for storage/transmission</p>
+<table>
+<tr><th>Format</th><th>Type</th><th>Size</th><th>Speed</th><th>Use Case</th></tr>
+<tr><td><span class="hi">JSON</span></td><td>Text</td><td>Large</td><td>Slow</td><td>REST APIs, config files, human-readable</td></tr>
+<tr><td><span class="hi">Protocol Buffers</span></td><td>Binary</td><td><span class="hg">Small</span></td><td><span class="hg">Fast</span></td><td>gRPC, internal services (Google)</td></tr>
+<tr><td><span class="hi">Avro</span></td><td>Binary</td><td>Small</td><td>Fast</td><td>Kafka events, Hadoop (schema in header)</td></tr>
+<tr><td><span class="hi">MessagePack</span></td><td>Binary</td><td>Small</td><td>Fast</td><td>Redis, embedded systems</td></tr>
+<tr><td><span class="hi">XML</span></td><td>Text</td><td>Very large</td><td>Slow</td><td>SOAP, legacy enterprise</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantee:</span> Binary formats (Protobuf, Avro) provide <span class="hg">schema evolution</span> with backward/forward compatibility — old consumers can read new messages and vice versa, because fields are identified by number not name. This is critical for zero-downtime deployments.</div>
+<div class="b bb"><span class="hi">Schema Registry</span> (Confluent) — central store for Avro/Protobuf schemas. Enforces compatibility rules. Used with Kafka to prevent breaking changes.</div>
+<div class="b bb"><span class="hi">Why needed:</span> <span class="hg">Network</span> — send objects over HTTP/TCP/Kafka (network only understands bytes). <span class="hg">Persistence</span> — store to DB/Redis/disk. <span class="hg">Cross-language</span> — Java → Python via Protobuf (no language barrier). <span class="hg">Caching</span> — serialize to Redis, deserialize on hit. <span class="hg">Distributed Computing / RPC</span> — gRPC serializes to Protobuf binary — faster &amp; smaller than JSON for internal service calls.</div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

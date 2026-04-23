@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5. Infrastructure — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-8"><span class="e">🏗️</span> 5 · INFRASTRUCTURE</div>
+
+<div class="T" id="load-balancer">
+<h2>Load Balancer</h2><p class="su"><span class="hi">L4</span> (TCP — fast, IP+port) vs <span class="hi">L7</span> (HTTP — smart, URL/headers). ALB, NLB, NGINX, HAProxy</p>
+<table>
+<tr><th>Algorithm</th><th>How</th><th>Best For</th></tr>
+<tr><td><span class="hi">Round Robin</span></td><td>Rotate sequentially</td><td>Equal-capacity servers</td></tr>
+<tr><td><span class="hi">Weighted Round Robin</span></td><td>Rotate sequentially based on assigned weights</td><td>Servers with different capacities</td></tr>
+<tr><td><span class="hi">Least Connections</span></td><td>Route to fewest active</td><td>Varying request durations</td></tr>
+<tr><td><span class="hi">IP Hash</span></td><td>Hash client IP → consistent server</td><td>Session affinity</td></tr>
+<tr><td><span class="hi">Consistent Hashing</span></td><td>Hash ring, minimal disruption</td><td>Cache servers</td></tr>
+</table>
+<table>
+<tr><th>Aspect</th><th>L4 (Transport Layer)</th><th>L7 (Application Layer)</th></tr>
+<tr><td>Works On</td><td><span class="hg">IP + TCP/UDP</span> — raw bytes, no content inspection</td><td><span class="hg">HTTP, gRPC, WebSocket</span> — reads headers, URL, cookies</td></tr>
+<tr><td>Routing By</td><td><span class="hg">IP address + Port</span> only</td><td><span class="hg">URL path, host, method, headers, cookies</span></td></tr>
+<tr><td>Speed</td><td><span class="hg">Faster</span> — no parsing overhead</td><td><span class="hg">Slightly slower</span> — inspects every request</td></tr>
+<tr><td>SSL</td><td><span class="hg">Passthrough</span> — encrypted traffic forwarded as-is</td><td><span class="hg">Termination</span> — decrypts, inspects, re-encrypts</td></tr>
+<tr><td>Sticky Sessions</td><td>IP-based only</td><td><span class="hg">Cookie / header</span> based — more reliable</td></tr>
+<tr><td>Content Awareness</td><td><span class="hr">None</span> — blind to payload</td><td><span class="hg">Full</span> — can rewrite headers, redirect, A/B route</td></tr>
+<tr><td>Use Case</td><td><span class="hg">TCP proxying</span>, DB connections, raw throughput, gaming</td><td><span class="hg">API gateway</span>, microservices routing, canary deploys</td></tr>
+<tr><td>Examples</td><td><span class="hi">AWS NLB</span>, HAProxy (TCP mode), NGINX (stream)</td><td><span class="hi">AWS ALB</span>, NGINX (http), Envoy, Traefik, Istio</td></tr>
+<tr><td>Health Check</td><td>TCP connect only (is port open?)</td><td><span class="hg">HTTP /health</span> endpoint — checks actual app response</td></tr>
+<tr><td>WebSocket</td><td><span class="hg">Native</span> — TCP passthrough, no extra config</td><td>Needs explicit <span class="hg">Upgrade header</span> proxying config</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">No single point of failure</span> (if LB is HA). <span class="hg">Health checks</span> auto-remove unhealthy backends. <span class="hg">SSL termination</span> at L7 offloads crypto from backends.</div>
+<div class="b by"><span class="hi">Sticky Sessions:</span> Route same client to same backend. Problem: hot spots, breaks on death. <span class="hg">Better: externalize session to Redis.</span></div>
+</div>
+
+<div class="T" id="api-gateway">
+<h2>API Gateway</h2><p class="su">Single entry point — <span class="hg">auth, rate limiting, routing, SSL</span>. Kong, Apigee, AWS API Gateway</p>
+<table>
+<tr><th>Responsibility</th><th>How</th></tr>
+<tr><td><span class="hi">Auth</span></td><td>Verify JWT/API key before routing upstream</td></tr>
+<tr><td><span class="hi">Rate Limiting</span></td><td>Per-client/IP/tier quotas (Redis-backed)</td></tr>
+<tr><td><span class="hi">Routing</span></td><td>Path-based forwarding to microservices</td></tr>
+<tr><td><span class="hi">BFF Pattern</span></td><td>Separate gateways for mobile vs web vs partner</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantee:</span> API Gateway provides a <span class="hg">single enforcement point</span> for cross-cutting concerns — auth, rate limiting, logging happen once at the edge, not duplicated in every service.</div>
+</div>
+
+<div class="T" id="proxy">
+<h2>Forward &amp; Reverse Proxy</h2><p class="su"><span class="hi">Forward</span> = hide client (corporate proxy). <span class="hi">Reverse</span> = hide servers (NGINX, Cloudflare)</p>
+<div class="b bg"><span class="hi">Reverse Proxy Guarantees:</span> <span class="hg">Backend isolation</span> — clients never see internal IPs. <span class="hg">SSL termination</span> — decrypt at proxy, HTTP internally. <span class="hg">Caching</span> — serve cached responses without hitting origin. <span class="hg">DDoS absorption</span> at edge.</div>
+</div>
+
+<div class="T" id="nginx">
+<h2>NGINX</h2><p class="su">Reverse proxy, LB, web server, API gateway. <span class="hi">~34% of all websites</span>. Event-driven, non-blocking.</p>
+<pre><code>upstream backend {
+    least_conn;
+    server app1:8080 weight=3;
+    server app2:8080;
+}
+server {
+    listen 443 ssl;
+    location /api/ { proxy_pass http://backend; }
+    location / { root /var/www/html; }  # Static files directly
+}</code></pre>
+<div class="b by"><span class="hi">Why NGINX is fast:</span> <span class="hg">Event-driven</span> single master + worker processes handle <span class="hg">thousands of concurrent connections</span> via non-blocking I/O + epoll. Workers act as <span class="hg">Reverse Proxy</span>, <span class="hg">Load Balancer</span>, <span class="hg">SSL Termination</span>, <span class="hg">Cache</span>, <span class="hg">Rate Limiter</span>, <span class="hg">Static Server</span>, <span class="hg">WebSocket Proxy</span>, <span class="hg">gRPC Proxy</span>. Real-world: <span class="hg">Netflix</span>, <span class="hg">Dropbox</span>, <span class="hg">Kubernetes</span> (default Ingress Controller).</div>
+</div>
+
+<div class="T" id="docker-k8s">
+<h2>Docker &amp; Kubernetes</h2><p class="su"><span class="hg">Docker</span> packages apps into containers. <span class="hg">Kubernetes (K8s)</span> orchestrates them at scale.</p>
+<table>
+<tr><th>Docker Concept</th><th>Detail</th></tr>
+<tr><td><span class="hi">Image</span></td><td>Immutable template with app + dependencies. Built from Dockerfile. Stored in registry (Docker Hub, ECR).</td></tr>
+<tr><td><span class="hi">Container</span></td><td>Running instance of image. Lightweight isolation (shared kernel, not full VM). Starts in seconds.</td></tr>
+<tr><td><span class="hi">Volume</span></td><td>Persistent storage that survives container restarts.</td></tr>
+</table>
+<table>
+<tr><th>K8s Concept</th><th>Detail</th></tr>
+<tr><td><span class="hi">Pod</span></td><td>Smallest unit. 1+ containers sharing network/storage. Ephemeral.</td></tr>
+<tr><td><span class="hi">Service</span></td><td>Stable network endpoint for pods (ClusterIP, NodePort, LoadBalancer).</td></tr>
+<tr><td><span class="hi">Deployment</span></td><td>Declarative desired state. Rolling updates, rollbacks.</td></tr>
+<tr><td><span class="hi">HPA</span></td><td>Horizontal Pod Autoscaler — scale on CPU/memory/custom metrics.</td></tr>
+<tr><td><span class="hi">StatefulSet</span></td><td>Ordered, stable pod identities. For DBs, Kafka, ZooKeeper.</td></tr>
+<tr><td><span class="hi">Ingress</span></td><td>HTTP routing rules (NGINX Ingress, Traefik). External traffic → services.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Deployment Strategies:</span> <span class="hg">Rolling</span> (gradual, default) · <span class="hg">Blue-Green</span> (swap envs) · <span class="hg">Canary</span> (5% traffic first) · <span class="hg">A/B</span> (feature flags, Istio traffic split)</div>
+<div class="b bg"><span class="hi">Guarantees:</span> K8s guarantees <span class="hg">desired state reconciliation</span> — if a pod dies, controller restarts it. <span class="hg">Self-healing</span> via liveness/readiness probes. <span class="hg">Service discovery</span> via DNS.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Google</strong> (Borg predecessor). <strong>Spotify</strong> 2000+ services on K8s. Managed: <span class="hg">EKS</span> (AWS), <span class="hg">GKE</span> (Google), <span class="hg">AKS</span> (Azure).</div>
+</div>
+
+<div class="T" id="service-mesh">
+<h2>Service Mesh</h2><p class="su"><span class="hg">Istio</span>, Linkerd — sidecar proxy (Envoy) for service-to-service networking</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">mTLS everywhere</span> (zero-trust). <span class="hg">Automatic observability</span> (metrics, traces per call). <span class="hg">Traffic management</span> (canary, retries, circuit breaking) via YAML, not code. vs API Gateway: Gateway = north-south (external→internal). Mesh = east-west (internal→internal).</div>
+</div>
+
+<div class="T" id="multi-region">
+<h2>Multi-Region &amp; Multi-Tenant</h2><p class="su">Deploying across regions for <span class="hg">low latency</span>, <span class="hg">disaster recovery</span>, and <span class="hg">compliance</span></p>
+<table>
+<tr><th>Pattern</th><th>How</th><th>Trade-off</th></tr>
+<tr><td><span class="hi">Active-Passive</span></td><td>Primary region serves traffic; standby for failover</td><td>Simple but standby idle; failover delay (minutes)</td></tr>
+<tr><td><span class="hi">Active-Active</span></td><td>Both regions serve traffic; data replicated</td><td><span class="hg">Low latency globally</span> but conflict resolution needed</td></tr>
+<tr><td><span class="hi">Follow-the-Sun</span></td><td>Route to region where it's business hours</td><td>Good for support/ops workloads</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantees:</span> Multi-region provides <span class="hg">disaster recovery</span> (entire region can fail) and <span class="hg">data residency compliance</span> (GDPR: EU data stays in EU). Trade-off: <span class="hr">cross-region replication lag</span> and <span class="hr">conflict resolution</span> complexity.</div>
+<div class="b bb"><span class="hi">Multi-Tenant:</span> <span class="hg">Shared infra</span> (single DB, tenant_id column — cheap, noisy neighbor risk) vs <span class="hg">Isolated</span> (separate DB per tenant — expensive, strong isolation) vs <span class="hg">Hybrid</span> (shared compute, isolated DB). <strong>Salesforce</strong> uses shared multi-tenant. <strong>AWS</strong> provides isolated accounts.</div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

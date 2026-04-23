@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2. Networking — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-1"><span class="e">🌐</span> 2 · NETWORKING</div>
+
+<div class="T" id="osi">
+<h2>OSI Model</h2><p class="su">7-layer reference model for network communication — know <span class="hg">L4 and L7</span> for interviews</p>
+<table>
+<tr><th>#</th><th>Layer</th><th>Protocol</th><th>System Design Relevance</th></tr>
+<tr><td>7</td><td><span class="hi">Application</span></td><td>HTTP, gRPC, DNS, SMTP</td><td><span class="hg">L7 Load Balancers</span> (ALB), API Gateways, WAF</td></tr>
+<tr><td>6</td><td>Presentation</td><td>TLS/SSL, JSON, Protobuf</td><td>Encryption, serialization</td></tr>
+<tr><td>5</td><td>Session</td><td>WebSocket, RPC</td><td>Connection management</td></tr>
+<tr><td>4</td><td><span class="hi">Transport</span></td><td>TCP, UDP, QUIC</td><td><span class="hg">L4 Load Balancers</span> (NLB), port-based routing</td></tr>
+<tr><td>3</td><td><span class="hi">Network</span></td><td>IP, ICMP</td><td>Routing, subnets, VPCs, BGP</td></tr>
+<tr><td>2</td><td>Data Link</td><td>Ethernet, ARP</td><td>MAC addresses, switches</td></tr>
+<tr><td>1</td><td>Physical</td><td>Fiber, copper</td><td>Data center hardware</td></tr>
+</table>
+<div class="b bg"><span class="hi">Why it matters:</span> <span class="hg">L4 LB</span> routes by IP+port (fast, no content inspection). <span class="hg">L7 LB</span> routes by URL/headers/cookies (smart, can do path-based routing). Most system design discussions happen at <span class="hg">L4 and L7</span>.</div>
+</div>
+
+<div class="T" id="tcp-udp">
+<h2>TCP / UDP</h2><p class="su">Transport layer — TCP (<span class="hg">reliable, ordered</span>) vs UDP (<span class="ho">fast, unreliable</span>)</p>
+<table>
+<tr><th>TCP</th><th>UDP</th></tr>
+<tr><td><span class="hi">Connection-oriented:</span> 3-way handshake (SYN→SYN-ACK→ACK)</td><td><span class="hi">Connectionless:</span> Send immediately</td></tr>
+<tr><td><span class="hi">Ordered + guaranteed:</span> Retransmits lost packets</td><td><span class="hi">Best-effort:</span> No retransmission, may arrive out-of-order</td></tr>
+<tr><td><span class="hi">Flow + congestion control:</span> Sliding window, slow start</td><td>No flow control — sender controls pace</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantees:</span> TCP guarantees <span class="hg">ordered, reliable, duplicate-free delivery</span> via sequence numbers, ACKs, and retransmission. UDP guarantees <span class="hg">nothing</span> — but that's why it's fast (no overhead).</div>
+<div class="cols">
+<div class="b bb"><strong>TCP:</strong> Banking, HTTPS, DB connections, email. Ports: 80/443/3306/5432/6379/9092</div>
+<div class="b bo"><strong>UDP:</strong> Live video, gaming, DNS, VoIP, QUIC (HTTP/3). Ports: 53/123/443(QUIC)</div>
+</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Fortnite/Valorant</strong> use UDP for player positions (few lost packets OK, low latency critical). <strong>QUIC</strong> (HTTP/3) — UDP-based with built-in TLS 1.3, 0-RTT resumption. Used by Chrome, YouTube, Cloudflare.</div>
+</div>
+
+<div class="T" id="http-https">
+<h2>HTTP / HTTPS</h2><p class="su">Application layer — HTTP (<span class="hr">plaintext</span>) vs HTTPS (<span class="hg">TLS encrypted</span>)</p>
+<table>
+<tr><th>Method</th><th>Purpose</th><th>Idempotent</th><th>Safe</th><th>Cacheable</th></tr>
+<tr><td><span class="hg">GET</span></td><td>Retrieve</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td><span class="ho">POST</span></td><td>Create</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><span class="ha">PUT</span></td><td>Replace</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><span class="hv">PATCH</span></td><td>Partial update</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><span class="hr">DELETE</span></td><td>Remove</td><td>✓</td><td>✗</td><td>✗</td></tr>
+</table>
+<div class="b bg"><span class="hi">HTTPS Guarantees:</span> <span class="hg">Confidentiality</span> (AES-256 encryption) · <span class="hg">Integrity</span> (SHA-256 HMAC, tamper-proof) · <span class="hg">Authenticity</span> (CA-signed certificate proves server identity) · <span class="hg">Forward secrecy</span> (ECDHE — past sessions safe even if key leaked).</div>
+<table>
+<tr><th colspan="6" class="hg">2xx — Success</th></tr>
+<tr><td><span class="hg">200</span></td><td>OK</td><td><span class="hg">201</span></td><td>Created</td><td><span class="hg">202</span></td><td>Accepted (async)</td></tr>
+<tr><td><span class="hg">204</span></td><td>No Content</td><td><span class="hg">206</span></td><td>Partial Content (streaming)</td><td></td><td></td></tr>
+<tr><th colspan="6" class="hi">3xx — Redirect</th></tr>
+<tr><td><span class="hi">301</span></td><td>Moved Permanently</td><td><span class="hi">302</span></td><td>Found (temp redirect)</td><td><span class="hi">304</span></td><td>Not Modified (cache)</td></tr>
+<tr><td><span class="hi">307</span></td><td>Temp Redirect (keep method)</td><td><span class="hi">308</span></td><td>Perm Redirect (keep method)</td><td></td><td></td></tr>
+<tr><th colspan="6" class="hr">4xx — Client Error</th></tr>
+<tr><td><span class="hr">400</span></td><td>Bad Request</td><td><span class="hr">401</span></td><td>Unauthorized</td><td><span class="hr">403</span></td><td>Forbidden</td></tr>
+<tr><td><span class="hr">404</span></td><td>Not Found</td><td><span class="hr">405</span></td><td>Method Not Allowed</td><td><span class="hr">408</span></td><td>Request Timeout</td></tr>
+<tr><td><span class="hr">409</span></td><td>Conflict</td><td><span class="hr">410</span></td><td>Gone (deleted)</td><td><span class="hr">413</span></td><td>Payload Too Large</td></tr>
+<tr><td><span class="hr">415</span></td><td>Unsupported Media Type</td><td><span class="hr">422</span></td><td>Unprocessable Entity</td><td><span class="hr">429</span></td><td>Too Many Requests</td></tr>
+<tr><td><span class="hr">451</span></td><td>Unavailable For Legal Reasons</td><td></td><td></td><td></td><td></td></tr>
+<tr><th colspan="6" class="hr">5xx — Server Error</th></tr>
+<tr><td><span class="hr">500</span></td><td>Internal Server Error</td><td><span class="hr">501</span></td><td>Not Implemented</td><td><span class="hr">502</span></td><td>Bad Gateway</td></tr>
+<tr><td><span class="hr">503</span></td><td>Service Unavailable</td><td><span class="hr">504</span></td><td>Gateway Timeout</td><td></td><td></td></tr>
+</table>
+<div class="b bb"><span class="hi">HTTP/2:</span> Binary framing, <span class="hg">multiplexing</span>, header compression (HPACK), server push. <span class="hi">HTTP/3:</span> QUIC-based (UDP), no head-of-line blocking, 0-RTT.</div>
+</div>
+
+<div class="T" id="dns">
+<h2>DNS</h2><p class="su">Translates <span class="hg">domains → IP addresses</span>. Resolution: Browser → OS → Resolver → Root → TLD → Authoritative</p>
+<table>
+<tr><th>Record</th><th>Purpose</th><th>Example</th></tr>
+<tr><td><span class="hi">A/AAAA</span></td><td>Domain → IPv4/IPv6</td><td>example.com → 93.184.216.34</td></tr>
+<tr><td><span class="hi">CNAME</span></td><td>Alias</td><td>www → example.com</td></tr>
+<tr><td><span class="hi">MX</span></td><td>Mail routing</td><td>→ mail.example.com</td></tr>
+<tr><td><span class="hi">SRV</span></td><td>Service discovery</td><td>_http._tcp.example.com</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantees:</span> DNS provides <span class="hg">eventual consistency</span> — changes propagate within TTL. Low TTL (60s) = fast failover but high query load. High TTL (86400s) = less load but slow propagation.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Route 53</strong> GeoDNS routes to nearest region. <strong>Cloudflare</strong> 1.1.1.1 resolves in ~11ms. <strong>Consul</strong> uses DNS for service discovery. <strong>Anycast</strong> — same IP from multiple locations.</div>
+</div>
+
+<div class="T" id="networking-extras">
+<h2>IP, Ports, Firewalls &amp; Security</h2><p class="su">Network fundamentals for infrastructure design</p>
+<table>
+<tr><th>Concept</th><th>Detail</th></tr>
+<tr><td><span class="hi">IP/CIDR</span></td><td>IPv4 (32-bit). <code>/24</code>=256 IPs, <code>/16</code>=65K. Private: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. VPCs use subnets.</td></tr>
+<tr><td><span class="hi">Key Ports</span></td><td>22 SSH · 53 DNS · 80 HTTP · 443 HTTPS · 3306 MySQL · 5432 Postgres · 6379 Redis · 9092 Kafka · 9200 ES · 27017 Mongo</td></tr>
+<tr><td><span class="hi">Firewalls</span></td><td><span class="hg">Security Groups</span> (AWS) = stateful per-instance. <span class="hg">NACLs</span> = stateless subnet-level. Whitelist only needed ports.</td></tr>
+<tr><td><span class="hi">Zero Trust</span></td><td>"Never trust, always verify." Every request authed regardless of network. <span class="hg">mTLS</span> between services. No implicit trust for internal traffic.</td></tr>
+<tr><td><span class="hi">DDoS</span></td><td><span class="hg">Cloudflare</span> / <span class="hg">AWS Shield</span> absorb at edge. Rate limiting, WAF, geo-blocking, CAPTCHA.</td></tr>
+</table>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

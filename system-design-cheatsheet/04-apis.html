@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4. APIs &amp; Communication — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-6"><span class="e">🔌</span> 4 · APIs &amp; COMMUNICATION</div>
+
+<div class="T" id="rest">
+<h2>REST API</h2><p class="su"><span class="hg">Stateless</span> HTTP-based — universal, cacheable. The <span class="hi">default choice</span> for public APIs</p>
+<pre><code>GET    /api/v1/products/123     → Fetch (cacheable, idempotent)
+POST   /api/v1/orders           → Create (use idempotency key to prevent dupes)
+PUT    /api/v1/orders/456       → Replace (idempotent)
+DELETE /api/v1/orders/456       → Cancel (idempotent)
+
+Pagination: ?cursor=abc123 (preferred) or ?page=2&limit=10
+Caching: Cache-Control: max-age=3600 · ETag: "abc123"
+Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Statelessness</span> — no server-side session, any instance handles any request. <span class="hg">Idempotency</span> of GET/PUT/DELETE — safe to retry on failure. <span class="hg">Cacheability</span> — HTTP caching (CDN, browser) reduces load.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Stripe API</strong> — gold standard (idempotency keys, versioning, pagination). <strong>GitHub API v3</strong> — REST. <strong>Twilio</strong> — REST for SMS/voice.</div>
+</div>
+
+<div class="T" id="grpc">
+<h2>gRPC</h2><p class="su"><span class="hg">HTTP/2 + Protobuf</span> — <span class="hi">10x faster</span> than REST. 4 call types: unary, server-stream, client-stream, bidirectional</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Type safety</span> — .proto schema + codegen catches incompatibility at compile time. <span class="hg">Deadline propagation</span> — timeout flows through entire call chain. <span class="hg">Multiplexing</span> — multiple concurrent calls on single HTTP/2 connection.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Google</strong> internal comms. <strong>Netflix/Uber</strong> microservice-to-microservice. Best for: internal APIs, 10K+ RPS, bidirectional streaming. <span class="hr">Not for browsers</span> (use gRPC-Web proxy).</div>
+</div>
+
+<div class="T" id="graphql">
+<h2>GraphQL</h2><p class="su">Client specifies <span class="hg">exactly which fields</span> — single endpoint, no versioning, strongly typed schema</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">No over-fetching</span> — client gets only requested fields. <span class="hg">Schema contract</span> — server validates queries against schema before execution. <span class="hg">Introspection</span> — clients can discover available types/fields.</div>
+<div class="b br"><span class="hi">Risks:</span> <span class="hr">N+1 problem</span> (fix with DataLoader batching). <span class="hr">Deep query DoS</span> (fix with depth limiting + cost analysis). <span class="hr">Caching hard</span> (each query unique). <strong>GitHub API v4</strong>, <strong>Shopify Storefront</strong> use GraphQL.</div>
+</div>
+
+<div class="T" id="api-extras">
+<h2>API Extras</h2><p class="su">SOAP, idempotency, sync/async, CORS, documentation</p>
+<table>
+<tr><th>Topic</th><th>Detail</th></tr>
+<tr><td><span class="hi">SOAP</span></td><td>XML-based, WSDL contract, WS-Security. Enterprise/legacy (banking). Heavier than REST.</td></tr>
+<tr><td><span class="hi">Idempotent APIs</span></td><td>Same request N times = same result. POST isn't idempotent — use <span class="hg">idempotency keys</span> (<code>Idempotency-Key: uuid</code>) to prevent duplicate orders. Stripe pattern.</td></tr>
+<tr><td><span class="hi">Sync → Async</span></td><td>POST → <span class="hg">202 Accepted</span> + job ID → poll <code>GET /jobs/{id}</code> or receive <span class="hg">webhook callback</span>. Decouple with queue.</td></tr>
+<tr><td><span class="hi">CORS</span></td><td>Browser security. Server sends <code>Access-Control-Allow-Origin</code>. Preflight OPTIONS for non-simple requests.</td></tr>
+<tr><td><span class="hi">OpenAPI/Swagger</span></td><td>Standard REST spec. Auto-generates docs, SDKs, mock servers. Postman for testing.</td></tr>
+</table>
+</div>
+
+<div class="T" id="realtime">
+<h2>Real-time Communication</h2><p class="su">Technologies for <span class="hg">pushing data</span> from server to client — choose based on direction + latency needs</p>
+<table>
+<tr><th>Tech</th><th>Direction</th><th>Latency</th><th>Best For</th><th>Guarantee</th></tr>
+<tr><td><span class="hi">Short Polling</span></td><td>Client → Server (repeated)</td><td>N sec</td><td>Dashboard refresh, legacy status checks, simple health monitors</td><td><span class="hg">Simple</span> but 99% requests empty (wasteful)</td></tr>
+<tr><td><span class="hi">Long Polling</span></td><td>Server holds connection</td><td>~sec</td><td>Chat (pre-WS era), low-frequency notifications, JIRA-style updates</td><td><span class="hg">Near real-time</span> but 1 conn/client held open</td></tr>
+<tr><td><span class="hi">WebSocket</span></td><td><span class="hg">Full duplex</span></td><td>~ms</td><td>Live stock prices (Robinhood, Binance), chat (Slack), collaborative editing (Figma), gaming (Chess.com)</td><td><span class="hg">Persistent bidirectional</span> — server pushes instantly. ~100K conn/server.</td></tr>
+<tr><td><span class="hi">SSE</span></td><td>Server → Client</td><td>~ms</td><td>AI token streaming (ChatGPT, GitHub Copilot), live news tickers, CI/CD build logs</td><td><span class="hg">Auto-reconnect</span> built into browser. Event ID for resuming. Text-only.</td></tr>
+<tr><td><span class="hi">WebRTC</span></td><td><span class="hg">Peer-to-peer</span></td><td>Ultra-low</td><td>Video/audio calls (Zoom, Google Meet), screen sharing, Discord voice</td><td><span class="hg">Direct P2P</span> — no server bandwidth for media. Browser-enforced encryption.</td></tr>
+<tr><td><span class="hi">Webhook</span></td><td><span class="hg">Server → Your Server</span></td><td>~sec</td><td>Payment events (Stripe), CI/CD triggers (GitHub Actions), order updates (Shopify)</td><td><span class="hg">Event-driven HTTP POST</span> — fire-and-forget. Retries on failure. No persistent connection.</td></tr>
+</table>
+<pre><code>WebSocket Lifecycle:
+  HTTP Upgrade → 101 Switching → Full Duplex (binary frames)
+  Heartbeat: Ping every 30s to detect dead connections
+  Reconnect: Exponential backoff (1s → 2s → 4s → 30s max)
+  Scale: Use Redis Pub/Sub to fan out across multiple WS servers
+
+Webhook Lifecycle:
+  Event occurs on Provider (e.g., Stripe payment success)
+    → Provider sends HTTP POST to your registered URL
+    → Your server receives payload (JSON)
+    → Your server responds 200 OK within ~5s
+    → If timeout/failure → Provider retries (exponential backoff)
+  Security:
+    Validate HMAC signature in header (e.g., Stripe-Signature)
+    Whitelist provider IPs
+    Idempotency: Use event ID to avoid duplicate processing
+  Scale:
+    Queue webhook events (e.g., into SQS / RabbitMQ)
+    Process async — don't block the HTTP response
+
+Choosing:
+  One-way server push, simple → SSE
+  AI streaming / live logs    → SSE
+  Bidirectional, low latency  → WebSocket
+  Live stocks / crypto / chat → WebSocket
+  Video/audio P2P             → WebRTC
+  Simple, infrequent updates  → Long Polling
+  Server-to-server events     → Webhook</code></pre>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Slack</strong> — WebSocket for messaging. <strong>Figma</strong> — WebSocket for collab editing. <strong>Zoom</strong> — WebRTC for video. <strong>Robinhood</strong> — WebSocket for live stock prices. <strong>Socket.IO</strong> — auto-fallback to polling. <strong>ChatGPT</strong> — SSE for token streaming. <strong>Stripe</strong> — Webhook for payment events.</div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>
