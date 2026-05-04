@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>14. Key Numbers — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-13"><span class="e">🔢</span> 14 · KEY NUMBERS</div>
+
+<div class="T" id="latency-numbers">
+<h2>Latency Reference</h2><p class="su">Approximate latencies every engineer should know</p>
+<table>
+<tr><th>Operation</th><th>Latency</th><th>Notes</th></tr>
+<tr><td>L1 cache</td><td>~1 ns</td><td></td></tr>
+<tr><td>RAM</td><td>~100 ns</td><td></td></tr>
+<tr><td>SSD random read</td><td>~100 µs</td><td>1000x slower than RAM</td></tr>
+<tr><td>HDD seek</td><td>~10 ms</td><td>100x slower than SSD</td></tr>
+<tr><td>Redis GET</td><td>~0.1-0.5 ms</td><td>In-memory</td></tr>
+<tr><td>DB query (indexed)</td><td>~1-5 ms</td><td></td></tr>
+<tr><td>Same datacenter RTT</td><td>~0.5 ms</td><td></td></tr>
+<tr><td>Cross-region RTT</td><td>~100-150 ms</td><td>US↔EU</td></tr>
+</table>
+</div>
+
+<div class="T" id="throughput-numbers">
+<h2>Throughput Reference</h2><p class="su">Capacity for back-of-envelope calculations</p>
+<table>
+<tr><th>System</th><th>Throughput</th></tr>
+<tr><td>Postgres</td><td>~10K reads, ~1-3K writes/sec</td></tr>
+<tr><td>Redis</td><td>~100K-1M ops/sec</td></tr>
+<tr><td>Kafka</td><td>~1M+ msg/sec (cluster)</td></tr>
+<tr><td>Cassandra</td><td>~50-100K writes/sec (per node)</td></tr>
+<tr><td>Elasticsearch</td><td>~10-50K docs/sec indexing</td></tr>
+<tr><td>S3</td><td>~3,500 PUT, ~5,500 GET/sec (per prefix)</td></tr>
+<tr><td>NGINX</td><td>~100K+ concurrent connections</td></tr>
+</table>
+</div>
+
+<div class="T" id="estimation">
+<h2>Back-of-Envelope Estimation</h2><p class="su">Quick math for interviews</p>
+<pre><code>Storage: 1M users × 1KB = 1GB · 1B users × 1KB = 1TB
+Time: 1 day ≈ 100K sec · 1 year ≈ 30M sec
+Traffic: 1M DAU × 10 req/day = 10M/day ÷ 100K sec = ~100 RPS avg · Peak = 3-5x
+Powers of 2: 2^10=1KB · 2^20=1MB · 2^30=1GB · 2^40=1TB · 2^50=1PB
+80/20 Rule: 20% of data = 80% of traffic (cache hot data)
+Rule of 72: Doubling time = 72 / growth% (10%/month → doubles in ~7 months)</code></pre>
+<div class="b bb"><span class="hi">Cost Estimation:</span> <span class="hg">Compute</span> — EC2 m5.xlarge ~$140/mo, Lambda ~$0.20/1M invocations. <span class="hg">Storage</span> — S3 ~$23/TB/mo, EBS ~$80/TB/mo, RDS ~$200-800/mo. <span class="hg">Bandwidth</span> — $0.09/GB egress (first 10TB). <span class="hg">Redis</span> — ElastiCache r6g.large ~$200/mo. Rule: compute > storage > bandwidth for most apps.</div>
+<div class="b bg"><span class="hi">SLA Math:</span> <span class="hg">99.9%</span> = 8.76h downtime/yr = 43.8min/mo. <span class="hg">99.99%</span> = 52.6min/yr = 4.38min/mo. <span class="hg">Serial</span>: A_total = A1 × A2 (0.999 × 0.999 = 0.998). <span class="hg">Parallel</span>: A_total = 1 - (1-A1)(1-A2) (two 99.9% = 99.9999%). Always set SLO stricter than SLA — buffer before breach.</div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

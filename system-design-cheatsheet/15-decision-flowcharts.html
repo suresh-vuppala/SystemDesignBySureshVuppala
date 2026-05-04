@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>15. Decision Flowcharts — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-8"><span class="e">🧭</span> 15 · DECISION FLOWCHARTS</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 1. API CHOICE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="api-choice">
+<h2>Which API Style?</h2><p class="su">Choose based on <span class="hg">audience</span>, <span class="hi">data shape</span>, and <span class="ho">performance needs</span></p>
+<svg width="100%" viewBox="0 0 460 200" style="max-width:460px;display:block;margin:4px auto">
+  <defs>
+    <marker id="fc1" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker>
+  </defs>
+  <!-- Q1: Client-facing or internal? -->
+  <rect x="150" y="4" width="160" height="32" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2" transform="rotate(0)"/>
+  <text x="230" y="18" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Is the API client-facing</text>
+  <text x="230" y="28" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">or internal?</text>
+  <!-- Internal branch -->
+  <line x1="310" y1="20" x2="380" y2="20" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="345" y="14" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Internal</text>
+  <rect x="382" y="8" width="70" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="417" y="24" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="800">gRPC</text>
+  <text x="417" y="42" text-anchor="middle" fill="var(--muted)" font-size="6">Protobuf · HTTP/2</text>
+  <text x="417" y="50" text-anchor="middle" fill="var(--muted)" font-size="6">10x faster · type-safe</text>
+  <!-- Client-facing branch -->
+  <line x1="230" y1="36" x2="230" y2="62" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="244" y="52" fill="var(--muted)" font-size="7" font-weight="600">Client-facing</text>
+  <!-- Q2: Over/under-fetching a concern? -->
+  <rect x="150" y="64" width="160" height="32" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="230" y="78" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Is over/under-fetching</text>
+  <text x="230" y="88" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">a concern?</text>
+  <!-- Yes → GraphQL -->
+  <line x1="150" y1="80" x2="80" y2="80" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="116" y="74" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Yes</text>
+  <rect x="4" y="68" width="74" height="24" rx="5" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="41" y="84" text-anchor="middle" fill="var(--a)" font-size="10" font-weight="800">GraphQL</text>
+  <text x="41" y="102" text-anchor="middle" fill="var(--muted)" font-size="6">Client picks fields</text>
+  <text x="41" y="110" text-anchor="middle" fill="var(--muted)" font-size="6">Single endpoint</text>
+  <!-- No → REST -->
+  <line x1="310" y1="80" x2="380" y2="80" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="345" y="74" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">No</text>
+  <rect x="382" y="68" width="70" height="24" rx="5" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="417" y="84" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="800">REST</text>
+  <text x="417" y="102" text-anchor="middle" fill="var(--muted)" font-size="6">HTTP verbs · cacheable</text>
+  <text x="417" y="110" text-anchor="middle" fill="var(--muted)" font-size="6">Default for public APIs</text>
+  <!-- Q3: Need real-time streaming? -->
+  <line x1="230" y1="96" x2="230" y2="122" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="244" y="112" fill="var(--muted)" font-size="7" font-weight="600">Need streaming?</text>
+  <rect x="150" y="124" width="160" height="28" rx="6" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="230" y="142" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Bidirectional or server-push?</text>
+  <!-- Bidirectional -->
+  <line x1="150" y1="138" x2="80" y2="138" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="116" y="132" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Bidir</text>
+  <rect x="4" y="126" width="74" height="24" rx="5" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="41" y="142" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="800">WebSocket</text>
+  <!-- Server-push only -->
+  <line x1="310" y1="138" x2="380" y2="138" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="345" y="132" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Server→Client</text>
+  <rect x="382" y="126" width="70" height="24" rx="5" fill="rgba(34,211,238,.12)" stroke="var(--c)" stroke-width="1.5"/>
+  <text x="417" y="142" text-anchor="middle" fill="var(--c)" font-size="10" font-weight="800">SSE</text>
+  <!-- Legacy/simple -->
+  <line x1="230" y1="152" x2="230" y2="170" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="244" y="164" fill="var(--muted)" font-size="6">Legacy/simple?</text>
+  <rect x="182" y="172" width="96" height="22" rx="5" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width="1"/>
+  <text x="230" y="186" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Long Polling</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 2. DATABASE CHOICE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="db-choice">
+<h2>Which Database?</h2><p class="su">Choose based on <span class="hg">access pattern</span>, <span class="hi">consistency needs</span>, and <span class="ho">scale</span></p>
+<svg width="100%" viewBox="0 0 520 240" style="max-width:520px;display:block;margin:4px auto">
+  <!-- Q1: Need ACID? -->
+  <rect x="190" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="260" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Need ACID + complex joins?</text>
+  <!-- Yes → SQL -->
+  <line x1="190" y1="18" x2="120" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="156" y="12" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="30" y="6" width="88" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="74" y="22" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">SQL (Postgres)</text>
+  <text x="74" y="40" text-anchor="middle" fill="var(--muted)" font-size="6">Strong consistency · JOINs</text>
+  <!-- No → more questions -->
+  <line x1="260" y1="32" x2="260" y2="52" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="274" y="44" fill="var(--muted)" font-size="7" font-weight="600">No</text>
+  <!-- Q2: High write throughput? -->
+  <rect x="190" y="54" width="140" height="28" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="260" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">High write throughput?</text>
+  <!-- Yes → Wide-Column -->
+  <line x1="190" y1="68" x2="120" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="156" y="62" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="14" y="56" width="104" height="24" rx="5" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="66" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Cassandra / ScyllaDB</text>
+  <text x="66" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">Wide-column · LSM-tree</text>
+  <!-- No -->
+  <line x1="260" y1="82" x2="260" y2="100" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <!-- Q3: Flexible schema? -->
+  <rect x="190" y="102" width="140" height="28" rx="6" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="260" y="120" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Flexible schema / JSON?</text>
+  <line x1="190" y1="116" x2="120" y2="116" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="156" y="110" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="22" y="104" width="96" height="24" rx="5" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="70" y="120" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="800">MongoDB</text>
+  <text x="70" y="136" text-anchor="middle" fill="var(--muted)" font-size="6">Document · single-doc ACID</text>
+  <line x1="260" y1="130" x2="260" y2="148" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <!-- Q4: Sub-ms key lookup? -->
+  <rect x="190" y="150" width="140" height="28" rx="6" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="260" y="168" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Sub-ms key lookup?</text>
+  <line x1="190" y1="164" x2="120" y2="164" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="156" y="158" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="22" y="152" width="96" height="24" rx="5" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="70" y="168" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="800">Redis / DynamoDB</text>
+  <text x="70" y="184" text-anchor="middle" fill="var(--muted)" font-size="6">Key-Value · O(1)</text>
+  <line x1="260" y1="178" x2="260" y2="196" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <!-- Q5: More specialized -->
+  <rect x="190" y="198" width="140" height="28" rx="6" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width="1"/>
+  <text x="260" y="216" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="700">Relationships / Search / Global?</text>
+  <!-- Right side: specialized answers -->
+  <line x1="330" y1="212" x2="370" y2="200" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <line x1="330" y1="212" x2="370" y2="212" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <line x1="330" y1="212" x2="370" y2="224" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <rect x="372" y="192" width="70" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="407" y="203" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Neo4j</text>
+  <text x="450" y="203" fill="var(--muted)" font-size="6">Graph</text>
+  <rect x="372" y="210" width="70" height="16" rx="3" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="407" y="221" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Elasticsearch</text>
+  <text x="450" y="221" fill="var(--muted)" font-size="6">Search</text>
+  <rect x="372" y="228" width="70" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="407" y="239" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Spanner</text>
+  <text x="450" y="239" fill="var(--muted)" font-size="6">Global ACID</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 3. MESSAGING CHOICE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="messaging-choice">
+<h2>Queue vs Stream vs Pub/Sub?</h2><p class="su">Choose based on <span class="hg">consumption model</span> and <span class="hi">retention needs</span></p>
+<svg width="100%" viewBox="0 0 480 180" style="max-width:480px;display:block;margin:4px auto">
+  <!-- Q1 -->
+  <rect x="170" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="240" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">How many consumers per msg?</text>
+  <!-- One consumer -->
+  <line x1="170" y1="18" x2="100" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="136" y="12" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">One</text>
+  <rect x="10" y="6" width="88" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="54" y="22" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Queue</text>
+  <text x="54" y="38" text-anchor="middle" fill="var(--muted)" font-size="6">RabbitMQ · SQS</text>
+  <text x="54" y="46" text-anchor="middle" fill="var(--muted)" font-size="6">msg deleted after ACK</text>
+  <!-- Many consumers -->
+  <line x1="240" y1="32" x2="240" y2="56" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="254" y="46" fill="var(--muted)" font-size="7" font-weight="600">Many</text>
+  <!-- Q2: Need replay? -->
+  <rect x="170" y="58" width="140" height="28" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="240" y="76" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Need replay / retention?</text>
+  <!-- Yes → Stream -->
+  <line x1="170" y1="72" x2="100" y2="72" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="136" y="66" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="10" y="60" width="88" height="24" rx="5" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="54" y="76" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="800">Event Stream</text>
+  <text x="54" y="92" text-anchor="middle" fill="var(--muted)" font-size="6">Kafka · Kinesis</text>
+  <text x="54" y="100" text-anchor="middle" fill="var(--muted)" font-size="6">durable log · rewind</text>
+  <!-- No → Pub/Sub -->
+  <line x1="310" y1="72" x2="380" y2="72" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="345" y="66" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="382" y="60" width="88" height="24" rx="5" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="426" y="76" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="800">Pub/Sub</text>
+  <text x="426" y="92" text-anchor="middle" fill="var(--muted)" font-size="6">SNS · Google Pub/Sub</text>
+  <text x="426" y="100" text-anchor="middle" fill="var(--muted)" font-size="6">broadcast · fire-and-forget</text>
+  <!-- Q3: Need both fan-out + buffering? -->
+  <line x1="240" y1="86" x2="240" y2="112" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <rect x="170" y="114" width="140" height="28" rx="6" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="240" y="132" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Fan-out + per-svc buffering?</text>
+  <line x1="240" y1="142" x2="240" y2="158" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <rect x="170" y="160" width="140" height="20" rx="5" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="240" y="174" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">SNS → SQS → Lambda</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 4. CACHE CHOICE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="cache-choice">
+<h2>Which Caching Strategy?</h2><p class="su">Choose based on <span class="hg">read/write ratio</span> and <span class="hi">consistency needs</span></p>
+<svg width="100%" viewBox="0 0 460 160" style="max-width:460px;display:block;margin:4px auto">
+  <!-- Q1 -->
+  <rect x="160" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="230" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Read-heavy or write-heavy?</text>
+  <!-- Read-heavy -->
+  <line x1="160" y1="18" x2="90" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="126" y="12" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Read-heavy</text>
+  <!-- Q2: App controls cache? -->
+  <rect x="10" y="28" width="120" height="28" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="70" y="46" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">App controls cache logic?</text>
+  <line x1="50" y1="8" x2="50" y2="28" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <!-- Yes → Cache-Aside -->
+  <line x1="10" y1="42" x2="0" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="0" y="62" fill="var(--g)" font-size="6">Yes</text>
+  <rect x="0" y="70" width="60" height="20" rx="4" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="30" y="83" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">Cache-Aside</text>
+  <text x="30" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">most common</text>
+  <!-- No → Read-Through -->
+  <line x1="130" y1="42" x2="130" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="136" y="62" fill="var(--r)" font-size="6">No</text>
+  <rect x="96" y="70" width="68" height="20" rx="4" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="130" y="83" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">Read-Through</text>
+  <text x="130" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">cache auto-fetches</text>
+  <!-- Write-heavy -->
+  <line x1="300" y1="18" x2="370" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="334" y="12" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Write-heavy</text>
+  <!-- Q3: Need strong consistency? -->
+  <rect x="330" y="28" width="120" height="28" rx="6" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="390" y="46" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Need strong consistency?</text>
+  <line x1="410" y1="8" x2="410" y2="28" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <!-- Yes → Write-Through -->
+  <line x1="330" y1="42" x2="320" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="318" y="62" fill="var(--g)" font-size="6">Yes</text>
+  <rect x="286" y="70" width="72" height="20" rx="4" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="322" y="83" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">Write-Through</text>
+  <text x="322" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">sync to DB</text>
+  <!-- No → Write-Back -->
+  <line x1="450" y1="42" x2="450" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="454" y="62" fill="var(--r)" font-size="6">No</text>
+  <rect x="414" y="70" width="72" height="20" rx="4" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="450" y="83" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="800">Write-Back</text>
+  <text x="450" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">async flush · fast</text>
+  <text x="450" y="106" text-anchor="middle" fill="var(--r)" font-size="5.5">⚠ data loss risk</text>
+  <!-- Write-Around at bottom -->
+  <line x1="230" y1="32" x2="230" y2="120" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="244" y="110" fill="var(--muted)" font-size="6">Write-rarely, read-later?</text>
+  <rect x="190" y="122" width="80" height="20" rx="4" fill="rgba(34,211,238,.12)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="230" y="135" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="800">Write-Around</text>
+  <text x="230" y="150" text-anchor="middle" fill="var(--muted)" font-size="5.5">write DB directly</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 5. REAL-TIME CHOICE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="realtime-choice">
+<h2>Which Real-time Tech?</h2><p class="su">Choose based on <span class="hg">direction</span>, <span class="hi">latency</span>, and <span class="ho">who talks to whom</span></p>
+<svg width="100%" viewBox="0 0 460 160" style="max-width:460px;display:block;margin:4px auto">
+  <!-- Q1 -->
+  <rect x="160" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="230" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Server-to-server or client?</text>
+  <!-- S2S -->
+  <line x1="300" y1="18" x2="370" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="334" y="12" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Server→Server</text>
+  <rect x="372" y="6" width="80" height="24" rx="5" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="412" y="22" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="800">Webhook</text>
+  <!-- Client -->
+  <line x1="230" y1="32" x2="230" y2="52" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="244" y="44" fill="var(--muted)" font-size="7" font-weight="600">Client</text>
+  <!-- Q2: Direction -->
+  <rect x="160" y="54" width="140" height="28" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="230" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Direction of data flow?</text>
+  <!-- Bidirectional -->
+  <line x1="160" y1="68" x2="80" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="120" y="62" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Bidirectional</text>
+  <rect x="4" y="56" width="74" height="24" rx="5" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="41" y="72" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="800">WebSocket</text>
+  <text x="41" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">chat · stocks · gaming</text>
+  <!-- Server→Client only -->
+  <line x1="300" y1="68" x2="370" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="334" y="62" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Server→Client</text>
+  <rect x="372" y="56" width="80" height="24" rx="5" fill="rgba(34,211,238,.12)" stroke="var(--c)" stroke-width="1.5"/>
+  <text x="412" y="72" text-anchor="middle" fill="var(--c)" font-size="9" font-weight="800">SSE</text>
+  <text x="412" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">AI streaming · logs</text>
+  <!-- P2P -->
+  <line x1="230" y1="82" x2="230" y2="102" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="244" y="96" fill="var(--muted)" font-size="7" font-weight="600">Peer-to-peer media?</text>
+  <rect x="190" y="104" width="80" height="24" rx="5" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="230" y="120" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="800">WebRTC</text>
+  <text x="230" y="136" text-anchor="middle" fill="var(--muted)" font-size="6">video · audio · screen share</text>
+  <!-- Simple/legacy fallback -->
+  <line x1="230" y1="128" x2="230" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="230" y="158" text-anchor="middle" fill="var(--muted)" font-size="7">Simple / legacy? → <tspan fill="var(--o)" font-weight="600">Long Polling</tspan></text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 6. SCALING CHOICE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="scaling-choice">
+<h2>How to Scale?</h2><p class="su">Choose based on <span class="hg">bottleneck type</span> — reads, writes, or both</p>
+<svg width="100%" viewBox="0 0 480 170" style="max-width:480px;display:block;margin:4px auto">
+  <!-- Q1 -->
+  <rect x="170" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="240" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">What's the bottleneck?</text>
+  <!-- Too many reads -->
+  <line x1="170" y1="18" x2="80" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="126" y="12" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Reads</text>
+  <rect x="4" y="30" width="80" height="20" rx="4" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1"/>
+  <text x="44" y="43" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">Read Replicas</text>
+  <rect x="4" y="54" width="80" height="20" rx="4" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1"/>
+  <text x="44" y="67" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="800">Cache (Redis)</text>
+  <rect x="4" y="78" width="80" height="20" rx="4" fill="rgba(34,211,238,.12)" stroke="var(--c)" stroke-width="1"/>
+  <text x="44" y="91" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="800">CDN</text>
+  <line x1="44" y1="18" x2="44" y2="30" stroke="var(--g)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <!-- Too many writes -->
+  <line x1="310" y1="18" x2="400" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="354" y="12" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Writes</text>
+  <rect x="396" y="30" width="80" height="20" rx="4" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1"/>
+  <text x="436" y="43" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">Sharding</text>
+  <rect x="396" y="54" width="80" height="20" rx="4" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="436" y="67" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="800">Partitioning</text>
+  <rect x="396" y="78" width="80" height="20" rx="4" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width="1"/>
+  <text x="436" y="91" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="800">Write-Behind Cache</text>
+  <line x1="436" y1="18" x2="436" y2="30" stroke="var(--a)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <!-- Both / everything -->
+  <line x1="240" y1="32" x2="240" y2="52" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="254" y="44" fill="var(--muted)" font-size="7" font-weight="600">Both</text>
+  <rect x="170" y="54" width="140" height="28" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="240" y="72" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Can a bigger machine handle it?</text>
+  <!-- Yes → Vertical -->
+  <line x1="170" y1="68" x2="120" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="146" y="62" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="90" y="108" width="80" height="20" rx="4" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="130" y="121" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">Scale Up (vertical)</text>
+  <line x1="120" y1="68" x2="120" y2="108" stroke="var(--g)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="130" y="136" text-anchor="middle" fill="var(--muted)" font-size="6">simple, no code changes</text>
+  <!-- No → Horizontal -->
+  <line x1="310" y1="68" x2="360" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#fc1)"/>
+  <text x="334" y="62" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="310" y="108" width="80" height="20" rx="4" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="350" y="121" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">Scale Out (horizontal)</text>
+  <line x1="360" y1="68" x2="360" y2="108" stroke="var(--a)" stroke-width=".8" marker-end="url(#fc1)"/>
+  <text x="350" y="136" text-anchor="middle" fill="var(--muted)" font-size="6">LB + sharding + stateless</text>
+  <!-- Bottom summary -->
+  <rect x="120" y="148" width="240" height="16" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="240" y="159" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">Start vertical → go horizontal when you hit the ceiling</text>
+</svg>
+</div>
+
+<!-- ═══ Additional Decision Tables ═══ -->
+<div class="T" id="more-decisions">
+<h2>More Decision Guides</h2><p class="su">Quick reference tables for common architecture decisions</p>
+
+<table>
+<tr><th colspan="3" style="color:var(--c)">Sync vs Async Communication</th></tr>
+<tr><th>Question</th><th>Sync (HTTP/gRPC)</th><th>Async (Queue/Event)</th></tr>
+<tr><td>Need immediate response?</td><td><span class="hg">Yes → Sync</span></td><td>No → Async</td></tr>
+<tr><td>Can caller wait?</td><td><span class="hg">Yes → Sync</span></td><td>No → Async (202 + poll)</td></tr>
+<tr><td>Tight coupling OK?</td><td>Yes → Sync</td><td><span class="hg">No → Async (decoupled)</span></td></tr>
+<tr><td>Need retry/replay?</td><td>Manual retry</td><td><span class="hg">Built-in (Kafka offset, SQS DLQ)</span></td></tr>
+</table>
+
+<table style="margin-top:8px">
+<tr><th colspan="3" style="color:var(--g)">Monolith vs Microservices</th></tr>
+<tr><th>Question</th><th>Monolith</th><th>Microservices</th></tr>
+<tr><td>Team size?</td><td><span class="hg">&lt;10 devs → Monolith</span></td><td>&gt;10 devs, multiple teams → Micro</td></tr>
+<tr><td>Deploy speed?</td><td>Single deploy (simple)</td><td><span class="hg">Independent deploys per service</span></td></tr>
+<tr><td>Complexity budget?</td><td><span class="hg">Low → Monolith</span></td><td>Can handle distributed complexity → Micro</td></tr>
+<tr><td>Scaling needs?</td><td>Scale entire app</td><td><span class="hg">Scale hot services independently</span></td></tr>
+<tr><td>Data consistency?</td><td><span class="hg">Single DB, ACID easy</span></td><td>Distributed txns (Saga), eventual consistency</td></tr>
+</table>
+
+<table style="margin-top:8px">
+<tr><th colspan="3" style="color:var(--a2)">SQL vs NoSQL (Simplified)</th></tr>
+<tr><th>Question</th><th>SQL</th><th>NoSQL</th></tr>
+<tr><td>Need ACID + JOINs?</td><td><span class="hg">Yes → SQL</span></td><td>No</td></tr>
+<tr><td>Schema known upfront?</td><td><span class="hg">Yes → SQL</span></td><td>Evolving → NoSQL (flexible schema)</td></tr>
+<tr><td>Write throughput &gt;100K/sec?</td><td>Hard (single leader)</td><td><span class="hg">Yes → Cassandra/DynamoDB</span></td></tr>
+<tr><td>Need horizontal scale?</td><td>Sharding is painful</td><td><span class="hg">Built-in (masterless, auto-shard)</span></td></tr>
+<tr><td>Complex queries?</td><td><span class="hg">SQL excels (JOINs, aggregations)</span></td><td>Must denormalize, no JOINs</td></tr>
+</table>
+
+<div class="b bb" style="margin-top:6px"><span class="hi">Microservices Patterns:</span> <span class="hg">Strangler Fig</span> — gradually replace monolith pieces with services. <span class="hg">BFF</span> — separate API gateway per client type. <span class="hg">Sidecar</span> — attach proxy (Envoy) to each service for cross-cutting concerns. <span class="hg">DDD</span> — bounded contexts define service boundaries (each service owns its domain + data).</div>
+<div class="b bg"><span class="hi">Data Privacy:</span> <span class="hg">GDPR</span> — EU data stays in EU, right to deletion, consent required. <span class="hg">PII handling</span> — encrypt at rest + transit, mask in logs, tokenize for analytics. <span class="hg">Data residency</span> — geo-sharding ensures compliance. Audit trail for all access.</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

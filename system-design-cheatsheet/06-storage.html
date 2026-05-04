@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6. Storage Systems — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-3"><span class="e">💾</span> 6 · STORAGE SYSTEMS</div>
+
+<div class="T" id="db-choice">
+<h2>Database Choice Guide</h2><p class="su">Choose based on <span class="hg">access patterns</span>, <span class="hi">guarantees</span>, and <span class="ho">scale</span></p>
+<table>
+<tr><th>Need</th><th>Choose</th><th>Why</th><th>Examples</th></tr>
+<tr><td>ACID + complex joins</td><td><span class="hg">SQL</span></td><td>Strong consistency, referential integrity</td><td>Postgres, MySQL, Aurora</td></tr>
+<tr><td>High write throughput</td><td><span class="hg">Wide-Column</span></td><td>LSM-tree, masterless, tunable consistency</td><td>Cassandra, ScyllaDB</td></tr>
+<tr><td>Flexible schema</td><td><span class="hg">Document</span></td><td>JSON-like, single-doc ACID</td><td>MongoDB, Firestore</td></tr>
+<tr><td>Sub-ms key lookup</td><td><span class="hg">Key-Value</span></td><td>O(1) get/put, in-memory option</td><td>Redis, DynamoDB</td></tr>
+<tr><td>Relationship traversal</td><td><span class="hg">Graph</span></td><td>Fast traversal without joins</td><td>Neo4j, Neptune</td></tr>
+<tr><td>Full-text search</td><td><span class="hg">Search Engine</span></td><td>Inverted index, BM25 ranking</td><td>Elasticsearch, OpenSearch</td></tr>
+<tr><td>Global ACID at scale</td><td><span class="hg">NewSQL</span></td><td>SQL + distributed consensus</td><td>Spanner, CockroachDB</td></tr>
+<tr><td>Analytics (OLAP)</td><td><span class="hg">Columnar</span></td><td>Column-oriented, fast aggregations</td><td>BigQuery, ClickHouse, Apache Pinot</td></tr>
+</table>
+</div>
+
+<div class="T" id="db-internals">
+<h2>Database Internals</h2><p class="su">Data structures that power your databases — how they store, index, and retrieve data</p>
+
+<!-- ═══ Core Storage Engines: B+Tree vs LSM Tree ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Core Storage Engines</div>
+<div class="d-grid" style="margin:4px 0">
+<!-- B+Tree -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">B+Tree (Read-Optimized)</h4>
+<svg width="100%" viewBox="0 0 220 80" style="max-width:220px;display:block;margin:0 auto">
+  <defs><marker id="st1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <rect x="80" y="2" width="60" height="16" rx="3" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="96" y="13" fill="var(--g)" font-size="7" font-weight="700">7</text>
+  <text x="124" y="13" fill="var(--g)" font-size="7" font-weight="700">16</text>
+  <line x1="90" y1="18" x2="40" y2="32" stroke="var(--g)" stroke-width=".8"/>
+  <line x1="110" y1="18" x2="110" y2="32" stroke="var(--g)" stroke-width=".8"/>
+  <line x1="130" y1="18" x2="180" y2="32" stroke="var(--g)" stroke-width=".8"/>
+  <rect x="4" y="34" width="72" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="40" y="44" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">1 · 2 · 5 · 6</text>
+  <rect x="84" y="34" width="52" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="110" y="44" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">9 · 11</text>
+  <rect x="144" y="34" width="72" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="180" y="44" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">17 · 22 · 23</text>
+  <line x1="76" y1="41" x2="84" y2="41" stroke="var(--a)" stroke-width=".6" marker-end="url(#st1)"/>
+  <line x1="136" y1="41" x2="144" y2="41" stroke="var(--a)" stroke-width=".6" marker-end="url(#st1)"/>
+  <text x="110" y="60" text-anchor="middle" fill="var(--muted)" font-size="6.5">Sorted keys · data in leaves · O(log N)</text>
+  <text x="110" y="70" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Postgres · MySQL InnoDB</text>
+  <text x="110" y="80" text-anchor="middle" fill="var(--muted)" font-size="6">Best for: reads (point + range queries)</text>
+</svg>
+</div>
+<!-- LSM Tree -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">LSM Tree (Write-Optimized)</h4>
+<svg width="100%" viewBox="0 0 220 80" style="max-width:220px;display:block;margin:0 auto">
+  <rect x="4" y="2" width="80" height="30" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1"/>
+  <text x="44" y="12" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Memory</text>
+  <rect x="10" y="16" width="68" height="12" rx="3" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="44" y="25" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">Memtable (skiplist)</text>
+  <line x1="84" y1="17" x2="108" y2="17" stroke="var(--muted)" stroke-width="1" marker-end="url(#st1)"/>
+  <text x="96" y="12" text-anchor="middle" fill="var(--muted)" font-size="5.5">flush</text>
+  <rect x="110" y="2" width="106" height="46" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="163" y="12" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Disk</text>
+  <rect x="116" y="16" width="94" height="8" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="163" y="23" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">SSTable 1 (sorted, immutable)</text>
+  <rect x="116" y="26" width="94" height="8" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="163" y="33" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">SSTable 2</text>
+  <rect x="116" y="36" width="94" height="8" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="163" y="43" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">SSTable 3</text>
+  <text x="163" y="56" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">↻ compaction merges SSTables</text>
+  <text x="110" y="68" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Cassandra · RocksDB · LevelDB</text>
+  <text x="110" y="78" text-anchor="middle" fill="var(--muted)" font-size="6">Best for: writes (sequential I/O)</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ More Data Structures ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> 8 Data Structures That Power Databases</div>
+
+<!-- Row 1 -->
+<div class="d-grid quad" style="margin:4px 0">
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--g)">1. Skiplist</h4>
+<svg width="100%" viewBox="0 0 140 36" style="max-width:140px;display:block;margin:0 auto">
+  <circle cx="10" cy="6" r="3.5" fill="var(--g)" opacity=".3"/><line x1="14" y1="6" x2="50" y2="6" stroke="var(--g)" stroke-width=".5"/>
+  <circle cx="54" cy="6" r="3.5" fill="var(--g)" opacity=".3"/><line x1="58" y1="6" x2="130" y2="6" stroke="var(--g)" stroke-width=".5"/>
+  <circle cx="10" cy="16" r="3.5" fill="var(--g)" opacity=".5"/><line x1="14" y1="16" x2="50" y2="16" stroke="var(--g)" stroke-width=".5"/>
+  <circle cx="54" cy="16" r="3.5" fill="var(--g)" opacity=".5"/><line x1="58" y1="16" x2="86" y2="16" stroke="var(--g)" stroke-width=".5"/>
+  <circle cx="90" cy="16" r="3.5" fill="var(--g)" opacity=".5"/><line x1="94" y1="16" x2="130" y2="16" stroke="var(--g)" stroke-width=".5"/>
+  <circle cx="10" cy="26" r="3.5" fill="var(--g)"/><circle cx="30" cy="26" r="3.5" fill="var(--r)"/><circle cx="54" cy="26" r="3.5" fill="var(--g)"/>
+  <circle cx="72" cy="26" r="3.5" fill="var(--r)"/><circle cx="90" cy="26" r="3.5" fill="var(--g)"/><circle cx="110" cy="26" r="3.5" fill="var(--r)"/>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">In-memory</span> · O(log N) search/insert · Multiple levels act as "express lanes" — skip nodes for fast traversal. <span class="hg">Redis</span> sorted sets (ZADD/ZRANGE).</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a)">2. Hash Index</h4>
+<svg width="100%" viewBox="0 0 140 36" style="max-width:140px;display:block;margin:0 auto">
+  <rect x="4" y="2" width="18" height="8" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="13" y="9" text-anchor="middle" fill="var(--a)" font-size="5.5">0</text>
+  <rect x="4" y="12" width="18" height="8" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="13" y="19" text-anchor="middle" fill="var(--a)" font-size="5.5">1</text>
+  <rect x="4" y="22" width="18" height="8" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="13" y="29" text-anchor="middle" fill="var(--a)" font-size="5.5">2</text>
+  <line x1="22" y1="6" x2="32" y2="6" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <rect x="34" y="2" width="22" height="8" rx="2" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".4"/>
+  <text x="45" y="9" text-anchor="middle" fill="var(--r)" font-size="4.5">as</text>
+  <line x1="56" y1="6" x2="62" y2="6" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <rect x="64" y="2" width="22" height="8" rx="2" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".4"/>
+  <text x="75" y="9" text-anchor="middle" fill="var(--r)" font-size="4.5">btc</text>
+  <line x1="22" y1="16" x2="32" y2="16" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <rect x="34" y="12" width="22" height="8" rx="2" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".4"/>
+  <text x="45" y="19" text-anchor="middle" fill="var(--r)" font-size="4.5">jobs</text>
+  <line x1="22" y1="26" x2="32" y2="26" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <rect x="34" y="22" width="26" height="8" rx="2" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".4"/>
+  <text x="47" y="29" text-anchor="middle" fill="var(--r)" font-size="4.5">twitter</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">In-memory</span> · O(1) average · Bucket array + chaining for collisions. Most common in-memory index solution.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--y)">3. SSTable</h4>
+<svg width="100%" viewBox="0 0 150 40" style="max-width:150px;display:block;margin:0 auto">
+  <rect x="4" y="2" width="56" height="32" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="32" y="10" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Index file</text>
+  <text x="8" y="18" fill="var(--muted)" font-size="4.5">aaa  offset:0  len:4</text>
+  <text x="8" y="24" fill="var(--muted)" font-size="4.5">aab  offset:4  len:7</text>
+  <text x="8" y="30" fill="var(--muted)" font-size="4.5">zzz  offset:3132</text>
+  <line x1="60" y1="18" x2="68" y2="18" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="2,2" marker-end="url(#st1)"/>
+  <rect x="70" y="8" width="74" height="16" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="76" y="18" fill="var(--a)" font-size="5">u b e r t w i t t e r m</text>
+  <text x="107" y="30" text-anchor="middle" fill="var(--muted)" font-size="5">blob file (sorted data)</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Disk-based</span> · Sorted String Table — immutable sorted key-value file. Index maps keys→offsets. Building block of LSM trees. Seldom used alone.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--o)">4. WAL</h4>
+<svg width="100%" viewBox="0 0 150 40" style="max-width:150px;display:block;margin:0 auto">
+  <text x="8" y="14" fill="var(--a)" font-size="7" font-weight="600">Write</text>
+  <line x1="32" y1="10" x2="42" y2="10" stroke="var(--muted)" stroke-width=".7" marker-end="url(#st1)"/>
+  <rect x="44" y="2" width="40" height="16" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="64" y="13" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">WAL</text>
+  <line x1="84" y1="10" x2="94" y2="10" stroke="var(--g)" stroke-width=".7" marker-end="url(#st1)"/>
+  <text x="89" y="6" fill="var(--g)" font-size="5">then</text>
+  <rect x="96" y="2" width="30" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="111" y="13" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">DB</text>
+  <text x="75" y="30" text-anchor="middle" fill="var(--muted)" font-size="5.5">Log first → apply later → replay on crash</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Durability</span> · Write-Ahead Log — every change logged before applying. On crash, replay to recover. <span class="hg">Postgres, MySQL, etcd, Kafka</span>.</div>
+</div>
+</div>
+
+<!-- Row 2: LSM, B-Tree, Inverted Index, R-Tree -->
+<div class="d-grid quad" style="margin:4px 0">
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a)">5. LSM Tree</h4>
+<svg width="100%" viewBox="0 0 150 40" style="max-width:150px;display:block;margin:0 auto">
+  <rect x="4" y="2" width="50" height="18" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="29" y="8" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Memory</text>
+  <text x="29" y="16" text-anchor="middle" fill="var(--y)" font-size="5">Skiplist</text>
+  <line x1="54" y1="11" x2="64" y2="11" stroke="var(--muted)" stroke-width=".6" marker-end="url(#st1)"/>
+  <rect x="66" y="2" width="78" height="32" rx="3" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="105" y="8" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Disk</text>
+  <rect x="70" y="12" width="70" height="6" rx="1" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".4"/>
+  <text x="105" y="17" text-anchor="middle" fill="var(--a)" font-size="4.5">SSTable 1</text>
+  <rect x="70" y="20" width="70" height="6" rx="1" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".4"/>
+  <text x="105" y="25" text-anchor="middle" fill="var(--a)" font-size="4.5">SSTable 2</text>
+  <rect x="70" y="28" width="70" height="6" rx="1" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".4"/>
+  <text x="105" y="33" text-anchor="middle" fill="var(--a)" font-size="4.5">SSTable 3</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Memory+Disk</span> · Writes to memtable, flushed to SSTables. Compaction merges. High write throughput. <span class="hg">Cassandra, RocksDB</span>. Disk compaction may impact reads.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--g)">6. B-Tree / B+Tree</h4>
+<svg width="100%" viewBox="0 0 150 40" style="max-width:150px;display:block;margin:0 auto">
+  <rect x="52" y="2" width="46" height="12" rx="3" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="66" y="11" fill="var(--g)" font-size="6" font-weight="700">7</text>
+  <text x="86" y="11" fill="var(--g)" font-size="6" font-weight="700">16</text>
+  <line x1="62" y1="14" x2="28" y2="22" stroke="var(--g)" stroke-width=".6"/>
+  <line x1="75" y1="14" x2="75" y2="22" stroke="var(--g)" stroke-width=".6"/>
+  <line x1="88" y1="14" x2="122" y2="22" stroke="var(--g)" stroke-width=".6"/>
+  <rect x="4" y="24" width="48" height="10" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="28" y="32" text-anchor="middle" fill="var(--g)" font-size="5.5">1·2·5·6</text>
+  <rect x="56" y="24" width="38" height="10" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="75" y="32" text-anchor="middle" fill="var(--g)" font-size="5.5">9·11</text>
+  <rect x="98" y="24" width="48" height="10" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="122" y="32" text-anchor="middle" fill="var(--g)" font-size="5.5">17·22·23</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Disk-based</span> · Most popular DB index. Balanced tree, sorted keys, data in leaves. O(log N). Leaf nodes linked for range scans. <span class="hg">Postgres, MySQL InnoDB</span>.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--c)">7. Inverted Index</h4>
+<svg width="100%" viewBox="0 0 150 40" style="max-width:150px;display:block;margin:0 auto">
+  <rect x="4" y="2" width="36" height="32" rx="3" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".6"/>
+  <text x="22" y="10" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Index</text>
+  <text x="10" y="18" fill="var(--g)" font-size="5" font-weight="600">is</text>
+  <text x="10" y="26" fill="var(--r)" font-size="5" font-weight="600">today</text>
+  <text x="10" y="34" fill="var(--a)" font-size="5" font-weight="600">my</text>
+  <line x1="40" y1="16" x2="52" y2="10" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <line x1="40" y1="24" x2="52" y2="22" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <line x1="40" y1="32" x2="52" y2="34" stroke="var(--muted)" stroke-width=".4" marker-end="url(#st1)"/>
+  <rect x="54" y="4" width="42" height="12" rx="2" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".4"/>
+  <text x="75" y="13" text-anchor="middle" fill="var(--muted)" font-size="4.5">"my name is"</text>
+  <rect x="54" y="18" width="42" height="10" rx="2" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".4"/>
+  <text x="75" y="26" text-anchor="middle" fill="var(--muted)" font-size="4.5">"What day?"</text>
+  <rect x="54" y="30" width="42" height="10" rx="2" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".4"/>
+  <text x="75" y="38" text-anchor="middle" fill="var(--muted)" font-size="4.5">"I bought"</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Search</span> · Maps each term → list of documents. BM25 ranking. Powers full-text search in <span class="hg">Elasticsearch / Lucene</span>.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a2)">8. R-Tree (Spatial)</h4>
+<svg width="100%" viewBox="0 0 150 40" style="max-width:150px;display:block;margin:0 auto">
+  <rect x="8" y="4" width="56" height="30" rx="2" fill="none" stroke="var(--a2)" stroke-width=".8"/>
+  <rect x="14" y="8" width="20" height="14" rx="1" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width=".6"/>
+  <rect x="38" y="14" width="22" height="16" rx="1" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width=".6"/>
+  <rect x="74" y="4" width="66" height="30" rx="2" fill="none" stroke="var(--a2)" stroke-width=".8"/>
+  <rect x="78" y="8" width="24" height="12" rx="1" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".6"/>
+  <rect x="108" y="16" width="28" height="14" rx="1" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".6"/>
+  <circle cx="22" cy="14" r="2" fill="var(--r)"/><circle cx="30" cy="18" r="2" fill="var(--r)"/>
+  <circle cx="46" cy="22" r="2" fill="var(--a2)"/><circle cx="52" cy="26" r="2" fill="var(--a2)"/>
+  <circle cx="86" cy="14" r="2" fill="var(--g)"/><circle cx="96" cy="12" r="2" fill="var(--g)"/>
+  <circle cx="118" cy="22" r="2" fill="var(--y)"/><circle cx="128" cy="26" r="2" fill="var(--y)"/>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Multi-dimensional</span> · Hierarchical bounding boxes for spatial data. Nearest neighbor, geo range queries. <span class="hg">PostGIS, MongoDB 2dsphere</span>.</div>
+</div>
+</div>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Schema:</span> <span class="hg">Normalization</span> (3NF, eliminate redundancy, needs JOINs) vs <span class="hg">Denormalization</span> (duplicate for read speed, no JOINs). <span class="hi">ACID vs BASE:</span> ACID = strong consistency (SQL). BASE = Basically Available, Soft state, Eventually consistent (NoSQL).</div>
+<div class="b bb"><span class="hi">DB Locks:</span> <span class="hg">Row-level</span> (InnoDB default) · <span class="hg">Table-level</span> (MyISAM) · <span class="hg">Intent locks</span> (signal intent) · <span class="hg">Advisory locks</span> (app-level). <span class="hi">MVCC</span> — readers see snapshot, no read locks (Postgres, MySQL InnoDB).</div>
+</div>
+
+<div class="T" id="db-indexing">
+<h2>Database Indexing</h2><p class="su">How indexes speed up reads by minimizing disk I/O — the difference between <span class="hg">seconds and milliseconds</span></p>
+
+<!-- ═══ Indexing Types ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Index Types</div>
+<table style="margin-top:2px">
+<tr><th>Index Type</th><th>How</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Clustered</span></td><td>Data physically sorted by index key (1 per table)</td><td>Primary key lookups, range scans</td></tr>
+<tr><td><span class="hi">Non-clustered</span></td><td>Separate structure with pointers to data rows</td><td>Secondary lookups (email, name)</td></tr>
+<tr><td><span class="hi">Composite</span></td><td>Multi-column index (leftmost prefix rule)</td><td><code>WHERE a=1 AND b=2</code></td></tr>
+<tr><td><span class="hi">Covering</span></td><td>All query columns in the index — no table access</td><td>Index-only scans (fastest reads)</td></tr>
+<tr><td><span class="hi">Partial</span></td><td>Index only a subset of rows (<code>WHERE active=true</code>)</td><td>Sparse data, smaller index size</td></tr>
+<tr><td><span class="hi">GIN</span></td><td>Generalized Inverted — multi-value keys</td><td>Full-text search, JSONB, arrays (Postgres)</td></tr>
+<tr><td><span class="hi">GiST</span></td><td>Generalized Search Tree — spatial/range</td><td>Geo queries (PostGIS), range types</td></tr>
+<tr><td><span class="hi">BRIN</span></td><td>Block Range — summary per block range</td><td>Large sequential data (time-series, logs)</td></tr>
+</table>
+
+<!-- ═══ How Indexing Makes Your DB Faster — Visual Example ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> How Indexing Makes Your DB Faster</div>
+
+<!-- Intro: The core problem -->
+<div class="b br" style="margin:2px 0 6px;font-size:.82rem;line-height:1.55">
+<span class="hi">The problem:</span> Your data lives on <span class="hr">disk</span>, not RAM. Disk reads are <span class="hr">10,000× slower</span> than memory. Worse — disk reads happen at the <span class="hi">block level</span> (e.g., 4KB or 8KB chunks). Even reading 1 byte loads the entire block. So the key to fast queries is: <span class="hg">read as few disk blocks as possible</span>. That's exactly what an index does — it's a small, sorted lookup table that tells the DB <em>which blocks</em> to read, so it skips the rest.
+</div>
+
+<!-- Setup: Table on disk -->
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="text-align:center;color:var(--y)">① The Data: Users Table on Disk</h4>
+<div style="font-size:.74rem;color:var(--muted);text-align:center;margin-bottom:4px">Each row = 200 bytes. Disk block = 600 bytes. So 3 rows fit per block.</div>
+<svg width="100%" viewBox="0 0 260 100" style="max-width:260px;display:block;margin:0 auto">
+  <!-- Table schema -->
+  <rect x="4" y="4" width="150" height="12" rx="2" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="12" y="13" fill="var(--y)" font-size="5.5" font-weight="700">id(4B)</text>
+  <text x="42" y="13" fill="var(--y)" font-size="5.5" font-weight="700">name(60B)</text>
+  <text x="86" y="13" fill="var(--y)" font-size="5.5" font-weight="700">age(4B)</text>
+  <text x="112" y="13" fill="var(--y)" font-size="5.5" font-weight="700">bio(128B)</text>
+  <!-- Row size -->
+  <text x="160" y="13" fill="var(--muted)" font-size="5.5">= 200B/row</text>
+  <!-- Rows -->
+  <rect x="4" y="18" width="150" height="8" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="24" fill="var(--g)" font-size="5">1</text><text x="42" y="24" fill="var(--text)" font-size="5">Alice</text><text x="86" y="24" fill="var(--text)" font-size="5">23</text><text x="112" y="24" fill="var(--muted)" font-size="5">...</text>
+  <rect x="4" y="26" width="150" height="8" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="32" fill="var(--g)" font-size="5">2</text><text x="42" y="32" fill="var(--text)" font-size="5">Bob</text><text x="86" y="32" fill="var(--text)" font-size="5">30</text><text x="112" y="32" fill="var(--muted)" font-size="5">...</text>
+  <rect x="4" y="34" width="150" height="8" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="40" fill="var(--g)" font-size="5">3</text><text x="42" y="40" fill="var(--text)" font-size="5">Carol</text><text x="86" y="40" fill="var(--text)" font-size="5">25</text><text x="112" y="40" fill="var(--muted)" font-size="5">...</text>
+  <rect x="4" y="42" width="150" height="8" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="48" fill="var(--g)" font-size="5">4</text><text x="42" y="48" fill="var(--text)" font-size="5">Dave</text><text x="86" y="48" fill="var(--text)" font-size="5">23</text><text x="112" y="48" fill="var(--muted)" font-size="5">...</text>
+  <text x="80" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">... 100 rows total</text>
+  <!-- Disk blocks -->
+  <text x="4" y="72" fill="var(--text)" font-size="6" font-weight="600">On disk (600B blocks):</text>
+  <rect x="4" y="76" width="22" height="14" rx="2" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="15" y="86" text-anchor="middle" fill="var(--a)" font-size="5.5">B1</text>
+  <rect x="28" y="76" width="22" height="14" rx="2" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="39" y="86" text-anchor="middle" fill="var(--a)" font-size="5.5">B2</text>
+  <rect x="52" y="76" width="22" height="14" rx="2" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="63" y="86" text-anchor="middle" fill="var(--a)" font-size="5.5">B3</text>
+  <text x="80" y="86" fill="var(--muted)" font-size="5.5">...</text>
+  <rect x="90" y="76" width="22" height="14" rx="2" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="101" y="86" text-anchor="middle" fill="var(--a)" font-size="5.5">B34</text>
+  <!-- Math -->
+  <text x="4" y="98" fill="var(--muted)" font-size="5.5">3 rows/block · ⌈100/3⌉ = <tspan fill="var(--a)" font-weight="600">34 blocks</tspan></text>
+</svg>
+</div>
+
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="text-align:center;color:var(--c)">② The Index: A Tiny Sorted Lookup Table</h4>
+<div style="font-size:.74rem;color:var(--muted);text-align:center;margin-bottom:4px">Only stores the column you search + pointer to the row. Much smaller than data.</div>
+<svg width="100%" viewBox="0 0 260 100" style="max-width:260px;display:block;margin:0 auto">
+  <!-- Index table -->
+  <rect x="4" y="4" width="80" height="12" rx="2" fill="rgba(34,211,238,.12)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="24" y="13" fill="var(--c)" font-size="5.5" font-weight="700">age(4B)</text>
+  <text x="64" y="13" fill="var(--c)" font-size="5.5" font-weight="700">id(4B)</text>
+  <rect x="4" y="16" width="80" height="7" fill="rgba(34,211,238,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="24" y="21" fill="var(--text)" font-size="5">23</text><text x="64" y="21" fill="var(--text)" font-size="5">1</text>
+  <rect x="4" y="23" width="80" height="7" fill="rgba(34,211,238,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="24" y="28" fill="var(--text)" font-size="5">23</text><text x="64" y="28" fill="var(--text)" font-size="5">4</text>
+  <rect x="4" y="30" width="80" height="7" fill="rgba(34,211,238,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="24" y="35" fill="var(--text)" font-size="5">25</text><text x="64" y="35" fill="var(--text)" font-size="5">3</text>
+  <rect x="4" y="37" width="80" height="7" fill="rgba(34,211,238,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="24" y="42" fill="var(--text)" font-size="5">30</text><text x="64" y="42" fill="var(--text)" font-size="5">2</text>
+  <text x="44" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">... 100 entries (sorted)</text>
+  <!-- Index size math -->
+  <text x="4" y="64" fill="var(--muted)" font-size="5.5">8B × 100 = 800B → <tspan fill="var(--c)" font-weight="600">2 blocks</tspan></text>
+  <!-- Index blocks -->
+  <rect x="4" y="70" width="30" height="14" rx="2" fill="rgba(34,211,238,.1)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="19" y="80" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">IB1</text>
+  <rect x="38" y="70" width="30" height="14" rx="2" fill="rgba(34,211,238,.1)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="53" y="80" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">IB2</text>
+  <!-- vs data blocks -->
+  <text x="80" y="80" fill="var(--muted)" font-size="5.5">vs 34 data blocks</text>
+  <!-- Key insight -->
+  <text x="130" y="96" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Index is 17× smaller than data!</text>
+</svg>
+</div>
+</div>
+
+<!-- Query comparison: Without vs With Index -->
+<div class="d-title"><span class="num d-blue">▸</span> Query: <code style="font-size:.8rem">SELECT * FROM users WHERE age = 23</code></div>
+<div class="b bb" style="margin:2px 0 4px;font-size:.8rem;line-height:1.5">The DB needs to find all users aged 23. Without an index, it has <span class="hr">no idea which blocks contain age=23</span> — so it reads every single block. With an index, it first checks the tiny index to learn <span class="hg">exactly which row IDs match</span>, then fetches only those specific blocks.</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Without Index -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--r)">❌ Without Index — Full Table Scan</h4>
+<div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">DB doesn't know where age=23 lives. Must load and check every block, one by one.</div>
+<svg width="100%" viewBox="0 0 260 70" style="max-width:260px;display:block;margin:0 auto">
+  <defs><marker id="ix1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Query -->
+  <text x="10" y="10" fill="var(--a)" font-size="6.5" font-weight="600">WHERE age=23</text>
+  <line x1="10" y1="14" x2="10" y2="22" stroke="var(--r)" stroke-width=".8" marker-end="url(#ix1)"/>
+  <!-- Must scan ALL blocks -->
+  <rect x="4" y="24" width="16" height="12" rx="2" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="12" y="33" text-anchor="middle" fill="var(--r)" font-size="5">B1</text>
+  <rect x="22" y="24" width="16" height="12" rx="2" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="30" y="33" text-anchor="middle" fill="var(--r)" font-size="5">B2</text>
+  <rect x="40" y="24" width="16" height="12" rx="2" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="48" y="33" text-anchor="middle" fill="var(--r)" font-size="5">B3</text>
+  <rect x="58" y="24" width="16" height="12" rx="2" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="66" y="33" text-anchor="middle" fill="var(--r)" font-size="5">B4</text>
+  <text x="80" y="33" fill="var(--r)" font-size="6">...</text>
+  <rect x="90" y="24" width="16" height="12" rx="2" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="98" y="33" text-anchor="middle" fill="var(--r)" font-size="5">B33</text>
+  <rect x="108" y="24" width="16" height="12" rx="2" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="116" y="33" text-anchor="middle" fill="var(--r)" font-size="5">B34</text>
+  <!-- Result -->
+  <text x="10" y="48" fill="var(--r)" font-size="7" font-weight="700">34 block reads</text>
+  <text x="10" y="58" fill="var(--muted)" font-size="6.5">Must read every block to find age=23</text>
+  <text x="10" y="68" fill="var(--r)" font-size="6.5" font-weight="600">Slow — O(N) disk I/O</text>
+</svg>
+</div>
+
+<!-- With Index -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">✓ With Index — Targeted Lookup</h4>
+<div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">Index says "age=23 is at id=1 (block 1) and id=4 (block 2)." DB reads only those 2 blocks.</div>
+<svg width="100%" viewBox="0 0 260 70" style="max-width:260px;display:block;margin:0 auto">
+  <!-- Step 1: Scan index (2 blocks) -->
+  <text x="10" y="10" fill="var(--c)" font-size="6.5" font-weight="600">Step 1: scan index</text>
+  <rect x="4" y="14" width="22" height="12" rx="2" fill="rgba(34,211,238,.15)" stroke="var(--c)" stroke-width="1"/>
+  <text x="15" y="23" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">IB1</text>
+  <rect x="28" y="14" width="22" height="12" rx="2" fill="rgba(34,211,238,.15)" stroke="var(--c)" stroke-width="1"/>
+  <text x="39" y="23" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">IB2</text>
+  <text x="56" y="23" fill="var(--c)" font-size="6">→ found id=1, id=4</text>
+  <!-- Step 2: Fetch only those data blocks -->
+  <text x="10" y="38" fill="var(--g)" font-size="6.5" font-weight="600">Step 2: fetch rows by id</text>
+  <rect x="4" y="42" width="22" height="12" rx="2" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width="1"/>
+  <text x="15" y="51" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">B1</text>
+  <rect x="28" y="42" width="22" height="12" rx="2" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width="1"/>
+  <text x="39" y="51" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">B2</text>
+  <text x="56" y="51" fill="var(--g)" font-size="6">→ got Alice, Dave</text>
+  <!-- Result -->
+  <text x="10" y="66" fill="var(--g)" font-size="7" font-weight="700">4 block reads (2 index + 2 data)</text>
+</svg>
+</div>
+</div>
+
+<!-- Performance comparison bar -->
+<div class="d-grid tri" style="margin:4px 0">
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">④ 100 Rows</h4>
+<div class="d-bar-wrap">
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--r)">No Idx</span><div class="d-bar d-red" style="width:100%">34 blocks</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--g)">Indexed</span><div class="d-bar d-green" style="width:12%">4</div></div>
+</div>
+<div style="font-size:.74rem;color:var(--g);font-weight:600;margin-top:4px;text-align:center">8.5× speedup</div>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a2)">At Scale: 1M Rows</h4>
+<div class="d-bar-wrap">
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--r)">No Idx</span><div class="d-bar d-red" style="width:100%">333K blocks</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--g)">B+Tree</span><div class="d-bar d-green" style="width:1%;min-width:40px">~4</div></div>
+</div>
+<div style="font-size:.74rem;color:var(--g);font-weight:600;margin-top:4px;text-align:center">~100,000× speedup</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y);text-align:center">⑤ Key Insights</h4>
+<div style="font-size:.78rem;line-height:1.55">
+  <span class="d-tick">▸</span> <span class="hi">Block-level reads:</span> Disk loads entire block even for 1 byte — so fewer blocks = faster<br>
+  <span class="d-tick">▸</span> <span class="hi">Index is tiny:</span> Only stores search column + pointer (8B vs 200B/row) → <span class="hg">17× smaller</span><br>
+  <span class="d-tick">▸</span> <span class="hi">Index is sorted:</span> Can binary search or stop early — no need to scan all entries<br>
+  <span class="d-tick">▸</span> <span class="hi">B+Tree:</span> Real DBs use tree indexes → O(log N) block reads, not O(N)<br>
+  <span class="d-tick">▸</span> <span class="hi">Trade-off:</span> Indexes speed up reads but <span class="hr">slow down writes</span> (must update index on every INSERT/UPDATE)
+</div>
+</div>
+</div>
+
+<!-- When to index / when not to -->
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g);text-align:center">✓ When to Index</h4>
+<div style="font-size:.78rem;line-height:1.55">
+  <span class="d-tick">▸</span> Columns in <code>WHERE</code> clauses (filter conditions)<br>
+  <span class="d-tick">▸</span> Columns in <code>JOIN ON</code> (foreign keys)<br>
+  <span class="d-tick">▸</span> Columns in <code>ORDER BY</code> / <code>GROUP BY</code><br>
+  <span class="d-tick">▸</span> High-cardinality columns (many unique values)<br>
+  <span class="d-tick">▸</span> Read-heavy tables (more reads than writes)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r);text-align:center">⚠ When NOT to Index</h4>
+<div style="font-size:.78rem;line-height:1.55">
+  <span class="d-cross">▸</span> Small tables (full scan is fast enough)<br>
+  <span class="d-cross">▸</span> Write-heavy tables (index update overhead)<br>
+  <span class="d-cross">▸</span> Low-cardinality columns (boolean, gender — few unique values)<br>
+  <span class="d-cross">▸</span> Columns rarely used in queries<br>
+  <span class="d-cross">▸</span> Too many indexes → slows INSERT/UPDATE/DELETE
+</div>
+</div>
+</div>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Bottom line:</span> An index is like a <span class="hg">book's table of contents</span> — instead of reading every page to find "Chapter 7", you look up the page number in the TOC and jump directly there. At scale, the difference between indexed and unindexed is <span class="hg">seconds vs milliseconds</span>.</div>
+</div>
+
+<div class="T" id="sql">
+<h2>SQL (PostgreSQL, MySQL)</h2><p class="su"><span class="hg">ACID</span> transactions + complex queries. The <span class="hi">default choice</span> when you need consistency</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Atomicity</span> — all or nothing. <span class="hg">Consistency</span> — constraints(PK, FK, UNIQUE) always enforced. <span class="hg">Isolation</span> — locks / MVCC prevent dirty reads. <span class="hg">Durability</span> — WAL survives crashes. These guarantees mean <span class="hg">partial updates are impossible</span> and <span class="hg">committed data is never lost</span>.</div>
+<table>
+<tr><th>Postgres Feature</th><th>Detail</th></tr>
+<tr><td><span class="hi">MVCC</span></td><td>Multi-version — readers see snapshot, writers create new version. No read locks.</td></tr>
+<tr><td><span class="hi">Indexes</span></td><td>B-Tree (default), GIN (full-text/JSONB), GiST (geo), BRIN (large sequential)</td></tr>
+<tr><td><span class="hi">JSONB</span></td><td>Binary JSON with indexing — bridge SQL and document model</td></tr>
+<tr><td><span class="hi">Partitioning</span></td><td>Range/list/hash. Partition pruning speeds queries on large tables.</td></tr>
+<tr><td><span class="hi">Extensions</span></td><td>PostGIS (geo), TimescaleDB (time-series), Citus (distributed), pg_trgm (fuzzy)</td></tr>
+</table>
+<div class="b bb"><span class="hi">Scaling:</span> <span class="hg">Read replicas</span> (followers serve reads) · <span class="hg">PgBouncer</span> (connection pooling) · <span class="hg">Citus</span>/Vitess (sharding) · Vertical (bigger machine)</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Write bottleneck</span> — single leader (~1-3K writes/sec). <span class="hr">Resharding is painful</span>. <span class="hr">Rigid schema</span> — ALTER on large tables can lock. <span class="hr">Vertical scaling ceiling</span>.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Instagram</strong> — sharded Postgres. <strong>Stripe</strong> — Postgres for payments. <strong>Supabase</strong> — "Firebase on Postgres".</div>
+</div>
+
+<div class="T" id="nosql">
+<h2>NoSQL</h2><p class="su"><span class="hg">Horizontal scaling</span>, flexible schema, tunable consistency</p>
+<table>
+<tr><th>Type</th><th>Examples</th><th>Guarantee</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Key-Value</span></td><td>Redis, DynamoDB</td><td>O(1) lookup, partition tolerant</td><td>Sessions, cache</td></tr>
+<tr><td><span class="hi">Document</span></td><td>MongoDB, Firestore</td><td>Single-doc ACID, flexible schema</td><td>Profiles, catalogs</td></tr>
+<tr><td><span class="hi">Wide-Column</span></td><td>Cassandra, HBase</td><td>Write-optimized, tunable consistency</td><td>Time-series, IoT</td></tr>
+<tr><td><span class="hi">Graph</span></td><td>Neo4j, Neptune</td><td>O(1) edge traversal</td><td>Social, fraud, recommendations</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cassandra Guarantees:</span> <span class="hg">Masterless ring</span> — no SPOF. <span class="hg">Tunable consistency</span> — QUORUM (W+R>N = strong) or ONE (fast, eventual). <span class="hg">Anti-entropy:</span> Read repair, Merkle trees, hinted handoff keep replicas in sync.</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">No complex joins</span>. <span class="hr">No multi-row ACID</span>. <span class="hr">Eventual consistency by default</span>. <span class="hr">Must model around queries</span>. <span class="hr">Tombstone overhead</span>.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Discord</strong> — Cassandra (migrated to ScyllaDB). <strong>Netflix</strong> — Cassandra for viewing history. <strong>Uber</strong> — Cassandra for location data.</div>
+</div>
+
+<div class="T" id="newsql">
+<h2>NewSQL</h2><p class="su"><span class="hg">Global ACID</span> at scale. Spanner (TrueTime + Paxos), CockroachDB (Raft), TiDB</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Serializability</span> globally — strongest isolation. <span class="hg">SQL interface</span> — familiar tools work. Trade-off: <span class="hr">consensus latency</span> (100ms+ multi-region) and <span class="hr">10x cost</span> vs Postgres. Most apps don't need this.</div>
+</div>
+
+<div class="T" id="timeseries">
+<h2>Time-Series DBs</h2><p class="su">InfluxDB, Prometheus, TimescaleDB — optimized for <span class="hg">append-heavy + range queries</span></p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">High ingest</span> (millions/sec). <span class="hg">Auto-retention</span> (TTL cleanup). <span class="hg">Downsampling</span> (1s→1min→1hr). Prometheus = pull-based scraping. TimescaleDB = Postgres extension (SQL for time-series).</div>
+</div>
+
+<div class="T" id="search">
+<h2>Search (Elasticsearch)</h2><p class="su"><span class="hg">Inverted index</span> + BM25 ranking + fuzzy matching. <span class="hr">NOT a primary data store</span> — always reindex from source DB</p>
+
+<!-- Lucene callout -->
+<div class="b bp" style="margin:2px 0 6px;font-size:.82rem;line-height:1.55"><span class="hv">Apache Lucene</span> is the <span class="hg">core search library</span> that does the actual work — it builds inverted indexes, runs queries, scores results with BM25, and manages segments on disk. <span class="hi">Elasticsearch</span> wraps Lucene with a distributed layer: sharding, replication, REST API, cluster management. <span class="hi">Solr</span> is another wrapper. When you search in ES, every shard is a <span class="hg">self-contained Lucene index</span>.</div>
+
+<!-- ═══ The Core Problem ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> Why Not Just Query the DB?</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--r)">❌ Without Inverted Index</h4>
+<svg width="100%" viewBox="0 0 220 60" style="max-width:220px;display:block;margin:0 auto">
+  <defs><marker id="sr1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <text x="10" y="12" fill="var(--a)" font-size="7" font-weight="600">Search: "fish"</text>
+  <line x1="10" y1="16" x2="10" y2="24" stroke="var(--r)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <!-- Scan every doc -->
+  <rect x="4" y="26" width="28" height="12" rx="2" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="18" y="35" text-anchor="middle" fill="var(--r)" font-size="5">Doc 1</text>
+  <rect x="34" y="26" width="28" height="12" rx="2" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="48" y="35" text-anchor="middle" fill="var(--r)" font-size="5">Doc 2</text>
+  <rect x="64" y="26" width="28" height="12" rx="2" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="78" y="35" text-anchor="middle" fill="var(--r)" font-size="5">Doc 3</text>
+  <text x="98" y="35" fill="var(--r)" font-size="6">...</text>
+  <rect x="108" y="26" width="28" height="12" rx="2" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="122" y="35" text-anchor="middle" fill="var(--r)" font-size="5">Doc N</text>
+  <text x="75" y="50" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">Scan every document — O(N × doc_size)</text>
+  <text x="75" y="60" text-anchor="middle" fill="var(--muted)" font-size="6">LIKE '%fish%' = full table scan, no index help</text>
+</svg>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">✓ With Inverted Index</h4>
+<svg width="100%" viewBox="0 0 220 60" style="max-width:220px;display:block;margin:0 auto">
+  <text x="10" y="12" fill="var(--a)" font-size="7" font-weight="600">Search: "fish"</text>
+  <line x1="10" y1="16" x2="10" y2="24" stroke="var(--g)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <!-- Lookup in index -->
+  <rect x="4" y="26" width="60" height="14" rx="3" fill="rgba(34,211,238,.1)" stroke="var(--c)" stroke-width="1"/>
+  <text x="34" y="36" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="600">Index: "fish"</text>
+  <line x1="64" y1="33" x2="78" y2="33" stroke="var(--g)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <text x="71" y="28" fill="var(--g)" font-size="5.5">→ [1, 5]</text>
+  <!-- Only fetch matching docs -->
+  <rect x="80" y="26" width="28" height="12" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1"/>
+  <text x="94" y="35" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Doc 1</text>
+  <rect x="112" y="26" width="28" height="12" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1"/>
+  <text x="126" y="35" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Doc 5</text>
+  <text x="110" y="50" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Direct lookup — O(1) per term</text>
+  <text x="110" y="60" text-anchor="middle" fill="var(--muted)" font-size="6">Skip millions of irrelevant docs</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ How Inverted Index Works ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> How an Inverted Index Works (Lucene's Core)</div>
+<svg width="100%" viewBox="0 0 500 130" style="max-width:500px;display:block;margin:2px auto 6px">
+  <!-- Documents (corpus) -->
+  <rect x="4" y="4" width="120" height="60" rx="5" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="64" y="16" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Corpus (Documents)</text>
+  <rect x="8" y="20" width="108" height="10" rx="2" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="28" fill="var(--g)" font-size="5" font-weight="600">Doc 1:</text><text x="38" y="28" fill="var(--text)" font-size="5">"The fish climbed a wall"</text>
+  <rect x="8" y="32" width="108" height="10" rx="2" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="40" fill="var(--g)" font-size="5" font-weight="600">Doc 2:</text><text x="38" y="40" fill="var(--text)" font-size="5">"The wall was tall"</text>
+  <rect x="8" y="44" width="108" height="10" rx="2" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="52" fill="var(--g)" font-size="5" font-weight="600">Doc 3:</text><text x="38" y="52" fill="var(--text)" font-size="5">"A fish in the sea"</text>
+
+  <!-- Arrow: Tokenize + Normalize -->
+  <line x1="124" y1="34" x2="152" y2="34" stroke="var(--y)" stroke-width="1" marker-end="url(#sr1)"/>
+  <text x="138" y="28" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">tokenize</text>
+  <text x="138" y="44" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">normalize</text>
+
+  <!-- Processing pipeline -->
+  <rect x="154" y="10" width="80" height="48" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1"/>
+  <text x="194" y="22" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Pipeline</text>
+  <text x="194" y="32" text-anchor="middle" fill="var(--muted)" font-size="5.5">lowercase</text>
+  <text x="194" y="40" text-anchor="middle" fill="var(--muted)" font-size="5.5">remove stop words</text>
+  <text x="194" y="48" text-anchor="middle" fill="var(--muted)" font-size="5.5">stem: "climbed"→"climb"</text>
+
+  <!-- Arrow to inverted index -->
+  <line x1="234" y1="34" x2="262" y2="34" stroke="var(--g)" stroke-width="1" marker-end="url(#sr1)"/>
+  <text x="248" y="28" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">build</text>
+
+  <!-- Inverted Index -->
+  <rect x="264" y="2" width="140" height="72" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="334" y="14" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Inverted Index</text>
+  <!-- Dictionary → Posting Lists -->
+  <rect x="270" y="18" width="44" height="10" rx="2" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width=".6"/>
+  <text x="292" y="26" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">Term</text>
+  <rect x="318" y="18" width="80" height="10" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="358" y="26" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Posting List (doc IDs)</text>
+  <!-- Entries -->
+  <text x="292" y="38" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">fish</text>
+  <text x="358" y="38" text-anchor="middle" fill="var(--g)" font-size="6">[1, 3]</text>
+  <line x1="314" y1="34" x2="318" y2="34" stroke="var(--muted)" stroke-width=".4"/>
+  <text x="292" y="48" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">climb</text>
+  <text x="358" y="48" text-anchor="middle" fill="var(--g)" font-size="6">[1]</text>
+  <text x="292" y="58" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">wall</text>
+  <text x="358" y="58" text-anchor="middle" fill="var(--g)" font-size="6">[1, 2]</text>
+  <text x="292" y="68" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">tall</text>
+  <text x="358" y="68" text-anchor="middle" fill="var(--g)" font-size="6">[2]</text>
+
+  <!-- Query example -->
+  <rect x="264" y="82" width="140" height="40" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="334" y="94" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Query: "fish wall"</text>
+  <text x="334" y="104" text-anchor="middle" fill="var(--muted)" font-size="6">fish → [1,3] ∩ wall → [1,2]</text>
+  <text x="334" y="114" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Result: Doc 1 ✓</text>
+  <text x="334" y="124" text-anchor="middle" fill="var(--muted)" font-size="5.5">set intersection of posting lists</text>
+
+  <!-- Labels below pipeline -->
+  <text x="64" y="74" text-anchor="middle" fill="var(--muted)" font-size="5.5">"the" removed (stop word)</text>
+  <text x="64" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">"climbed" → "climb" (stemmed)</text>
+</svg>
+
+<!-- ═══ What's Stored in a Posting List ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> What's Inside a Posting List?</div>
+<table style="margin-top:2px">
+<tr><th>Data</th><th>What</th><th>Enables</th></tr>
+<tr><td><span class="hi">Doc ID</span></td><td>Which documents contain this term</td><td>Basic search — find matching docs</td></tr>
+<tr><td><span class="hi">Term Frequency</span></td><td>How many times term appears in doc</td><td><span class="hg">Relevance ranking</span> — more mentions = more relevant</td></tr>
+<tr><td><span class="hi">Position</span></td><td>Where in the doc the term appears (word #)</td><td><span class="hg">Phrase queries</span> — "fish climbing" (adjacent words)</td></tr>
+<tr><td><span class="hi">Offset</span></td><td>Character start/end position in original text</td><td><span class="hg">Highlighting</span> — bold matched words in snippets</td></tr>
+</table>
+
+<!-- ═══ Text Processing Pipeline ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Text Processing Pipeline (Lucene Analyzer)</div>
+<svg width="100%" viewBox="0 0 480 36" style="max-width:480px;display:block;margin:2px auto 4px">
+  <text x="10" y="14" fill="var(--text)" font-size="7" font-weight="600">"The Fish Climbed!"</text>
+  <line x1="100" y1="10" x2="114" y2="10" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <rect x="116" y="2" width="50" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="141" y="13" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Tokenize</text>
+  <line x1="166" y1="10" x2="176" y2="10" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <rect x="178" y="2" width="50" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="203" y="13" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Lowercase</text>
+  <line x1="228" y1="10" x2="238" y2="10" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <rect x="240" y="2" width="56" height="16" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="268" y="13" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Stop Words</text>
+  <line x1="296" y1="10" x2="306" y2="10" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <rect x="308" y="2" width="44" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="330" y="13" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Stem</text>
+  <line x1="352" y1="10" x2="362" y2="10" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <text x="370" y="14" fill="var(--g)" font-size="7" font-weight="700">["fish", "climb"]</text>
+  <!-- Below: what each step does -->
+  <text x="141" y="28" text-anchor="middle" fill="var(--muted)" font-size="5">split words</text>
+  <text x="203" y="28" text-anchor="middle" fill="var(--muted)" font-size="5">"Fish"→"fish"</text>
+  <text x="268" y="28" text-anchor="middle" fill="var(--muted)" font-size="5">remove "the"</text>
+  <text x="330" y="28" text-anchor="middle" fill="var(--muted)" font-size="5">"climbed"→"climb"</text>
+</svg>
+
+<!-- ═══ Ranking: BM25 ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Ranking: How Results Are Scored (BM25)</div>
+<div class="b bb" style="margin:2px 0 4px;font-size:.8rem;line-height:1.5">
+Not all matches are equal. <span class="hi">BM25</span> scores each document by: <span class="hg">Term Frequency</span> (more mentions = more relevant, with diminishing returns) × <span class="hg">Inverse Document Frequency</span> (rare terms matter more — "fish" in 2 of 1M docs scores higher than "the" in 999K docs) × <span class="hg">Document Length</span> (shorter docs with the term rank higher — a 10-word doc mentioning "fish" 3× is more focused than a 10K-word doc mentioning it 3×).
+</div>
+
+<!-- ═══ Lucene Internals ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Inside Lucene: Segments &amp; Merging</div>
+<div class="b bo" style="margin:2px 0 4px;font-size:.8rem;line-height:1.5">
+Lucene doesn't update the inverted index in-place. Instead: new docs are written to an <span class="hi">in-memory buffer</span> → periodically flushed to an immutable <span class="hg">segment</span> on disk (each segment is a mini inverted index). Searches fan out across all segments and merge results. Background <span class="hg">merge policy</span> combines small segments into larger ones (like LSM compaction). Deletes are just <span class="hr">tombstone markers</span> — physically removed during merge. This is why ES has a <span class="hi">refresh interval</span> (default 1s) — new docs aren't searchable until the buffer is flushed to a segment.
+</div>
+
+<!-- ═══ Optimizations ═══ -->
+<div class="d-title"><span class="num d-a2">▸</span> Optimizations at Scale</div>
+<table style="margin-top:2px">
+<tr><th>Technique</th><th>How</th><th>Why</th></tr>
+<tr><td><span class="hi">Sorted Posting Lists</span></td><td>Doc IDs stored in sorted order</td><td>Efficient merge/intersection — O(n) for AND queries</td></tr>
+<tr><td><span class="hi">Delta Encoding</span></td><td>Store gaps between IDs, not absolute IDs</td><td>Compress posting lists — critical at Google scale</td></tr>
+<tr><td><span class="hi">Tiered / Champion Lists</span></td><td>Keep top-N docs per term in memory</td><td>Fast access for frequent queries — rest on disk</td></tr>
+<tr><td><span class="hi">Positional Index</span></td><td>Store exact word positions in each doc</td><td>Phrase queries ("fish climbing") and proximity search</td></tr>
+<tr><td><span class="hi">N-gram Indexing</span></td><td>Index bigrams/trigrams ("new york")</td><td>Multi-word search, autocomplete, fuzzy matching</td></tr>
+<tr><td><span class="hi">Sharding</span></td><td>Split index across nodes (each shard = Lucene index)</td><td>Horizontal scale — scatter-gather across shards</td></tr>
+</table>
+
+<!-- ═══ ES Architecture ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Architecture: ES wraps Lucene</div>
+<svg width="100%" viewBox="0 0 500 100" style="max-width:500px;display:block;margin:2px auto 4px">
+  <!-- App -->
+  <rect x="4" y="34" width="44" height="22" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="26" y="48" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text>
+  <line x1="48" y1="45" x2="66" y2="45" stroke="var(--muted)" stroke-width="1" marker-end="url(#sr1)"/>
+  <text x="57" y="40" text-anchor="middle" fill="var(--muted)" font-size="5">REST</text>
+
+  <!-- ES Cluster -->
+  <rect x="68" y="4" width="240" height="88" rx="6" fill="rgba(34,211,238,.03)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="188" y="16" text-anchor="middle" fill="var(--c)" font-size="7.5" font-weight="700">Elasticsearch Cluster (distributed layer)</text>
+
+  <!-- Shard boxes — each contains Lucene -->
+  <rect x="74" y="22" width="70" height="40" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="109" y="32" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Shard 0</text>
+  <rect x="80" y="36" width="58" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="109" y="46" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Lucene Index</text>
+  <text x="109" y="56" text-anchor="middle" fill="var(--muted)" font-size="4.5">inverted idx + segments</text>
+
+  <rect x="150" y="22" width="70" height="40" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="185" y="32" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Shard 1</text>
+  <rect x="156" y="36" width="58" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="185" y="46" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Lucene Index</text>
+  <text x="185" y="56" text-anchor="middle" fill="var(--muted)" font-size="4.5">inverted idx + segments</text>
+
+  <rect x="226" y="22" width="70" height="40" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="261" y="32" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Shard 2</text>
+  <rect x="232" y="36" width="58" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="261" y="46" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Lucene Index</text>
+  <text x="261" y="56" text-anchor="middle" fill="var(--muted)" font-size="4.5">inverted idx + segments</text>
+
+  <!-- Replicas -->
+  <rect x="74" y="66" width="70" height="12" rx="2" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".4" stroke-dasharray="3,2"/>
+  <text x="109" y="75" text-anchor="middle" fill="var(--muted)" font-size="5">replica 0</text>
+  <rect x="150" y="66" width="70" height="12" rx="2" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width=".4" stroke-dasharray="3,2"/>
+  <text x="185" y="75" text-anchor="middle" fill="var(--muted)" font-size="5">replica 1</text>
+  <rect x="226" y="66" width="70" height="12" rx="2" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width=".4" stroke-dasharray="3,2"/>
+  <text x="261" y="75" text-anchor="middle" fill="var(--muted)" font-size="5">replica 2</text>
+
+  <!-- Query flow -->
+  <text x="188" y="92" text-anchor="middle" fill="var(--muted)" font-size="5.5">query → scatter to all shards → each Lucene runs query locally → gather + merge + rank</text>
+
+  <!-- Source DB -->
+  <line x1="308" y1="45" x2="326" y2="45" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sr1)"/>
+  <text x="317" y="40" text-anchor="middle" fill="var(--muted)" font-size="5">reindex</text>
+  <rect x="328" y="34" width="50" height="22" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1"/>
+  <text x="353" y="48" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">Source DB</text>
+
+  <!-- Lucene internals callout -->
+  <rect x="392" y="4" width="104" height="72" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="444" y="16" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Inside Each Lucene</text>
+  <text x="444" y="28" text-anchor="middle" fill="var(--muted)" font-size="6">Inverted Index</text>
+  <text x="444" y="38" text-anchor="middle" fill="var(--muted)" font-size="6">Stored Fields</text>
+  <text x="444" y="48" text-anchor="middle" fill="var(--muted)" font-size="6">Doc Values (columnar)</text>
+  <text x="444" y="58" text-anchor="middle" fill="var(--muted)" font-size="6">Segments (immutable)</text>
+  <text x="444" y="68" text-anchor="middle" fill="var(--muted)" font-size="6">Merge Policy</text>
+
+  <!-- ELK -->
+  <text x="353" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">ELK: ES + Logstash + Kibana</text>
+  <text x="353" y="78" text-anchor="middle" fill="var(--muted)" font-size="5.5">Also: Solr (another Lucene wrapper)</text>
+</svg>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Guarantees:</span> <span class="hg">Sub-second full-text search</span> across billions of docs. <span class="hg">Shard resilience</span> — replicas survive node failure. <span class="hr">Not ACID</span> — eventually consistent (refresh interval delay). <span class="hr">Not a source of truth</span> — must reindex from primary DB.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Wikipedia</strong> (full-text search), <strong>GitHub</strong> (code search across 200M+ repos), <strong>Uber</strong> (trip search), <strong>Netflix</strong> (log analysis via ELK). Use <code>search_after</code> for deep pagination (not <code>from/size</code>).</div>
+</div>
+
+<div class="T" id="blob">
+<h2>Blob Storage (S3)</h2><p class="su"><span class="hg">99.999999999% durability</span> (11 nines). Cheap, infinite scale. Pre-signed URLs for direct access.</p>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Strong read-after-write consistency</span> (S3, since Dec 2020). <span class="hg">Versioning</span> protects against accidental deletes. Lifecycle policies auto-tier: Standard → IA → Glacier.</div>
+</div>
+
+<!-- ═══ Storage Extras ═══ -->
+<div class="T" id="storage-extras">
+<h2>Storage Extras</h2><p class="su">Connection pooling, migrations, vector DBs, graph deep dive</p>
+<table>
+<tr><th>Concept</th><th>Detail</th></tr>
+<tr><td><span class="hi">Connection Pooling</span></td><td>DB connections are expensive (TCP + TLS + auth). Pool reuses connections. <span class="hg">PgBouncer</span> (Postgres), <span class="hg">HikariCP</span> (Java), <span class="hg">ProxySQL</span> (MySQL). Typical: 20-100 connections per app instance. Serverless needs pooling badly (Lambda → 1000s of connections).</td></tr>
+<tr><td><span class="hi">Schema Migrations</span></td><td>Version-controlled DB changes. <span class="hg">Flyway</span>, <span class="hg">Liquibase</span>, <span class="hg">Alembic</span> (Python), <span class="hg">Rails Migrations</span>. <span class="hr">ALTER on large tables can lock</span> — use <span class="hg">pt-online-schema-change</span> or <span class="hg">gh-ost</span> for zero-downtime migrations.</td></tr>
+<tr><td><span class="hi">Vector Databases</span></td><td>Store + search high-dimensional embeddings (AI/ML). <span class="hg">Pinecone</span>, <span class="hg">Weaviate</span>, <span class="hg">Milvus</span>, <span class="hg">pgvector</span> (Postgres extension). Use: semantic search, RAG (retrieval-augmented generation), recommendation. ANN (Approximate Nearest Neighbor) via HNSW index.</td></tr>
+<tr><td><span class="hi">Graph DB Deep Dive</span></td><td><span class="hg">Neo4j</span> — Cypher query language, O(1) edge traversal (index-free adjacency). Use: social graphs, fraud detection (find cycles), knowledge graphs, recommendation engines. <span class="hr">Not for</span>: tabular data, aggregations, high write throughput.</td></tr>
+</table>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

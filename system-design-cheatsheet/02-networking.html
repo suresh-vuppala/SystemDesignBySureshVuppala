@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2. Networking — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-1"><span class="e">🌐</span> 2 · NETWORKING</div>
+
+<div class="T" id="osi">
+<h2>OSI Model</h2><p class="su">7-layer reference model for network communication — know <span class="hg">L4 and L7</span> for interviews</p>
+<table>
+<tr><th>#</th><th>Layer</th><th>Protocol</th><th>System Design Relevance</th></tr>
+<tr><td>7</td><td><span class="hi">Application</span></td><td>HTTP, gRPC, DNS, SMTP</td><td><span class="hg">L7 Load Balancers</span> (ALB), API Gateways, WAF</td></tr>
+<tr><td>6</td><td>Presentation</td><td>TLS/SSL, JSON, Protobuf</td><td>Encryption, serialization</td></tr>
+<tr><td>5</td><td>Session</td><td>WebSocket, RPC</td><td>Connection management</td></tr>
+<tr><td>4</td><td><span class="hi">Transport</span></td><td>TCP, UDP, QUIC</td><td><span class="hg">L4 Load Balancers</span> (NLB), port-based routing</td></tr>
+<tr><td>3</td><td><span class="hi">Network</span></td><td>IP, ICMP</td><td>Routing, subnets, VPCs, BGP</td></tr>
+<tr><td>2</td><td>Data Link</td><td>Ethernet, ARP</td><td>MAC addresses, switches</td></tr>
+<tr><td>1</td><td>Physical</td><td>Fiber, copper</td><td>Data center hardware</td></tr>
+</table>
+<div class="b bg"><span class="hi">Why it matters:</span> <span class="hg">L4 LB</span> routes by IP+port (fast, no content inspection). <span class="hg">L7 LB</span> routes by URL/headers/cookies (smart, can do path-based routing). Most system design discussions happen at <span class="hg">L4 and L7</span>.</div>
+</div>
+
+<div class="T" id="tcp-udp">
+<h2>TCP / UDP</h2><p class="su">Transport layer — TCP (<span class="hg">reliable, ordered</span>) vs UDP (<span class="ho">fast, unreliable</span>)</p>
+
+<!-- ═══ TCP vs UDP Handshake Visual ═══ -->
+<div class="d-grid" style="margin:4px 0">
+
+<!-- TCP 3-way handshake -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">TCP — 3-Way Handshake</h4>
+<svg width="100%" viewBox="0 0 220 110" style="max-width:220px;display:block;margin:0 auto">
+  <defs><marker id="tu1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Client -->
+  <text x="30" y="14" text-anchor="middle" font-size="12">💻</text>
+  <text x="30" y="26" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Client</text>
+  <!-- Server -->
+  <text x="190" y="14" text-anchor="middle" font-size="12">🖥️</text>
+  <text x="190" y="26" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Server</text>
+  <!-- Lifelines -->
+  <line x1="30" y1="28" x2="30" y2="106" stroke="var(--g)" stroke-width="1" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="190" y1="28" x2="190" y2="106" stroke="var(--o)" stroke-width="1" stroke-dasharray="3,3" opacity=".3"/>
+  <!-- SYN -->
+  <line x1="30" y1="38" x2="190" y2="38" stroke="var(--a)" stroke-width="1.2" marker-end="url(#tu1)"/>
+  <rect x="80" y="30" width="60" height="12" rx="3" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="110" y="39" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">SYN</text>
+  <!-- SYN-ACK -->
+  <line x1="190" y1="56" x2="30" y2="56" stroke="var(--g)" stroke-width="1.2" marker-end="url(#tu1)"/>
+  <rect x="70" y="48" width="80" height="12" rx="3" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="110" y="57" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">SYN-ACK</text>
+  <!-- ACK -->
+  <line x1="30" y1="74" x2="190" y2="74" stroke="var(--a)" stroke-width="1.2" marker-end="url(#tu1)"/>
+  <rect x="80" y="66" width="60" height="12" rx="3" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="110" y="75" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">ACK</text>
+  <!-- Connected -->
+  <rect x="50" y="84" width="120" height="14" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="110" y="94" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">✓ Connection established</text>
+  <text x="110" y="106" text-anchor="middle" fill="var(--muted)" font-size="6">Reliable, ordered, bidirectional</text>
+</svg>
+</div>
+
+<!-- UDP fire-and-forget -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--o)">UDP — Fire and Forget</h4>
+<svg width="100%" viewBox="0 0 220 110" style="max-width:220px;display:block;margin:0 auto">
+  <!-- Client -->
+  <text x="30" y="14" text-anchor="middle" font-size="12">💻</text>
+  <text x="30" y="26" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Client</text>
+  <!-- Server -->
+  <text x="190" y="14" text-anchor="middle" font-size="12">🖥️</text>
+  <text x="190" y="26" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Server</text>
+  <!-- Lifelines -->
+  <line x1="30" y1="28" x2="30" y2="106" stroke="var(--o)" stroke-width="1" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="190" y1="28" x2="190" y2="106" stroke="var(--o)" stroke-width="1" stroke-dasharray="3,3" opacity=".3"/>
+  <!-- Request -->
+  <line x1="30" y1="38" x2="190" y2="38" stroke="var(--o)" stroke-width="1.2" marker-end="url(#tu1)"/>
+  <text x="110" y="34" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Request</text>
+  <!-- Response 1 -->
+  <line x1="190" y1="52" x2="30" y2="52" stroke="var(--o)" stroke-width="1" marker-end="url(#tu1)"/>
+  <text x="110" y="48" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Response</text>
+  <!-- Response 2 -->
+  <line x1="190" y1="64" x2="30" y2="64" stroke="var(--o)" stroke-width="1" marker-end="url(#tu1)"/>
+  <text x="110" y="60" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Response</text>
+  <!-- Response 3 (lost) -->
+  <line x1="190" y1="76" x2="110" y2="76" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="100" y="74" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">✗ lost</text>
+  <!-- No handshake label -->
+  <rect x="40" y="86" width="140" height="14" rx="4" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="110" y="96" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">No handshake — send immediately</text>
+  <text x="110" y="106" text-anchor="middle" fill="var(--muted)" font-size="6">No guarantee, no ordering, fast</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ Unicast / Broadcast / Multicast ═══ -->
+<div class="d-grid tri" style="margin:4px 0">
+<!-- Unicast -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--g)">Unicast (TCP)</h4>
+<svg width="100%" viewBox="0 0 120 50" style="max-width:120px;display:block;margin:0 auto">
+  <circle cx="20" cy="20" r="8" fill="var(--g)"/>
+  <circle cx="100" cy="20" r="8" fill="var(--muted)" stroke="var(--border)" stroke-width="1"/>
+  <line x1="28" y1="20" x2="92" y2="20" stroke="var(--g)" stroke-width="1.2" marker-end="url(#tu1)"/>
+  <text x="60" y="42" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">One-to-One</text>
+</svg>
+</div>
+<!-- Broadcast -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--o)">Broadcast (UDP)</h4>
+<svg width="100%" viewBox="0 0 120 50" style="max-width:120px;display:block;margin:0 auto">
+  <circle cx="20" cy="25" r="8" fill="var(--o)"/>
+  <circle cx="80" cy="8" r="6" fill="var(--muted)" stroke="var(--border)" stroke-width=".8"/>
+  <circle cx="100" cy="20" r="6" fill="var(--muted)" stroke="var(--border)" stroke-width=".8"/>
+  <circle cx="80" cy="38" r="6" fill="var(--muted)" stroke="var(--border)" stroke-width=".8"/>
+  <circle cx="105" cy="38" r="6" fill="var(--muted)" stroke="var(--border)" stroke-width=".8"/>
+  <line x1="28" y1="22" x2="74" y2="10" stroke="var(--o)" stroke-width=".8" marker-end="url(#tu1)"/>
+  <line x1="28" y1="25" x2="94" y2="20" stroke="var(--o)" stroke-width=".8" marker-end="url(#tu1)"/>
+  <line x1="28" y1="28" x2="74" y2="38" stroke="var(--o)" stroke-width=".8" marker-end="url(#tu1)"/>
+  <line x1="28" y1="30" x2="99" y2="38" stroke="var(--o)" stroke-width=".8" marker-end="url(#tu1)"/>
+  <text x="60" y="50" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">One-to-All</text>
+</svg>
+</div>
+<!-- Multicast -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a2)">Multicast (UDP)</h4>
+<svg width="100%" viewBox="0 0 120 50" style="max-width:120px;display:block;margin:0 auto">
+  <circle cx="20" cy="25" r="8" fill="var(--a2)"/>
+  <circle cx="80" cy="10" r="6" fill="var(--a2)" opacity=".6"/>
+  <circle cx="100" cy="25" r="6" fill="var(--muted)" stroke="var(--border)" stroke-width=".8"/>
+  <circle cx="80" cy="40" r="6" fill="var(--a2)" opacity=".6"/>
+  <line x1="28" y1="22" x2="74" y2="12" stroke="var(--a2)" stroke-width=".8" marker-end="url(#tu1)"/>
+  <line x1="28" y1="28" x2="74" y2="40" stroke="var(--a2)" stroke-width=".8" marker-end="url(#tu1)"/>
+  <!-- Not to the unsubscribed one -->
+  <text x="60" y="50" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">One-to-Several</text>
+</svg>
+</div>
+</div>
+
+<!-- Existing comparison table -->
+<table style="margin-top:4px">
+<tr><th>TCP</th><th>UDP</th></tr>
+<tr><td><span class="hi">Connection-oriented:</span> 3-way handshake (SYN→SYN-ACK→ACK)</td><td><span class="hi">Connectionless:</span> Send immediately</td></tr>
+<tr><td><span class="hi">Ordered + guaranteed:</span> Retransmits lost packets</td><td><span class="hi">Best-effort:</span> No retransmission, may arrive out-of-order</td></tr>
+<tr><td><span class="hi">Flow + congestion control:</span> Sliding window, slow start</td><td>No flow control — sender controls pace</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantees:</span> TCP guarantees <span class="hg">ordered, reliable, duplicate-free delivery</span> via sequence numbers, ACKs, and retransmission. UDP guarantees <span class="hg">nothing</span> — but that's why it's fast (no overhead).</div>
+<div class="cols">
+<div class="b bb"><strong>TCP:</strong> Banking, HTTPS, DB connections, email. Ports: 80/443/3306/5432/6379/9092</div>
+<div class="b bo"><strong>UDP:</strong> Live video, gaming, DNS, VoIP, QUIC (HTTP/3). Ports: 53/123/443(QUIC)</div>
+</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Fortnite/Valorant</strong> use UDP for player positions (few lost packets OK, low latency critical). <strong>QUIC</strong> (HTTP/3) — UDP-based with built-in TLS 1.3, 0-RTT resumption. Used by Chrome, YouTube, Cloudflare.</div>
+</div>
+
+<div class="T" id="http-https">
+<h2>HTTP / HTTPS</h2><p class="su">Application layer — HTTP (<span class="hr">plaintext</span>) vs HTTPS (<span class="hg">TLS encrypted</span>)</p>
+
+<!-- ═══ HTTP vs HTTPS Visual ═══ -->
+<div class="d-grid" style="margin:4px 0">
+
+<!-- HTTP (plaintext) -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--r)">HTTP — Plaintext</h4>
+<svg width="100%" viewBox="0 0 220 80" style="max-width:220px;display:block;margin:0 auto">
+  <defs><marker id="ht1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Client -->
+  <text x="24" y="16" text-anchor="middle" font-size="12">👤</text>
+  <text x="24" y="28" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Client</text>
+  <!-- Server -->
+  <text x="196" y="16" text-anchor="middle" font-size="12">🖥️</text>
+  <text x="196" y="28" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Server</text>
+  <!-- Request -->
+  <line x1="40" y1="36" x2="180" y2="36" stroke="var(--r)" stroke-width="1.2" marker-end="url(#ht1)"/>
+  <text x="110" y="32" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">GET /api/data (plaintext)</text>
+  <!-- Response -->
+  <line x1="180" y1="50" x2="40" y2="50" stroke="var(--r)" stroke-width="1.2" marker-end="url(#ht1)"/>
+  <text x="110" y="46" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">200 OK {"password":"abc"}</text>
+  <!-- Attacker sniffing -->
+  <text x="110" y="64" text-anchor="middle" font-size="10">👁️</text>
+  <text x="110" y="76" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">⚠ Anyone on network can read everything</text>
+</svg>
+</div>
+
+<!-- HTTPS (TLS) -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">HTTPS — TLS Encrypted</h4>
+<svg width="100%" viewBox="0 0 220 80" style="max-width:220px;display:block;margin:0 auto">
+  <!-- Client -->
+  <text x="24" y="16" text-anchor="middle" font-size="12">👤</text>
+  <text x="24" y="28" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Client</text>
+  <!-- Server -->
+  <text x="196" y="16" text-anchor="middle" font-size="12">🖥️</text>
+  <text x="196" y="28" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">Server</text>
+  <!-- Encrypted tunnel -->
+  <rect x="38" y="30" width="144" height="24" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="110" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">🔒 TLS encrypted tunnel</text>
+  <!-- Request inside tunnel -->
+  <line x1="50" y1="46" x2="170" y2="46" stroke="var(--g)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="110" y="52" text-anchor="middle" fill="var(--g)" font-size="5.5">GET /api/data · 200 OK</text>
+  <!-- Attacker blocked -->
+  <text x="110" y="64" text-anchor="middle" font-size="10">👁️</text>
+  <text x="110" y="76" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">✓ Sees only encrypted gibberish</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ HTTPS / TLS Handshake ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> How HTTPS Works — TLS Handshake</div>
+<svg width="100%" viewBox="0 0 480 220" style="max-width:480px;display:block;margin:2px auto 6px">
+  <!-- Column headers -->
+  <text x="60" y="14" text-anchor="middle" fill="var(--a)" font-size="10" font-weight="700">Client</text>
+  <text x="240" y="14" text-anchor="middle" fill="var(--muted)" font-size="9" font-weight="600">↔</text>
+  <text x="380" y="14" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="700">Server</text>
+  <!-- Lifelines -->
+  <line x1="60" y1="20" x2="60" y2="214" stroke="var(--a)" stroke-width="1" stroke-dasharray="3,3" opacity=".25"/>
+  <line x1="380" y1="20" x2="380" y2="214" stroke="var(--g)" stroke-width="1" stroke-dasharray="3,3" opacity=".25"/>
+
+  <!-- ── Phase 1: TCP Handshake ── -->
+  <rect x="0" y="22" width="46" height="14" rx="3" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".8"/>
+  <circle cx="10" cy="29" r="6" fill="var(--r)"/><text x="10" y="32" text-anchor="middle" fill="#fff" font-size="6" font-weight="700">1</text>
+  <text x="28" y="32" fill="var(--r)" font-size="6" font-weight="700">TCP</text>
+
+  <line x1="60" y1="30" x2="380" y2="30" stroke="var(--r)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="27" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">TCP SYN</text>
+  <line x1="380" y1="40" x2="60" y2="40" stroke="var(--g)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="37" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">TCP SYN+ACK</text>
+  <line x1="60" y1="50" x2="380" y2="50" stroke="var(--r)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="47" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">TCP ACK</text>
+  <!-- Connection established -->
+  <line x1="50" y1="56" x2="390" y2="56" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+  <text x="220" y="63" text-anchor="middle" fill="var(--muted)" font-size="6">connection established</text>
+
+  <!-- Right side: Asymmetric label -->
+  <rect x="420" y="26" width="56" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="448" y="38" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Asymmetric</text>
+  <text x="448" y="48" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Encryption</text>
+
+  <!-- ── Phase 2: Certificate Check ── -->
+  <rect x="0" y="66" width="46" height="14" rx="3" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".8"/>
+  <circle cx="10" cy="73" r="6" fill="var(--y)"/><text x="10" y="76" text-anchor="middle" fill="#fff" font-size="6" font-weight="700">2</text>
+  <text x="28" y="76" fill="var(--y)" font-size="6" font-weight="700">Cert</text>
+
+  <line x1="60" y1="74" x2="380" y2="74" stroke="var(--a)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="71" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Client Hello (supported ciphers, random)</text>
+  <line x1="380" y1="86" x2="60" y2="86" stroke="var(--g)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="83" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Server Hello + Certificate + Server Hello Done</text>
+
+  <!-- Right side: Encrypted Session Key -->
+  <rect x="420" y="68" width="56" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="448" y="78" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Encrypted</text>
+  <text x="448" y="88" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Session Key</text>
+
+  <!-- ── Phase 3: Key Exchange ── -->
+  <rect x="0" y="96" width="46" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <circle cx="10" cy="103" r="6" fill="var(--g)"/><text x="10" y="106" text-anchor="middle" fill="#fff" font-size="6" font-weight="700">3</text>
+  <text x="28" y="106" fill="var(--g)" font-size="6" font-weight="700">Key</text>
+
+  <line x1="60" y1="104" x2="380" y2="104" stroke="var(--a)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="101" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Client Key Exchange (pre-master secret)</text>
+  <line x1="60" y1="116" x2="380" y2="116" stroke="var(--a)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="113" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Change Cipher Spec + Finished</text>
+  <line x1="380" y1="128" x2="60" y2="128" stroke="var(--g)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="125" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Change Cipher Spec + Finished</text>
+
+  <!-- Right side: Session Key -->
+  <rect x="420" y="100" width="56" height="28" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="448" y="112" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Session</text>
+  <text x="448" y="122" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Key 🔑</text>
+  <!-- Arrow from encrypted to session -->
+  <line x1="448" y1="96" x2="448" y2="100" stroke="var(--muted)" stroke-width=".6" marker-end="url(#ht1)"/>
+
+  <!-- ── Phase 4: Encrypted Data ── -->
+  <rect x="0" y="138" width="46" height="14" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <circle cx="10" cy="145" r="6" fill="var(--a)"/><text x="10" y="148" text-anchor="middle" fill="#fff" font-size="6" font-weight="700">4</text>
+  <text x="28" y="148" fill="var(--a)" font-size="6" font-weight="700">Data</text>
+
+  <!-- Encrypted tunnel -->
+  <rect x="50" y="156" width="340" height="24" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="220" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">🔒 Symmetric encryption (AES-256) using session key</text>
+  <line x1="60" y1="172" x2="380" y2="172" stroke="var(--g)" stroke-width=".8" marker-end="url(#ht1)"/>
+  <text x="220" y="176" text-anchor="middle" fill="var(--g)" font-size="6">Encrypted Data ↔ Encrypted Data</text>
+
+  <!-- Right side: Symmetric -->
+  <rect x="420" y="152" width="56" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="448" y="164" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Symmetric</text>
+  <text x="448" y="174" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Encryption</text>
+
+  <!-- Summary -->
+  <rect x="50" y="190" width="340" height="22" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="220" y="200" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Asymmetric (slow) for key exchange → Symmetric (fast) for data</text>
+  <text x="220" y="212" text-anchor="middle" fill="var(--muted)" font-size="6.5">TLS 1.3: 1-RTT handshake · 0-RTT resumption · ECDHE for forward secrecy</text>
+</svg>
+
+<!-- Methods table -->
+<table style="margin-top:4px">
+<tr><th>Method</th><th>Purpose</th><th>Idempotent</th><th>Safe</th><th>Cacheable</th></tr>
+<tr><td><span class="hg">GET</span></td><td>Retrieve</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td><span class="ho">POST</span></td><td>Create</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><span class="ha">PUT</span></td><td>Replace</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><span class="hv">PATCH</span></td><td>Partial update</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><span class="hr">DELETE</span></td><td>Remove</td><td>✓</td><td>✗</td><td>✗</td></tr>
+</table>
+<div class="b bg"><span class="hi">HTTPS Guarantees:</span> <span class="hg">Confidentiality</span> (AES-256 encryption) · <span class="hg">Integrity</span> (SHA-256 HMAC, tamper-proof) · <span class="hg">Authenticity</span> (CA-signed certificate proves server identity) · <span class="hg">Forward secrecy</span> (ECDHE — past sessions safe even if key leaked).</div>
+<table>
+<tr><th colspan="6" class="hg">2xx — Success</th></tr>
+<tr><td><span class="hg">200</span></td><td>OK</td><td><span class="hg">201</span></td><td>Created</td><td><span class="hg">202</span></td><td>Accepted (async)</td></tr>
+<tr><td><span class="hg">204</span></td><td>No Content</td><td><span class="hg">206</span></td><td>Partial Content (streaming)</td><td></td><td></td></tr>
+<tr><th colspan="6" class="hi">3xx — Redirect</th></tr>
+<tr><td><span class="hi">301</span></td><td>Moved Permanently</td><td><span class="hi">302</span></td><td>Found (temp redirect)</td><td><span class="hi">304</span></td><td>Not Modified (cache)</td></tr>
+<tr><td><span class="hi">307</span></td><td>Temp Redirect (keep method)</td><td><span class="hi">308</span></td><td>Perm Redirect (keep method)</td><td></td><td></td></tr>
+<tr><th colspan="6" class="hr">4xx — Client Error</th></tr>
+<tr><td><span class="hr">400</span></td><td>Bad Request</td><td><span class="hr">401</span></td><td>Unauthorized</td><td><span class="hr">403</span></td><td>Forbidden</td></tr>
+<tr><td><span class="hr">404</span></td><td>Not Found</td><td><span class="hr">405</span></td><td>Method Not Allowed</td><td><span class="hr">408</span></td><td>Request Timeout</td></tr>
+<tr><td><span class="hr">409</span></td><td>Conflict</td><td><span class="hr">410</span></td><td>Gone (deleted)</td><td><span class="hr">413</span></td><td>Payload Too Large</td></tr>
+<tr><td><span class="hr">415</span></td><td>Unsupported Media Type</td><td><span class="hr">422</span></td><td>Unprocessable Entity</td><td><span class="hr">429</span></td><td>Too Many Requests</td></tr>
+<tr><td><span class="hr">451</span></td><td>Unavailable For Legal Reasons</td><td></td><td></td><td></td><td></td></tr>
+<tr><th colspan="6" class="hr">5xx — Server Error</th></tr>
+<tr><td><span class="hr">500</span></td><td>Internal Server Error</td><td><span class="hr">501</span></td><td>Not Implemented</td><td><span class="hr">502</span></td><td>Bad Gateway</td></tr>
+<tr><td><span class="hr">503</span></td><td>Service Unavailable</td><td><span class="hr">504</span></td><td>Gateway Timeout</td><td></td><td></td></tr>
+</table>
+<div class="b bb"><span class="hi">HTTP/2:</span> Binary framing, <span class="hg">multiplexing</span>, header compression (HPACK), server push. <span class="hi">HTTP/3:</span> QUIC-based (UDP), no head-of-line blocking, 0-RTT.</div>
+<div class="b bp"><span class="hv">HTTP/1.1 vs 2 vs 3:</span> <span class="hi">HTTP/1.1</span> — one request per TCP connection (or pipelining, rarely used). <span class="hi">HTTP/2</span> — multiplexed streams over single TCP, but TCP head-of-line blocking remains (1 lost packet stalls all streams). <span class="hi">HTTP/3 (QUIC)</span> — each stream independent over UDP, lost packet only stalls its own stream. <span class="hg">0-RTT resumption</span> — reconnect without handshake (TLS 1.3 session tickets). Adopted by Chrome, YouTube, Cloudflare, Meta.</div>
+</div>
+
+<div class="T" id="dns">
+<h2>DNS</h2><p class="su">Translates <span class="hg">domains → IP addresses</span>. Resolution: Browser → OS → Resolver → Root → TLD → Authoritative</p>
+<table>
+<tr><th>Record</th><th>Purpose</th><th>Example</th></tr>
+<tr><td><span class="hi">A/AAAA</span></td><td>Domain → IPv4/IPv6</td><td>example.com → 93.184.216.34</td></tr>
+<tr><td><span class="hi">CNAME</span></td><td>Alias</td><td>www → example.com</td></tr>
+<tr><td><span class="hi">MX</span></td><td>Mail routing</td><td>→ mail.example.com</td></tr>
+<tr><td><span class="hi">SRV</span></td><td>Service discovery</td><td>_http._tcp.example.com</td></tr>
+</table>
+<div class="b bg"><span class="hi">Guarantees:</span> DNS provides <span class="hg">eventual consistency</span> — changes propagate within TTL. Low TTL (60s) = fast failover but high query load. High TTL (86400s) = less load but slow propagation.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Route 53</strong> GeoDNS routes to nearest region. <strong>Cloudflare</strong> 1.1.1.1 resolves in ~11ms. <strong>Consul</strong> uses DNS for service discovery. <strong>Anycast</strong> — same IP from multiple locations.</div>
+</div>
+
+<div class="T" id="networking-extras">
+<h2>IP, Ports, Firewalls &amp; Security</h2><p class="su">Network fundamentals for infrastructure design</p>
+<table>
+<tr><th>Concept</th><th>Detail</th></tr>
+<tr><td><span class="hi">IP/CIDR</span></td><td>IPv4 (32-bit). <code>/24</code>=256 IPs, <code>/16</code>=65K. Private: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. VPCs use subnets.</td></tr>
+<tr><td><span class="hi">Key Ports</span></td><td>22 SSH · 53 DNS · 80 HTTP · 443 HTTPS · 3306 MySQL · 5432 Postgres · 6379 Redis · 9092 Kafka · 9200 ES · 27017 Mongo</td></tr>
+<tr><td><span class="hi">Firewalls</span></td><td><span class="hg">Security Groups</span> (AWS) = stateful per-instance. <span class="hg">NACLs</span> = stateless subnet-level. Whitelist only needed ports.</td></tr>
+<tr><td><span class="hi">Zero Trust</span></td><td>"Never trust, always verify." Every request authed regardless of network. <span class="hg">mTLS</span> between services. No implicit trust for internal traffic.</td></tr>
+<tr><td><span class="hi">DDoS</span></td><td><span class="hg">Cloudflare</span> / <span class="hg">AWS Shield</span> absorb at edge. Rate limiting, WAF, geo-blocking, CAPTCHA.</td></tr>
+</table>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>

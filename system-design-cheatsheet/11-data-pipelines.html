@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>11. Data Pipelines — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-11"><span class="e">🔄</span> 11 · DATA PIPELINES</div>
+
+<div class="T" id="cdc">
+<h2>Change Data Capture (CDC)</h2>
+<p class="su">
+  Stream DB changes from the transaction log to improve 
+  <span class="hg">real-time updates</span> (propagate changes), 
+  <span class="hg">decoupling</span> (no app code changes), and 
+  <span class="hg">integration</span> (sync downstream systems), 
+  with trade-offs in 
+  <span class="hg">consistency</span> (event lag), 
+  <span class="hg">ordering</span> (out-of-order events), and 
+  <span class="hg">operational complexity</span> (setup, monitoring).
+</p>
+<!-- ═══ CDC Pipeline Visual ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> CDC Pipeline — How It Works</div>
+<svg width="100%" viewBox="0 0 520 130" style="max-width:520px;display:block;margin:2px auto 6px">
+  <defs><marker id="cd1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ── 1. Source Database ── -->
+  <rect x="4" y="20" width="70" height="50" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="39" y="36" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Source DB</text>
+  <!-- WAL/Binlog inside -->
+  <rect x="10" y="44" width="58" height="14" rx="3" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="39" y="54" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">WAL / Binlog</text>
+  <!-- Writes label -->
+  <text x="39" y="16" text-anchor="middle" fill="var(--muted)" font-size="6.5">App writes normally</text>
+  <text x="39" y="78" text-anchor="middle" fill="var(--muted)" font-size="6">INSERT · UPDATE · DELETE</text>
+  <text x="39" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">all logged in txn log</text>
+
+  <!-- Arrow: WAL → CDC -->
+  <line x1="74" y1="45" x2="104" y2="45" stroke="var(--g)" stroke-width="1.2" marker-end="url(#cd1)"/>
+  <text x="89" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">read log</text>
+
+  <!-- ── 2. CDC Connector ── -->
+  <rect x="106" y="16" width="80" height="58" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="146" y="30" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">CDC</text>
+  <text x="146" y="40" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Connector</text>
+  <!-- Operations -->
+  <rect x="112" y="46" width="30" height="10" rx="2" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="127" y="54" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">INSERT</text>
+  <rect x="144" y="46" width="34" height="10" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="161" y="54" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">UPDATE</text>
+  <rect x="126" y="58" width="34" height="10" rx="2" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="143" y="66" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">DELETE</text>
+  <!-- Tool label -->
+  <text x="146" y="82" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="600">Debezium / AWS DMS</text>
+  <text x="146" y="92" text-anchor="middle" fill="var(--muted)" font-size="6">Kafka Connect plugin</text>
+
+  <!-- Arrow: CDC → Kafka -->
+  <line x1="186" y1="45" x2="216" y2="45" stroke="var(--g)" stroke-width="1.2" marker-end="url(#cd1)"/>
+  <text x="201" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">publish</text>
+
+  <!-- ── 3. Messaging System ── -->
+  <rect x="218" y="16" width="80" height="58" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="258" y="32" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Kafka</text>
+  <text x="258" y="44" text-anchor="middle" fill="var(--muted)" font-size="6.5">topic per table</text>
+  <!-- Partitions -->
+  <rect x="224" y="50" width="20" height="8" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <rect x="246" y="50" width="20" height="8" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <rect x="268" y="50" width="20" height="8" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="258" y="68" text-anchor="middle" fill="var(--muted)" font-size="6">ordered per partition</text>
+  <text x="258" y="82" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Kafka / Kinesis / Pulsar</text>
+
+  <!-- Arrow: Kafka → Targets -->
+  <line x1="298" y1="30" x2="340" y2="16" stroke="var(--g)" stroke-width="1" marker-end="url(#cd1)"/>
+  <line x1="298" y1="45" x2="340" y2="45" stroke="var(--r)" stroke-width="1" marker-end="url(#cd1)"/>
+  <line x1="298" y1="60" x2="340" y2="74" stroke="var(--a2)" stroke-width="1" marker-end="url(#cd1)"/>
+  <line x1="298" y1="68" x2="340" y2="100" stroke="var(--c)" stroke-width="1" marker-end="url(#cd1)"/>
+
+  <!-- ── 4. Target Systems ── -->
+  <rect x="338" y="2" width="178" height="120" rx="8" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width="1"/>
+  <text x="427" y="14" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">TARGET SYSTEMS</text>
+
+  <!-- Target: Database (replica) -->
+  <rect x="344" y="20" width="76" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="382" y="32" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Database (replica)</text>
+
+  <!-- Target: Cache -->
+  <rect x="344" y="44" width="76" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1"/>
+  <text x="382" y="56" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">Cache (Redis)</text>
+
+  <!-- Target: Search -->
+  <rect x="344" y="68" width="76" height="18" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="382" y="80" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">Search (ES)</text>
+
+  <!-- Target: Data Warehouse -->
+  <rect x="344" y="92" width="76" height="18" rx="4" fill="rgba(34,211,238,.1)" stroke="var(--c)" stroke-width="1"/>
+  <text x="382" y="104" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="600">Data Warehouse</text>
+
+  <!-- Use case labels -->
+  <text x="440" y="32" fill="var(--muted)" font-size="5.5">cross-region sync</text>
+  <text x="440" y="56" fill="var(--muted)" font-size="5.5">invalidate / update</text>
+  <text x="440" y="80" fill="var(--muted)" font-size="5.5">reindex documents</text>
+  <text x="440" y="104" fill="var(--muted)" font-size="5.5">analytics / reporting</text>
+</svg>
+
+<!-- ═══ Why CDC over Dual Writes ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> Why CDC? The Dual-Write Problem</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Dual Write (bad) -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--r)">❌ Dual Write (Dangerous)</h4>
+<svg width="100%" viewBox="0 0 200 70" style="max-width:200px;display:block;margin:0 auto">
+  <!-- App -->
+  <rect x="4" y="18" width="36" height="20" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="22" y="31" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text>
+  <!-- Arrow to DB -->
+  <line x1="40" y1="24" x2="72" y2="14" stroke="var(--g)" stroke-width="1" marker-end="url(#cd1)"/>
+  <text x="56" y="14" fill="var(--g)" font-size="5.5">1. write DB</text>
+  <!-- Arrow to Cache -->
+  <line x1="40" y1="34" x2="72" y2="48" stroke="var(--r)" stroke-width="1" marker-end="url(#cd1)"/>
+  <text x="56" y="48" fill="var(--r)" font-size="5.5">2. write cache</text>
+  <!-- DB -->
+  <rect x="74" y="4" width="40" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="94" y="15" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">DB ✓</text>
+  <!-- Cache -->
+  <rect x="74" y="40" width="40" height="16" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="94" y="51" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">Cache ✗</text>
+  <!-- Problem -->
+  <text x="140" y="14" fill="var(--muted)" font-size="6">DB succeeds</text>
+  <text x="140" y="50" fill="var(--r)" font-size="6" font-weight="600">Cache fails → inconsistent!</text>
+  <text x="100" y="66" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">No atomicity across two systems</text>
+</svg>
+</div>
+
+<!-- CDC (good) -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">✓ CDC (Safe)</h4>
+<svg width="100%" viewBox="0 0 200 70" style="max-width:200px;display:block;margin:0 auto">
+  <!-- App -->
+  <rect x="4" y="18" width="36" height="20" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="22" y="31" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text>
+  <!-- Arrow to DB only -->
+  <line x1="40" y1="28" x2="62" y2="28" stroke="var(--g)" stroke-width="1" marker-end="url(#cd1)"/>
+  <text x="51" y="22" fill="var(--g)" font-size="5.5">write DB</text>
+  <!-- DB -->
+  <rect x="64" y="18" width="36" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="82" y="31" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">DB ✓</text>
+  <!-- WAL -->
+  <line x1="82" y1="38" x2="82" y2="48" stroke="var(--y)" stroke-width=".8" marker-end="url(#cd1)"/>
+  <rect x="64" y="50" width="36" height="12" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="82" y="59" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">WAL</text>
+  <!-- CDC reads WAL -->
+  <line x1="100" y1="56" x2="118" y2="56" stroke="var(--o)" stroke-width=".8" marker-end="url(#cd1)"/>
+  <text x="109" y="52" fill="var(--o)" font-size="5">CDC</text>
+  <!-- Kafka -->
+  <rect x="120" y="48" width="30" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="135" y="59" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka</text>
+  <!-- To cache -->
+  <line x1="150" y1="56" x2="168" y2="56" stroke="var(--g)" stroke-width=".8" marker-end="url(#cd1)"/>
+  <rect x="170" y="48" width="28" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="184" y="59" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Cache</text>
+  <!-- Guarantee -->
+  <text x="100" y="14" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Single write → WAL → CDC → all targets</text>
+  <text x="100" y="24" text-anchor="middle" fill="var(--g)" font-size="6">✓ Eventually consistent, never lost</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ CDC Methods ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> CDC Methods</div>
+<table style="margin-top:2px">
+<tr><th>Method</th><th>How</th><th>Latency</th><th>Impact on Source</th></tr>
+<tr><td><span class="hi">Log-Based</span></td><td>Read WAL/binlog (Debezium)</td><td><span class="hg">~ms</span></td><td><span class="hg">Zero</span> — reads log, not tables</td></tr>
+<tr><td><span class="hi">Query-Based</span></td><td>Poll with <code>WHERE updated_at > ?</code></td><td>~sec-min</td><td><span class="hr">Load</span> — queries hit DB</td></tr>
+<tr><td><span class="hi">Trigger-Based</span></td><td>DB triggers write to shadow table</td><td>~ms</td><td><span class="hr">High</span> — triggers on every write</td></tr>
+</table>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Guarantees:</span> <span class="hg">At-least-once delivery</span> (consumers must be idempotent). <span class="hg">Ordering per table</span>. <span class="hg">No dual-write problem</span> — single source of truth is the DB, everything else derived from its log.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>LinkedIn</strong> — 100+ Kafka topics via CDC. <strong>Shopify</strong> — real-time inventory sync. <strong>Airbnb</strong> — Debezium for search index updates. <strong>Stripe</strong> — outbox + CDC for payment events.</div>
+
+<!-- ═══ CDC Tools ═══ -->
+<div class="b bb" style="margin-top:4px"><span class="hi">CDC Tools:</span> <span class="hg">Debezium</span> — open-source, log-based, Kafka Connect plugin (most popular). <span class="hg">AWS DMS</span> — managed, serverless, AWS-native migrations + replication. <span class="hg">Fivetran</span> — SaaS, 200+ connectors, zero-config ELT to warehouses. <span class="hg">Airbyte</span> — open-source Fivetran alternative, 300+ connectors, self-hosted or cloud. All log-based = zero impact on source DB.</div>
+</div>
+
+<div class="T" id="etl">
+<h2>ETL / ELT</h2><p class="su"><span class="hg">ETL:</span> Transform before loading (traditional). <span class="hg">ELT:</span> Load raw, transform in warehouse (modern).</p>
+<div class="b bb"><span class="hi">Tools:</span> <span class="hg">Airflow</span> (DAG orchestration). <span class="hg">dbt</span> (SQL transformations). <span class="hg">Dagster/Prefect</span> (modern alternatives). <span class="hi">Lambda Architecture:</span> Batch + Speed + Serving layers. <span class="hi">Kappa:</span> Everything streaming (simpler).</div>
+</div>
+
+<div class="T" id="stream-processing">
+<h2>Stream Processing</h2><p class="su">Process data <span class="hg">in real-time</span> as it arrives — event by event, no waiting</p>
+
+<!-- ═══ Stream Processing Visual ═══ -->
+<svg width="100%" viewBox="0 0 480 80" style="max-width:480px;display:block;margin:4px auto">
+  <defs><marker id="sp1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Data Sources -->
+  <rect x="4" y="8" width="60" height="14" rx="3" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="34" y="18" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">Ride Events</text>
+  <rect x="4" y="26" width="60" height="14" rx="3" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="34" y="36" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="600">Click Stream</text>
+  <rect x="4" y="44" width="60" height="14" rx="3" fill="rgba(244,114,182,.12)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="34" y="54" text-anchor="middle" fill="var(--p)" font-size="6.5" font-weight="600">IoT Sensors</text>
+  <!-- Arrow: continuous stream -->
+  <line x1="64" y1="18" x2="110" y2="32" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <line x1="64" y1="33" x2="110" y2="33" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <line x1="64" y1="51" x2="110" y2="36" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <text x="88" y="26" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">continuous</text>
+  <!-- Stream pipe -->
+  <rect x="112" y="20" width="120" height="26" rx="12" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <rect x="122" y="26" width="22" height="14" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="133" y="36" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">evt</text>
+  <rect x="148" y="26" width="22" height="14" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="159" y="36" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">evt</text>
+  <rect x="174" y="26" width="22" height="14" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="185" y="36" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">evt</text>
+  <rect x="200" y="26" width="22" height="14" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="211" y="36" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">evt</text>
+  <text x="172" y="16" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Stream Processing</text>
+  <text x="172" y="54" text-anchor="middle" fill="var(--muted)" font-size="6">process each event as it arrives</text>
+  <!-- Arrow to outcomes -->
+  <line x1="232" y1="33" x2="260" y2="33" stroke="var(--g)" stroke-width="1" marker-end="url(#sp1)"/>
+  <!-- Outcomes -->
+  <rect x="262" y="6" width="90" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="307" y="16" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">⚡ Surge pricing (Uber)</text>
+  <rect x="262" y="24" width="90" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="307" y="34" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">🚨 Fraud alert (Stripe)</text>
+  <rect x="262" y="42" width="90" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="307" y="52" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">📊 Live dashboard</text>
+  <rect x="262" y="60" width="90" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="307" y="70" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">🔔 Real-time alerts</text>
+  <!-- Latency -->
+  <text x="400" y="34" fill="var(--g)" font-size="8" font-weight="700">ms–sec</text>
+  <text x="400" y="46" fill="var(--muted)" font-size="6">latency</text>
+</svg>
+
+<table style="margin-top:4px">
+<tr><th>Framework</th><th>Model</th><th>Real-World Example</th></tr>
+<tr><td><span class="hi">Apache Flink</span></td><td>True streaming, exactly-once, stateful</td><td><span class="hg">Uber</span> — surge pricing: count ride requests per zone in 5-min sliding window → price multiplier in real-time</td></tr>
+<tr><td><span class="hi">Kafka Streams</span></td><td>Library (no cluster), Kafka ecosystem</td><td><span class="hg">LinkedIn</span> — "Who viewed your profile" notifications: join view events with user profiles, emit within seconds</td></tr>
+<tr><td><span class="hi">Spark Streaming</span></td><td>Micro-batch (100ms–sec intervals)</td><td><span class="hg">Netflix</span> — real-time viewing metrics: aggregate play/pause/skip events per title for trending dashboard</td></tr>
+</table>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Key Concepts:</span> <span class="hg">Windowing</span> — tumbling (fixed, non-overlapping: "count per 5 min"), sliding (overlapping: "last 10 min, updated every 1 min"), session (gap-based: "user activity until 30 min idle"). <span class="hg">Watermarks</span> — handle late-arriving events ("allow 5 sec late data"). <span class="hg">Exactly-once</span> — checkpointing + idempotent sinks. <span class="hg">State</span> — RocksDB in Flink for keyed state (e.g., running count per user).</div>
+</div>
+
+<div class="T" id="batch-processing">
+<h2>Batch Processing</h2><p class="su">Process <span class="hg">large datasets</span> in scheduled jobs — collect first, process later</p>
+
+<!-- ═══ Batch Processing Visual ═══ -->
+<svg width="100%" viewBox="0 0 480 80" style="max-width:480px;display:block;margin:4px auto">
+  <!-- Data Sources -->
+  <rect x="4" y="8" width="60" height="14" rx="3" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="34" y="18" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">App Logs</text>
+  <rect x="4" y="26" width="60" height="14" rx="3" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="34" y="36" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="600">Transactions</text>
+  <rect x="4" y="44" width="60" height="14" rx="3" fill="rgba(244,114,182,.12)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="34" y="54" text-anchor="middle" fill="var(--p)" font-size="6.5" font-weight="600">User Activity</text>
+  <!-- Arrow: store first -->
+  <line x1="64" y1="18" x2="110" y2="28" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <line x1="64" y1="33" x2="110" y2="33" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <line x1="64" y1="51" x2="110" y2="38" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <text x="88" y="24" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">store first</text>
+  <!-- Storage (big bucket) -->
+  <rect x="112" y="10" width="80" height="46" rx="8" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="152" y="22" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Data Lake / DB</text>
+  <!-- Data blocks inside -->
+  <rect x="118" y="28" width="18" height="12" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <rect x="138" y="28" width="18" height="12" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <rect x="158" y="28" width="18" height="12" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <rect x="128" y="42" width="18" height="12" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <rect x="148" y="42" width="18" height="12" rx="2" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width=".5"/>
+  <!-- Arrow: process all at once -->
+  <line x1="192" y1="33" x2="220" y2="33" stroke="var(--g)" stroke-width="1" marker-end="url(#sp1)"/>
+  <text x="206" y="28" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">scheduled</text>
+  <!-- Batch engine -->
+  <rect x="222" y="18" width="70" height="30" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+  <text x="257" y="30" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Batch Engine</text>
+  <text x="257" y="42" text-anchor="middle" fill="var(--muted)" font-size="6">Spark / MapReduce</text>
+  <!-- Arrow to outcomes -->
+  <line x1="292" y1="33" x2="320" y2="33" stroke="var(--g)" stroke-width="1" marker-end="url(#sp1)"/>
+  <!-- Outcomes -->
+  <rect x="322" y="6" width="100" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="372" y="16" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">📧 Daily email reports</text>
+  <rect x="322" y="24" width="100" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="372" y="34" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">🤖 ML model training</text>
+  <rect x="322" y="42" width="100" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="372" y="52" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">📊 Monthly analytics</text>
+  <rect x="322" y="60" width="100" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="372" y="70" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">🔄 Data warehouse ETL</text>
+  <!-- Latency -->
+  <text x="450" y="34" fill="var(--o)" font-size="8" font-weight="700">min–hrs</text>
+  <text x="450" y="46" fill="var(--muted)" font-size="6">latency</text>
+</svg>
+
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="text-align:center;color:var(--a)">MapReduce → Spark</h4>
+<svg width="100%" viewBox="0 0 260 40" style="max-width:260px;display:block;margin:0 auto">
+  <!-- Map -->
+  <rect x="4" y="4" width="50" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="29" y="16" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Map</text>
+  <text x="29" y="28" text-anchor="middle" fill="var(--muted)" font-size="5.5">parallel transform</text>
+  <line x1="54" y1="13" x2="68" y2="13" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <!-- Shuffle -->
+  <rect x="70" y="4" width="50" height="18" rx="4" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1"/>
+  <text x="95" y="16" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Shuffle</text>
+  <text x="95" y="28" text-anchor="middle" fill="var(--muted)" font-size="5.5">group by key</text>
+  <line x1="120" y1="13" x2="134" y2="13" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sp1)"/>
+  <!-- Reduce -->
+  <rect x="136" y="4" width="50" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="161" y="16" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Reduce</text>
+  <text x="161" y="28" text-anchor="middle" fill="var(--muted)" font-size="5.5">aggregate</text>
+  <!-- Spark label -->
+  <text x="220" y="10" fill="var(--g)" font-size="7" font-weight="700">Spark:</text>
+  <text x="220" y="20" fill="var(--muted)" font-size="6">in-memory DAG</text>
+  <text x="220" y="30" fill="var(--g)" font-size="6" font-weight="600">100× faster</text>
+</svg>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="text-align:center;color:var(--g)">Real-World Batch Examples</h4>
+<div style="font-size:.78rem;line-height:1.55">
+  <span class="d-tick">▸</span> <span class="hg">Netflix</span> — nightly Spark job processes PBs of viewing data → "Because you watched" recommendations<br>
+  <span class="d-tick">▸</span> <span class="hg">Spotify</span> — daily batch: aggregate all listening history → generate "Discover Weekly" playlist<br>
+  <span class="d-tick">▸</span> <span class="hg">Uber</span> — end-of-day batch: calculate driver earnings, trip summaries, tax reports<br>
+  <span class="d-tick">▸</span> <span class="hg">Banks</span> — nightly batch: reconcile all transactions, generate statements, fraud reports
+</div>
+</div>
+</div>
+
+<!-- Stream vs Batch comparison -->
+<table style="margin-top:4px">
+<tr><th>Aspect</th><th>Stream Processing</th><th>Batch Processing</th></tr>
+<tr><td><span class="hi">When</span></td><td>As data arrives (continuous)</td><td>Scheduled (hourly/daily/weekly)</td></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">ms – seconds</span></td><td><span class="ho">minutes – hours</span></td></tr>
+<tr><td><span class="hi">Data</span></td><td>Unbounded (infinite stream)</td><td>Bounded (fixed dataset)</td></tr>
+<tr><td><span class="hi">State</span></td><td>In-memory (RocksDB, checkpoints)</td><td>Disk (HDFS, S3)</td></tr>
+<tr><td><span class="hi">Use Case</span></td><td>Fraud detection, surge pricing, alerts</td><td>Reports, ML training, ETL, analytics</td></tr>
+<tr><td><span class="hi">Tools</span></td><td>Flink, Kafka Streams, Spark Streaming</td><td>Spark, MapReduce, Hive, Presto</td></tr>
+</table>
+<div class="b bb" style="margin-top:4px"><span class="hi">Lambda Architecture:</span> Run <span class="hg">both</span> — batch for accuracy (recompute everything), stream for speed (approximate, real-time). Merge results in serving layer. <span class="hi">Kappa Architecture:</span> <span class="hg">Stream only</span> — replay Kafka log for reprocessing instead of separate batch. Simpler but needs durable stream (Kafka retention).</div>
+</div>
+
+<div class="T" id="data-warehouse">
+<h2>Data Warehouse</h2><p class="su"><span class="hg">OLAP</span> — columnar storage, fast aggregations. BigQuery, Snowflake, ClickHouse</p>
+<div class="b bg"><span class="hi">Guarantee:</span> <span class="hg">Columnar storage</span> reads only needed columns — <code>SUM(revenue)</code> skips all other columns. <span class="hg">10:1 compression</span>. OLTP — Runs the business (transactional). OLAP — Analyzes the business (analytical).</div>
+</div>
+
+<div class="T" id="data-lakes">
+<h2>Data Lakes &amp; Lakehouse</h2><p class="su">Raw files on S3/GCS. Lakehouse = lake (cheap) + warehouse (ACID). Delta Lake, Iceberg, Hudi add ACID + time travel.</p>
+<div class="b bb"><span class="hi">Columnar Formats:</span> <span class="hg">Parquet</span> (most popular), ORC. Column-oriented, compressed, splittable. 10x smaller than CSV.</div>
+</div>
+
+<!-- ═══ Pipeline Extras ═══ -->
+<div class="T" id="pipeline-extras">
+<h2>Pipeline Extras</h2><p class="su">Data quality, schema registry, lineage, real-time analytics</p>
+<table>
+<tr><th>Concept</th><th>Detail</th></tr>
+<tr><td><span class="hi">Data Quality</span></td><td>Validate at ingestion: <span class="hg">Great Expectations</span>, <span class="hg">dbt tests</span>, <span class="hg">Soda</span>. Check: nulls, schema drift, value ranges, freshness. Bad data in → bad decisions out.</td></tr>
+<tr><td><span class="hi">Schema Registry</span></td><td><span class="hg">Confluent Schema Registry</span> — central store for Avro/Protobuf schemas. Enforces backward/forward compatibility. Prevents breaking changes across Kafka producers and consumers.</td></tr>
+<tr><td><span class="hi">Data Lineage</span></td><td>Track where data came from, how it was transformed, where it goes. <span class="hg">Apache Atlas</span>, <span class="hg">OpenLineage</span>, <span class="hg">DataHub</span>. Critical for GDPR compliance ("where is user X's data?") and debugging pipelines.</td></tr>
+<tr><td><span class="hi">Real-Time Analytics</span></td><td><span class="hg">Apache Pinot</span> (LinkedIn — who viewed your profile), <span class="hg">Apache Druid</span> (real-time OLAP), <span class="hg">ClickHouse</span> (fast columnar, Cloudflare analytics). Ingest from Kafka, query in ms. Bridge between streaming and BI dashboards.</td></tr>
+</table>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>
