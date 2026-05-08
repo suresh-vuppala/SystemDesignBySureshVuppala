@@ -348,130 +348,7 @@
   <span class="hg">write latency</span> (slower writes), and 
   <span class="hg">operational complexity</span> (manage replicas).
 </p>
-<!-- ═══ 3 Replication Types ═══ -->
-<div class="d-grid tri" style="margin:4px 0">
 
-<!-- Leader-Follower -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--g)">Single Leader</h4>
-<svg width="100%" viewBox="0 0 160 100" style="max-width:160px;display:block;margin:0 auto">
-  <defs><marker id="rp1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
-  <!-- Client -->
-  <text x="8" y="42" font-size="10">👤</text>
-  <line x1="22" y1="38" x2="38" y2="38" stroke="var(--muted)" stroke-width="1" marker-end="url(#rp1)"/>
-  <text x="30" y="32" fill="var(--muted)" font-size="5.5">r/w</text>
-  <!-- Leader -->
-  <rect x="40" y="26" width="40" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
-  <text x="60" y="36" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Leader</text>
-  <text x="60" y="46" text-anchor="middle" fill="var(--g)" font-size="6">(writes)</text>
-  <!-- Replication arrows -->
-  <line x1="80" y1="32" x2="110" y2="16" stroke="var(--a)" stroke-width=".8" marker-end="url(#rp1)"/>
-  <line x1="80" y1="44" x2="110" y2="60" stroke="var(--a)" stroke-width=".8" marker-end="url(#rp1)"/>
-  <text x="98" y="26" fill="var(--a)" font-size="5" font-weight="600">repl</text>
-  <text x="98" y="56" fill="var(--a)" font-size="5" font-weight="600">repl</text>
-  <!-- Followers -->
-  <rect x="112" y="4" width="42" height="22" rx="4" fill="rgba(244,114,182,.1)" stroke="var(--p)" stroke-width="1"/>
-  <text x="133" y="14" text-anchor="middle" fill="var(--p)" font-size="6.5" font-weight="600">Follower</text>
-  <text x="133" y="22" text-anchor="middle" fill="var(--muted)" font-size="5">read-only</text>
-  <rect x="112" y="50" width="42" height="22" rx="4" fill="rgba(244,114,182,.1)" stroke="var(--p)" stroke-width="1"/>
-  <text x="133" y="60" text-anchor="middle" fill="var(--p)" font-size="6.5" font-weight="600">Follower</text>
-  <text x="133" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">read-only</text>
-  <!-- Read clients -->
-  <text x="148" y="16" font-size="7">👤</text>
-  <text x="148" y="62" font-size="7">👤</text>
-  <!-- Lag label -->
-  <rect x="30" y="76" width="100" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".7"/>
-  <text x="80" y="86" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">⚠ Replication lag → stale reads</text>
-</svg>
-<div style="font-size:.7rem;color:var(--muted);line-height:1.4;margin-top:3px">
-  <span class="hi">How:</span> All writes go to 1 leader. Leader streams WAL/binlog to followers. Followers apply changes and serve reads.<br>
-  <span class="hi">Failover:</span> Leader dies → promote a follower (manual or Sentinel/Patroni). Brief downtime during election.<br>
-  <span class="hi">Read-your-writes:</span> After writing, read from leader (not follower) to avoid stale data.<br>
-  <span class="hi">Ex:</span> <span class="hg">Postgres</span> (streaming replication), <span class="hg">MySQL</span> (binlog), <span class="hg">MongoDB</span> (replica set), <span class="hg">Redis</span> (master-replica).
-</div>
-</div>
-
-<!-- Multi-Leader -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--a)">Multi-Leader</h4>
-<svg width="100%" viewBox="0 0 160 100" style="max-width:160px;display:block;margin:0 auto">
-  <!-- User A -->
-  <text x="14" y="12" font-size="8">👤</text><text x="14" y="22" text-anchor="middle" fill="var(--muted)" font-size="5" dx="4">User A</text>
-  <line x1="14" y1="24" x2="14" y2="34" stroke="var(--muted)" stroke-width=".7" marker-end="url(#rp1)"/>
-  <!-- User B -->
-  <text x="140" y="12" font-size="8">👤</text><text x="140" y="22" text-anchor="middle" fill="var(--muted)" font-size="5" dx="4">User B</text>
-  <line x1="144" y1="24" x2="144" y2="34" stroke="var(--muted)" stroke-width=".7" marker-end="url(#rp1)"/>
-  <!-- DC A -->
-  <rect x="0" y="36" width="68" height="40" rx="5" fill="none" stroke="var(--c)" stroke-width=".8" stroke-dasharray="4,2"/>
-  <text x="34" y="34" text-anchor="middle" fill="var(--c)" font-size="5.5">Datacenter A</text>
-  <rect x="4" y="42" width="34" height="16" rx="3" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1"/>
-  <text x="21" y="53" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Leader</text>
-  <rect x="4" y="62" width="34" height="12" rx="3" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width=".7"/>
-  <text x="21" y="71" text-anchor="middle" fill="var(--p)" font-size="5.5">Follower</text>
-  <line x1="21" y1="58" x2="21" y2="62" stroke="var(--g)" stroke-width=".6" marker-end="url(#rp1)"/>
-  <!-- DC B -->
-  <rect x="92" y="36" width="68" height="40" rx="5" fill="none" stroke="var(--c)" stroke-width=".8" stroke-dasharray="4,2"/>
-  <text x="126" y="34" text-anchor="middle" fill="var(--c)" font-size="5.5">Datacenter B</text>
-  <rect x="122" y="42" width="34" height="16" rx="3" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1"/>
-  <text x="139" y="53" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Leader</text>
-  <rect x="122" y="62" width="34" height="12" rx="3" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width=".7"/>
-  <text x="139" y="71" text-anchor="middle" fill="var(--p)" font-size="5.5">Follower</text>
-  <line x1="139" y1="58" x2="139" y2="62" stroke="var(--a)" stroke-width=".6" marker-end="url(#rp1)"/>
-  <!-- Conflict resolution between leaders -->
-  <line x1="38" y1="50" x2="56" y2="50" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
-  <line x1="122" y1="50" x2="104" y2="50" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
-  <rect x="56" y="42" width="48" height="16" rx="4" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width="1"/>
-  <text x="80" y="49" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Conflict</text>
-  <text x="80" y="56" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Resolution</text>
-  <!-- Warning -->
-  <text x="80" y="88" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">⚠ Conflicts need LWW / CRDTs</text>
-</svg>
-<div style="font-size:.7rem;color:var(--muted);line-height:1.4;margin-top:3px">
-  <span class="hi">How:</span> Multiple leaders accept writes independently. Changes replicated async between leaders. Conflicts resolved on merge.<br>
-  <span class="hi">Conflict strategies:</span> <span class="hg">LWW</span> (last timestamp wins), <span class="hg">merge</span> (combine both), <span class="hg">custom logic</span> (app decides), <span class="hg">CRDTs</span> (auto-merge).<br>
-  <span class="hi">Use case:</span> Multi-region writes (users in US write to US leader, EU to EU leader — low latency for both).<br>
-  <span class="hi">Ex:</span> <span class="hg">CouchDB</span> (multi-master), <span class="hg">Postgres BDR</span>, <span class="hg">MySQL Group Replication</span>, <span class="hg">Google Docs</span> (OT/CRDTs).
-</div>
-</div>
-
-<!-- Leaderless -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--a2)">Leaderless (Quorum)</h4>
-<svg width="100%" viewBox="0 0 160 100" style="max-width:160px;display:block;margin:0 auto">
-  <!-- User -->
-  <text x="8" y="42" font-size="10">👤</text>
-  <text x="8" y="54" text-anchor="middle" fill="var(--muted)" font-size="5" dx="8">User</text>
-  <!-- Write arrows to all 3 replicas -->
-  <line x1="24" y1="34" x2="80" y2="12" stroke="var(--g)" stroke-width=".8" marker-end="url(#rp1)"/>
-  <line x1="24" y1="38" x2="80" y2="38" stroke="var(--g)" stroke-width=".8" marker-end="url(#rp1)"/>
-  <line x1="24" y1="42" x2="80" y2="64" stroke="var(--r)" stroke-width=".8" marker-end="url(#rp1)" stroke-dasharray="3,2"/>
-  <text x="40" y="28" fill="var(--g)" font-size="5">write</text>
-  <!-- Replicas -->
-  <rect x="82" y="2" width="44" height="18" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1"/>
-  <text x="104" y="14" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">Replica 1</text>
-  <rect x="82" y="28" width="44" height="18" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1"/>
-  <text x="104" y="40" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">Replica 2</text>
-  <rect x="82" y="54" width="44" height="18" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="104" y="66" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">Replica 3</text>
-  <!-- Success/fail labels -->
-  <text x="134" y="14" fill="var(--g)" font-size="6" font-weight="600">✓</text>
-  <text x="134" y="40" fill="var(--g)" font-size="6" font-weight="600">✓</text>
-  <text x="134" y="66" fill="var(--r)" font-size="6" font-weight="600">✗ offline</text>
-  <!-- Success back to user -->
-  <line x1="24" y1="46" x2="14" y2="46" stroke="var(--g)" stroke-width="1" marker-end="url(#rp1)"/>
-  <text x="20" y="58" fill="var(--g)" font-size="5.5" font-weight="600">✓ OK</text>
-  <!-- Quorum callout -->
-  <rect x="20" y="78" width="120" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".7"/>
-  <text x="80" y="88" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">W=2 of N=3 → quorum met ✓</text>
-</svg>
-<div style="font-size:.7rem;color:var(--muted);line-height:1.4;margin-top:3px">
-  <span class="hi">How:</span> Client writes to ALL replicas in parallel. Success if W (write quorum) respond. Reads query R replicas, take latest version.<br>
-  <span class="hi">Consistency:</span> <span class="hg">W + R > N</span> = strong (overlap guarantees latest read). W=1, R=1 = fast but eventual.<br>
-  <span class="hi">Repair:</span> <span class="hg">Read repair</span> (fix stale on read), <span class="hg">anti-entropy</span> (background Merkle tree sync), <span class="hg">hinted handoff</span> (neighbor holds writes for downed node).<br>
-  <span class="hi">Ex:</span> <span class="hg">Cassandra</span>, <span class="hg">DynamoDB</span>, <span class="hg">Riak</span>, <span class="hg">Voldemort</span>. Best for: high availability, no SPOF, tunable consistency.
-</div>
-</div>
-</div>
 
 <!-- ═══ Sync vs Async visual ═══ -->
 <div class="d-title"><span class="num d-yellow">▸</span> Sync vs Async vs Semi-Sync Replication</div>
@@ -609,8 +486,545 @@
 <tr><td><span class="hi">Async</span></td><td>Master only</td><td><span class="hr">Possible</span> (lag window)</td><td><span class="hg">Lowest</span></td><td>Social feeds, analytics (Postgres async)</td></tr>
 </table>
 
-<!-- Quorum + comparison -->
-<div class="b bg" style="margin-top:4px"><span class="hi">Quorum Guarantee:</span> N=3 replicas. <span class="hg">W=2, R=2</span> → W+R=4 > N=3 → <span class="hg">strong consistency</span> (read and write sets overlap). W=1, R=1 → fast but eventual.</div>
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SINGLE-LEADER DEEP DIVE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="d-title"><span class="num d-green">▸</span> Single-Leader Replication — Deep Dive</div>
+<svg width="100%" viewBox="0 0 700 340" style="max-width:700px;display:block;margin:2px auto 6px">
+  <defs><marker id="sl1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ WRITE PATH ═══ -->
+  <rect x="4" y="4" width="692" height="130" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+  <text x="350" y="18" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Write Path — All Writes Go Through Single Leader</text>
+
+  <!-- Client -->
+  <rect x="14" y="30" width="60" height="36" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="44" y="44" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Client</text>
+  <text x="44" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">INSERT INTO</text>
+  <text x="44" y="62" text-anchor="middle" fill="var(--muted)" font-size="5">orders ...</text>
+  <line x1="74" y1="48" x2="98" y2="48" stroke="var(--o)" stroke-width="1" marker-end="url(#sl1)"/>
+  <text x="86" y="42" text-anchor="middle" fill="var(--o)" font-size="5">write</text>
+
+  <!-- Leader -->
+  <rect x="100" y="26" width="90" height="44" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="145" y="40" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">Leader ★</text>
+  <text x="145" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">1. Write to WAL/binlog</text>
+  <text x="145" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">2. Apply to storage engine</text>
+  <text x="145" y="66" text-anchor="middle" fill="var(--muted)" font-size="5">3. Stream to followers</text>
+
+  <!-- WAL detail -->
+  <rect x="100" y="74" width="90" height="20" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="145" y="84" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">WAL: LSN 0→1→2→3→4</text>
+  <text x="145" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">Write-Ahead Log (append-only)</text>
+
+  <!-- Replication arrows -->
+  <line x1="190" y1="40" x2="240" y2="30" stroke="var(--a)" stroke-width=".8" marker-end="url(#sl1)"/>
+  <line x1="190" y1="55" x2="240" y2="55" stroke="var(--a)" stroke-width=".8" marker-end="url(#sl1)"/>
+  <line x1="190" y1="65" x2="240" y2="80" stroke="var(--a)" stroke-width=".8" marker-end="url(#sl1)"/>
+  <text x="218" y="46" text-anchor="middle" fill="var(--a)" font-size="5">stream WAL</text>
+
+  <!-- Follower 1 -->
+  <rect x="242" y="20" width="80" height="24" rx="4" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="282" y="32" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="600">Follower 1</text>
+  <text x="282" y="40" text-anchor="middle" fill="var(--muted)" font-size="4.5">LSN: 4 (caught up)</text>
+
+  <!-- Follower 2 -->
+  <rect x="242" y="46" width="80" height="24" rx="4" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="282" y="58" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="600">Follower 2</text>
+  <text x="282" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">LSN: 3 (1 behind)</text>
+
+  <!-- Follower 3 -->
+  <rect x="242" y="72" width="80" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="282" y="84" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Follower 3</text>
+  <text x="282" y="92" text-anchor="middle" fill="var(--r)" font-size="4.5">LSN: 1 (lagging!)</text>
+
+  <!-- Read clients from followers -->
+  <text x="330" y="34" font-size="7">👤</text>
+  <text x="330" y="60" font-size="7">👤</text>
+  <text x="330" y="86" font-size="7">👤</text>
+  <text x="348" y="34" fill="var(--g)" font-size="5">fresh read</text>
+  <text x="348" y="60" fill="var(--y)" font-size="5">slightly stale</text>
+  <text x="348" y="86" fill="var(--r)" font-size="5">stale read!</text>
+
+  <!-- Replication Lag panel -->
+  <rect x="420" y="24" width="268" height="100" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="554" y="38" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Replication Lag Problems</text>
+  <text x="430" y="52" fill="var(--r)" font-size="5.5"><tspan font-weight="600">Read-after-write:</tspan> User writes, reads from follower → sees old data</text>
+  <text x="430" y="64" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Fix:</tspan> Read own writes from leader, or wait for follower to catch up</text>
+  <text x="430" y="78" fill="var(--r)" font-size="5.5"><tspan font-weight="600">Monotonic reads:</tspan> User reads F1 (fresh), then F2 (stale) → time goes backward</text>
+  <text x="430" y="90" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Fix:</tspan> Sticky sessions — always read from same follower</text>
+  <text x="430" y="104" fill="var(--r)" font-size="5.5"><tspan font-weight="600">Consistent prefix:</tspan> Causal order violated across partitions</text>
+  <text x="430" y="116" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Fix:</tspan> Causal ordering / version vectors</text>
+
+  <!-- ═══ FAILOVER FLOW ═══ -->
+  <rect x="4" y="140" width="692" height="90" rx="6" fill="rgba(248,113,113,.02)" stroke="var(--r)" stroke-width="1"/>
+  <text x="350" y="154" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">Failover — Leader Dies, Promote Follower</text>
+
+  <!-- Step 1 -->
+  <rect x="14" y="162" width="100" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="64" y="174" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">① Leader crashes</text>
+  <text x="64" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">heartbeat timeout</text>
+  <text x="64" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">(30s default)</text>
+  <line x1="114" y1="180" x2="128" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 2 -->
+  <rect x="130" y="162" width="100" height="36" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="180" y="174" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">② Detect failure</text>
+  <text x="180" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Sentinel / Patroni /</text>
+  <text x="180" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">Orchestrator detects</text>
+  <line x1="230" y1="180" x2="244" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 3 -->
+  <rect x="246" y="162" width="100" height="36" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="296" y="174" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">③ Elect new leader</text>
+  <text x="296" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Pick follower with</text>
+  <text x="296" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">highest LSN (most data)</text>
+  <line x1="346" y1="180" x2="360" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 4 -->
+  <rect x="362" y="162" width="100" height="36" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="412" y="174" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">④ Reconfigure</text>
+  <text x="412" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Redirect writes to</text>
+  <text x="412" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">new leader, update DNS</text>
+  <line x1="462" y1="180" x2="476" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 5 -->
+  <rect x="478" y="162" width="100" height="36" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="528" y="174" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">⑤ Old leader returns</text>
+  <text x="528" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Demoted to follower</text>
+  <text x="528" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">Discard unreplicated writes</text>
+
+  <!-- Danger callout -->
+  <rect x="590" y="162" width="100" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="640" y="174" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">⚠ Split-brain risk</text>
+  <text x="640" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Both think they're leader</text>
+  <text x="640" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">→ fencing (STONITH)</text>
+
+  <!-- Failover danger -->
+  <text x="350" y="222" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Failover risks: data loss (unreplicated writes), split-brain, stale reads during election, client reconnection delay</text>
+
+  <!-- ═══ USE CASES ═══ -->
+  <rect x="4" y="236" width="692" height="100" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1"/>
+  <text x="350" y="250" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Single-Leader — When to Use</text>
+
+  <rect x="14" y="258" width="160" height="34" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="94" y="270" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Read-heavy workloads</text>
+  <text x="94" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">Scale reads with followers</text>
+  <text x="94" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Writes bottleneck at leader</text>
+
+  <rect x="180" y="258" width="160" height="34" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="260" y="270" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Strong consistency needed</text>
+  <text x="260" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">Read from leader = latest data</text>
+  <text x="260" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Banking, inventory, orders</text>
+
+  <rect x="346" y="258" width="160" height="34" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="426" y="270" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Simple operations</text>
+  <text x="426" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">No conflict resolution needed</text>
+  <text x="426" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Mature tooling (Patroni, etc.)</text>
+
+  <rect x="512" y="258" width="178" height="34" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="601" y="270" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Single-region deployments</text>
+  <text x="601" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">Low-latency replication within DC</text>
+  <text x="601" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Cross-region = high write latency</text>
+
+  <!-- Examples -->
+  <text x="14" y="308" fill="var(--g)" font-size="6"><tspan font-weight="700">Postgres:</tspan> streaming replication + Patroni (auto-failover)</text>
+  <text x="250" y="308" fill="var(--a)" font-size="6"><tspan font-weight="700">MySQL:</tspan> binlog replication + Orchestrator</text>
+  <text x="460" y="308" fill="var(--a2)" font-size="6"><tspan font-weight="700">MongoDB:</tspan> replica set (Raft-based election)</text>
+  <text x="14" y="322" fill="var(--o)" font-size="6"><tspan font-weight="700">Redis:</tspan> master-replica + Sentinel</text>
+  <text x="250" y="322" fill="var(--r)" font-size="6"><tspan font-weight="700">Kafka:</tspan> partition leader + ISR followers</text>
+  <text x="460" y="322" fill="var(--y)" font-size="6"><tspan font-weight="700">etcd/ZooKeeper:</tspan> Raft/ZAB consensus leader</text>
+  <text x="350" y="336" text-anchor="middle" fill="var(--muted)" font-size="5.5">Most common replication model — simple, well-understood, but single point of write bottleneck</text>
+</svg>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MULTI-LEADER DEEP DIVE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="d-title"><span class="num d-blue">▸</span> Multi-Leader Replication — Deep Dive</div>
+<svg width="100%" viewBox="0 0 760 520" style="max-width:760px;display:block;margin:2px auto 6px">
+  <defs><marker id="ml1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ MULTI-REGION ARCHITECTURE ═══ -->
+  <rect x="4" y="4" width="752" height="180" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1"/>
+  <text x="380" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Multi-Leader: Users Write to Nearest Leader → Low Latency</text>
+
+  <!-- Region US -->
+  <rect x="14" y="28" width="220" height="100" rx="6" fill="none" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="124" y="40" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">🇺🇸 US-East Region</text>
+  <rect x="24" y="46" width="60" height="24" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="54" y="58" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Leader A</text>
+  <text x="54" y="66" text-anchor="middle" fill="var(--g)" font-size="5">(r/w)</text>
+  <rect x="94" y="46" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="119" y="58" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <rect x="94" y="66" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="119" y="78" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <line x1="84" y1="54" x2="94" y2="54" stroke="var(--g)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <line x1="84" y1="62" x2="94" y2="72" stroke="var(--g)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <!-- US users -->
+  <text x="160" y="52" font-size="8">👤👤👤</text>
+  <text x="180" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">US users → 5ms</text>
+  <!-- US writes -->
+  <rect x="24" y="90" width="200" height="30" rx="3" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="124" y="102" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Writes: order_created, payment_processed</text>
+  <text x="124" y="114" text-anchor="middle" fill="var(--muted)" font-size="5">Local write latency: ~5ms (same region)</text>
+
+  <!-- Region EU -->
+  <rect x="270" y="28" width="220" height="100" rx="6" fill="none" stroke="var(--a)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="380" y="40" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">🇪🇺 EU-West Region</text>
+  <rect x="280" y="46" width="60" height="24" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="310" y="58" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Leader B</text>
+  <text x="310" y="66" text-anchor="middle" fill="var(--a)" font-size="5">(r/w)</text>
+  <rect x="350" y="46" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="375" y="58" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <rect x="350" y="66" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="375" y="78" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <line x1="340" y1="54" x2="350" y2="54" stroke="var(--a)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <line x1="340" y1="62" x2="350" y2="72" stroke="var(--a)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <!-- EU users -->
+  <text x="416" y="52" font-size="8">👤👤👤</text>
+  <text x="436" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">EU users → 8ms</text>
+  <rect x="280" y="90" width="200" height="30" rx="3" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="380" y="102" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Writes: user_updated, GDPR_delete</text>
+  <text x="380" y="114" text-anchor="middle" fill="var(--muted)" font-size="5">Data sovereignty: EU data stays in EU</text>
+
+  <!-- Region Asia -->
+  <rect x="526" y="28" width="220" height="100" rx="6" fill="none" stroke="var(--a2)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="636" y="40" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">🌏 Asia-Pacific Region</text>
+  <rect x="536" y="46" width="60" height="24" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="566" y="58" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Leader C</text>
+  <text x="566" y="66" text-anchor="middle" fill="var(--a2)" font-size="5">(r/w)</text>
+  <rect x="606" y="46" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="631" y="58" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <rect x="606" y="66" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="631" y="78" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <line x1="596" y1="54" x2="606" y2="54" stroke="var(--a2)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <line x1="596" y1="62" x2="606" y2="72" stroke="var(--a2)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <!-- Asia users -->
+  <text x="672" y="52" font-size="8">👤👤👤</text>
+  <text x="692" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">Asia users → 6ms</text>
+  <rect x="536" y="90" width="200" height="30" rx="3" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="636" y="102" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Writes: ride_events, IoT_telemetry</text>
+  <text x="636" y="114" text-anchor="middle" fill="var(--muted)" font-size="5">Edge/IoT: write to nearest node</text>
+
+  <!-- Cross-region replication arrows -->
+  <line x1="84" y1="58" x2="280" y2="58" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <line x1="280" y1="52" x2="84" y2="52" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <text x="182" y="48" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">async repl ~80ms</text>
+
+  <line x1="340" y1="58" x2="536" y2="58" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <line x1="536" y1="52" x2="340" y2="52" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <text x="438" y="48" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">async repl ~120ms</text>
+
+  <!-- HA callout -->
+  <rect x="14" y="134" width="730" height="20" rx="3" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="380" y="148" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">High Availability: If US region fails → EU and Asia continue serving writes (no failover delay, active-active DR)</text>
+  <text x="380" y="160" text-anchor="middle" fill="var(--muted)" font-size="5.5">Each region is independent — no single point of failure. Offline-first apps sync when reconnected.</text>
+  <text x="380" y="172" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Write-heavy global apps: distribute write load across regions, avoid single-leader bottleneck</text>
+
+  <!-- ═══ CONFLICT RESOLUTION ═══ -->
+  <rect x="4" y="190" width="752" height="160" rx="6" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1"/>
+  <text x="380" y="204" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Handling Write Conflicts — The Core Challenge</text>
+
+  <!-- Conflict scenario -->
+  <rect x="14" y="212" width="340" height="60" rx="4" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="184" y="224" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Conflict Example: Same Row Updated in 2 Regions</text>
+  <text x="24" y="238" fill="var(--g)" font-size="5.5">US Leader A: UPDATE users SET name='Bob' WHERE id=42 <tspan fill="var(--muted)">(t=100)</tspan></text>
+  <text x="24" y="250" fill="var(--a)" font-size="5.5">EU Leader B: UPDATE users SET name='Robert' WHERE id=42 <tspan fill="var(--muted)">(t=101)</tspan></text>
+  <text x="24" y="264" fill="var(--r)" font-size="5.5" font-weight="600">Both succeed locally → conflict detected on replication!</text>
+
+  <!-- Resolution strategies -->
+  <rect x="370" y="212" width="378" height="130" rx="4" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="559" y="224" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Conflict Resolution Strategies</text>
+
+  <rect x="378" y="230" width="84" height="44" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="420" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">LWW</text>
+  <text x="420" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">Last Write Wins</text>
+  <text x="420" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">highest timestamp</text>
+  <text x="420" y="272" text-anchor="middle" fill="var(--r)" font-size="4">⚠ data loss</text>
+
+  <rect x="468" y="230" width="84" height="44" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="510" y="242" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">CRDTs</text>
+  <text x="510" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">Auto-merge types</text>
+  <text x="510" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">G-Counter, OR-Set</text>
+  <text x="510" y="272" text-anchor="middle" fill="var(--g)" font-size="4">✓ no data loss</text>
+
+  <rect x="558" y="230" width="84" height="44" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="600" y="242" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Custom Logic</text>
+  <text x="600" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">App-level handler</text>
+  <text x="600" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">merge/prompt user</text>
+  <text x="600" y="272" text-anchor="middle" fill="var(--a)" font-size="4">flexible but complex</text>
+
+  <rect x="648" y="230" width="92" height="44" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="694" y="242" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">Version Vectors</text>
+  <text x="694" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">{A:3, B:2, C:1}</text>
+  <text x="694" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">detect concurrent</text>
+  <text x="694" y="272" text-anchor="middle" fill="var(--a2)" font-size="4">causal ordering</text>
+
+  <!-- Version vector detail -->
+  <text x="378" y="286" fill="var(--a2)" font-size="5.5"><tspan font-weight="600">Version Vectors:</tspan> Each leader maintains a vector clock {LeaderA: 3, LeaderB: 2, LeaderC: 1}.</text>
+  <text x="378" y="298" fill="var(--muted)" font-size="5.5">If vector A dominates B → A is newer. If neither dominates → concurrent conflict → resolve with strategy above.</text>
+  <text x="378" y="310" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Google Docs:</tspan> OT (Operational Transform) — transform concurrent edits to converge. <tspan font-weight="600">Figma:</tspan> CRDTs for real-time collab.</text>
+
+  <!-- Conflict avoidance -->
+  <rect x="14" y="278" width="340" height="60" rx="4" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="184" y="290" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Conflict Avoidance Strategies</text>
+  <text x="24" y="304" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Sticky routing:</tspan> user_id=42 always writes to US leader → no cross-region conflict</text>
+  <text x="24" y="316" fill="var(--a)" font-size="5.5"><tspan font-weight="600">Partition by region:</tspan> EU data → EU leader only. US data → US leader only.</text>
+  <text x="24" y="328" fill="var(--a2)" font-size="5.5"><tspan font-weight="600">Schema design:</tspan> append-only events (no updates) → conflicts impossible</text>
+
+  <!-- ═══ TOPOLOGIES ═══ -->
+  <rect x="4" y="356" width="752" height="160" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="380" y="370" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">Multi-Leader Replication Topologies</text>
+
+  <!-- Circular -->
+  <rect x="14" y="380" width="230" height="80" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="129" y="394" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Circular Topology</text>
+  <!-- Circle of 4 nodes -->
+  <circle cx="80" cy="430" r="8" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="80" y="433" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">A</text>
+  <circle cx="130" cy="410" r="8" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="130" y="413" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">B</text>
+  <circle cx="180" cy="430" r="8" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="180" y="433" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">C</text>
+  <circle cx="130" cy="450" r="8" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width="1"/>
+  <text x="130" y="453" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">D</text>
+  <!-- Arrows in circle -->
+  <line x1="88" y1="426" x2="122" y2="416" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="138" y1="414" x2="172" y2="426" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="176" y1="438" x2="138" y2="448" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="122" y1="448" x2="86" y2="436" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <text x="129" y="468" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">⚠ Single node failure breaks ring</text>
+
+  <!-- Star -->
+  <rect x="264" y="380" width="230" height="80" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="379" y="394" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Star Topology (Hub-Spoke)</text>
+  <!-- Hub -->
+  <circle cx="379" cy="430" r="10" fill="rgba(251,191,36,.15)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="379" y="433" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="700">Hub</text>
+  <!-- Spokes -->
+  <circle cx="329" cy="415" r="7" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="329" y="418" text-anchor="middle" fill="var(--g)" font-size="4.5">A</text>
+  <circle cx="429" cy="415" r="7" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="429" y="418" text-anchor="middle" fill="var(--a)" font-size="4.5">B</text>
+  <circle cx="329" cy="450" r="7" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="329" y="453" text-anchor="middle" fill="var(--a2)" font-size="4.5">C</text>
+  <circle cx="429" cy="450" r="7" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="429" y="453" text-anchor="middle" fill="var(--o)" font-size="4.5">D</text>
+  <line x1="336" y1="418" x2="369" y2="427" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="422" y1="418" x2="389" y2="427" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="336" y1="448" x2="369" y2="435" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="422" y1="448" x2="389" y2="435" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <text x="379" y="468" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">⚠ Hub is SPOF, but simpler routing</text>
+
+  <!-- All-to-All -->
+  <rect x="514" y="380" width="234" height="80" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="631" y="394" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">All-to-All (Mesh) ✓ Best</text>
+  <!-- Mesh nodes -->
+  <circle cx="581" cy="415" r="7" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="581" y="418" text-anchor="middle" fill="var(--g)" font-size="4.5">A</text>
+  <circle cx="681" cy="415" r="7" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="681" y="418" text-anchor="middle" fill="var(--a)" font-size="4.5">B</text>
+  <circle cx="581" cy="450" r="7" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="581" y="453" text-anchor="middle" fill="var(--a2)" font-size="4.5">C</text>
+  <circle cx="681" cy="450" r="7" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="681" y="453" text-anchor="middle" fill="var(--o)" font-size="4.5">D</text>
+  <!-- All connections -->
+  <line x1="588" y1="415" x2="674" y2="415" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="588" y1="450" x2="674" y2="450" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="581" y1="422" x2="581" y2="443" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="681" y1="422" x2="681" y2="443" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="588" y1="419" x2="674" y2="446" stroke="var(--g)" stroke-width=".4"/>
+  <line x1="588" y1="446" x2="674" y2="419" stroke="var(--g)" stroke-width=".4"/>
+  <text x="631" y="468" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">✓ Most fault-tolerant, no SPOF</text>
+
+  <!-- Topology comparison -->
+  <text x="14" y="500" fill="var(--muted)" font-size="5.5"><tspan fill="var(--r)" font-weight="600">Circular:</tspan> MySQL circular replication — simple but fragile. <tspan fill="var(--y)" font-weight="600">Star:</tspan> easier conflict detection at hub. <tspan fill="var(--g)" font-weight="600">All-to-All:</tspan> CouchDB, Postgres BDR — most resilient.</text>
+  <text x="14" y="514" fill="var(--muted)" font-size="5.5"><tspan fill="var(--a)" font-weight="600">Real-world:</tspan> Google Docs (OT), Figma (CRDTs), CouchDB (multi-master), Postgres BDR, MySQL Group Replication, Cassandra (peer-to-peer is leaderless but similar topology).</text>
+</svg>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- LEADERLESS DEEP DIVE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="d-title"><span class="num d-purple">▸</span> Leaderless Replication — Deep Dive</div>
+<svg width="100%" viewBox="0 0 760 480" style="max-width:760px;display:block;margin:2px auto 6px">
+  <defs><marker id="ll1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ QUORUM WRITE + READ ═══ -->
+  <rect x="4" y="4" width="752" height="180" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="380" y="18" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">Leaderless: Write to ALL Replicas, Quorum Decides Success</text>
+
+  <!-- Write side -->
+  <rect x="14" y="28" width="360" height="148" rx="5" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="194" y="42" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Write: W=2 of N=3 (quorum)</text>
+
+  <!-- Client write -->
+  <rect x="24" y="52" width="60" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="54" y="66" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client</text>
+  <text x="54" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">PUT user:42</text>
+
+  <!-- Arrows to all 3 replicas -->
+  <line x1="84" y1="58" x2="130" y2="52" stroke="var(--g)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="84" y1="66" x2="130" y2="80" stroke="var(--g)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="84" y1="74" x2="130" y2="110" stroke="var(--r)" stroke-width=".8" marker-end="url(#ll1)" stroke-dasharray="3,2"/>
+  <text x="108" y="50" fill="var(--g)" font-size="5">write</text>
+
+  <!-- Replica 1 -->
+  <rect x="132" y="42" width="80" height="24" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="172" y="54" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Replica 1 (v2)</text>
+  <text x="172" y="62" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">✓ ACK</text>
+
+  <!-- Replica 2 -->
+  <rect x="132" y="70" width="80" height="24" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="172" y="82" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Replica 2 (v2)</text>
+  <text x="172" y="90" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">✓ ACK</text>
+
+  <!-- Replica 3 (down) -->
+  <rect x="132" y="100" width="80" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="172" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Replica 3 (v1)</text>
+  <text x="172" y="120" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">✗ offline</text>
+
+  <!-- Success -->
+  <rect x="230" y="68" width="130" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="295" y="80" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">W=2 ≥ quorum → SUCCESS</text>
+  <text x="295" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">Client gets OK even with 1 down</text>
+
+  <!-- Quorum formula -->
+  <rect x="24" y="130" width="340" height="38" rx="3" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="194" y="144" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Quorum Formula: W + R > N</text>
+  <text x="194" y="156" text-anchor="middle" fill="var(--muted)" font-size="5.5">N=3, W=2, R=2 → 2+2=4 > 3 → at least 1 replica has latest version in every read</text>
+  <text x="194" y="166" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Tunable: W=1,R=3 (fast writes) | W=3,R=1 (fast reads) | W=1,R=1 (eventual)</text>
+
+  <!-- Read side -->
+  <rect x="386" y="28" width="362" height="148" rx="5" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="567" y="42" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Read: R=2 of N=3 (quorum)</text>
+
+  <!-- Client read -->
+  <rect x="396" y="52" width="60" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="426" y="66" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client</text>
+  <text x="426" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">GET user:42</text>
+
+  <!-- Read arrows -->
+  <line x1="456" y1="58" x2="502" y2="52" stroke="var(--a)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="456" y1="66" x2="502" y2="80" stroke="var(--a)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="456" y1="74" x2="502" y2="110" stroke="var(--a)" stroke-width=".8" marker-end="url(#ll1)"/>
+
+  <!-- Replica responses -->
+  <rect x="504" y="42" width="80" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="544" y="54" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">R1: v2 ✓</text>
+  <text x="544" y="62" text-anchor="middle" fill="var(--g)" font-size="5">(latest)</text>
+
+  <rect x="504" y="70" width="80" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="544" y="82" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">R2: v2 ✓</text>
+  <text x="544" y="90" text-anchor="middle" fill="var(--g)" font-size="5">(latest)</text>
+
+  <rect x="504" y="100" width="80" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="544" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">R3: v1 (stale)</text>
+  <text x="544" y="120" text-anchor="middle" fill="var(--r)" font-size="5">was offline</text>
+
+  <!-- Resolution -->
+  <rect x="600" y="52" width="140" height="50" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="670" y="66" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Client picks highest</text>
+  <text x="670" y="78" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">version: v2 ✓</text>
+  <text x="670" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">+ triggers read repair on R3</text>
+
+  <!-- Read repair detail -->
+  <rect x="396" y="130" width="340" height="38" rx="3" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="566" y="144" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Read Repair: Fix Stale Replicas on Read</text>
+  <text x="566" y="156" text-anchor="middle" fill="var(--muted)" font-size="5.5">Client reads R3=v1 (stale) → sends v2 to R3 → R3 now has v2. Lazy repair, no background process.</text>
+  <text x="566" y="166" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Anti-entropy: background Merkle tree sync catches anything read repair misses</text>
+
+  <!-- ═══ REPAIR MECHANISMS ═══ -->
+  <rect x="4" y="190" width="752" height="120" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+  <text x="380" y="204" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Repair Mechanisms — Keeping Replicas in Sync</text>
+
+  <!-- Read Repair -->
+  <rect x="14" y="214" width="236" height="86" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="132" y="228" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Read Repair</text>
+  <text x="132" y="242" text-anchor="middle" fill="var(--muted)" font-size="5.5">On read: detect stale replica</text>
+  <text x="132" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ push latest version to it</text>
+  <text x="132" y="268" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">✓ Lazy, no extra traffic</text>
+  <text x="132" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Only fixes data that's read</text>
+  <text x="132" y="292" text-anchor="middle" fill="var(--muted)" font-size="5">Used by: Cassandra, DynamoDB, Riak</text>
+
+  <!-- Anti-Entropy -->
+  <rect x="262" y="214" width="236" height="86" rx="5" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="380" y="228" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Anti-Entropy (Merkle Trees)</text>
+  <text x="380" y="242" text-anchor="middle" fill="var(--muted)" font-size="5.5">Background process compares</text>
+  <text x="380" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">Merkle tree hashes between replicas</text>
+  <text x="380" y="268" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">✓ Catches ALL inconsistencies</text>
+  <text x="380" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Background CPU/network cost</text>
+  <text x="380" y="292" text-anchor="middle" fill="var(--muted)" font-size="5">Used by: Cassandra, DynamoDB, Riak</text>
+
+  <!-- Hinted Handoff -->
+  <rect x="510" y="214" width="238" height="86" rx="5" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="629" y="228" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Hinted Handoff</text>
+  <text x="629" y="242" text-anchor="middle" fill="var(--muted)" font-size="5.5">Node X is down → neighbor Y</text>
+  <text x="629" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">stores writes as "hints" for X</text>
+  <text x="629" y="268" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">✓ X comes back → Y replays hints</text>
+  <text x="629" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Y runs out of space if X is down long</text>
+  <text x="629" y="292" text-anchor="middle" fill="var(--muted)" font-size="5">Used by: Cassandra, Riak, Voldemort</text>
+
+  <!-- ═══ SLOPPY QUORUM + USE CASES ═══ -->
+  <rect x="4" y="316" width="752" height="164" rx="6" fill="rgba(251,146,60,.02)" stroke="var(--o)" stroke-width="1"/>
+  <text x="380" y="330" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">Sloppy Quorum, Version Vectors &amp; Use Cases</text>
+
+  <!-- Sloppy Quorum -->
+  <rect x="14" y="340" width="360" height="60" rx="4" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="194" y="354" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Sloppy Quorum</text>
+  <text x="194" y="368" text-anchor="middle" fill="var(--muted)" font-size="5.5">If not enough "home" replicas are reachable, accept writes on ANY available node</text>
+  <text x="194" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ higher availability (writes always succeed) but weaker consistency guarantee</text>
+  <text x="194" y="392" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Cassandra: consistency=ANY uses sloppy quorum. DynamoDB: similar approach.</text>
+
+  <!-- Version Vectors -->
+  <rect x="386" y="340" width="362" height="60" rx="4" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="567" y="354" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Version Vectors (Crux of Leaderless)</text>
+  <text x="567" y="368" text-anchor="middle" fill="var(--muted)" font-size="5.5">Each replica tracks: {R1: 3, R2: 2, R3: 4} — vector clock per key</text>
+  <text x="567" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">{R1:3, R2:2} vs {R1:2, R2:3} → concurrent! Neither dominates → conflict → resolve</text>
+  <text x="567" y="392" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">{R1:3, R2:2} vs {R1:2, R2:1} → first dominates → no conflict, first is newer</text>
+
+  <!-- Use cases grid -->
+  <rect x="14" y="408" width="178" height="58" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="103" y="422" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">High Availability</text>
+  <text x="103" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">No single point of failure</text>
+  <text x="103" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">Any node can serve r/w</text>
+  <text x="103" y="458" text-anchor="middle" fill="var(--g)" font-size="5">Shopping carts, sessions</text>
+
+  <rect x="198" y="408" width="178" height="58" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="287" y="422" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Tunable Consistency</text>
+  <text x="287" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">W=1,R=1 → eventual (fast)</text>
+  <text x="287" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">W=N,R=1 → strong (slow writes)</text>
+  <text x="287" y="458" text-anchor="middle" fill="var(--a)" font-size="5">Per-query consistency level</text>
+
+  <rect x="382" y="408" width="178" height="58" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="471" y="422" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">Write-Heavy / Global</text>
+  <text x="471" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">No write bottleneck (no leader)</text>
+  <text x="471" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">Multi-DC: write to local replicas</text>
+  <text x="471" y="458" text-anchor="middle" fill="var(--a2)" font-size="5">IoT, time-series, metrics</text>
+
+  <rect x="566" y="408" width="182" height="58" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="657" y="422" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="700">Partition Tolerant</text>
+  <text x="657" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">Network splits → still serve</text>
+  <text x="657" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">AP in CAP theorem</text>
+  <text x="657" y="458" text-anchor="middle" fill="var(--o)" font-size="5">DNS, CDN edge caches</text>
+
+  <!-- Examples -->
+  <text x="14" y="478" fill="var(--a2)" font-size="6"><tspan font-weight="700">Cassandra:</tspan> CL=QUORUM (W+R>N). <tspan font-weight="700">DynamoDB:</tspan> eventually consistent reads (fast) or strongly consistent (slower). <tspan font-weight="700">Riak:</tspan> CRDTs + version vectors. <tspan font-weight="700">Voldemort:</tspan> LinkedIn's key-value store.</text>
+</svg>
+
+<!-- ═══ REPLICATION COMPARISON TABLE ═══ -->
+<table style="margin-top:4px">
+<tr><th>Aspect</th><th>Single-Leader</th><th>Multi-Leader</th><th>Leaderless</th></tr>
+<tr><td><span class="hi">Write path</span></td><td>All writes → 1 leader</td><td>Writes → nearest leader</td><td>Writes → ALL replicas (W of N)</td></tr>
+<tr><td><span class="hi">Read scaling</span></td><td><span class="hg">Followers serve reads</span></td><td><span class="hg">Local leader + followers</span></td><td><span class="hg">Any replica serves reads</span></td></tr>
+<tr><td><span class="hi">Write scaling</span></td><td><span class="hr">Bottleneck at leader</span></td><td><span class="hg">Distributed across leaders</span></td><td><span class="hg">No bottleneck (no leader)</span></td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Strong</span> (read from leader)</td><td><span class="hr">Eventual</span> (conflicts possible)</td><td><span class="hi">Tunable</span> (W+R>N = strong)</td></tr>
+<tr><td><span class="hi">Conflicts</span></td><td><span class="hg">None</span> (single writer)</td><td><span class="hr">Yes</span> — LWW, CRDTs, custom</td><td><span class="hr">Yes</span> — version vectors, CRDTs</td></tr>
+<tr><td><span class="hi">Failover</span></td><td><span class="hr">Election needed</span> (downtime)</td><td><span class="hg">Other leaders continue</span></td><td><span class="hg">No failover needed</span></td></tr>
+<tr><td><span class="hi">Complexity</span></td><td><span class="hg">Simple</span></td><td><span class="hr">High</span> (conflict resolution)</td><td><span class="hi">Medium</span> (quorum tuning)</td></tr>
+<tr><td><span class="hi">Best for</span></td><td>Read-heavy, single-region</td><td>Multi-region writes, collab</td><td>High availability, write-heavy</td></tr>
+<tr><td><span class="hi">Examples</span></td><td>Postgres, MySQL, MongoDB, Redis</td><td>CouchDB, Postgres BDR, Google Docs</td><td>Cassandra, DynamoDB, Riak</td></tr>
+</table>
+<div class="b bg" style="margin-top:4px"><span class="hi">Decision Guide:</span> Need <span class="hg">strong consistency</span> + simple ops? → <span class="hg">Single-Leader</span>. Need <span class="hg">multi-region low-latency writes</span>? → <span class="hg">Multi-Leader</span>. Need <span class="hg">maximum availability</span> + no SPOF? → <span class="hg">Leaderless</span>. Most systems start single-leader and evolve as scale demands.</div>
 </div>
 
 <div class="T" id="sharding">
