@@ -729,6 +729,21 @@ Lucene doesn't update the inverted index in-place. Instead: new docs are written
 <div class="T" id="blob">
 <h2>Blob Storage (S3)</h2><p class="su"><span class="hg">99.999999999% durability</span> (11 nines). Cheap, infinite scale. Pre-signed URLs for direct access.</p>
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Strong read-after-write consistency</span> (S3, since Dec 2020). <span class="hg">Versioning</span> protects against accidental deletes. Lifecycle policies auto-tier: Standard → IA → Glacier.</div>
+
+<h3>🛡️ How S3 Achieves 11 Nines Durability</h3>
+<p class="su"><span class="hg">99.999999999%</span> = expected loss of <span class="hg">1 object per 10,000 objects every 10 million years</span>. Achieved through layered redundancy, not a single trick.</p>
+<table>
+<tr><th>Layer</th><th>Mechanism</th><th>Why It Matters</th></tr>
+<tr><td><span class="hi">Replication</span></td><td>Each object stored across <span class="hg">≥3 AZs</span> (separate buildings, power, network) within a region</td><td>AZ-level disaster (fire, flood, power) cannot lose data</td></tr>
+<tr><td><span class="hi">Erasure Coding</span></td><td>Object split into <span class="hg">k data + m parity shards</span> (Reed-Solomon). Survives loss of any <span class="hg">m</span> shards</td><td>Cheaper than 3x replication, same or better durability</td></tr>
+<tr><td><span class="hi">Sync Quorum Write</span></td><td>PUT acknowledged only after <span class="hg">durably persisted to multiple devices in ≥3 AZs</span></td><td>No "fake" success — committed = survived</td></tr>
+<tr><td><span class="hi">Continuous Checksums</span></td><td>MD5/CRC computed on write, <span class="hg">verified on every read</span> + background scrubbing</td><td>Detects silent disk corruption (bit rot) before it spreads</td></tr>
+<tr><td><span class="hi">Auto Self-Healing</span></td><td>Scrubber finds bad shard → <span class="hg">rebuilds from parity</span> on healthy disk automatically</td><td>Failure window measured in minutes, not days</td></tr>
+<tr><td><span class="hi">Versioning + MFA Delete</span></td><td>Optional — every overwrite/delete keeps prior version</td><td>Protects against <span class="hr">app bugs &amp; ransomware</span> (the real threat — not hardware)</td></tr>
+<tr><td><span class="hi">Cross-Region Replication</span></td><td>Optional async copy to another region</td><td>Survives full-region outage; required for compliance/DR</td></tr>
+</table>
+<div class="b by"><span class="hi">Compared to WAL durability (SQL DBs):</span> WAL gives <span class="hg">single-node crash safety</span> — fsync to one disk before ack. S3 gives <span class="hg">multi-AZ disaster durability</span> — quorum fsync across buildings + erasure coding + continuous repair. Same principle (persist before ack) scaled to a fleet.</div>
+<div class="b br"><span class="hi">Durability ≠ Availability:</span> 11 nines durability, but only <span class="hg">99.99% availability</span> SLA. Data is safe even when API is unreachable. Also <span class="hr">does not protect against</span> accidental <code>DELETE</code>, bad code, or compromised credentials — use Versioning + Object Lock + bucket policies.</div>
 </div>
 
 <!-- ═══ Storage Extras ═══ -->

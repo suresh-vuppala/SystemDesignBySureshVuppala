@@ -160,12 +160,12 @@
 
 <!-- Compact comparison -->
 <table style="margin-top:4px">
-<tr><th>Strategy</th><th>Read Path</th><th>Write Path</th><th>Consistency</th><th>Best For</th></tr>
-<tr><td><span class="hi">Cache-Aside</span></td><td>App → Cache → DB on miss</td><td>App → DB (cache invalidated)</td><td>Eventual</td><td>General purpose (most common)</td></tr>
-<tr><td><span class="hi">Read-Through</span></td><td>App → Cache (auto-fetches DB)</td><td>—</td><td>Eventual</td><td>Simpler app code</td></tr>
-<tr><td><span class="hi">Write-Around</span></td><td>App → Cache → DB on miss</td><td>App → DB directly</td><td>Eventual</td><td>Write-heavy, read-rarely data</td></tr>
-<tr><td><span class="hi">Write-Back</span></td><td>App → Cache</td><td>App → Cache → <span class="hr">async</span> DB</td><td><span class="hr">Eventual</span></td><td>High write throughput</td></tr>
-<tr><td><span class="hi">Write-Through</span></td><td>App → Cache</td><td>App → Cache → <span class="hg">sync</span> DB</td><td><span class="hg">Strong</span></td><td>Read-heavy, consistency needed</td></tr>
+<tr><th>Strategy</th><th>Read Path</th><th>Write Path</th><th>Consistency</th><th>Best For</th><th>Real-World Use Cases</th></tr>
+<tr><td><span class="hi">Cache-Aside</span></td><td>App → Cache → DB on miss</td><td>App → DB (cache invalidated)</td><td>Eventual</td><td>General purpose (most common)</td><td><strong>Facebook</strong> Memcached/TAO (user profiles, posts) · <strong>Instagram</strong> feed metadata · <strong>Reddit</strong> hot posts · <strong>Netflix</strong> EVCache for user/movie metadata</td></tr>
+<tr><td><span class="hi">Read-Through</span></td><td>App → Cache (auto-fetches DB)</td><td>—</td><td>Eventual</td><td>Simpler app code</td><td><strong>AWS DAX</strong> in front of DynamoDB · <strong>Hibernate L2</strong> with Ehcache/Redis · <strong>NCache</strong>/<strong>Apache Ignite</strong> read-through providers · <strong>GraphQL DataLoader</strong> patterns</td></tr>
+<tr><td><span class="hi">Write-Around</span></td><td>App → Cache → DB on miss</td><td>App → DB directly</td><td>Eventual</td><td>Write-heavy, read-rarely data</td><td><strong>Logging/audit trails</strong> (write once, read rarely) · <strong>IoT sensor ingestion</strong> · <strong>Analytics events</strong> · <strong>Time-series</strong> writes (InfluxDB ingest) · <strong>CDN origin</strong> for cold assets</td></tr>
+<tr><td><span class="hi">Write-Back</span></td><td>App → Cache</td><td>App → Cache → <span class="hr">async</span> DB</td><td><span class="hr">Eventual</span></td><td>High write throughput</td><td><strong>CPU L1/L2 caches</strong> · <strong>OS page cache</strong> (dirty pages flushed) · <strong>Linux ext4 writeback</strong> · <strong>Gaming leaderboards</strong> (Redis → DB batch flush) · <strong>Ad click counters</strong> · <strong>Kafka producer batching</strong></td></tr>
+<tr><td><span class="hi">Write-Through</span></td><td>App → Cache</td><td>App → Cache → <span class="hg">sync</span> DB</td><td><span class="hg">Strong</span></td><td>Read-heavy, consistency needed</td><td><strong>Banking/payment</strong> ledgers · <strong>Stripe</strong> account balances · <strong>E-commerce inventory</strong> (Amazon stock counts) · <strong>Session stores</strong> with durability · <strong>Order status</strong> in checkout flows</td></tr>
 </table>
 
 <div class="b bb"><span class="hi">Invalidation:</span> <span class="hg">TTL</span> (simple, stale until expiry) · <span class="hg">Event-driven</span> (CDC/app triggers delete, near real-time) · <span class="hg">Version key</span> (new version = auto miss). <span class="hi">Eviction:</span> LRU (most common) · LFU · FIFO.</div>
