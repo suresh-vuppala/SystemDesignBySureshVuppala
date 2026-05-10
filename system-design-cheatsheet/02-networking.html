@@ -341,21 +341,144 @@
 <div class="b by"><span class="hi">Real-world:</span> <strong>Route 53</strong> GeoDNS routes to nearest region. <strong>Cloudflare</strong> 1.1.1.1 resolves in ~11ms. <strong>Consul</strong> uses DNS for service discovery. <strong>Anycast</strong> — same IP from multiple locations.</div>
 </div>
 
-<div class="T" id="networking-extras">
-<h2>IP, Ports, Firewalls &amp; Security</h2><p class="su">Network fundamentals for infrastructure design</p>
+<div class="T" id="ip-cidr">
+<h2>IP &amp; CIDR</h2><p class="su">Address space, subnet sizing, and private ranges</p>
 <table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">IP/CIDR</span></td><td>IPv4 (32-bit). <code>/24</code>=256 IPs, <code>/16</code>=65K. Private: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. VPCs use subnets.</td></tr>
-<tr><td><span class="hi">Key Ports</span></td><td>22 SSH · 53 DNS · 80 HTTP · 443 HTTPS · 3306 MySQL · 5432 Postgres · 6379 Redis · 9092 Kafka · 9200 ES · 27017 Mongo</td></tr>
-<tr><td><span class="hi">Firewalls</span></td><td><span class="hg">Security Groups</span> (AWS) = stateful per-instance. <span class="hg">NACLs</span> = stateless subnet-level. Whitelist only needed ports.</td></tr>
-<tr><td><span class="hi">Zero Trust</span></td><td>"Never trust, always verify." Every request authed regardless of network. <span class="hg">mTLS</span> between services. No implicit trust for internal traffic.</td></tr>
-<tr><td><span class="hi">DDoS</span></td><td><span class="hg">Cloudflare</span> / <span class="hg">AWS Shield</span> absorb at edge. Rate limiting, WAF, geo-blocking, CAPTCHA.</td></tr>
+<tr><th>Notation</th><th>Hosts</th><th>Typical use</th></tr>
+<tr><td><code>/32</code></td><td>1</td><td>Single host (allow-list a server)</td></tr>
+<tr><td><code>/24</code></td><td>256</td><td>Small subnet (a single AZ)</td></tr>
+<tr><td><code>/16</code></td><td>65,536</td><td>Per-region VPC</td></tr>
+<tr><td><code>/8</code></td><td>16.7 M</td><td>Whole org (10.0.0.0/8)</td></tr>
 </table>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CIDR block visualization">
+  <rect x="10" y="20" width="540" height="34" fill="#1e2230" stroke="#404863" rx="4"/>
+  <text x="280" y="14" text-anchor="middle" fill="#c8cee0" font-size="11" font-family="Inter">10.0.0.0/8 — 16.7M addresses</text>
+  <rect x="10" y="20" width="68" height="34" fill="#6c8cff" opacity=".55" stroke="#6c8cff"/>
+  <text x="44" y="42" text-anchor="middle" fill="#fff" font-size="10" font-family="Inter">/16 (65K)</text>
+  <rect x="10" y="74" width="540" height="22" fill="#1e2230" stroke="#404863" rx="4"/>
+  <rect x="10" y="74" width="34" height="22" fill="#a78bfa" opacity=".6" stroke="#a78bfa"/>
+  <text x="27" y="90" text-anchor="middle" fill="#fff" font-size="9" font-family="Inter">/24</text>
+  <text x="280" y="68" text-anchor="middle" fill="#c8cee0" font-size="10" font-family="Inter">10.0.0.0/16 — 65,536 addresses</text>
+  <rect x="10" y="116" width="540" height="20" fill="#1e2230" stroke="#404863" rx="4"/>
+  <rect x="10" y="116" width="6" height="20" fill="#34d399" opacity=".7" stroke="#34d399"/>
+  <text x="280" y="110" text-anchor="middle" fill="#c8cee0" font-size="10" font-family="Inter">10.0.0.0/24 — 256 addresses · /32 = 1</text>
+</svg>
+<div class="b bg"><b>Private ranges (RFC 1918):</b> <code>10.0.0.0/8</code> · <code>172.16.0.0/12</code> · <code>192.168.0.0/16</code>. Used inside VPCs and home networks; not routable on the public internet.</div>
+<div class="b by"><b>Trick:</b> CIDR suffix = number of network bits. Smaller suffix = bigger block. Halve the block → suffix +1.</div>
+</div>
+
+<div class="T" id="key-ports">
+<h2>Key Ports Cheat Sheet</h2><p class="su">Standard ports you'll meet in any architecture diagram</p>
+<table>
+<tr><th>Port</th><th>Service</th><th>Notes</th></tr>
+<tr><td><code>22</code></td><td>SSH</td><td>Encrypted shell, key-based auth</td></tr>
+<tr><td><code>53</code></td><td>DNS</td><td>UDP first, TCP for &gt; 512 B</td></tr>
+<tr><td><code>80 / 443</code></td><td>HTTP / HTTPS</td><td>443 = TLS-wrapped HTTP</td></tr>
+<tr><td><code>3306 / 5432</code></td><td>MySQL / Postgres</td><td>Lock down to app subnet</td></tr>
+<tr><td><code>6379</code></td><td>Redis</td><td>Bind to private net only</td></tr>
+<tr><td><code>9092</code></td><td>Kafka</td><td>Plus 9093 for TLS</td></tr>
+<tr><td><code>9200 / 27017</code></td><td>Elasticsearch / Mongo</td><td>Never expose publicly</td></tr>
+</table>
+<div class="b br"><b>Rule of thumb:</b> ports &lt; 1024 are <em>privileged</em> (need root). Run apps on 8080/8443 and let a load balancer terminate 80/443.</div>
+</div>
+
+<div class="T" id="firewalls">
+<h2>Firewalls — Security Groups vs NACLs</h2><p class="su">Two layers of network filtering in every cloud VPC</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Security Group vs NACL layers">
+  <rect x="10" y="10" width="540" height="200" fill="none" stroke="#404863" stroke-dasharray="4 4" rx="6"/>
+  <text x="280" y="28" text-anchor="middle" fill="#c8cee0" font-size="11" font-family="Inter">VPC</text>
+  <rect x="40" y="46" width="480" height="148" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+  <text x="280" y="62" text-anchor="middle" fill="#a78bfa" font-size="11" font-family="Inter" font-weight="600">NACL — stateless · subnet-level · allow + deny rules</text>
+  <rect x="80" y="80" width="400" height="100" fill="#171a24" stroke="#34d399" rx="6"/>
+  <text x="280" y="98" text-anchor="middle" fill="#34d399" font-size="11" font-family="Inter" font-weight="600">Security Group — stateful · per-instance · allow only</text>
+  <rect x="220" y="118" width="120" height="44" fill="#252a3a" stroke="#6c8cff" rx="4"/>
+  <text x="280" y="135" text-anchor="middle" fill="#fff" font-size="11" font-family="Inter">EC2 / Pod</text>
+  <text x="280" y="151" text-anchor="middle" fill="#8b93ac" font-size="9" font-family="Inter">app workload</text>
+  <path d="M0 132 L78 132" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#a1)"/>
+  <defs><marker id="a1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#fbbf24"/></marker></defs>
+  <text x="38" y="124" fill="#fbbf24" font-size="9" font-family="Inter">traffic</text>
+</svg>
+<table>
+<tr><th>Aspect</th><th>Security Group</th><th>NACL</th></tr>
+<tr><td>Scope</td><td>Instance / ENI</td><td>Subnet</td></tr>
+<tr><td>State</td><td><b>Stateful</b> (return traffic auto-allowed)</td><td><b>Stateless</b> (must allow both directions)</td></tr>
+<tr><td>Rules</td><td>Allow only</td><td>Allow + Deny</td></tr>
+<tr><td>Order</td><td>All rules evaluated</td><td>Numbered, first match wins</td></tr>
+</table>
+<div class="b bp"><b>Best practice:</b> least-privilege allow-list per port; default deny everything else. Use NACLs as a coarse "block this CIDR" knife.</div>
+</div>
+
+<div class="T" id="zero-trust">
+<h2>Zero Trust Networking</h2><p class="su">"Never trust, always verify" — no implicit trust for internal traffic</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zero Trust mTLS between services">
+  <rect x="20" y="60" width="120" height="60" fill="#1e2230" stroke="#34d399" rx="6"/>
+  <text x="80" y="86" text-anchor="middle" fill="#fff" font-size="12" font-family="Inter">Service A</text>
+  <text x="80" y="104" text-anchor="middle" fill="#8b93ac" font-size="9" font-family="Inter">SPIFFE ID</text>
+  <rect x="220" y="60" width="120" height="60" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+  <text x="280" y="86" text-anchor="middle" fill="#fff" font-size="12" font-family="Inter">Sidecar Proxy</text>
+  <text x="280" y="104" text-anchor="middle" fill="#8b93ac" font-size="9" font-family="Inter">cert rotate</text>
+  <rect x="420" y="60" width="120" height="60" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+  <text x="480" y="86" text-anchor="middle" fill="#fff" font-size="12" font-family="Inter">Service B</text>
+  <text x="480" y="104" text-anchor="middle" fill="#8b93ac" font-size="9" font-family="Inter">policy check</text>
+  <path d="M140 90 L220 90" stroke="#34d399" stroke-width="1.6" marker-end="url(#zt1)"/>
+  <path d="M340 90 L420 90" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#zt1)"/>
+  <text x="180" y="82" text-anchor="middle" fill="#34d399" font-size="9" font-family="Inter">JWT</text>
+  <text x="380" y="82" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="Inter">mTLS</text>
+  <defs><marker id="zt1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+  <text x="280" y="32" text-anchor="middle" fill="#c8cee0" font-size="11" font-family="Inter">Every hop authenticated · authorized · encrypted</text>
+  <rect x="220" y="138" width="120" height="22" fill="#0f1117" stroke="#404863" rx="4"/>
+  <text x="280" y="153" text-anchor="middle" fill="#c8cee0" font-size="9" font-family="Inter">Policy engine (OPA / Istio)</text>
+</svg>
+<div class="b bg"><b>Pillars:</b> verify identity, verify device, least privilege, log everything, assume breach.</div>
+<div class="b by"><b>Tools:</b> Istio / Linkerd (mTLS sidecars), SPIFFE/SPIRE (workload IDs), OPA (policy), Cloudflare Access / Zscaler (BeyondCorp-style proxy).</div>
+</div>
+
+<div class="T" id="ddos-defense">
+<h2>DDoS Defense</h2><p class="su">Layers of mitigation from edge to origin</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DDoS layered defense">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="90" height="50" fill="#1e2230" stroke="#f87171" rx="6"/>
+    <text x="65" y="82" fill="#fff">Attackers</text>
+    <text x="65" y="98">↯ floods</text>
+
+    <rect x="140" y="50" width="100" height="70" fill="#1e2230" stroke="#22d3ee" rx="6"/>
+    <text x="190" y="72" fill="#fff">Anycast Edge</text>
+    <text x="190" y="88">Cloudflare /</text>
+    <text x="190" y="100">AWS Shield</text>
+
+    <rect x="270" y="50" width="100" height="70" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="320" y="72" fill="#fff">WAF</text>
+    <text x="320" y="88">rate-limit</text>
+    <text x="320" y="100">geo-block</text>
+
+    <rect x="400" y="50" width="100" height="70" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="450" y="72" fill="#fff">CAPTCHA</text>
+    <text x="450" y="88">bot mgmt</text>
+    <text x="450" y="100">JS challenge</text>
+
+    <rect x="270" y="138" width="100" height="22" fill="#0f1117" stroke="#34d399" rx="4"/>
+    <text x="320" y="153" fill="#34d399">Origin (clean traffic)</text>
+  </g>
+  <path d="M110 85 L140 85" stroke="#f87171" stroke-width="1.5" marker-end="url(#dd1)"/>
+  <path d="M240 85 L270 85" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#dd1)"/>
+  <path d="M370 85 L400 85" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#dd1)"/>
+  <path d="M450 120 L320 138" stroke="#34d399" stroke-width="1.5" marker-end="url(#dd1)"/>
+  <defs><marker id="dd1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Layer</th><th>Attack</th><th>Defense</th></tr>
+<tr><td>L3/L4</td><td>SYN flood, UDP amplification</td><td>Anycast, scrubbing center, BGP blackhole</td></tr>
+<tr><td>L7</td><td>HTTP flood, slowloris</td><td>WAF, rate-limit per IP/JA3, CAPTCHA</td></tr>
+<tr><td>App</td><td>Login brute-force, scraping</td><td>Bot management, account lockout, signed cookies</td></tr>
+</table>
+<div class="b br"><b>Capacity rule:</b> if your peak inbound is X Gbps, your edge mitigation must absorb 10–100× X.</div>
 </div>
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="css/dp-engine.css">
+<script src="js/dp-engine.js"></script>
 <script src="js/nav.js"></script>
 </body>
 </html>

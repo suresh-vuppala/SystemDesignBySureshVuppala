@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engineering Blogs — System Design Cheatsheet</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>Engineering Blogs</span></h1><p>Curated reading list — top tech blogs by category</p></div>
+<div class="ct">
+<div class="sd sd-13"><span class="e">📚</span> ENGG BLOGS · CURATED READING LIST</div>
+
+<div class="T" id="big-tech">
+<h2>Big Tech / FAANG</h2><p class="su">Hyperscalers — petabyte data, billion+ users, novel infra</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Meta</span></td><td><a href="https://engineering.fb.com/" target="_blank" rel="noopener">engineering.fb.com</a></td><td>TAO, Cassandra origin, RocksDB, Presto</td></tr>
+<tr><td><span class="hi">Google</span></td><td><a href="https://research.google/blog/" target="_blank" rel="noopener">research.google/blog</a></td><td>Spanner, Borg, MapReduce, BigTable</td></tr>
+<tr><td><span class="hi">Netflix</span></td><td><a href="https://netflixtechblog.com/" target="_blank" rel="noopener">netflixtechblog.com</a></td><td>Chaos engineering, microservices, EVCache</td></tr>
+<tr><td><span class="hi">Amazon (AWS)</span></td><td><a href="https://aws.amazon.com/blogs/architecture/" target="_blank" rel="noopener">aws.amazon.com/blogs/architecture</a></td><td>Reference architectures, well-architected</td></tr>
+<tr><td><span class="hi">Microsoft</span></td><td><a href="https://devblogs.microsoft.com/engineering-at-microsoft/" target="_blank" rel="noopener">devblogs.microsoft.com</a></td><td>Azure internals, .NET, dev productivity</td></tr>
+<tr><td><span class="hi">Apple</span></td><td><a href="https://machinelearning.apple.com/" target="_blank" rel="noopener">machinelearning.apple.com</a></td><td>On-device ML, privacy-preserving systems</td></tr>
+<tr><td><span class="hi">LinkedIn</span></td><td><a href="https://engineering.linkedin.com/blog" target="_blank" rel="noopener">engineering.linkedin.com</a></td><td>Kafka origin, Pinot, Espresso, Voldemort</td></tr>
+<tr><td><span class="hi">Twitter / X</span></td><td><a href="https://blog.twitter.com/engineering" target="_blank" rel="noopener">blog.twitter.com/engineering</a></td><td>Timeline at scale, Manhattan, Heron</td></tr>
+<tr><td><span class="hi">YouTube</span></td><td><a href="https://blog.youtube/inside-youtube/tags/engineering-and-developers/" target="_blank" rel="noopener">blog.youtube</a></td><td>Video infra, recommendations</td></tr>
+</table>
+</div>
+
+<div class="T" id="streaming-media">
+<h2>Streaming &amp; Media</h2><p class="su">Real-time delivery at planetary scale</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Spotify</span></td><td><a href="https://engineering.atspotify.com/" target="_blank" rel="noopener">engineering.atspotify.com</a></td><td>Backstage, event delivery, ML for music</td></tr>
+<tr><td><span class="hi">Twitch</span></td><td><a href="https://blog.twitch.tv/en/tags/engineering/" target="_blank" rel="noopener">blog.twitch.tv</a></td><td>Live video, chat, low-latency streaming</td></tr>
+<tr><td><span class="hi">Hulu</span></td><td><a href="https://medium.com/hulu-tech-blog" target="_blank" rel="noopener">medium.com/hulu-tech-blog</a></td><td>VOD pipeline, ad insertion</td></tr>
+<tr><td><span class="hi">Disney+ Hotstar</span></td><td><a href="https://blog.hotstar.com/" target="_blank" rel="noopener">blog.hotstar.com</a></td><td>Live cricket scaling, 25M concurrent</td></tr>
+<tr><td><span class="hi">SoundCloud</span></td><td><a href="https://developers.soundcloud.com/blog/" target="_blank" rel="noopener">developers.soundcloud.com/blog</a></td><td>Audio storage, streaming infra</td></tr>
+</table>
+</div>
+
+<div class="T" id="fintech">
+<h2>Fintech &amp; Payments</h2><p class="su">Strict consistency, idempotency, and ledger correctness</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Stripe</span></td><td><a href="https://stripe.com/blog/engineering" target="_blank" rel="noopener">stripe.com/blog/engineering</a></td><td>Idempotency, API design, distributed ledgers</td></tr>
+<tr><td><span class="hi">PayPal</span></td><td><a href="https://medium.com/paypal-tech" target="_blank" rel="noopener">medium.com/paypal-tech</a></td><td>Fraud detection, Kraken cluster mgmt</td></tr>
+<tr><td><span class="hi">Block (Square)</span></td><td><a href="https://developer.squareup.com/blog/" target="_blank" rel="noopener">developer.squareup.com/blog</a></td><td>Point-of-sale infra, Cash App scale</td></tr>
+<tr><td><span class="hi">Coinbase</span></td><td><a href="https://www.coinbase.com/blog/landing/engineering" target="_blank" rel="noopener">coinbase.com/blog/engineering</a></td><td>Crypto custody, exchange architecture</td></tr>
+<tr><td><span class="hi">Robinhood</span></td><td><a href="https://robinhood.engineering/" target="_blank" rel="noopener">robinhood.engineering</a></td><td>Trading platforms, market data</td></tr>
+<tr><td><span class="hi">Plaid</span></td><td><a href="https://plaid.com/blog/eng/" target="_blank" rel="noopener">plaid.com/blog/eng</a></td><td>Bank integrations, OAuth at scale</td></tr>
+<tr><td><span class="hi">Wise (TransferWise)</span></td><td><a href="https://medium.com/wise-engineering" target="_blank" rel="noopener">medium.com/wise-engineering</a></td><td>Cross-border payments, FX, ledgers</td></tr>
+<tr><td><span class="hi">Monzo</span></td><td><a href="https://monzo.com/blog/technology" target="_blank" rel="noopener">monzo.com/blog/technology</a></td><td>1500+ microservices, banking on AWS</td></tr>
+</table>
+</div>
+
+<div class="T" id="ecommerce">
+<h2>E-commerce &amp; Marketplaces</h2><p class="su">Catalog, search, recommendations, checkout at scale</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Shopify</span></td><td><a href="https://shopify.engineering/" target="_blank" rel="noopener">shopify.engineering</a></td><td>Black Friday scaling, Ruby/Rails at scale</td></tr>
+<tr><td><span class="hi">eBay</span></td><td><a href="https://innovation.ebayinc.com/tech/engineering/" target="_blank" rel="noopener">innovation.ebayinc.com</a></td><td>Search, payments, billion-listing catalog</td></tr>
+<tr><td><span class="hi">Etsy</span></td><td><a href="https://www.etsy.com/codeascraft" target="_blank" rel="noopener">etsy.com/codeascraft</a></td><td>Continuous deployment pioneer, A/B testing</td></tr>
+<tr><td><span class="hi">Airbnb</span></td><td><a href="https://medium.com/airbnb-engineering" target="_blank" rel="noopener">medium.com/airbnb-engineering</a></td><td>Airflow origin, search ranking, payments</td></tr>
+<tr><td><span class="hi">Pinterest</span></td><td><a href="https://medium.com/@Pinterest_Engineering" target="_blank" rel="noopener">medium.com/Pinterest_Engineering</a></td><td>Recommendation system, image search</td></tr>
+<tr><td><span class="hi">Instacart</span></td><td><a href="https://tech.instacart.com/" target="_blank" rel="noopener">tech.instacart.com</a></td><td>ML for grocery, real-time inventory</td></tr>
+<tr><td><span class="hi">Zalando</span></td><td><a href="https://engineering.zalando.com/" target="_blank" rel="noopener">engineering.zalando.com</a></td><td>Microservices, K8s in production</td></tr>
+<tr><td><span class="hi">Mercari</span></td><td><a href="https://engineering.mercari.com/en/blog/" target="_blank" rel="noopener">engineering.mercari.com</a></td><td>Marketplace infra, ML pipelines</td></tr>
+</table>
+</div>
+
+<div class="T" id="ride-delivery">
+<h2>Ride-share &amp; Delivery</h2><p class="su">Geo-spatial, real-time matching, dispatch</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Uber</span></td><td><a href="https://www.uber.com/blog/engineering/" target="_blank" rel="noopener">uber.com/blog/engineering</a></td><td>H3 geo, Cadence, dispatch, Michelangelo</td></tr>
+<tr><td><span class="hi">Lyft</span></td><td><a href="https://eng.lyft.com/" target="_blank" rel="noopener">eng.lyft.com</a></td><td>Envoy origin, Flyte, ML platform</td></tr>
+<tr><td><span class="hi">DoorDash</span></td><td><a href="https://doordash.engineering/blog/" target="_blank" rel="noopener">doordash.engineering/blog</a></td><td>Logistics, on-time delivery ML</td></tr>
+<tr><td><span class="hi">Grab</span></td><td><a href="https://engineering.grab.com/" target="_blank" rel="noopener">engineering.grab.com</a></td><td>Super-app, Southeast Asia scale</td></tr>
+<tr><td><span class="hi">Deliveroo</span></td><td><a href="https://deliveroo.engineering/" target="_blank" rel="noopener">deliveroo.engineering</a></td><td>Frank dispatch, rider routing</td></tr>
+<tr><td><span class="hi">Swiggy</span></td><td><a href="https://bytes.swiggy.com/" target="_blank" rel="noopener">bytes.swiggy.com</a></td><td>India-scale food delivery, real-time</td></tr>
+</table>
+</div>
+
+<div class="T" id="infra-cloud">
+<h2>Infrastructure &amp; Cloud</h2><p class="su">The platforms others build on</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Cloudflare</span></td><td><a href="https://blog.cloudflare.com/" target="_blank" rel="noopener">blog.cloudflare.com</a></td><td>Edge compute, DDoS, networking deep dives</td></tr>
+<tr><td><span class="hi">Fastly</span></td><td><a href="https://www.fastly.com/blog/" target="_blank" rel="noopener">fastly.com/blog</a></td><td>Edge cloud, Compute@Edge, VCL</td></tr>
+<tr><td><span class="hi">DigitalOcean</span></td><td><a href="https://www.digitalocean.com/blog/tag/engineering" target="_blank" rel="noopener">digitalocean.com/blog</a></td><td>Cloud infra ops, K8s</td></tr>
+<tr><td><span class="hi">Heroku</span></td><td><a href="https://blog.heroku.com/engineering" target="_blank" rel="noopener">blog.heroku.com/engineering</a></td><td>Twelve-factor app, dyno architecture</td></tr>
+<tr><td><span class="hi">HashiCorp</span></td><td><a href="https://www.hashicorp.com/blog/products/engineering" target="_blank" rel="noopener">hashicorp.com/blog</a></td><td>Terraform, Vault, Consul, Nomad</td></tr>
+<tr><td><span class="hi">Datadog</span></td><td><a href="https://www.datadoghq.com/blog/engineering/" target="_blank" rel="noopener">datadoghq.com/blog/engineering</a></td><td>Observability infra, time-series at scale</td></tr>
+<tr><td><span class="hi">GitHub</span></td><td><a href="https://github.blog/category/engineering/" target="_blank" rel="noopener">github.blog/engineering</a></td><td>Git internals, Codespaces, Actions</td></tr>
+<tr><td><span class="hi">GitLab</span></td><td><a href="https://about.gitlab.com/blog/categories/engineering/" target="_blank" rel="noopener">about.gitlab.com/blog</a></td><td>Monorepo dev, CI/CD platform</td></tr>
+</table>
+</div>
+
+<div class="T" id="data-ml">
+<h2>Data, Databases &amp; ML</h2><p class="su">Storage engines, query planners, ML platforms</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Confluent</span></td><td><a href="https://www.confluent.io/blog/" target="_blank" rel="noopener">confluent.io/blog</a></td><td>Kafka deep dives, exactly-once, KRaft</td></tr>
+<tr><td><span class="hi">Databricks</span></td><td><a href="https://www.databricks.com/blog/category/engineering" target="_blank" rel="noopener">databricks.com/blog</a></td><td>Spark, Delta Lake, lakehouse</td></tr>
+<tr><td><span class="hi">Snowflake</span></td><td><a href="https://www.snowflake.com/en/blog/engineering/" target="_blank" rel="noopener">snowflake.com/blog/engineering</a></td><td>Cloud data warehouse, separation of compute/storage</td></tr>
+<tr><td><span class="hi">MongoDB</span></td><td><a href="https://www.mongodb.com/blog/channel/engineering-blog" target="_blank" rel="noopener">mongodb.com/blog</a></td><td>WiredTiger, distributed transactions</td></tr>
+<tr><td><span class="hi">Elastic</span></td><td><a href="https://www.elastic.co/blog/category/engineering" target="_blank" rel="noopener">elastic.co/blog/engineering</a></td><td>Lucene internals, search relevance</td></tr>
+<tr><td><span class="hi">Cockroach Labs</span></td><td><a href="https://www.cockroachlabs.com/blog/" target="_blank" rel="noopener">cockroachlabs.com/blog</a></td><td>Distributed SQL, Raft, MVCC</td></tr>
+<tr><td><span class="hi">Yugabyte</span></td><td><a href="https://www.yugabyte.com/blog/" target="_blank" rel="noopener">yugabyte.com/blog</a></td><td>Distributed SQL, geo-partitioning</td></tr>
+<tr><td><span class="hi">Redis</span></td><td><a href="https://redis.io/blog/" target="_blank" rel="noopener">redis.io/blog</a></td><td>Data structures server, persistence</td></tr>
+<tr><td><span class="hi">PlanetScale</span></td><td><a href="https://planetscale.com/blog" target="_blank" rel="noopener">planetscale.com/blog</a></td><td>Vitess, MySQL at scale, branching DB</td></tr>
+<tr><td><span class="hi">OpenAI</span></td><td><a href="https://openai.com/research/" target="_blank" rel="noopener">openai.com/research</a></td><td>LLM scaling, RLHF, infra for GPT</td></tr>
+</table>
+</div>
+
+<div class="T" id="social-comms">
+<h2>Social, Comms &amp; Productivity</h2><p class="su">Real-time, collaborative, chat at scale</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Slack</span></td><td><a href="https://slack.engineering/" target="_blank" rel="noopener">slack.engineering</a></td><td>Real-time messaging, scaling Pinpoints</td></tr>
+<tr><td><span class="hi">Discord</span></td><td><a href="https://discord.com/blog/category/engineering" target="_blank" rel="noopener">discord.com/blog/engineering</a></td><td>Trillions of messages, ScyllaDB, Elixir</td></tr>
+<tr><td><span class="hi">Zoom</span></td><td><a href="https://medium.com/zoom-developer-blog" target="_blank" rel="noopener">medium.com/zoom-developer-blog</a></td><td>Real-time video, scaling globally</td></tr>
+<tr><td><span class="hi">Dropbox</span></td><td><a href="https://dropbox.tech/" target="_blank" rel="noopener">dropbox.tech</a></td><td>Magic Pocket, sync engine, Edgestore</td></tr>
+<tr><td><span class="hi">Asana</span></td><td><a href="https://blog.asana.com/category/eng/" target="_blank" rel="noopener">blog.asana.com</a></td><td>Real-time collab, Luna2 graph engine</td></tr>
+<tr><td><span class="hi">Notion</span></td><td><a href="https://www.notion.so/blog/topic/tech" target="_blank" rel="noopener">notion.so/blog/topic/tech</a></td><td>Block-based docs, sharding Postgres</td></tr>
+<tr><td><span class="hi">Figma</span></td><td><a href="https://www.figma.com/blog/section/engineering/" target="_blank" rel="noopener">figma.com/blog/engineering</a></td><td>Multiplayer cursors, CRDTs, WebGL</td></tr>
+<tr><td><span class="hi">Canva</span></td><td><a href="https://www.canva.dev/blog/engineering/" target="_blank" rel="noopener">canva.dev/blog/engineering</a></td><td>Browser graphics, real-time editing</td></tr>
+<tr><td><span class="hi">Reddit</span></td><td><a href="https://www.reddit.com/r/RedditEng/" target="_blank" rel="noopener">reddit.com/r/RedditEng</a></td><td>Comments tree at scale, Lemma feed ranking</td></tr>
+</table>
+</div>
+
+<div class="T" id="travel-hospitality">
+<h2>Travel, Hospitality &amp; Other</h2><p class="su">Booking, search, large-vendor integration</p>
+<table>
+<tr><th>Company</th><th>Blog</th><th>Known for</th></tr>
+<tr><td><span class="hi">Booking.com</span></td><td><a href="https://blog.booking.com/" target="_blank" rel="noopener">blog.booking.com</a></td><td>Experimentation platform, search</td></tr>
+<tr><td><span class="hi">Expedia</span></td><td><a href="https://medium.com/expedia-group-tech" target="_blank" rel="noopener">medium.com/expedia-group-tech</a></td><td>Travel APIs, microservices migration</td></tr>
+<tr><td><span class="hi">Trivago</span></td><td><a href="https://tech.trivago.com/" target="_blank" rel="noopener">tech.trivago.com</a></td><td>Hotel search, comparison engines</td></tr>
+<tr><td><span class="hi">Yelp</span></td><td><a href="https://engineeringblog.yelp.com/" target="_blank" rel="noopener">engineeringblog.yelp.com</a></td><td>Search ranking, review fraud detection</td></tr>
+</table>
+</div>
+
+<div class="T" id="curated-newsletters">
+<h2>Newsletters &amp; Aggregators</h2><p class="su">Hand-picked deep-dive newsletters and digests</p>
+<table>
+<tr><th>Source</th><th>Link</th><th>What you get</th></tr>
+<tr><td><span class="hi">ByteByteGo</span></td><td><a href="https://blog.bytebytego.com/" target="_blank" rel="noopener">blog.bytebytego.com</a></td><td>Visual system design weekly</td></tr>
+<tr><td><span class="hi">High Scalability</span></td><td><a href="http://highscalability.com/" target="_blank" rel="noopener">highscalability.com</a></td><td>Real architectures (classic)</td></tr>
+<tr><td><span class="hi">The Pragmatic Engineer</span></td><td><a href="https://www.pragmaticengineer.com/" target="_blank" rel="noopener">pragmaticengineer.com</a></td><td>Industry insights, eng leadership</td></tr>
+<tr><td><span class="hi">InfoQ</span></td><td><a href="https://www.infoq.com/architecture-design/" target="_blank" rel="noopener">infoq.com/architecture-design</a></td><td>Conference talks, architecture trends</td></tr>
+<tr><td><span class="hi">The Morning Paper</span></td><td><a href="https://blog.acolyer.org/" target="_blank" rel="noopener">blog.acolyer.org</a></td><td>Daily CS paper summaries (archive)</td></tr>
+<tr><td><span class="hi">Papers We Love</span></td><td><a href="https://paperswelove.org/" target="_blank" rel="noopener">paperswelove.org</a></td><td>Classic CS papers + meetups</td></tr>
+<tr><td><span class="hi">DDIA Companion</span></td><td><a href="https://github.com/ept/ddia-references" target="_blank" rel="noopener">github.com/ept/ddia-references</a></td><td>Designing Data-Intensive Apps refs</td></tr>
+<tr><td><span class="hi">Awesome Scalability</span></td><td><a href="https://github.com/binhnguyennus/awesome-scalability" target="_blank" rel="noopener">awesome-scalability</a></td><td>Mega list of scaling case studies</td></tr>
+</table>
+</div>
+
+<div class="b bp"><b>Tip:</b> subscribe via RSS (e.g. Feedly, Inoreader) or follow company eng accounts on LinkedIn/X. The richest content is often in conference talks linked from these blogs (re:Invent, KubeCon, QCon, Strange Loop, Kafka Summit).</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="css/dp-engine.css">
+<script src="js/dp-engine.js"></script>
+<script>
+// Inject only the top main-menu (skip the full module nav grid on this page)
+(function(){
+  var hero = document.querySelector('.hero');
+  if(!hero) return;
+  hero.insertAdjacentHTML('afterend',
+    '<nav class="main-menu" aria-label="Main menu">'
+    + '<a class="mm-link" href="index.html">🏠 Home</a>'
+    + '<a class="mm-link" href="01-foundations.html">📘 Cheatsheet</a>'
+    + '<a class="mm-link mm-active" href="engineering-blogs.html">📚 Engg Blogs</a>'
+    + '</nav>');
+})();
+</script>
+</div>
+</body>
+</html>

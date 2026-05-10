@@ -731,20 +731,126 @@ Lucene doesn't update the inverted index in-place. Instead: new docs are written
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Strong read-after-write consistency</span> (S3, since Dec 2020). <span class="hg">Versioning</span> protects against accidental deletes. Lifecycle policies auto-tier: Standard → IA → Glacier.</div>
 </div>
 
-<!-- ═══ Storage Extras ═══ -->
-<div class="T" id="storage-extras">
-<h2>Storage Extras</h2><p class="su">Connection pooling, migrations, vector DBs, graph deep dive</p>
+<!-- ═══ Storage: separate compact lessons ═══ -->
+<div class="T" id="connection-pooling">
+<h2>Connection Pooling</h2><p class="su">Reuse expensive DB connections instead of opening per request</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Connection pool">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="30" width="110" height="30" fill="#1e2230" stroke="#6c8cff" rx="6"/><text x="75" y="49" fill="#fff">App pod 1</text>
+    <rect x="20" y="75" width="110" height="30" fill="#1e2230" stroke="#6c8cff" rx="6"/><text x="75" y="94" fill="#fff">App pod 2</text>
+    <rect x="20" y="120" width="110" height="30" fill="#1e2230" stroke="#6c8cff" rx="6"/><text x="75" y="139" fill="#fff">App pod 3</text>
+
+    <rect x="210" y="50" width="140" height="80" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="72" fill="#fff">Pooler</text>
+    <text x="280" y="88" fill="#8b93ac">PgBouncer / HikariCP</text>
+    <text x="280" y="108" fill="#fbbf24">N reusable conns</text>
+
+    <rect x="430" y="60" width="110" height="60" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="485" y="86" fill="#fff">Postgres</text>
+    <text x="485" y="102" fill="#8b93ac">100 max conns</text>
+  </g>
+  <path d="M130 45 L210 70" stroke="#6c8cff" stroke-width="1.4"/>
+  <path d="M130 90 L210 90" stroke="#6c8cff" stroke-width="1.4"/>
+  <path d="M130 135 L210 110" stroke="#6c8cff" stroke-width="1.4"/>
+  <path d="M350 90 L430 90" stroke="#34d399" stroke-width="1.6" marker-end="url(#cp1)"/>
+  <defs><marker id="cp1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
 <table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">Connection Pooling</span></td><td>DB connections are expensive (TCP + TLS + auth). Pool reuses connections. <span class="hg">PgBouncer</span> (Postgres), <span class="hg">HikariCP</span> (Java), <span class="hg">ProxySQL</span> (MySQL). Typical: 20-100 connections per app instance. Serverless needs pooling badly (Lambda → 1000s of connections).</td></tr>
-<tr><td><span class="hi">Schema Migrations</span></td><td>Version-controlled DB changes. <span class="hg">Flyway</span>, <span class="hg">Liquibase</span>, <span class="hg">Alembic</span> (Python), <span class="hg">Rails Migrations</span>. <span class="hr">ALTER on large tables can lock</span> — use <span class="hg">pt-online-schema-change</span> or <span class="hg">gh-ost</span> for zero-downtime migrations.</td></tr>
-<tr><td><span class="hi">Vector Databases</span></td><td>Store + search high-dimensional embeddings (AI/ML). <span class="hg">Pinecone</span>, <span class="hg">Weaviate</span>, <span class="hg">Milvus</span>, <span class="hg">pgvector</span> (Postgres extension). Use: semantic search, RAG (retrieval-augmented generation), recommendation. ANN (Approximate Nearest Neighbor) via HNSW index.</td></tr>
-<tr><td><span class="hi">Graph DB Deep Dive</span></td><td><span class="hg">Neo4j</span> — Cypher query language, O(1) edge traversal (index-free adjacency). Use: social graphs, fraud detection (find cycles), knowledge graphs, recommendation engines. <span class="hr">Not for</span>: tabular data, aggregations, high write throughput.</td></tr>
+<tr><th>Pooler</th><th>Stack</th><th>Mode</th></tr>
+<tr><td>PgBouncer</td><td>Postgres</td><td>session / transaction / statement</td></tr>
+<tr><td>HikariCP</td><td>Java / JVM</td><td>in-process</td></tr>
+<tr><td>ProxySQL</td><td>MySQL</td><td>proxy + query routing</td></tr>
+<tr><td>RDS Proxy</td><td>AWS</td><td>managed, IAM-aware</td></tr>
 </table>
+<div class="b br"><b>Serverless gotcha:</b> 1000 Lambda containers × 5 conns each = 5000 — your DB caps at 100. Always front Lambda with a pooler.</div>
+</div>
+
+<div class="T" id="schema-migrations">
+<h2>Schema Migrations</h2><p class="su">Version-controlled, repeatable DB changes</p>
+<table>
+<tr><th>Tool</th><th>Stack</th></tr>
+<tr><td>Flyway</td><td>JVM, polyglot SQL</td></tr>
+<tr><td>Liquibase</td><td>JVM, XML/YAML changesets</td></tr>
+<tr><td>Alembic</td><td>Python / SQLAlchemy</td></tr>
+<tr><td>Prisma Migrate</td><td>Node / TS</td></tr>
+<tr><td>Rails / Django Migrations</td><td>built-in ORM</td></tr>
+</table>
+<pre><code>-- V20260510__add_user_email.sql
+ALTER TABLE users
+  ADD COLUMN email TEXT;
+CREATE UNIQUE INDEX users_email_uq
+  ON users (email);</code></pre>
+<div class="b br"><b>Big-table pitfall:</b> <code>ALTER</code> can take an exclusive lock for hours. Use <b>pt-online-schema-change</b> (MySQL) or <b>gh-ost</b> for zero-downtime changes (shadow table + chunked copy + atomic swap).</div>
+<div class="b bg"><b>Expand–contract:</b> add new column → dual-write → backfill → switch reads → drop old. Never break the running app.</div>
+</div>
+
+<div class="T" id="vector-db">
+<h2>Vector Databases</h2><p class="su">Store + ANN-search high-dimensional embeddings for AI/RAG</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vector embedding pipeline">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="70" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="70" y="96" fill="#fff">Doc / query</text>
+    <rect x="160" y="70" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="210" y="90" fill="#fff">Embed model</text>
+    <text x="210" y="104" fill="#8b93ac">OpenAI / BGE</text>
+    <rect x="300" y="60" width="100" height="60" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="350" y="80" fill="#fff">Vector [768]</text>
+    <text x="350" y="96" fill="#8b93ac">cosine sim</text>
+    <rect x="440" y="60" width="100" height="60" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="490" y="86" fill="#fff">Vector DB</text>
+    <text x="490" y="102" fill="#8b93ac">HNSW / IVF</text>
+  </g>
+  <path d="M120 90 L160 90" stroke="#6c8cff" stroke-width="1.4" marker-end="url(#v1)"/>
+  <path d="M260 90 L300 90" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#v1)"/>
+  <path d="M400 90 L440 90" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#v1)"/>
+  <defs><marker id="v1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+  <text x="280" y="150" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">Top-K nearest neighbors return semantically similar items</text>
+</svg>
+<table>
+<tr><th>DB</th><th>Notes</th></tr>
+<tr><td>Pinecone / Weaviate / Milvus</td><td>Managed or OSS, native ANN</td></tr>
+<tr><td>pgvector</td><td>Postgres extension — reuse existing DB</td></tr>
+<tr><td>Qdrant / Chroma</td><td>Lightweight, dev-friendly</td></tr>
+<tr><td>OpenSearch / Elastic</td><td>Hybrid lexical + vector</td></tr>
+</table>
+<div class="b bg"><b>Use cases:</b> semantic search, RAG, dedup, recommendations, image / audio similarity.</div>
+</div>
+
+<div class="T" id="graph-db-deep">
+<h2>Graph DB Deep Dive</h2><p class="su">Index-free adjacency — O(1) hops between connected nodes</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graph DB sample">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <circle cx="100" cy="100" r="28" fill="#1e2230" stroke="#6c8cff"/><text x="100" y="104" fill="#fff">Alice</text>
+    <circle cx="260" cy="50" r="28" fill="#1e2230" stroke="#34d399"/><text x="260" y="54" fill="#fff">Bob</text>
+    <circle cx="260" cy="150" r="28" fill="#1e2230" stroke="#fbbf24"/><text x="260" y="154" fill="#fff">Carol</text>
+    <circle cx="420" cy="100" r="28" fill="#1e2230" stroke="#a78bfa"/><text x="420" y="104" fill="#fff">Post #42</text>
+    <line x1="125" y1="90" x2="235" y2="60" stroke="#34d399" stroke-width="1.5"/>
+    <text x="175" y="68" fill="#34d399">FOLLOWS</text>
+    <line x1="125" y1="110" x2="235" y2="140" stroke="#fbbf24" stroke-width="1.5"/>
+    <text x="175" y="138" fill="#fbbf24">FOLLOWS</text>
+    <line x1="285" y1="60" x2="395" y2="95" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="345" y="70" fill="#a78bfa">LIKES</text>
+    <line x1="285" y1="140" x2="395" y2="110" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="345" y="140" fill="#a78bfa">LIKES</text>
+  </g>
+</svg>
+<pre><code>// Cypher: friends-of-friends who liked Post #42
+MATCH (me:User {name:'Alice'})-[:FOLLOWS*1..2]->(f:User)
+      -[:LIKES]->(p:Post {id:42})
+RETURN DISTINCT f.name;</code></pre>
+<table>
+<tr><th>Use for</th><th>Avoid for</th></tr>
+<tr><td>Social graphs, fraud cycles, recs</td><td>Tabular OLAP / aggregates</td></tr>
+<tr><td>Knowledge graphs, dependency trees</td><td>High write throughput, BLOBs</td></tr>
+<tr><td>Pathfinding, shortest-path</td><td>Simple CRUD apps (overkill)</td></tr>
+</table>
+<div class="b bg"><b>Engines:</b> Neo4j, Amazon Neptune, JanusGraph, ArangoDB (multi-model), TigerGraph (analytics-heavy).</div>
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="css/dp-engine.css">
+<script src="js/dp-engine.js"></script>
 <script src="js/nav.js"></script>
 </body>
 </html>

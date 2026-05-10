@@ -669,24 +669,157 @@ Producer → [ Topic ]
 <tr><td><span class="hi">Example</span></td><td>RabbitMQ, SQS</td><td>Kafka, Kinesis, Redis Streams</td><td>SNS, Google Pub/Sub</td></tr>
 </table>
 <div class="b bg"><span class="hi">Key Insight:</span> The fundamental difference is the <span class="hg">consumption model</span>. Queues are <span class="hg">competing consumers</span> (work distribution). Streams are <span class="hg">independent consumers</span> (each reads everything). Pub/Sub is <span class="hg">broadcast</span> (everyone gets a copy). Many real systems combine them — e.g., SNS → SQS → Lambda.</div>
-</div>
+</div><!-- ═══ Messaging: separate compact lessons ═══ -->
+<div class="T" id="dlq">
+<h2>Dead Letter Queue (DLQ)</h2><p class="su">Quarantine poison messages so the main queue keeps flowing</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DLQ flow">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="75" y="86" fill="#fff">Producer</text>
+    <rect x="170" y="60" width="110" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="225" y="80" fill="#fff">Main queue</text>
+    <text x="225" y="94" fill="#8b93ac">maxReceive=5</text>
+    <rect x="320" y="60" width="110" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="375" y="86" fill="#fff">Consumer</text>
+    <rect x="320" y="120" width="110" height="40" fill="#1e2230" stroke="#f87171" rx="6"/>
+    <text x="375" y="140" fill="#f87171">DLQ</text>
+    <text x="375" y="154" fill="#8b93ac">alarm + inspect</text>
+  </g>
+  <path d="M130 80 L170 80" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#dl1)"/>
+  <path d="M280 80 L320 80" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#dl1)"/>
+  <path d="M225 100 L225 140 L320 140" fill="none" stroke="#f87171" stroke-width="1.5" marker-end="url(#dl1)"/>
+  <text x="235" y="122" text-anchor="start" fill="#f87171" font-family="Inter" font-size="9">after N fails</text>
+  <defs><marker id="dl1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Broker</th><th>Mechanism</th></tr>
+<tr><td>SQS</td><td>Source queue → redrive policy → DLQ</td></tr>
+<tr><td>RabbitMQ</td><td>Dead-letter exchange (DLX) on TTL/reject</td></tr>
+<tr><td>Kafka</td><td>App writes failed events to <code>topic.DLT</code> (Spring Cloud, Kafka Connect)</td></tr>
+</table>
+<div class="b br"><b>Always alarm on DLQ depth &gt; 0.</b> Use redrive to replay after fixing the bug.</div>
 </div>
 
-<!-- ═══ Messaging Extras ═══ -->
-<div class="T" id="messaging-extras">
-<h2>Messaging Extras</h2><p class="su">DLQ, event sourcing, CQRS, ordering guarantees</p>
+<div class="T" id="event-sourcing">
+<h2>Event Sourcing</h2><p class="su">Persist <em>facts</em>, derive state by replaying them</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Event sourcing log">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="30" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="50" fill="#fff">AccountOpened</text>
+    <rect x="20" y="66" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="86" fill="#fff">Deposited 100</text>
+    <rect x="20" y="102" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="122" fill="#fff">Withdrew 30</text>
+    <rect x="20" y="138" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="158" fill="#fff">Deposited 50</text>
+
+    <text x="170" y="100" fill="#8b93ac">replay →</text>
+
+    <rect x="230" y="60" width="140" height="80" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="300" y="82" fill="#fff">Current state</text>
+    <text x="300" y="104" fill="#34d399">balance = 120</text>
+    <text x="300" y="122" fill="#8b93ac">opened: yes</text>
+
+    <rect x="410" y="30" width="130" height="50" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="475" y="50" fill="#fff">Snapshot @ N</text>
+    <text x="475" y="66" fill="#8b93ac">speeds replay</text>
+
+    <rect x="410" y="100" width="130" height="50" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="475" y="120" fill="#fff">Audit trail</text>
+    <text x="475" y="136" fill="#8b93ac">free, exact</text>
+  </g>
+</svg>
+<div class="b bg"><b>Wins:</b> perfect audit, time-travel debugging, rebuild any projection, natural fit for ledgers.</div>
+<div class="b br"><b>Costs:</b> schema evolution of events, eventual consistency on reads, snapshot/compaction strategy needed.</div>
+</div>
+
+<div class="T" id="cqrs">
+<h2>CQRS</h2><p class="su">Separate the write model from the read model</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CQRS">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="30" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="75" y="56" fill="#fff">Command</text>
+    <rect x="170" y="30" width="140" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="240" y="50" fill="#fff">Write model</text>
+    <text x="240" y="64" fill="#8b93ac">aggregate → events</text>
+    <rect x="350" y="30" width="190" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="445" y="50" fill="#fff">Event store / Kafka</text>
+
+    <rect x="170" y="110" width="140" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="240" y="130" fill="#fff">Projection</text>
+    <text x="240" y="144" fill="#8b93ac">denormalized view</text>
+
+    <rect x="20" y="110" width="110" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
+    <text x="75" y="136" fill="#fff">Query</text>
+  </g>
+  <path d="M130 50 L170 50" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#cq1)"/>
+  <path d="M310 50 L350 50" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#cq1)"/>
+  <path d="M445 70 L240 110" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#cq1)"/>
+  <path d="M170 130 L130 130" stroke="#34d399" stroke-width="1.5" marker-end="url(#cq1)"/>
+  <defs><marker id="cq1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<div class="b bp"><b>Use when:</b> reads vs writes scale very differently, or queries demand multiple shapes (search index, cache, OLAP).</div>
+<div class="b br"><b>Avoid when:</b> simple CRUD — the dual-model overhead isn't worth it.</div>
+</div>
+
+<div class="T" id="ordering">
+<h2>Ordering Guarantees</h2><p class="su">Where order is preserved — and where it is not</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kafka per-partition ordering">
+  <g font-family="Inter" font-size="10" fill="#c8cee0">
+    <text x="20" y="22" fill="#fff">Topic “orders” (3 partitions — ordered <em>within</em>, not across)</text>
+    <rect x="20" y="36" width="500" height="30" fill="#252a3a" stroke="#6c8cff" rx="4"/>
+    <text x="30" y="55">P0:</text>
+    <text x="60" y="55" fill="#34d399">A1 → A2 → A3</text>
+    <rect x="20" y="72" width="500" height="30" fill="#252a3a" stroke="#6c8cff" rx="4"/>
+    <text x="30" y="91">P1:</text>
+    <text x="60" y="91" fill="#fbbf24">B1 → B2 → B3</text>
+    <rect x="20" y="108" width="500" height="30" fill="#252a3a" stroke="#6c8cff" rx="4"/>
+    <text x="30" y="127">P2:</text>
+    <text x="60" y="127" fill="#a78bfa">C1 → C2 → C3</text>
+  </g>
+</svg>
 <table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">Dead Letter Queue</span></td><td>After N failed retries, message moves to DLQ for inspection. Prevents poison messages from blocking the queue. <span class="hg">SQS DLQ</span>, RabbitMQ dead-letter exchange. Always monitor DLQ depth.</td></tr>
-<tr><td><span class="hi">Event Sourcing</span></td><td>Store <span class="hg">events</span> (facts that happened) instead of current state. Replay events to rebuild state. Append-only log. <span class="hg">Audit trail</span> built-in. Used by: banking (ledger), Kafka log, EventStoreDB. <span class="hr">Complex</span> — event schema evolution, eventual consistency.</td></tr>
-<tr><td><span class="hi">CQRS</span></td><td>Command Query Responsibility Segregation — separate <span class="hg">write model</span> (commands → event store) from <span class="hg">read model</span> (optimized projections). Write and read can scale independently. Often paired with event sourcing. <span class="hr">Adds complexity</span> — only use when read/write patterns differ significantly.</td></tr>
-<tr><td><span class="hi">Ordering</span></td><td><span class="hg">Per-partition</span> ordering (Kafka) — use partition key to ensure related events ordered. <span class="hr">No global ordering</span> across partitions. SQS FIFO — strict order within message group. RabbitMQ — ordered per queue.</td></tr>
-<tr><td><span class="hi">Schema Registry</span></td><td>Central store for Avro/Protobuf schemas (<span class="hg">Confluent Schema Registry</span>). Enforces backward/forward compatibility. Prevents breaking changes in event schemas across producers and consumers.</td></tr>
+<tr><th>Broker</th><th>Order scope</th></tr>
+<tr><td>Kafka</td><td>Per-partition (key → partition)</td></tr>
+<tr><td>SQS standard</td><td>Best effort — may reorder</td></tr>
+<tr><td>SQS FIFO</td><td>Strict per <code>MessageGroupId</code></td></tr>
+<tr><td>RabbitMQ</td><td>Per queue</td></tr>
+<tr><td>Pub/Sub</td><td>Optional ordering keys</td></tr>
 </table>
+<div class="b by"><b>Trick:</b> use a stable partition key (userId, accountId) so all related events land in the same partition and stay ordered.</div>
+</div>
+
+<div class="T" id="schema-registry">
+<h2>Schema Registry</h2><p class="su">Central contract for event payloads — prevents “it broke prod”</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schema registry">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="30" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/><text x="75" y="56" fill="#fff">Producer</text>
+    <rect x="230" y="60" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="80" fill="#fff">Registry</text>
+    <text x="280" y="94" fill="#8b93ac">v1, v2, v3 (Avro)</text>
+    <rect x="430" y="30" width="110" height="40" fill="#1e2230" stroke="#34d399" rx="6"/><text x="485" y="56" fill="#fff">Consumer</text>
+    <rect x="230" y="120" width="100" height="30" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="280" y="140" fill="#a78bfa">Kafka topic</text>
+  </g>
+  <path d="M130 50 L230 80" stroke="#6c8cff" stroke-width="1.4" marker-end="url(#sr1)"/>
+  <text x="170" y="60" fill="#6c8cff" font-size="9" font-family="Inter">register schema</text>
+  <path d="M330 80 L430 50" stroke="#34d399" stroke-width="1.4" marker-end="url(#sr1)"/>
+  <text x="395" y="58" text-anchor="middle" fill="#34d399" font-size="9" font-family="Inter">fetch by id</text>
+  <path d="M130 70 L230 130" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#sr1)"/>
+  <path d="M330 130 L430 70" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#sr1)"/>
+  <defs><marker id="sr1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Compatibility</th><th>Producers may add</th><th>Consumers may read</th></tr>
+<tr><td>Backward</td><td>new optional fields</td><td>old data with new code</td></tr>
+<tr><td>Forward</td><td>fields can be removed safely later</td><td>new data with old code</td></tr>
+<tr><td>Full</td><td>both — safest</td><td>both</td></tr>
+</table>
+<div class="b bg"><b>Tools:</b> Confluent Schema Registry, AWS Glue Schema Registry, Apicurio. Enforce in CI before merging schema PRs.</div>
+</div>
+
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="css/dp-engine.css">
+<script src="js/dp-engine.js"></script>
 <script src="js/nav.js"></script>
 </body>
 </html>
