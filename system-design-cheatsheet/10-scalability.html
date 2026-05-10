@@ -1955,18 +1955,83 @@
 <tr><td><span class="hi">Leaky Bucket</span></td><td><span class="hg">No</span></td><td>Queue size</td><td>Exact</td><td>Smooth output (traffic shaping)</td></tr>
 </table>
 <div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Stripe</strong> — 100 req/sec per API key (token bucket). <strong>GitHub</strong> — 5000 req/hour (sliding window). Apply at: <span class="hg">API Gateway</span> (preferred), reverse proxy, or Redis (<code>INCR</code>+<code>EXPIRE</code>).</div>
-</div>
+</div><!-- ═══ Scalability: separate compact lessons ═══ -->
+<div class="T" id="backpressure">
+<h2>Backpressure</h2><p class="su">When the consumer can’t keep up with the producer</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Backpressure strategies">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="70" y="86" fill="#fff">Producer</text>
+    <rect x="170" y="60" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="220" y="80" fill="#fff">Buffer</text>
+    <text x="220" y="94" fill="#8b93ac">queue / channel</text>
+    <rect x="320" y="60" width="100" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="370" y="86" fill="#fff">Consumer</text>
+    <rect x="450" y="30" width="90" height="30" fill="#1e2230" stroke="#f87171" rx="4"/>
+    <text x="495" y="50" fill="#f87171">drop / shed</text>
+    <rect x="450" y="70" width="90" height="30" fill="#1e2230" stroke="#fbbf24" rx="4"/>
+    <text x="495" y="90" fill="#fbbf24">slow producer</text>
+    <rect x="450" y="110" width="90" height="30" fill="#1e2230" stroke="#34d399" rx="4"/>
+    <text x="495" y="130" fill="#34d399">batch / yield</text>
+  </g>
+  <path d="M120 80 L170 80" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#bp1)"/>
+  <path d="M270 80 L320 80" stroke="#34d399" stroke-width="1.5" marker-end="url(#bp1)"/>
+  <path d="M220 100 L495 30" stroke="#f87171" stroke-width="1" stroke-dasharray="3 2"/>
+  <path d="M220 100 L495 85" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 2"/>
+  <path d="M220 100 L495 125" stroke="#34d399" stroke-width="1" stroke-dasharray="3 2"/>
+  <defs><marker id="bp1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Strategy</th><th>When</th><th>Example</th></tr>
+<tr><td>Drop / 503</td><td>Real-time, freshness &gt; completeness</td><td>Live metrics, ad bids</td></tr>
+<tr><td>Bounded buffer + block</td><td>Want lossless, can wait</td><td>Reactive Streams, Akka</td></tr>
+<tr><td>Slow producer (TCP / lag)</td><td>End-to-end flow control</td><td>Kafka consumer lag, HTTP/2</td></tr>
+</table>
+<div class="b br"><b>Always alarm on queue depth.</b> Unbounded buffers are how outages turn into OOMs.</div>
 </div>
 
-<!-- ═══ Scalability Extras ═══ -->
-<div class="T" id="scalability-extras">
-<h2>Scalability Extras</h2><p class="su">Backpressure, auto-scaling, graceful degradation</p>
-<table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">Backpressure</span></td><td>When consumer can't keep up with producer. <span class="hg">Drop</span> (shed load), <span class="hg">Buffer</span> (queue, risk OOM), <span class="hg">Slow producer</span> (TCP flow control, Kafka consumer lag). Reactive Streams (Java) have built-in backpressure. Always monitor queue depth.</td></tr>
-<tr><td><span class="hi">Auto-Scaling</span></td><td><span class="hg">CPU-based</span> (scale at 70% CPU — simple, laggy). <span class="hg">Queue-depth</span> (scale workers when queue grows — SQS + Lambda). <span class="hg">Request-based</span> (RPS threshold). <span class="hg">Predictive</span> (ML-based, schedule for known peaks). K8s HPA + KEDA for event-driven scaling.</td></tr>
-<tr><td><span class="hi">Graceful Degradation</span></td><td>When system is overloaded: <span class="hg">serve stale cache</span>, <span class="hg">disable non-critical features</span> (recommendations, analytics), <span class="hg">return simplified responses</span>, <span class="hg">feature flags</span> (LaunchDarkly) to toggle. Partial outage ≠ total failure.</td></tr>
-</table>
+<div class="T" id="auto-scaling">
+<h2>Auto-Scaling</h2><p class="su">Match capacity to load — reactively or predictively</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto scaling signals">
+  <g font-family="Inter" font-size="10" fill="#c8cee0">
+    <rect x="20" y="30" width="160" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="100" y="50" text-anchor="middle" fill="#fff">CPU &gt; 70%</text>
+    <text x="100" y="64" text-anchor="middle" fill="#8b93ac">simple, laggy</text>
+    <rect x="200" y="30" width="160" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="50" text-anchor="middle" fill="#fff">Queue depth</text>
+    <text x="280" y="64" text-anchor="middle" fill="#8b93ac">SQS+Lambda, KEDA</text>
+    <rect x="380" y="30" width="160" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="460" y="50" text-anchor="middle" fill="#fff">RPS / latency</text>
+    <text x="460" y="64" text-anchor="middle" fill="#8b93ac">closest to UX</text>
+    <rect x="110" y="100" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="190" y="120" text-anchor="middle" fill="#fff">Predictive (ML)</text>
+    <text x="190" y="134" text-anchor="middle" fill="#8b93ac">pre-warm peaks</text>
+    <rect x="290" y="100" width="160" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
+    <text x="370" y="120" text-anchor="middle" fill="#fff">Schedule</text>
+    <text x="370" y="134" text-anchor="middle" fill="#8b93ac">9am traffic, batch jobs</text>
+  </g>
+</svg>
+<div class="b bp"><b>Combine signals:</b> base on CPU, but shrink scale-down cooldown using predictive models so you scale up early and shed slowly.</div>
+<div class="b by"><b>Tools:</b> K8s HPA + KEDA, AWS ASG + Target Tracking, GCP autoscaler. Pair with cluster autoscaler for nodes.</div>
+</div>
+
+<div class="T" id="graceful-degradation">
+<h2>Graceful Degradation</h2><p class="su">Stay partially up instead of fully down</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceful degradation tiers">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="30" width="520" height="30" fill="#34d399" opacity=".25" stroke="#34d399" rx="6"/>
+    <text x="280" y="50" fill="#fff">Healthy: full features</text>
+    <rect x="60" y="68" width="440" height="30" fill="#fbbf24" opacity=".25" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="88" fill="#fff">Stressed: serve stale cache, disable recs/analytics</text>
+    <rect x="110" y="106" width="340" height="30" fill="#fb923c" opacity=".25" stroke="#fb923c" rx="6"/>
+    <text x="280" y="126" fill="#fff">Overloaded: read-only, simplified UI</text>
+    <rect x="160" y="144" width="240" height="22" fill="#f87171" opacity=".25" stroke="#f87171" rx="6"/>
+    <text x="280" y="159" fill="#fff">Critical-only: login + checkout</text>
+  </g>
+</svg>
+<div class="b bg"><b>Tactics:</b> feature flags (LaunchDarkly), tier traffic by importance (paid &gt; free), cached fallbacks, circuit breakers, request hedging.</div>
+</div>
+
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>

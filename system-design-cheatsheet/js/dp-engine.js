@@ -178,9 +178,9 @@
     p._step.i=0;dpRender(p);dpToggle(p,btn);
   };
 
-  var dpScale=2,dpTx=0,dpTy=0,dpPan=false;
+  var dpScale=5,dpTx=0,dpTy=0,dpPan=false;
   function dpApplyTransform(){var z=document.getElementById('dp-zoom-inner');if(z)z.style.transform='translate('+dpTx+'px,'+dpTy+'px) scale('+dpScale+')';}
-  window.dpZoom=function(f){if(f===0){dpScale=2;dpTx=0;dpTy=0;}else dpScale=Math.min(5,Math.max(.5,dpScale*f));dpApplyTransform();};
+  window.dpZoom=function(f){if(f===0){dpScale=5;dpTx=0;dpTy=0;}else dpScale=Math.min(20,Math.max(.5,dpScale*f));dpApplyTransform();};
   window.dpTogglePan=function(){dpPan=!dpPan;dpSetPanUI();};
   function dpSetPanUI(){var b=document.getElementById('dp-pan-btn'),w=document.getElementById('dp-zoom-wrap');if(!w)return;if(dpPan){w.classList.add('dp-pan-on');if(b){b.classList.add('dp-pan-active');b.setAttribute('aria-pressed','true');}}else{w.classList.remove('dp-pan-on','dp-panning');if(b){b.classList.remove('dp-pan-active');b.setAttribute('aria-pressed','false');}}}
   /* Pan: hold Space, or click ✋ then drag. Middle-mouse always pans. */
@@ -207,7 +207,7 @@
       if(pv)pv.disabled=true;if(nx)nx.disabled=(n===0);
     }
     var mb=document.getElementById('dp-modal-play');if(mb){mb.textContent='▶';mb.title='Play';}
-    dpScale=2;dpTx=0;dpTy=0;dpPan=false;dpSetPanUI();dpApplyTransform();
+    dpScale=5;dpTx=0;dpTy=0;dpPan=false;dpSetPanUI();dpApplyTransform();
     document.getElementById('dp-modal').style.display='flex';
   };
   window.dpModalPlay=function(){var p=dpModalPanel();if(p)dpToggle(p,document.getElementById('dp-modal-play'));};

@@ -731,19 +731,134 @@ server {
 </div>
 
 <div class="b bb" style="margin-top:4px"><span class="hi">Choose:</span> <span class="hg">Shared/Shared</span> for cost (Salesforce) → <span class="hg">Shared/Multi-DB</span> for data isolation (Shopify) → <span class="hg">Multi/Multi</span> for full isolation (enterprise/compliance). Most SaaS starts shared and migrates to hybrid as they scale.</div>
-</div>
+</div><!-- ═══ Infrastructure: separate compact lessons ═══ -->
+<div class="T" id="service-discovery">
+<h2>Service Discovery</h2><p class="su">How services find each other in a dynamic fleet</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Service discovery">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="30" y="80" width="100" height="50" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="80" y="100" fill="#fff" font-size="11">Client</text>
+    <text x="80" y="116" fill="#8b93ac">app pod</text>
+
+    <rect x="230" y="30" width="120" height="50" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="290" y="50" fill="#fff" font-size="11">Registry</text>
+    <text x="290" y="66" fill="#8b93ac">Consul / etcd / Eureka</text>
+
+    <rect x="430" y="55" width="110" height="30" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="485" y="74" fill="#fff">svc-A v1 ·10.0.0.5</text>
+    <rect x="430" y="95" width="110" height="30" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="485" y="114" fill="#fff">svc-A v1 ·10.0.0.6</text>
+    <rect x="430" y="135" width="110" height="30" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="485" y="154" fill="#fff">svc-A v1 ·10.0.0.7</text>
+  </g>
+  <path d="M130 100 L230 60" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#sd1)"/>
+  <text x="170" y="74" fill="#6c8cff" font-size="9" font-family="Inter">where is svc-A?</text>
+  <path d="M350 60 L430 70" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#sd1)"/>
+  <text x="395" y="50" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="Inter">heartbeat</text>
+  <path d="M230 60 L130 110" stroke="#34d399" stroke-width="1.5" marker-end="url(#sd1)"/>
+  <text x="185" y="100" fill="#34d399" font-size="9" font-family="Inter">[ips]</text>
+  <defs><marker id="sd1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Pattern</th><th>Who calls registry</th><th>Examples</th></tr>
+<tr><td>Client-side</td><td>App library</td><td>Eureka + Ribbon, Consul SDK</td></tr>
+<tr><td>Server-side</td><td>Load balancer</td><td>AWS ALB + Cloud Map, Envoy</td></tr>
+<tr><td>DNS-based</td><td>Stdlib resolver</td><td>K8s CoreDNS, Consul DNS</td></tr>
+</table>
+<div class="b bg"><b>Health checks</b> remove dead instances from the registry within seconds — critical for fast failover.</div>
 </div>
 
-<!-- ═══ Additional Infrastructure Concepts ═══ -->
-<div class="T" id="infra-extras">
-<h2>Infrastructure Extras</h2><p class="su">Service discovery, CI/CD, serverless, IaC</p>
+<div class="T" id="cicd">
+<h2>CI/CD &amp; Deployment Strategies</h2><p class="su">Ship safely without taking the site down</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deployment strategies">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <text x="80" y="18" fill="#fff" font-weight="600">Rolling</text>
+    <rect x="20" y="26" width="30" height="22" fill="#34d399" opacity=".7"/>
+    <rect x="52" y="26" width="30" height="22" fill="#34d399" opacity=".7"/>
+    <rect x="84" y="26" width="30" height="22" fill="#fbbf24" opacity=".75"/>
+    <rect x="116" y="26" width="30" height="22" fill="#6c8cff" opacity=".75"/>
+    <text x="83" y="42" fill="#0f1117" font-weight="700">old</text>
+    <text x="131" y="42" fill="#fff" font-weight="700">new</text>
+
+    <text x="320" y="18" fill="#fff" font-weight="600">Blue / Green</text>
+    <rect x="230" y="26" width="100" height="22" fill="#22d3ee" opacity=".55"/>
+    <text x="280" y="42" fill="#fff" font-weight="700">BLUE (live)</text>
+    <rect x="340" y="26" width="100" height="22" fill="#a78bfa" opacity=".55"/>
+    <text x="390" y="42" fill="#fff" font-weight="700">GREEN (warm)</text>
+    <path d="M280 56 L390 56" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#cd1)"/>
+    <text x="335" y="50" fill="#fbbf24">flip router</text>
+
+    <text x="80" y="108" fill="#fff" font-weight="600">Canary</text>
+    <rect x="20" y="116" width="126" height="22" fill="#34d399" opacity=".55"/>
+    <text x="83" y="132" fill="#fff" font-weight="700">95% old</text>
+    <rect x="148" y="116" width="30" height="22" fill="#fb923c" opacity=".75"/>
+    <text x="163" y="132" fill="#0f1117" font-weight="700">5%</text>
+    <text x="100" y="154" fill="#8b93ac">monitor errors → ramp</text>
+
+    <text x="320" y="108" fill="#fff" font-weight="600">Feature Flag</text>
+    <rect x="230" y="116" width="210" height="22" fill="#252a3a" stroke="#404863"/>
+    <rect x="330" y="116" width="50" height="22" fill="#f472b6" opacity=".7"/>
+    <text x="335" y="132" fill="#fff" font-weight="700">flag ON</text>
+    <text x="335" y="154" fill="#8b93ac">decoupled from deploy</text>
+  </g>
+  <defs><marker id="cd1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<div class="b bp"><b>Pipeline:</b> commit → build → unit → image → deploy staging → e2e → promote prod (canary) → auto-rollback on SLO breach.</div>
+</div>
+
+<div class="T" id="serverless">
+<h2>Serverless / FaaS</h2><p class="su">Pay-per-invocation compute that scales to zero</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Serverless cold start">
+  <g font-family="Inter" font-size="10" fill="#c8cee0">
+    <rect x="20" y="60" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="75" y="86" text-anchor="middle" fill="#fff">Event source</text>
+    <text x="75" y="100" text-anchor="middle" fill="#8b93ac">S3, SQS, API GW</text>
+
+    <rect x="170" y="40" width="100" height="30" fill="#fbbf24" opacity=".25" stroke="#fbbf24" rx="6"/>
+    <text x="220" y="60" text-anchor="middle" fill="#fbbf24">cold start</text>
+    <rect x="170" y="80" width="100" height="30" fill="#34d399" opacity=".3" stroke="#34d399" rx="6"/>
+    <text x="220" y="100" text-anchor="middle" fill="#34d399">warm exec</text>
+
+    <rect x="320" y="40" width="110" height="70" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="375" y="62" text-anchor="middle" fill="#fff">Function</text>
+    <text x="375" y="78" text-anchor="middle" fill="#8b93ac">Lambda / GCF</text>
+    <text x="375" y="94" text-anchor="middle" fill="#8b93ac">15 min max</text>
+
+    <rect x="460" y="60" width="80" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
+    <text x="500" y="86" text-anchor="middle" fill="#fff">DB / next svc</text>
+  </g>
+  <path d="M130 80 L170 80" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#sl1)"/>
+  <path d="M270 80 L320 80" stroke="#34d399" stroke-width="1.5" marker-end="url(#sl1)"/>
+  <path d="M430 80 L460 80" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#sl1)"/>
+  <defs><marker id="sl1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+  <text x="280" y="140" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">cold: 100ms–2s · warm: ms</text>
+</svg>
 <table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">Service Discovery</span></td><td><span class="hg">Client-side</span> (app queries registry: Consul, etcd, Eureka) vs <span class="hg">Server-side</span> (LB queries registry: AWS ALB + Cloud Map). DNS-based (Consul DNS, K8s CoreDNS) is simplest.</td></tr>
-<tr><td><span class="hi">CI/CD</span></td><td><span class="hg">CI</span> — build + test on every commit (GitHub Actions, Jenkins). <span class="hg">CD</span> — auto-deploy to staging/prod. Strategies: <span class="hg">Rolling</span> (gradual), <span class="hg">Blue-Green</span> (swap envs), <span class="hg">Canary</span> (5% traffic first), <span class="hg">Feature Flags</span> (toggle in code).</td></tr>
-<tr><td><span class="hi">Serverless / FaaS</span></td><td>AWS Lambda, Cloud Functions, Vercel. <span class="hg">Pay per invocation</span>, auto-scales to zero. <span class="hr">Cold start</span> latency (100ms–2s). Best for: event-driven, low-traffic, glue logic. Not for: long-running, stateful, high-throughput.</td></tr>
-<tr><td><span class="hi">Infrastructure as Code</span></td><td><span class="hg">Terraform</span> (multi-cloud, declarative HCL), <span class="hg">CloudFormation</span> (AWS-only), <span class="hg">Pulumi</span> (real programming languages). Version-controlled, reproducible, auditable infra.</td></tr>
+<tr><th>Good for</th><th>Bad for</th></tr>
+<tr><td>Event-driven glue, image resize, webhooks</td><td>Long-running jobs (&gt;15 min)</td></tr>
+<tr><td>Spiky low-volume traffic</td><td>Sustained high RPS (cost &gt; container)</td></tr>
+<tr><td>Cron + queue workers</td><td>Stateful sessions, websockets</td></tr>
 </table>
+<div class="b by"><b>Mitigate cold start:</b> provisioned concurrency, slim runtimes (Go, Rust), keep-warm pings, SnapStart.</div>
+</div>
+
+<div class="T" id="iac">
+<h2>Infrastructure as Code</h2><p class="su">Version-control your cloud just like your app</p>
+<table>
+<tr><th>Tool</th><th>Language</th><th>Strength</th></tr>
+<tr><td>Terraform</td><td>HCL (declarative)</td><td>Multi-cloud, huge provider catalog</td></tr>
+<tr><td>CloudFormation</td><td>YAML/JSON</td><td>Native AWS, free state mgmt</td></tr>
+<tr><td>Pulumi</td><td>TS/Python/Go</td><td>Real code — loops, tests, abstractions</td></tr>
+<tr><td>CDK</td><td>TS/Py/Java</td><td>AWS-blessed L2/L3 constructs</td></tr>
+</table>
+<pre><code>resource "aws_s3_bucket" "logs" {
+  bucket = "acme-logs-prod"
+  versioning { enabled = true }
+  tags = { env = "prod" }
+}</code></pre>
+<div class="b bg"><b>Workflow:</b> PR → <code>plan</code> in CI (diff visible) → review → <code>apply</code> on merge. State in S3+DynamoDB lock or Terraform Cloud.</div>
+</div>
+
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>

@@ -777,18 +777,99 @@
 
 <!-- Isolation levels -->
 <div class="b bb" style="margin-top:6px"><span class="hi">Isolation Levels:</span> <span class="hg">Read Uncommitted</span> → <span class="hg">Read Committed</span> (Postgres default) → <span class="hg">Repeatable Read</span> (MySQL default) → <span class="hg">Serializable</span> (strongest, slowest). <span class="hi">MVCC</span> — readers see snapshot, no read locks. <span class="hi">Deadlock prevention:</span> Acquire locks in same order, use timeouts.</div>
-</div>
+</div><!-- ═══ Consistency: separate compact lessons ═══ -->
+<div class="T" id="saga-orchestration">
+<h2>Saga — Orchestration vs Choreography</h2><p class="su">Long-running distributed transactions with compensations</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Saga patterns">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <text x="140" y="18" fill="#fff" font-weight="600">Orchestration</text>
+    <rect x="100" y="30" width="80" height="30" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="140" y="49" fill="#fbbf24">Orchestrator</text>
+    <rect x="20" y="100" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="55" y="119">Order</text>
+    <rect x="105" y="100" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="140" y="119">Payment</text>
+    <rect x="190" y="100" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="225" y="119">Ship</text>
+    <path d="M140 60 L55 100" stroke="#fbbf24" stroke-width="1.3"/>
+    <path d="M140 60 L140 100" stroke="#fbbf24" stroke-width="1.3"/>
+    <path d="M140 60 L225 100" stroke="#fbbf24" stroke-width="1.3"/>
+
+    <text x="420" y="18" fill="#fff" font-weight="600">Choreography (events)</text>
+    <rect x="310" y="50" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="345" y="69">Order</text>
+    <rect x="410" y="50" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="445" y="69">Payment</text>
+    <rect x="360" y="110" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="395" y="129">Ship</text>
+    <path d="M380 65 L410 65" stroke="#a78bfa" stroke-width="1.3" marker-end="url(#sa1)"/>
+    <path d="M445 80 L395 110" stroke="#a78bfa" stroke-width="1.3" marker-end="url(#sa1)"/>
+  </g>
+  <text x="280" y="180" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">On any failure: emit compensating action (refund, cancel reservation)</text>
+  <defs><marker id="sa1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th></th><th>Orchestration</th><th>Choreography</th></tr>
+<tr><td>Coordinator</td><td>Central (Temporal, Cadence, AWS Step Functions)</td><td>None — services react to events</td></tr>
+<tr><td>Visibility</td><td>Easy to trace</td><td>Hidden in event flows</td></tr>
+<tr><td>Coupling</td><td>Coupled to orchestrator</td><td>Loosely coupled</td></tr>
+<tr><td>Best for</td><td>Complex flows, many steps</td><td>Few simple steps, autonomous teams</td></tr>
+</table>
 </div>
 
-<!-- ═══ Consistency Extras ═══ -->
-<div class="T" id="consistency-extras">
-<h2>Consistency Extras</h2><p class="su">Saga orchestration, conflict resolution, event sourcing + CQRS</p>
+<div class="T" id="conflict-resolution">
+<h2>Conflict Resolution</h2><p class="su">Reconciling concurrent writes in eventually consistent systems</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Conflict resolution">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="40" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="70" y="58" fill="#fff">Node A</text>
+    <text x="70" y="72" fill="#8b93ac">x = 5 @ t=10</text>
+    <rect x="20" y="100" width="100" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="70" y="118" fill="#fff">Node B</text>
+    <text x="70" y="132" fill="#8b93ac">x = 7 @ t=11</text>
+    <rect x="180" y="30" width="160" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="260" y="50" fill="#fff">LWW → keeps t=11</text>
+    <text x="260" y="64" fill="#8b93ac">simple, can lose data</text>
+    <rect x="180" y="80" width="160" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
+    <text x="260" y="100" fill="#fff">Vector clock</text>
+    <text x="260" y="114" fill="#8b93ac">detects true conflicts</text>
+    <rect x="180" y="130" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="260" y="150" fill="#fff">CRDT</text>
+    <text x="260" y="164" fill="#8b93ac">auto-merges, no loss</text>
+    <rect x="380" y="80" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="460" y="100" fill="#fff">x = {5,7} → 12</text>
+    <text x="460" y="114" fill="#8b93ac">G-Counter merge</text>
+  </g>
+  <path d="M120 60 L180 50" stroke="#fbbf24" stroke-width="1.3"/>
+  <path d="M120 100 L180 100" stroke="#22d3ee" stroke-width="1.3"/>
+  <path d="M120 120 L180 150" stroke="#34d399" stroke-width="1.3"/>
+  <path d="M340 150 L380 100" stroke="#34d399" stroke-width="1.3" marker-end="url(#cr1)"/>
+  <defs><marker id="cr1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
 <table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">Saga Orchestration</span></td><td>Central <span class="hg">orchestrator</span> (Temporal, Cadence) tells each service what to do and handles compensations. vs <span class="hi">Choreography</span> — services react to events independently (no central coordinator). Orchestration = easier to debug, choreography = more decoupled.</td></tr>
-<tr><td><span class="hi">Conflict Resolution</span></td><td><span class="hg">LWW</span> (Last Writer Wins) — timestamp-based, simple but can lose data. <span class="hg">Vector Clocks</span> — track causal history per node, detect true conflicts. <span class="hg">CRDTs</span> — data structures that auto-merge (G-Counter, OR-Set). Used by Figma, Apple Notes, Riak.</td></tr>
-<tr><td><span class="hi">Clock Sync</span></td><td><span class="hg">NTP</span> — ~ms accuracy (most systems). <span class="hg">TrueTime</span> (Google Spanner) — GPS + atomic clocks, bounded uncertainty. <span class="hg">Hybrid Logical Clocks</span> — combine physical + logical time (CockroachDB). Needed for distributed ordering.</td></tr>
+<tr><th>Strategy</th><th>Used by</th></tr>
+<tr><td>Last-Writer-Wins</td><td>Cassandra (default), DynamoDB</td></tr>
+<tr><td>Vector / version clocks</td><td>Riak, Voldemort — surfaces siblings</td></tr>
+<tr><td>CRDTs (G-Counter, OR-Set, RGA)</td><td>Figma, Apple Notes, Redis CRDT, Yjs / Automerge</td></tr>
 </table>
+</div>
+
+<div class="T" id="clock-sync">
+<h2>Clock Sync &amp; Time</h2><p class="su">Why “now” is harder than it looks in distributed systems</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Clock sync sources">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="40" width="160" height="60" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="100" y="60" fill="#fff">NTP</text>
+    <text x="100" y="76" fill="#8b93ac">~ms accuracy</text>
+    <text x="100" y="92" fill="#8b93ac">drift, no bound</text>
+    <rect x="200" y="40" width="160" height="60" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="60" fill="#fff">TrueTime (Spanner)</text>
+    <text x="280" y="76" fill="#8b93ac">GPS + atomic</text>
+    <text x="280" y="92" fill="#8b93ac">bounded ε</text>
+    <rect x="380" y="40" width="160" height="60" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="460" y="60" fill="#fff">Hybrid Logical Clock</text>
+    <text x="460" y="76" fill="#8b93ac">physical + logical</text>
+    <text x="460" y="92" fill="#8b93ac">CockroachDB, YugabyteDB</text>
+  </g>
+  <text x="280" y="130" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">Used for global ordering, MVCC snapshots, lease expiry</text>
+</svg>
+<div class="b br"><b>Never</b> assume system clocks agree across nodes. Use logical clocks for ordering, monotonic clocks for timeouts.</div>
+</div>
+
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>

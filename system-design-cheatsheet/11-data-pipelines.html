@@ -356,15 +356,113 @@
 </div>
 
 <!-- ═══ Pipeline Extras ═══ -->
-<div class="T" id="pipeline-extras">
-<h2>Pipeline Extras</h2><p class="su">Data quality, schema registry, lineage, real-time analytics</p>
+<!-- ═══ Pipelines: separate compact lessons ═══ -->
+<div class="T" id="data-quality">
+<h2>Data Quality</h2><p class="su">Validate at ingestion — garbage in, garbage out</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Data quality gate">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="70" y="86" fill="#fff">Source</text>
+    <rect x="170" y="60" width="140" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="240" y="80" fill="#fff">Quality gate</text>
+    <text x="240" y="94" fill="#8b93ac">Great Expectations / dbt tests</text>
+    <rect x="360" y="30" width="100" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="410" y="56" fill="#34d399">Pass → land</text>
+    <rect x="360" y="90" width="100" height="40" fill="#1e2230" stroke="#f87171" rx="6"/>
+    <text x="410" y="108" fill="#f87171">Fail → quarantine</text>
+    <text x="410" y="122" fill="#8b93ac">+ alert</text>
+  </g>
+  <path d="M120 80 L170 80" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#dq1)"/>
+  <path d="M310 80 L360 50" stroke="#34d399" stroke-width="1.5" marker-end="url(#dq1)"/>
+  <path d="M310 80 L360 110" stroke="#f87171" stroke-width="1.5" marker-end="url(#dq1)"/>
+  <defs><marker id="dq1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
 <table>
-<tr><th>Concept</th><th>Detail</th></tr>
-<tr><td><span class="hi">Data Quality</span></td><td>Validate at ingestion: <span class="hg">Great Expectations</span>, <span class="hg">dbt tests</span>, <span class="hg">Soda</span>. Check: nulls, schema drift, value ranges, freshness. Bad data in → bad decisions out.</td></tr>
-<tr><td><span class="hi">Schema Registry</span></td><td><span class="hg">Confluent Schema Registry</span> — central store for Avro/Protobuf schemas. Enforces backward/forward compatibility. Prevents breaking changes across Kafka producers and consumers.</td></tr>
-<tr><td><span class="hi">Data Lineage</span></td><td>Track where data came from, how it was transformed, where it goes. <span class="hg">Apache Atlas</span>, <span class="hg">OpenLineage</span>, <span class="hg">DataHub</span>. Critical for GDPR compliance ("where is user X's data?") and debugging pipelines.</td></tr>
-<tr><td><span class="hi">Real-Time Analytics</span></td><td><span class="hg">Apache Pinot</span> (LinkedIn — who viewed your profile), <span class="hg">Apache Druid</span> (real-time OLAP), <span class="hg">ClickHouse</span> (fast columnar, Cloudflare analytics). Ingest from Kafka, query in ms. Bridge between streaming and BI dashboards.</td></tr>
+<tr><th>Check</th><th>Example</th></tr>
+<tr><td>Schema</td><td>columns + types match contract</td></tr>
+<tr><td>Nullness</td><td><code>user_id NOT NULL</code></td></tr>
+<tr><td>Range / set</td><td><code>0 ≤ score ≤ 100</code>, <code>currency ∈ USD…</code></td></tr>
+<tr><td>Freshness</td><td>last partition &lt; 6 h old</td></tr>
+<tr><td>Volume</td><td>row count within ±10% of 7-day median</td></tr>
 </table>
+<div class="b bg"><b>Tools:</b> Great Expectations, dbt tests, Soda, Monte Carlo (observability).</div>
+</div>
+
+<div class="T" id="pipeline-schema-registry">
+<h2>Schema Registry (Pipelines)</h2><p class="su">Single source of truth for event payloads</p>
+<table>
+<tr><th>Compatibility</th><th>Effect</th></tr>
+<tr><td>Backward</td><td>New consumer reads old data — default for adding optional fields</td></tr>
+<tr><td>Forward</td><td>Old consumer reads new data — safe to remove fields</td></tr>
+<tr><td>Full</td><td>Both — strictest, safest in production</td></tr>
+</table>
+<pre><code>{
+  "type": "record",
+  "name": "Order",
+  "fields": [
+    {"name":"id",     "type":"string"},
+    {"name":"amount", "type":"double"},
+    {"name":"coupon", "type":["null","string"], "default":null}
+  ]
+}</code></pre>
+<div class="b by"><b>Enforce in CI:</b> reject schema PR if it breaks compatibility against the registry. Confluent / Apicurio / Glue.</div>
+</div>
+
+<div class="T" id="data-lineage">
+<h2>Data Lineage</h2><p class="su">Where did this number come from?</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lineage graph">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="90" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/><text x="65" y="86" fill="#fff">orders.csv</text>
+    <rect x="150" y="60" width="90" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/><text x="195" y="82" fill="#fff">stage.orders</text>
+    <rect x="280" y="30" width="90" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/><text x="325" y="52" fill="#fff">dim_customer</text>
+    <rect x="280" y="90" width="90" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/><text x="325" y="112" fill="#fff">fact_orders</text>
+    <rect x="410" y="60" width="130" height="40" fill="#1e2230" stroke="#34d399" rx="6"/><text x="475" y="82" fill="#fff">Revenue dashboard</text>
+  </g>
+  <path d="M110 80 L150 80" stroke="#6c8cff" stroke-width="1.4" marker-end="url(#ln1)"/>
+  <path d="M240 70 L280 50" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#ln1)"/>
+  <path d="M240 90 L280 110" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#ln1)"/>
+  <path d="M370 50 L410 75" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#ln1)"/>
+  <path d="M370 110 L410 85" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#ln1)"/>
+  <defs><marker id="ln1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Tool</th><th>Niche</th></tr>
+<tr><td>OpenLineage</td><td>Open spec, plugs into Airflow / dbt / Spark</td></tr>
+<tr><td>DataHub</td><td>LinkedIn-born catalog + lineage</td></tr>
+<tr><td>Apache Atlas</td><td>Hadoop ecosystem</td></tr>
+<tr><td>Marquez</td><td>Reference impl of OpenLineage</td></tr>
+</table>
+<div class="b bp"><b>Why it matters:</b> GDPR "where is user X's data?", impact analysis before schema changes, root-cause for bad metrics.</div>
+</div>
+
+<div class="T" id="realtime-analytics">
+<h2>Real-Time Analytics</h2><p class="su">Sub-second OLAP from streaming sources</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Real-time analytics path">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="70" y="80" fill="#fff">App events</text>
+    <text x="70" y="94" fill="#8b93ac">clicks, txns</text>
+    <rect x="160" y="60" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="210" y="86" fill="#fff">Kafka</text>
+    <rect x="300" y="60" width="100" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="350" y="80" fill="#fff">Pinot / Druid</text>
+    <text x="350" y="94" fill="#8b93ac">columnar OLAP</text>
+    <rect x="440" y="60" width="100" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="490" y="86" fill="#fff">Dashboard</text>
+  </g>
+  <path d="M120 80 L160 80" stroke="#6c8cff" stroke-width="1.4" marker-end="url(#ra1)"/>
+  <path d="M260 80 L300 80" stroke="#fbbf24" stroke-width="1.4" marker-end="url(#ra1)"/>
+  <path d="M400 80 L440 80" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#ra1)"/>
+  <defs><marker id="ra1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Engine</th><th>Sweet spot</th></tr>
+<tr><td>Apache Pinot</td><td>User-facing analytics (LinkedIn "who viewed")</td></tr>
+<tr><td>Apache Druid</td><td>Time-series OLAP, slicing &amp; dicing</td></tr>
+<tr><td>ClickHouse</td><td>Lightning-fast columnar SQL (Cloudflare)</td></tr>
+<tr><td>Materialize / RisingWave</td><td>Streaming SQL with incremental views</td></tr>
+</table>
+<div class="b bg"><b>Architecture:</b> Kafka → stream engine (Flink/Spark) → OLAP store → BI / app dashboards. Sub-second freshness, query in ms.</div>
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
