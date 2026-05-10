@@ -422,10 +422,42 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
 <!-- ═══ 4 Pattern Visuals ═══ -->
 <div class="d-grid quad" style="margin:4px 0">
 
-<!-- Short Polling -->
-<div class="d-panel" style="padding:6px">
+<!-- Short Polling — ANIMATED with ZOOM POPUP -->
+<div class="d-panel sp-panel" style="padding:6px;position:relative">
 <h4 style="color:var(--g)">Short Polling</h4>
-<svg width="100%" viewBox="0 0 160 80" style="max-width:160px;display:block;margin:0 auto">
+<!-- Control buttons -->
+<div style="position:absolute;top:4px;right:6px;display:flex;gap:4px">
+<!-- Play button -->
+<button class="sp-play-btn" onclick="var p=this.closest('.sp-panel');p.classList.remove('sp-playing');void p.offsetWidth;p.classList.add('sp-playing');this.textContent='⏸';setTimeout(function(){p.classList.remove('sp-playing');p.querySelector('.sp-play-btn').textContent='▶'},6200)" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--g);background:rgba(52,211,153,.1);color:var(--g);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0" title="Replay animation">▶</button>
+<!-- Zoom/Expand button -->
+<button style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--a);background:rgba(108,140,255,.1);color:var(--a);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0" title="Expand diagram">⛶</button>
+</div>
+<style>
+/* Default: everything visible (final state) */
+.sp-panel .sp-el{opacity:1;transition:none}
+/* When playing: hide all first, then animate in sequence */
+.sp-playing .sp-el{opacity:0}
+.sp-playing .sp-req1{animation:spSlideUp .5s ease-out .3s forwards}
+.sp-playing .sp-res1{animation:spSlideDown .4s ease-out .7s forwards}
+.sp-playing .sp-wait1{animation:spFadeIn .3s ease-out 1s forwards}
+.sp-playing .sp-req2{animation:spSlideUp .5s ease-out 1.6s forwards}
+.sp-playing .sp-res2{animation:spSlideDown .4s ease-out 2s forwards}
+.sp-playing .sp-wait2{animation:spFadeIn .3s ease-out 2.3s forwards}
+.sp-playing .sp-req3{animation:spSlideUp .5s ease-out 3.2s forwards}
+.sp-playing .sp-res3{animation:spSlideDown .4s ease-out 3.6s forwards}
+.sp-playing .sp-data{animation:spFadeIn .4s ease-out 4s forwards}
+.sp-playing .sp-lbl{animation:spFadeIn .4s ease-out 4.6s forwards}
+@keyframes spSlideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spSlideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spFadeIn{from{opacity:0}to{opacity:1}}
+/* Modal styles */
+#sp-modal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:0;animation:spModalIn .25s ease-out}
+#sp-modal-content{background:var(--bg,#1a1b26);border:1px solid var(--border,#2a2b3d);border-radius:16px;width:calc(100% - 48px);height:calc(100% - 48px);position:relative;box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden}
+#sp-modal-close{position:absolute;top:12px;right:16px;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border,#2a2b3d);background:rgba(248,113,113,.08);color:var(--r,#f87171);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+#sp-modal-close:hover{background:rgba(248,113,113,.2)}
+@keyframes spModalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+</style>
+<svg width="100%" viewBox="0 0 160 90" style="max-width:160px;display:block;margin:0 auto">
   <defs><marker id="rt1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
   <!-- Server timeline -->
   <text x="10" y="12" fill="var(--g)" font-size="6.5" font-weight="700">Server</text>
@@ -435,24 +467,92 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
   <text x="10" y="56" fill="var(--a)" font-size="6.5" font-weight="700">Browser</text>
   <line x1="40" y1="54" x2="150" y2="54" stroke="var(--muted)" stroke-width=".8"/>
   <text x="154" y="56" fill="var(--muted)" font-size="5">t</text>
-  <!-- Req 1: empty -->
-  <line x1="50" y1="54" x2="50" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
-  <line x1="54" y1="10" x2="54" y2="54" stroke="var(--muted)" stroke-width=".8" marker-end="url(#rt1)" stroke-dasharray="2,2"/>
-  <!-- Wait -->
-  <text x="68" y="66" fill="var(--r)" font-size="5.5" font-weight="600">wait</text>
-  <!-- Req 2: empty -->
-  <line x1="82" y1="54" x2="82" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
-  <line x1="86" y1="10" x2="86" y2="54" stroke="var(--muted)" stroke-width=".8" marker-end="url(#rt1)" stroke-dasharray="2,2"/>
-  <!-- Wait -->
-  <text x="100" y="66" fill="var(--r)" font-size="5.5" font-weight="600">wait</text>
-  <!-- Req 3: has data -->
-  <line x1="114" y1="54" x2="114" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
-  <line x1="118" y1="10" x2="118" y2="54" stroke="var(--g)" stroke-width="1.2" marker-end="url(#rt1)"/>
-  <text x="126" y="36" fill="var(--g)" font-size="5.5" font-weight="600">✓ data</text>
-  <!-- Label -->
-  <text x="80" y="78" text-anchor="middle" fill="var(--muted)" font-size="6">Client asks repeatedly — most empty</text>
+
+  <!-- Req 1: request up (empty response) -->
+  <g class="sp-el sp-req1">
+    <line x1="50" y1="54" x2="50" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
+    <text x="44" y="34" fill="var(--a)" font-size="4.5" font-weight="600">GET</text>
+  </g>
+  <g class="sp-el sp-res1">
+    <line x1="54" y1="10" x2="54" y2="54" stroke="var(--muted)" stroke-width=".8" marker-end="url(#rt1)" stroke-dasharray="2,2"/>
+    <text x="58" y="34" fill="var(--r)" font-size="4.5" font-weight="600">∅</text>
+  </g>
+  <!-- Wait 1 -->
+  <text class="sp-el sp-wait1" x="62" y="66" fill="var(--r)" font-size="5" font-weight="600">⏱ 5s</text>
+
+  <!-- Req 2: request up (empty response) -->
+  <g class="sp-el sp-req2">
+    <line x1="82" y1="54" x2="82" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
+    <text x="76" y="34" fill="var(--a)" font-size="4.5" font-weight="600">GET</text>
+  </g>
+  <g class="sp-el sp-res2">
+    <line x1="86" y1="10" x2="86" y2="54" stroke="var(--muted)" stroke-width=".8" marker-end="url(#rt1)" stroke-dasharray="2,2"/>
+    <text x="90" y="34" fill="var(--r)" font-size="4.5" font-weight="600">∅</text>
+  </g>
+  <!-- Wait 2 -->
+  <text class="sp-el sp-wait2" x="94" y="66" fill="var(--r)" font-size="5" font-weight="600">⏱ 5s</text>
+
+  <!-- Req 3: request up (HAS DATA!) -->
+  <g class="sp-el sp-req3">
+    <line x1="114" y1="54" x2="114" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
+    <text x="108" y="34" fill="var(--a)" font-size="4.5" font-weight="600">GET</text>
+  </g>
+  <g class="sp-el sp-res3">
+    <line x1="118" y1="10" x2="118" y2="54" stroke="var(--g)" stroke-width="1.4" marker-end="url(#rt1)"/>
+    <text x="126" y="30" fill="var(--g)" font-size="5.5" font-weight="700">✓</text>
+    <text x="126" y="38" fill="var(--g)" font-size="4.5" font-weight="600">data!</text>
+  </g>
+  <!-- Data arrived label -->
+  <g class="sp-el sp-data">
+    <rect x="100" y="58" width="50" height="10" rx="3" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width=".6"/>
+    <text x="125" y="66" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">200 OK</text>
+  </g>
+
+  <!-- Summary labels -->
+  <text class="sp-el sp-lbl" x="80" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">Client asks every N sec — most responses empty (wasteful)</text>
+  <text class="sp-el sp-lbl" x="80" y="89" text-anchor="middle" fill="var(--r)" font-size="5">2 wasted requests before getting data</text>
 </svg>
 </div>
+
+<!-- ═══ SHORT POLLING ZOOM MODAL ═══ -->
+<div id="sp-modal" onclick="if(event.target===this)this.style.display='none'">
+<div id="sp-modal-content">
+  <button id="sp-modal-close" onclick="document.getElementById('sp-modal').style.display='none'" title="Close">✕</button>
+  <div style="display:flex;gap:6px;position:absolute;top:12px;left:16px;z-index:2">
+    <button onclick="spZoom(1.25)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border,#2a2b3d);background:rgba(108,140,255,.08);color:var(--a,#6c8cff);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+    <button onclick="spZoom(0.8)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border,#2a2b3d);background:rgba(108,140,255,.08);color:var(--a,#6c8cff);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+    <button onclick="spZoom(0)" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border,#2a2b3d);background:rgba(108,140,255,.08);color:var(--a,#6c8cff);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center">Reset</button>
+    <button id="sp-modal-play" onclick="spModalPlay()" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--g,#34d399);background:rgba(52,211,153,.08);color:var(--g,#34d399);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Replay animation">▶</button>
+  </div>
+  <div id="sp-zoom-wrap" style="overflow:auto;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:48px 16px 16px">
+    <div id="sp-zoom-inner" style="transform-origin:center center;transition:transform .2s ease"></div>
+  </div>
+</div>
+</div>
+<script>
+var spScale=2;
+function spZoom(f){
+  if(f===0)spScale=2;else spScale=Math.min(5,Math.max(.5,spScale*f));
+  document.getElementById('sp-zoom-inner').style.transform='scale('+spScale+')';
+}
+function spModalPlay(){
+  var panel=document.querySelector('#sp-zoom-inner .sp-panel');
+  if(!panel)return;
+  panel.classList.remove('sp-playing');void panel.offsetWidth;
+  panel.classList.add('sp-playing');
+  var btn=document.getElementById('sp-modal-play');
+  btn.textContent='⏸';
+  setTimeout(function(){panel.classList.remove('sp-playing');btn.textContent='▶'},6200);
+}
+document.querySelector('[title="Expand diagram"]').addEventListener('click',function(){
+  var inner=document.getElementById('sp-zoom-inner');
+  inner.innerHTML=document.querySelector('.sp-panel').outerHTML;
+  var btns=inner.querySelector('div[style*="position:absolute"]');
+  if(btns)btns.remove();
+  spScale=2;inner.style.transform='scale(2)';
+  document.getElementById('sp-modal').style.display='flex';
+});
+</script>
 
 <!-- Long Polling -->
 <div class="d-panel" style="padding:6px">
