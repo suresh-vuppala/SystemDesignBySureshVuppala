@@ -6,7 +6,7 @@ const navHTML = `
 </div>
 <div class="ng" id="topicNav">
   <div class="nc"><h3 style="color:var(--c)">1. Foundations</h3><div class="lk">
-    <a href="01-foundations.html#sd-framework">Framework</a><a href="01-foundations.html#fr-nfr">FR vs NFR</a><a href="01-foundations.html#scaling-basics">Scaling</a><a href="01-foundations.html#stateless-stateful">Stateless/Stateful</a><a href="01-foundations.html#serialization">Serialization</a>
+    <a href="01-foundations.html#sd-framework">Framework</a><a href="01-foundations.html#fr-nfr">FR vs NFR</a><a href="01-foundations.html#nfr-metrics">NFR Metrics &amp; SLOs</a><a href="01-foundations.html#scaling-basics">Scaling</a><a href="01-foundations.html#stateless-stateful">Stateless/Stateful</a><a href="01-foundations.html#serialization">Serialization</a>
   </div></div>
   <div class="nc"><h3 style="color:var(--c)">2. Networking</h3><div class="lk">
     <a href="02-networking.html#osi">OSI Model</a><a href="02-networking.html#tcp-udp">TCP/UDP</a><a href="02-networking.html#http-https">HTTP/HTTPS</a><a href="02-networking.html#dns">DNS</a><a href="02-networking.html#networking-extras">IP/Ports/Firewall</a>
@@ -43,15 +43,15 @@ const navHTML = `
   </div>
   <div class="nc"><h3 style="color:var(--g)">10. Scalability</h3>
     <div class="sg"><a href="10-scalability.html#partitioning">Partitioning</a><a href="10-scalability.html#sharding">Sharding</a><a href="10-scalability.html#replication">Replication</a></div>
-    <div class="sg"><a href="10-scalability.html#distributed-indexing">Dist. Indexing</a><a href="10-scalability.html#consistent-hashing">Consistent Hash</a><a href="10-scalability.html#bloom-filters">Bloom Filters</a><a href="10-scalability.html#rate-limiting">Rate Limiting</a></div>
+    <div class="sg"><a href="10-scalability.html#distributed-indexing">Dist. Indexing</a><a href="10-scalability.html#consistent-hashing">Consistent Hash</a><a href="10-scalability.html#bloom-filters">Bloom Filters</a><a href="10-scalability.html#rate-limiting">Rate Limiting</a><a href="10-scalability.html#scalability-extras">Extras</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--o)">11. Data Pipelines</h3>
     <div class="sg"><a href="11-data-pipelines.html#cdc">CDC</a><a href="11-data-pipelines.html#etl">ETL/ELT</a></div>
     <div class="sg"><a href="11-data-pipelines.html#stream-processing">Stream</a><a href="11-data-pipelines.html#batch-processing">Batch</a></div>
-    <div class="sg"><a href="11-data-pipelines.html#data-warehouse">Warehouse</a><a href="11-data-pipelines.html#data-lakes">Lakehouse</a></div>
+    <div class="sg"><a href="11-data-pipelines.html#data-warehouse">Warehouse</a><a href="11-data-pipelines.html#data-lakes">Lakehouse</a><a href="11-data-pipelines.html#pipeline-extras">Extras</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--a2)">12. Distributed Systems</h3>
-    <div class="sg"><a href="12-distributed-systems.html#dist-patterns">Patterns</a><a href="12-distributed-systems.html#fault-tolerance">Fault Tolerance</a></div>
+    <div class="sg"><a href="12-distributed-systems.html#dist-patterns">Patterns</a><a href="12-distributed-systems.html#fault-tolerance">Fault Tolerance</a><a href="12-distributed-systems.html#data-redundancy">Data Redundancy</a><a href="12-distributed-systems.html#leader-election">Leader Election</a></div>
     <div class="sg"><a href="12-distributed-systems.html#zookeeper">ZooKeeper</a><a href="12-distributed-systems.html#gfs-hdfs">GFS/HDFS</a><a href="12-distributed-systems.html#bigtable">BigTable</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--c)">13. Observability</h3><div class="lk">
@@ -174,7 +174,7 @@ input.addEventListener('keydown', e => {
   }
 });
 
-// Highlight active module card based on current page
+// Highlight active module card based on current page (always expanded — no collapse).
 document.querySelectorAll('#topicNav .nc').forEach(card => {
   const links = card.querySelectorAll('a');
   for(const a of links){
@@ -185,4 +185,94 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
     }
   }
 });
+
+// ═══ Right rail: on-page section navigator ═══
+(function buildRail(){
+  const sections = Array.from(document.querySelectorAll('.T[id]'));
+  if(sections.length < 2) return;
+  // Pick a label from the page's module card in the top nav
+  let moduleLabel = '';
+  const activeCard = document.querySelector('#topicNav .nc.active h3');
+  if(activeCard) moduleLabel = activeCard.textContent.trim();
+  const items = sections.map(sec => {
+    const h2 = sec.querySelector('h2');
+    return { id: sec.id, label: h2 ? h2.textContent.trim() : sec.id, el: sec };
+  });
+  const rail = document.createElement('aside');
+  rail.id = 'pageRail';
+  rail.setAttribute('aria-label','On this page');
+  rail.innerHTML =
+    '<h4><span class="pr-dot"></span>' + (moduleLabel || 'On this page') + '</h4>' +
+    '<ol>' + items.map(it => '<li><a href="#' + it.id + '" data-id="' + it.id + '">' + it.label + '</a></li>').join('') + '</ol>';
+  document.body.appendChild(rail);
+
+  // Persistent toggle button — user opens the section list only when needed.
+  const toggle = document.createElement('button');
+  toggle.id = 'pr-toggle';
+  toggle.type = 'button';
+  toggle.setAttribute('aria-label','Show section list');
+  toggle.setAttribute('aria-expanded','false');
+  toggle.title = 'Show section list';
+  toggle.innerHTML = '<span class="pr-tog-ic">☰</span><span class="pr-tog-lbl">Sections</span>';
+  document.body.appendChild(toggle);
+
+  function setOpen(open){
+    rail.classList.toggle('pr-visible', open);
+    toggle.classList.toggle('pr-tog-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.title = open ? 'Hide section list' : 'Show section list';
+  }
+  toggle.addEventListener('click', () => setOpen(!rail.classList.contains('pr-visible')));
+  // Close when a rail link is clicked on small screens
+  rail.addEventListener('click', e => {
+    if(e.target.tagName === 'A' && window.matchMedia('(max-width: 1280px)').matches) setOpen(false);
+  });
+  // Esc closes
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && rail.classList.contains('pr-visible')) setOpen(false);
+  });
+
+  const linkById = {};
+  rail.querySelectorAll('a').forEach(a => { linkById[a.dataset.id] = a; });
+
+  function setActive(id){
+    Object.values(linkById).forEach(a => a.classList.remove('pr-active'));
+    const a = linkById[id];
+    if(a){ a.classList.add('pr-active'); a.scrollIntoView({block:'nearest'}); }
+  }
+
+  // Highlight via IntersectionObserver — pick the section closest to top of viewport
+  const visible = new Map();
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if(e.isIntersecting) visible.set(e.target.id, e.intersectionRatio);
+      else visible.delete(e.target.id);
+    });
+    // Choose the topmost visible section; fall back to last passed
+    let bestId = null, bestTop = Infinity;
+    items.forEach(it => {
+      if(visible.has(it.id)){
+        const t = it.el.getBoundingClientRect().top;
+        if(t < bestTop){ bestTop = t; bestId = it.id; }
+      }
+    });
+    if(!bestId){
+      // Find last section whose top is above the trigger line
+      let last = null;
+      items.forEach(it => {
+        if(it.el.getBoundingClientRect().top < 140) last = it.id;
+      });
+      bestId = last || items[0].id;
+    }
+    setActive(bestId);
+  }, { rootMargin: '-100px 0px -55% 0px', threshold: [0, 0.25, 0.6, 1] });
+  items.forEach(it => io.observe(it.el));
+
+  // If URL has a hash, mark it active immediately
+  if(location.hash){
+    const id = location.hash.slice(1);
+    if(linkById[id]) setActive(id);
+  } else if(items[0]) setActive(items[0].id);
+
+})();
 })();

@@ -34,6 +34,28 @@
 <div class="b bb"><span class="hi">Core Challenges:</span> <span class="hg">Too many users</span> → horizontal scaling, LB, caching. <span class="hg">Too much data</span> → sharding, tiered storage. <span class="hg">Low latency</span> → caching, CDN, geo-distribution. <span class="hg">High availability</span> → replication, multi-region, graceful degradation.</div>
 </div>
 
+<div class="T" id="nfr-metrics">
+<h2>NFR Metrics &amp; SLOs</h2><p class="su">How non-functional requirements are <em>measured</em> — pick targets, then design to them</p>
+<table>
+<tr><th>NFR</th><th>What it means</th><th>Metric</th><th>Typical Target</th><th>Levers</th></tr>
+<tr><td><span class="hi">Latency</span></td><td>Time per request (user-perceived speed)</td><td><span class="hg">p50 / p95 / p99 / p99.9</span> ms</td><td>p99 &lt; 200 ms (web) · &lt; 50 ms (internal RPC)</td><td>Cache, CDN, async, geo-PoP, fewer hops</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td>Work served per unit time</td><td><span class="hg">RPS / QPS / TPS / msgs·s⁻¹</span></td><td>10K–1M RPS per service</td><td>Horizontal scale, batching, sharding</td></tr>
+<tr><td><span class="hi">Availability</span></td><td>% of time system is up &amp; serving</td><td><span class="hg">"Nines"</span> uptime</td><td>99.9 % (8.7 h/yr) · 99.99 % (52 min) · 99.999 % (5 min)</td><td>Redundancy, multi-AZ/region, failover, health checks</td></tr>
+<tr><td><span class="hi">Durability</span></td><td>% chance data survives (no loss, ever)</td><td><span class="hg">Nines</span> of durability</td><td>11×9 (S3) · 99.999999999 %</td><td>Replication (3×), erasure coding, cross-region backup, WAL</td></tr>
+<tr><td><span class="hi">Reliability</span></td><td>Correctness over time (MTBF / MTTR)</td><td><span class="hg">Error rate</span>, MTBF, MTTR</td><td>Error budget &lt; 0.1 % · MTTR &lt; 5 min</td><td>Retries, circuit breakers, idempotency, runbooks</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td>Ability to grow with load (linear, ideally)</td><td><span class="hg">Cost / RPS</span>, scale factor</td><td>Linear up to 10×–100×</td><td>Stateless services, sharding, autoscale</td></tr>
+<tr><td><span class="hi">Bandwidth</span></td><td>Data moved over network per second</td><td><span class="hg">MB/s · Gbps</span> ingress/egress</td><td>Stay within VPC/CDN egress budget</td><td>Compression, CDN, delta sync, batching</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>How much data is kept &amp; for how long</td><td><span class="hg">GB / TB / PB</span>, retention</td><td>Right-size; tier hot→warm→cold (S3 IA/Glacier)</td><td>TTL, compression, tiering, dedup</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td>How fresh / agreed data is across replicas</td><td><span class="hg">Strong / RYW / Eventual</span>, replica lag</td><td>Strong for $ · eventual for likes</td><td>Quorum (R+W&gt;N), Raft/Paxos, CRDTs</td></tr>
+<tr><td><span class="hi">Security / Privacy</span></td><td>AuthN/AuthZ, encryption, audit</td><td><span class="hg">CVE count</span>, % encrypted, audit pass</td><td>0 critical CVEs · TLS everywhere · PII encrypted at rest</td><td>OAuth2, mTLS, KMS, WAF, RBAC</td></tr>
+<tr><td><span class="hi">Cost</span></td><td>$ per request / GB / user</td><td><span class="hg">$ / 1M req</span>, $/GB-month</td><td>Within unit-economics envelope</td><td>Spot, reserved, autoscale-down, caching</td></tr>
+</table>
+<div class="b bg"><span class="hi">Why percentiles, not averages, for latency:</span> averages hide tail pain. With 100 ms avg you can still have 5 % users at 2 s. <span class="hg">p50</span> = median (typical user), <span class="hg">p95 / p99</span> = the bad days, <span class="hg">p99.9</span> = the angry tweets. SLO is usually written on <span class="hg">p99</span> for user-facing, <span class="hg">p99.9</span> for infra.</div>
+<div class="b by"><span class="hi">"Nines" cheatsheet — downtime per year:</span> <span class="hg">99 %</span> = 3.65 days · <span class="hg">99.9 %</span> = 8.77 h · <span class="hg">99.99 %</span> = 52.6 min · <span class="hg">99.999 %</span> = 5.26 min · <span class="hg">99.9999 %</span> = 31.5 s. Each extra 9 ≈ 10× cost &amp; complexity (more replicas, multi-region, chaos testing). Durability uses the same scale but for <em>data loss probability</em> — S3 advertises <span class="hg">11×9</span> = 1 object lost per 100 B per year.</div>
+<div class="b bp"><span class="hi">SLI · SLO · SLA:</span> <span class="hg">SLI</span> = the <em>measurement</em> ("p99 latency over 5-min window"). <span class="hg">SLO</span> = your <em>internal</em> target ("p99 &lt; 200 ms, 99.9 % of the time"). <span class="hg">SLA</span> = the <em>contractual</em> promise to customers (with refund/credit if missed). Always: SLA &lt; SLO &lt; actual performance — leave headroom for the <span class="hg">error budget</span>.</div>
+<div class="b bb"><span class="hi">Trade-offs (CAP/PACELC reminder):</span> you cannot maximize all NFRs at once. <span class="hg">More 9's of availability</span> → weaker consistency or higher cost. <span class="hg">Lower latency</span> → larger cache footprint / more PoPs / weaker durability (e.g. async fsync). State the SLO <em>numerically</em> in interviews — "p99 &lt; 200 ms, 99.99 % availability, 11×9 durability" — then derive the architecture from it.</div>
+</div>
+
 <div class="T" id="scaling-basics">
 <h2>Scaling Basics</h2><p class="su">Vertical vs Horizontal — the fundamental scaling decision</p>
 <table>
@@ -81,6 +103,8 @@
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="css/dp-engine.css">
+<script src="js/dp-engine.js"></script>
 <script src="js/nav.js"></script>
 </body>
 </html>
