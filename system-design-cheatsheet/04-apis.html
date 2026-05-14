@@ -930,93 +930,204 @@ document.addEventListener('keydown',function(e){
 </div>
 
 <!-- ═══ WebSocket ═══ -->
-<div class="d-panel dp-panel ws-panel" data-dp-duration="6200" style="padding:6px">
+<div class="d-panel dp-panel ws-panel" data-dp-duration="8000" style="padding:6px">
 <h4 style="color:var(--y)">WebSocket</h4>
 <div class="dp-ctrls">
 <button class="dp-ctrl" onclick="dpToggle(this.closest('.dp-panel'),this)" title="Play / Pause">▶</button>
 <button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">⛶</button>
 </div>
 <style>
-.ws-panel.dp-playing .ws-banner{animation:dpPop .4s ease-out .3s forwards}
-.ws-panel.dp-playing .ws-m1{animation:dpFadeIn .4s ease-out .9s forwards}
-.ws-panel.dp-playing .ws-m2{animation:dpFadeIn .4s ease-out 1.6s forwards}
-.ws-panel.dp-playing .ws-m3{animation:dpFadeIn .4s ease-out 2.3s forwards}
-.ws-panel.dp-playing .ws-m4{animation:dpFadeIn .4s ease-out 3.0s forwards}
-.ws-panel.dp-playing .ws-m5{animation:dpFadeIn .4s ease-out 3.7s forwards}
-.ws-panel.dp-playing .ws-m6{animation:dpFadeIn .4s ease-out 4.4s forwards}
-.ws-panel.dp-playing .ws-m7{animation:dpFadeIn .4s ease-out 5.0s forwards}
-.ws-panel.dp-playing .ws-m8{animation:dpFadeIn .4s ease-out 5.5s forwards}
-.ws-panel.dp-playing .ws-lbl{animation:dpFadeIn .4s ease-out 5.9s forwards}
+.ws-panel.dp-playing .ws-title{animation:dpFadeIn .3s ease-out .2s forwards}
+.ws-panel.dp-playing .ws-p1{animation:dpFadeIn .4s ease-out .5s forwards}
+.ws-panel.dp-playing .ws-req{animation:dpFadeIn .4s ease-out 1s forwards}
+.ws-panel.dp-playing .ws-req-detail{animation:dpFadeIn .3s ease-out 1.3s forwards}
+.ws-panel.dp-playing .ws-101{animation:dpFadeIn .4s ease-out 1.6s forwards}
+.ws-panel.dp-playing .ws-101-detail{animation:dpFadeIn .3s ease-out 1.9s forwards}
+.ws-panel.dp-playing .ws-est{animation:dpPop .4s ease-out 2.2s forwards}
+.ws-panel.dp-playing .ws-p2{animation:dpFadeIn .4s ease-out 2.8s forwards}
+.ws-panel.dp-playing .ws-data{animation:dpFadeIn .3s ease-out 3.2s forwards}
+.ws-panel.dp-playing .ws-action{animation:dpFadeIn .3s ease-out 3.6s forwards}
+.ws-panel.dp-playing .ws-resp{animation:dpFadeIn .3s ease-out 4s forwards}
+.ws-panel.dp-playing .ws-p3{animation:dpFadeIn .4s ease-out 4.4s forwards}
+.ws-panel.dp-playing .ws-ping{animation:dpFadeIn .3s ease-out 4.8s forwards}
+.ws-panel.dp-playing .ws-pong{animation:dpFadeIn .3s ease-out 5.2s forwards}
+.ws-panel.dp-playing .ws-frame{animation:dpFadeIn .4s ease-out 5.8s forwards}
+.ws-panel.dp-playing .ws-overhead{animation:dpFadeIn .3s ease-out 6.3s forwards}
+.ws-panel.dp-playing .ws-lbl{animation:dpFadeIn .4s ease-out 7s forwards}
 </style>
-<svg width="100%" viewBox="0 0 160 80" style="max-width:160px;display:block;margin:0 auto">
-  <!-- Server timeline -->
-  <text x="10" y="12" fill="var(--g)" font-size="6.5" font-weight="700">Server</text>
-  <line x1="40" y1="10" x2="150" y2="10" stroke="var(--muted)" stroke-width=".8"/>
-  <text x="154" y="12" fill="var(--muted)" font-size="5">t</text>
-  <!-- Browser timeline -->
-  <text x="10" y="56" fill="var(--a)" font-size="6.5" font-weight="700">Browser</text>
-  <line x1="40" y1="54" x2="150" y2="54" stroke="var(--muted)" stroke-width=".8"/>
-  <text x="154" y="56" fill="var(--muted)" font-size="5">t</text>
-  <!-- Full duplex banner -->
-  <g class="dp-el ws-banner">
-    <rect x="50" y="0" width="60" height="10" rx="3" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
-    <text x="80" y="8" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">full-duplex</text>
+<svg width="100%" viewBox="0 0 300 175" style="max-width:300px;display:block;margin:0 auto">
+  <defs><marker id="wsarr" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><polygon points="0 0,5 2.5,0 5" fill="#8b8fa3"/></marker></defs>
+  
+  <!-- Actors -->
+  <text x="30" y="12" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Browser</text>
+  <text x="270" y="12" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Server</text>
+  
+  <!-- Phase 1: Handshake -->
+  <g class="dp-el ws-p1">
+    <rect x="8" y="18" width="284" height="12" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+    <text x="14" y="26" fill="var(--y)" font-size="5.5" font-weight="700">Phase 1: HTTP Upgrade Handshake</text>
   </g>
-  <!-- Bidirectional messages (X pattern) -->
-  <line class="dp-el ws-m1" x1="50" y1="54" x2="62" y2="10" stroke="var(--a)" stroke-width=".8"/>
-  <line class="dp-el ws-m2" x1="58" y1="10" x2="70" y2="54" stroke="var(--g)" stroke-width=".8"/>
-  <line class="dp-el ws-m3" x1="74" y1="54" x2="86" y2="10" stroke="var(--a)" stroke-width=".8"/>
-  <line class="dp-el ws-m4" x1="82" y1="10" x2="94" y2="54" stroke="var(--g)" stroke-width=".8"/>
-  <line class="dp-el ws-m5" x1="98" y1="54" x2="110" y2="10" stroke="var(--a)" stroke-width=".8"/>
-  <line class="dp-el ws-m6" x1="106" y1="10" x2="118" y2="54" stroke="var(--g)" stroke-width=".8"/>
-  <line class="dp-el ws-m7" x1="122" y1="54" x2="134" y2="10" stroke="var(--a)" stroke-width=".8"/>
-  <line class="dp-el ws-m8" x1="130" y1="10" x2="142" y2="54" stroke="var(--g)" stroke-width=".8"/>
+  
+  <!-- HTTP Upgrade -->
+  <line class="dp-el ws-req" x1="50" y1="34" x2="250" y2="34" stroke="var(--a)" stroke-width=".8" marker-end="url(#wsarr)"/>
+  <text x="150" y="32" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">GET /chat HTTP/1.1 + Upgrade: websocket</text>
+  
+  <!-- HTTP Upgrade details -->
+  <text class="dp-el ws-req-detail" x="160" y="41" fill="var(--muted)" font-size="4.2" font-family="monospace">Sec-WebSocket-Key: dGhlIHNhbXBsZQ==</text>
+  
+  <!-- 101 Response -->
+  <line class="dp-el ws-101" x1="250" y1="48" x2="50" y2="48" stroke="var(--g)" stroke-width=".8" marker-end="url(#wsarr)"/>
+  <text x="150" y="46" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">101 Switching Protocols</text>
+  
+  <!-- 101 details -->
+  <text class="dp-el ws-101-detail" x="140" y="55" fill="var(--muted)" font-size="4.2" font-family="monospace">Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=</text>
+  
+  <!-- Established -->
+  <g class="dp-el ws-est">
+    <rect x="60" y="60" width="180" height="10" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".7"/>
+    <text x="150" y="67" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">✓ Full-Duplex Connection Established</text>
+  </g>
+  
+  <!-- Phase 2: Bidirectional -->
+  <g class="dp-el ws-p2">
+    <rect x="8" y="74" width="284" height="12" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+    <text x="14" y="82" fill="var(--g)" font-size="5.5" font-weight="700">Phase 2: Bidirectional Real-Time Communication</text>
+  </g>
+  
+  <!-- Real-time data -->
+  <line class="dp-el ws-data" x1="250" y1="92" x2="50" y2="92" stroke="var(--g)" stroke-width=".7" marker-end="url(#wsarr)"/>
+  <text x="150" y="90" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Server: Price update</text>
+  
+  <!-- User action -->
+  <line class="dp-el ws-action" x1="50" y1="101" x2="250" y2="101" stroke="var(--a)" stroke-width=".7" marker-end="url(#wsarr)"/>
+  <text x="150" y="99" text-anchor="middle" fill="var(--a)" font-size="4.5" font-weight="600">Client: User action</text>
+  
+  <!-- Instant response -->
+  <line class="dp-el ws-resp" x1="250" y1="110" x2="50" y2="110" stroke="var(--g)" stroke-width=".7" marker-end="url(#wsarr)"/>
+  <text x="150" y="108" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Server: Instant response</text>
+  
+  <!-- Phase 3: Keep-Alive -->
+  <g class="dp-el ws-p3">
+    <rect x="8" y="118" width="284" height="12" rx="2" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+    <text x="14" y="126" fill="var(--a2)" font-size="5.5" font-weight="700">Phase 3: Keep-Alive Heartbeat (every 30s)</text>
+  </g>
+  
+  <!-- Ping/Pong -->
+  <line class="dp-el ws-ping" x1="150" y1="134" x2="230" y2="134" stroke="var(--a2)" stroke-width=".6" marker-end="url(#wsarr)"/>
+  <text x="190" y="132" text-anchor="middle" fill="var(--a2)" font-size="4" font-weight="600">Ping</text>
+  
+  <line class="dp-el ws-pong" x1="230" y1="141" x2="150" y2="141" stroke="var(--a2)" stroke-width=".6" marker-end="url(#wsarr)"/>
+  <text x="190" y="139" text-anchor="middle" fill="var(--a2)" font-size="4" font-weight="600">Pong</text>
+  
+  <!-- Binary Frame Format -->
+  <g class="dp-el ws-frame">
+    <rect x="8" y="150" width="284" height="14" rx="2" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".5" stroke-dasharray="2,2"/>
+    <text x="14" y="158" fill="var(--c)" font-size="5" font-weight="600">✦ Binary Frames: FIN(1b) | RSV(3b) | Opcode(4b) | Mask(1b) | Length(7-64b) | Payload</text>
+  </g>
+  
+  <!-- Overhead comparison -->
+  <text class="dp-el ws-overhead" x="150" y="171" text-anchor="middle" fill="var(--muted)" font-size="4.5" font-weight="600">~2-14 bytes overhead vs 400+ for HTTP · Text &amp; Binary support</text>
+  
   <!-- Label -->
-  <text class="dp-el ws-lbl" x="80" y="78" text-anchor="middle" fill="var(--muted)" font-size="6">Both send anytime — persistent conn</text>
+  <text class="dp-el ws-lbl" x="150" y="182" text-anchor="middle" fill="var(--muted)" font-size="4.5">One persistent connection · 100K+ per server · Sub-ms latency</text>
 </svg>
 </div>
 
 <!-- ═══ SSE ═══ -->
-<div class="d-panel dp-panel sse-panel" data-dp-duration="6200" style="padding:6px">
-<h4 style="color:var(--c)">SSE</h4>
+<div class="d-panel dp-panel sse-panel" data-dp-duration="9000" style="padding:6px">
+<h4 style="color:var(--c)">SSE (Server-Sent Events)</h4>
 <div class="dp-ctrls">
 <button class="dp-ctrl" onclick="dpToggle(this.closest('.dp-panel'),this)" title="Play / Pause">▶</button>
 <button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">⛶</button>
 </div>
 <style>
-.sse-panel.dp-playing .sse-banner{animation:dpPop .4s ease-out .3s forwards}
-.sse-panel.dp-playing .sse-req{animation:dpSlideUp .5s ease-out .8s forwards}
-.sse-panel.dp-playing .sse-e1{animation:dpFadeIn .35s ease-out 1.6s forwards}
-.sse-panel.dp-playing .sse-e2{animation:dpFadeIn .35s ease-out 2.4s forwards}
-.sse-panel.dp-playing .sse-e3{animation:dpFadeIn .35s ease-out 3.2s forwards}
-.sse-panel.dp-playing .sse-e4{animation:dpFadeIn .35s ease-out 4.0s forwards}
-.sse-panel.dp-playing .sse-e5{animation:dpFadeIn .35s ease-out 4.8s forwards}
-.sse-panel.dp-playing .sse-lbl{animation:dpFadeIn .4s ease-out 5.5s forwards}
+.sse-panel.dp-playing .sse-title{animation:dpFadeIn .3s ease-out .2s forwards}
+.sse-panel.dp-playing .sse-p1{animation:dpFadeIn .4s ease-out .5s forwards}
+.sse-panel.dp-playing .sse-req{animation:dpFadeIn .4s ease-out 1s forwards}
+.sse-panel.dp-playing .sse-200{animation:dpFadeIn .4s ease-out 1.5s forwards}
+.sse-panel.dp-playing .sse-open{animation:dpPop .4s ease-out 2s forwards}
+.sse-panel.dp-playing .sse-stream{animation:dpFadeIn .4s ease-out 2.6s forwards}
+.sse-panel.dp-playing .sse-e1{animation:dpFadeIn .3s ease-out 3s forwards}
+.sse-panel.dp-playing .sse-e2{animation:dpFadeIn .3s ease-out 3.5s forwards}
+.sse-panel.dp-playing .sse-e3{animation:dpFadeIn .3s ease-out 4s forwards}
+.sse-panel.dp-playing .sse-minutes{animation:dpFadeIn .3s ease-out 4.5s forwards}
+.sse-panel.dp-playing .sse-e4{animation:dpFadeIn .3s ease-out 5.1s forwards}
+.sse-panel.dp-playing .sse-drop{animation:dpPop .4s ease-out 5.7s forwards}
+.sse-panel.dp-playing .sse-reconnect{animation:dpFadeIn .4s ease-out 6.5s forwards}
+.sse-panel.dp-playing .sse-resume{animation:dpFadeIn .4s ease-out 7.2s forwards}
+.sse-panel.dp-playing .sse-lbl{animation:dpFadeIn .4s ease-out 8s forwards}
 </style>
-<svg width="100%" viewBox="0 0 160 80" style="max-width:160px;display:block;margin:0 auto">
-  <!-- Server timeline -->
-  <text x="10" y="12" fill="var(--g)" font-size="6.5" font-weight="700">Server</text>
-  <line x1="40" y1="10" x2="150" y2="10" stroke="var(--muted)" stroke-width=".8"/>
-  <text x="154" y="12" fill="var(--muted)" font-size="5">t</text>
-  <!-- Browser timeline -->
-  <text x="10" y="56" fill="var(--a)" font-size="6.5" font-weight="700">Browser</text>
-  <line x1="40" y1="54" x2="150" y2="54" stroke="var(--muted)" stroke-width=".8"/>
-  <text x="154" y="56" fill="var(--muted)" font-size="5">t</text>
-  <!-- Uni-directional banner -->
-  <g class="dp-el sse-banner">
-    <rect x="44" y="0" width="72" height="10" rx="3" fill="rgba(34,211,238,.1)" stroke="var(--c)" stroke-width=".6"/>
-    <text x="80" y="8" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="700">uni-directional</text>
+<svg width="100%" viewBox="0 0 300 140" style="max-width:300px;display:block;margin:0 auto">
+  <defs><marker id="ssearr" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><polygon points="0 0,5 2.5,0 5" fill="#22d3ee"/></marker></defs>
+  
+  <!-- Actors -->
+  <text x="30" y="12" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Browser</text>
+  <text x="270" y="12" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Server</text>
+  
+  <!-- Phase 1: Connection -->
+  <g class="dp-el sse-p1">
+    <rect x="8" y="18" width="284" height="14" rx="3" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".6"/>
+    <text x="14" y="28" fill="var(--c)" font-size="6" font-weight="700">Phase 1: Initial Connection (GET /events)</text>
   </g>
-  <!-- Initial request from browser -->
-  <line class="dp-el sse-req" x1="48" y1="54" x2="48" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#rt1)"/>
-  <!-- Server pushes only -->
-  <line class="dp-el sse-e1" x1="60" y1="10" x2="68" y2="54" stroke="var(--g)" stroke-width="1"/>
-  <line class="dp-el sse-e2" x1="76" y1="10" x2="84" y2="54" stroke="var(--g)" stroke-width="1"/>
-  <line class="dp-el sse-e3" x1="92" y1="10" x2="100" y2="54" stroke="var(--g)" stroke-width="1"/>
-  <line class="dp-el sse-e4" x1="108" y1="10" x2="116" y2="54" stroke="var(--g)" stroke-width="1"/>
-  <line class="dp-el sse-e5" x1="124" y1="10" x2="132" y2="54" stroke="var(--g)" stroke-width="1"/>
+  
+  <!-- GET Request -->
+  <line class="dp-el sse-req" x1="50" y1="36" x2="250" y2="36" stroke="var(--a)" stroke-width=".8" marker-end="url(#ssearr)"/>
+  <text x="150" y="34" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">GET /events (Accept: text/event-stream)</text>
+  
+  <!-- HTTP 200 OK -->
+  <line class="dp-el sse-200" x1="250" y1="44" x2="50" y2="44" stroke="var(--g)" stroke-width=".8" marker-end="url(#ssearr)"/>
+  <text x="150" y="42" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">HTTP 200 OK</text>
+  
+  <!-- Open connection -->
+  <g class="dp-el sse-open">
+    <rect x="80" y="50" width="140" height="12" rx="3" fill="rgba(34,211,238,.12)" stroke="var(--c)" stroke-width=".7"/>
+    <text x="150" y="59" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="700">Connection stays open</text>
+  </g>
+  
+  <!-- Phase 2: Stream -->
+  <g class="dp-el sse-stream">
+    <rect x="8" y="66" width="284" height="14" rx="3" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".6"/>
+    <text x="14" y="76" fill="var(--c)" font-size="6" font-weight="700">Phase 2: Server Streams Events</text>
+  </g>
+  
+  <!-- Event 1 -->
+  <line class="dp-el sse-e1" x1="250" y1="84" x2="70" y2="84" stroke="var(--g)" stroke-width=".7" marker-end="url(#ssearr)"/>
+  <text x="160" y="82" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">data: Price update $150.25</text>
+  
+  <!-- Event 2 -->
+  <line class="dp-el sse-e2" x1="250" y1="91" x2="70" y2="91" stroke="var(--g)" stroke-width=".7" marker-end="url(#ssearr)"/>
+  <text x="160" y="89" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">data: Price update $150.30</text>
+  
+  <!-- Event 3 -->
+  <line class="dp-el sse-e3" x1="250" y1="98" x2="70" y2="98" stroke="var(--g)" stroke-width=".7" marker-end="url(#ssearr)"/>
+  <text x="160" y="96" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">data: Price update $150.28</text>
+  
+  <!-- Minutes pass -->
+  <g class="dp-el sse-minutes">
+    <rect x="90" y="104" width="120" height="10" rx="2" fill="rgba(200,200,200,.1)" stroke="var(--muted)" stroke-width=".5" stroke-dasharray="2,2"/>
+    <text x="150" y="112" text-anchor="middle" fill="var(--muted)" font-size="5">Minutes pass...</text>
+  </g>
+  
+  <!-- Event 4 -->
+  <line class="dp-el sse-e4" x1="250" y1="118" x2="70" y2="118" stroke="var(--g)" stroke-width=".7" marker-end="url(#ssearr)"/>
+  <text x="160" y="116" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">data: Price update $151.00</text>
+  
+  <!-- Connection drops -->
+  <g class="dp-el sse-drop">
+    <rect x="8" y="124" width="284" height="12" rx="3" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".6"/>
+    <text x="150" y="132" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Connection drops (network glitch)</text>
+  </g>
+  
+  <!-- Reconnect with Last-Event-ID -->
+  <line class="dp-el sse-reconnect" x1="50" y1="140" x2="250" y2="140" stroke="var(--a)" stroke-width=".7" marker-end="url(#ssearr)" stroke-dasharray="3,2"/>
+  <text x="150" y="138" text-anchor="middle" fill="var(--a)" font-size="4.5" font-weight="600">Auto-reconnect: GET /events (Last-Event-ID: 42)</text>
+  
+  <!-- Resume from event 42 -->
+  <line class="dp-el sse-resume" x1="250" y1="147" x2="50" y2="147" stroke="var(--g)" stroke-width=".7" marker-end="url(#ssearr)" stroke-dasharray="3,2"/>
+  <text x="150" y="145" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Resumes from event 42 (no data loss!)</text>
+  
   <!-- Label -->
-  <text class="dp-el sse-lbl" x="80" y="78" text-anchor="middle" fill="var(--muted)" font-size="6">Server pushes only — auto-reconnect</text>
+  <text class="dp-el sse-lbl" x="150" y="156" text-anchor="middle" fill="var(--muted)" font-size="5.5">Server-only push · built-in browser auto-reconnect · replay via event IDs</text>
 </svg>
 </div>
 </div>
@@ -1160,36 +1271,293 @@ document.addEventListener('keydown',function(e){
 <tr><td><span class="hi">WebRTC</span></td><td><span class="hg">Peer-to-peer</span></td><td>Ultra-low</td><td>Video/audio calls (Zoom, Google Meet), screen sharing, Discord voice</td><td><span class="hg">Direct P2P</span> — no server bandwidth for media. Browser-enforced encryption.</td></tr>
 <tr><td><span class="hi">Webhook</span></td><td><span class="hg">Server → Your Server</span></td><td>~sec</td><td>Payment events (Stripe), CI/CD triggers (GitHub Actions), order updates (Shopify)</td><td><span class="hg">Event-driven HTTP POST</span> — fire-and-forget. Retries on failure. No persistent connection.</td></tr>
 </table>
-<pre><code>WebSocket Lifecycle:
-  HTTP Upgrade → 101 Switching → Full Duplex (binary frames)
-  Heartbeat: Ping every 30s to detect dead connections
-  Reconnect: Exponential backoff (1s → 2s → 4s → 30s max)
-  Scale: Use Redis Pub/Sub to fan out across multiple WS servers
-
-Webhook Lifecycle:
-  Event occurs on Provider (e.g., Stripe payment success)
-    → Provider sends HTTP POST to your registered URL
-    → Your server receives payload (JSON)
-    → Your server responds 200 OK within ~5s
-    → If timeout/failure → Provider retries (exponential backoff)
-  Security:
-    Validate HMAC signature in header (e.g., Stripe-Signature)
-    Whitelist provider IPs
-    Idempotency: Use event ID to avoid duplicate processing
-  Scale:
-    Queue webhook events (e.g., into SQS / RabbitMQ)
-    Process async — don't block the HTTP response
-
-Choosing:
-  One-way server push, simple → SSE
-  AI streaming / live logs    → SSE
-  Bidirectional, low latency  → WebSocket
-  Live stocks / crypto / chat → WebSocket
-  Video/audio P2P             → WebRTC
-  Simple, infrequent updates  → Long Polling
-  Server-to-server events     → Webhook</code></pre>
 <div class="b by"><span class="hi">Real-world:</span> <strong>Slack</strong> — WebSocket for messaging. <strong>Figma</strong> — WebSocket for collab editing. <strong>Zoom</strong> — WebRTC for video. <strong>Robinhood</strong> — WebSocket for live stock prices. <strong>Socket.IO</strong> — auto-fallback to polling. <strong>ChatGPT</strong> — SSE for token streaming. <strong>Stripe</strong> — Webhook for payment events.</div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- WebSocket Deep Dive -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="websocket-deep">
+<h2>WebSocket</h2><p class="su">Persistent, bidirectional communication. Perfect for real-time apps that need instant two-way data flow.</p>
+
+
+
+<div class="d-title"><span class="num d-green">▸</span> Quick Summary</div>
+<table style="margin:4px 0;font-size:.82rem">
+<tr><th style="width:30%">✓ Strengths</th><th style="width:30%">✗ Challenges</th><th style="width:40%">⚙ Best Practices</th></tr>
+<tr><td><span class="hi">Bidirectional</span> instant (~ms)<br><span class="hi">100K+</span> connections/server<br>Binary + text<br>Persistent connection</td><td>Stateful (track clients)<br>Needs reconnect logic<br>Load balance complexity<br>No auto-replay on disconnect</td><td>Use <span class="hi">wss://</span> (TLS)<br>Exponential backoff<br><span class="hi">Redis Pub/Sub</span> for scaling<br>Validate messages server-side</td></tr>
+</table>
+
+<div class="d-title"><span class="num d-red">▸</span> Scaling with Redis Pub/Sub</div>
+<div class="b bg" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">
+<span class="hi">Problem:</span> Multiple servers → events isolated per server → clients on Server B miss updates from Server A.<br>
+<span class="hi">Solution:</span> All servers subscribe to <span class="hi">Redis channels</span> → event fans out to ALL servers → all clients see updates instantly.
+</div>
+
+<svg width="100%" viewBox="0 0 520 200" style="max-width:520px;display:block;margin:4px auto 8px">
+  <defs><marker id="rdsm1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  
+  <!-- Servers cluster -->
+  <g>
+    <text x="80" y="18" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">WS Server Cluster</text>
+    
+    <!-- Server 1 -->
+    <rect x="16" y="28" width="60" height="50" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+    <text x="46" y="42" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Server 1</text>
+    <circle cx="32" cy="58" r="3" fill="var(--a)"/><text x="38" y="61" fill="var(--muted)" font-size="5">Client</text>
+    <circle cx="48" cy="58" r="3" fill="var(--a)"/><text x="54" y="61" fill="var(--muted)" font-size="5">Client</text>
+    <circle cx="64" cy="58" r="3" fill="var(--a)"/><text x="70" y="61" fill="var(--muted)" font-size="5">Client</text>
+    
+    <!-- Server 2 -->
+    <rect x="96" y="28" width="60" height="50" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+    <text x="126" y="42" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Server 2</text>
+    <circle cx="112" cy="58" r="3" fill="var(--a)"/><text x="118" y="61" fill="var(--muted)" font-size="5">Client</text>
+    <circle cx="128" cy="58" r="3" fill="var(--a)"/><text x="134" y="61" fill="var(--muted)" font-size="5">Client</text>
+    <circle cx="144" cy="58" r="3" fill="var(--a)"/><text x="150" y="61" fill="var(--muted)" font-size="5">Client</text>
+    
+    <!-- Server 3 -->
+    <rect x="176" y="28" width="60" height="50" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+    <text x="206" y="42" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Server 3</text>
+    <circle cx="192" cy="58" r="3" fill="var(--a)"/><text x="198" y="61" fill="var(--muted)" font-size="5">Client</text>
+    <circle cx="208" cy="58" r="3" fill="var(--a)"/><text x="214" y="61" fill="var(--muted)" font-size="5">Client</text>
+    <circle cx="224" cy="58" r="3" fill="var(--a)"/><text x="230" y="61" fill="var(--muted)" font-size="5">Client</text>
+  </g>
+  
+  <!-- Redis center -->
+  <g>
+    <rect x="280" y="40" width="120" height="40" rx="6" fill="rgba(220,38,38,.08)" stroke="var(--r)" stroke-width="1.2"/>
+    <text x="340" y="56" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Redis Pub/Sub</text>
+    <text x="340" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">Event Broker</text>
+  </g>
+  
+  <!-- Connections from servers to Redis -->
+  <line x1="76" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
+  <line x1="156" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
+  <line x1="236" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
+  
+  <!-- Event producer -->
+  <g>
+    <rect x="280" y="100" width="120" height="32" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+    <text x="340" y="114" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Event Producer</text>
+    <text x="340" y="126" text-anchor="middle" fill="var(--muted)" font-size="5.5">(Service / Worker)</text>
+  </g>
+  
+  <!-- Producer to Redis -->
+  <line x1="340" y1="100" x2="340" y2="80" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rdsm1)"/>
+  
+  <!-- Redis to servers -->
+  <line x1="300" y1="80" x2="46" y2="78" stroke="var(--r)" stroke-width="1.2" marker-end="url(#rdsm1)"/>
+  <text x="160" y="76" fill="var(--muted)" font-size="5.5">broadcast event to all servers</text>
+  <line x1="320" y1="80" x2="126" y2="78" stroke="var(--r)" stroke-width="1.2" marker-end="url(#rdsm1)"/>
+  <line x1="340" y1="80" x2="206" y2="78" stroke="var(--r)" stroke-width="1.2" marker-end="url(#rdsm1)"/>
+  
+  <!-- Each server broadcasts to its clients -->
+  <line x1="32" y1="78" x2="32" y2="90" stroke="var(--a)" stroke-width=".8" marker-end="url(#rdsm1)"/>
+  <line x1="48" y1="78" x2="48" y2="90" stroke="var(--a)" stroke-width=".8" marker-end="url(#rdsm1)"/>
+  <line x1="64" y1="78" x2="64" y2="90" stroke="var(--a)" stroke-width=".8" marker-end="url(#rdsm1)"/>
+  
+  <text x="50" y="105" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Push to local clients</text>
+  
+  <!-- Summary -->
+  <rect x="8" y="140" width="504" height="52" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="20" y="154" fill="var(--g)" font-size="7" font-weight="700">✦ Multi-Server Flow</text>
+  <text x="20" y="166" fill="var(--muted)" font-size="6">1. Client on Server A sends message</text>
+  <text x="20" y="176" fill="var(--muted)" font-size="6">2. Server A publishes to Redis channel</text>
+  <text x="280" y="166" fill="var(--muted)" font-size="6">3. Redis fans-out to ALL subscribed servers</text>
+  <text x="280" y="176" fill="var(--muted)" font-size="6">4. Servers B & C push to their clients instantly</text>
+  <text x="20" y="186" fill="var(--muted)" font-size="6" font-weight="600">Result: All clients see the message regardless of which server they're connected to</text>
+</svg>
+
+<div class="b bp" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">
+<span class="hi">Load Balancing:</span> <span class="hg">Sticky sessions</span> (pin client to server) vs <span class="hg">connection migration</span> (client reconnects) vs <span class="hg">shared Redis store</span> (state survives server change).
+</div>
+
+<div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Slack</strong> (millions of connections), <strong>Figma</strong> (collaborative editing), <strong>Binance</strong> (market data). Typical: <strong>100K–500K connections/server</strong>, sub-ms latency.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- Server-Sent Events (SSE) Deep Dive -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="sse-deep">
+<h2>Server-Sent Events (SSE) — Deep Dive</h2><p class="su">One-way server-to-client push over HTTP. Built-in auto-reconnect, event IDs for replay, automatic browser handling.</p>
+
+<div class="b bp" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">
+<span class="hi">Middle ground:</span> Polling is wasteful (99% empty requests) → WebSockets overkill if unidirectional → <span class="hi">SSE perfect for server-only push</span> with auto-reconnect built-in.
+</div>
+
+<div class="d-title"><span class="num d-cyan">▸</span> SSE Event Stream Format</div>
+<svg width="100%" viewBox="0 0 520 160" style="max-width:520px;display:block;margin:2px auto 6px">
+  <defs><marker id="ssem1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  
+  <!-- Example SSE stream -->
+  <rect x="8" y="8" width="504" height="24" rx="4" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="20" y="22" fill="var(--c)" font-size="7" font-weight="700">✦ SSE Stream Format (Text-based)</text>
+  
+  <!-- Event 1 -->
+  <rect x="12" y="36" width="490" height="50" rx="3" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width=".6"/>
+  <text x="20" y="50" fill="var(--muted)" font-size="6" font-family="monospace">event: priceUpdate</text>
+  <text x="20" y="60" fill="var(--muted)" font-size="6" font-family="monospace">id: 42</text>
+  <text x="20" y="70" fill="var(--muted)" font-size="6" font-family="monospace">retry: 5000</text>
+  <text x="20" y="80" fill="var(--g)" font-size="6" font-family="monospace" font-weight="600">data: {"symbol": "AAPL", "price": 150.25}</text>
+  
+  <text x="520" y="50" text-anchor="end" fill="var(--muted)" font-size="5.5">← Custom event type</text>
+  <text x="520" y="60" text-anchor="end" fill="var(--muted)" font-size="5.5">← Unique ID for replay</text>
+  <text x="520" y="70" text-anchor="end" fill="var(--muted)" font-size="5.5">← Reconnect delay (ms)</text>
+  <text x="520" y="80" text-anchor="end" fill="var(--muted)" font-size="5.5">← Actual payload (JSON)</text>
+  
+  <!-- Blank line = event boundary -->
+  <text x="20" y="92" fill="var(--r)" font-size="6" font-family="monospace" font-weight="700">(blank line ends event)</text>
+  
+  <!-- Event 2 -->
+  <rect x="12" y="100" width="490" height="38" rx="3" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width=".6"/>
+  <text x="20" y="114" fill="var(--muted)" font-size="6" font-family="monospace">event: notification</text>
+  <text x="20" y="124" fill="var(--muted)" font-size="6" font-family="monospace">id: 43</text>
+  <text x="20" y="134" fill="var(--g)" font-size="6" font-family="monospace" font-weight="600">data: {"message": "Market closing in 5 minutes"}</text>
+  
+  <!-- Connection notes -->
+  <rect x="12" y="142" width="490" height="14" rx="3" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="20" y="152" fill="var(--g)" font-size="6" font-weight="600">🔗 Single HTTP/1.1 connection stays open — just HTTP headers, no protocol upgrade needed</text>
+</svg>
+
+<div class="d-title"><span class="num d-green">▸</span> Auto-Reconnection with Event Replay</div>
+<svg width="100%" viewBox="0 0 520 140" style="max-width:520px;display:block;margin:2px auto 6px">
+  <defs><marker id="ssem2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  
+  <!-- Timeline phases -->
+  <rect x="8" y="8" width="504" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="260" y="20" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Browser Auto-Reconnection with Event Replay</text>
+  
+  <!-- Phase 1: Normal streaming -->
+  <text x="20" y="42" fill="var(--a)" font-size="6.5" font-weight="700">① Connected, receiving events</text>
+  <line x1="80" y1="34" x2="200" y2="34" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ssem2)"/>
+  <text x="140" y="32" text-anchor="middle" fill="var(--muted)" font-size="6">event id=1,2,3...</text>
+  
+  <!-- Phase 2: Connection drops -->
+  <text x="20" y="62" fill="var(--r)" font-size="6.5" font-weight="700">② Connection drops (network error)</text>
+  <line x1="80" y1="54" x2="200" y2="54" stroke="var(--r)" stroke-width="1.2" marker-end="url(#ssem2)" stroke-dasharray="4,2"/>
+  <text x="140" y="52" text-anchor="middle" fill="var(--r)" font-size="6">❌ lost!</text>
+  
+  <!-- Phase 3: Auto-reconnect -->
+  <text x="20" y="82" fill="var(--y)" font-size="6.5" font-weight="700">③ Browser auto-reconnects (3s default)</text>
+  <line x1="80" y1="74" x2="200" y2="74" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ssem2)"/>
+  <text x="140" y="72" text-anchor="middle" fill="var(--y)" font-size="6">GET /events + Last-Event-ID: 3</text>
+  
+  <!-- Phase 4: Server replays missed events -->
+  <text x="20" y="102" fill="var(--g)" font-size="6.5" font-weight="700">④ Server replays missed events</text>
+  <line x1="200" y1="94" x2="80" y2="94" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ssem2)"/>
+  <text x="140" y="92" text-anchor="middle" fill="var(--g)" font-size="6">event 4,5,6...</text>
+  
+  <!-- Summary box -->
+  <rect x="20" y="112" width="490" height="20" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="30" y="127" fill="var(--g)" font-size="6" font-weight="600">✓ Zero data loss — browser handles reconnection + server replays missed events using Last-Event-ID</text>
+</svg>
+
+<div class="d-title"><span class="num d-purple">▸</span> Quick Summary</div>
+<table style="margin:4px 0;font-size:.82rem">
+<tr><th style="width:30%">✓ Strengths</th><th style="width:30%">✗ Limitations</th><th style="width:40%">⚙ Common Fixes</th></tr>
+<tr><td><span class="hi">Auto-reconnect</span> built-in<br><span class="hi">Event replay</span> (Last-Event-ID)<br>Standard HTTP<br>10K+ connections/server</td><td>Server-only (unidirectional)<br>Text-only (no binary)<br>6 conn/domain (HTTP/1.1)<br>Proxy buffering issues<br>No IE support</td><td><span class="hi">Proxy buffering:</span> proxy_buffering off<br><span class="hi">Connection limits:</span> Use HTTP/2<br><span class="hi">Idle timeout:</span> Heartbeat every 30s<br><span class="hi">Storms:</span> retry: 5000ms</td></tr>
+</table>
+
+<div class="d-title"><span class="num d-blue">▸</span> Use Cases</div>
+<table style="margin:4px 0;font-size:.82rem">
+<tr><th>Use</th><th>Example</th></tr>
+<tr><td>Live prices / market data</td><td>Robinhood, Finnhub, Binance</td></tr>
+<tr><td>AI token streaming</td><td>ChatGPT, GitHub Copilot</td></tr>
+<tr><td>Build logs, CI/CD output</td><td>GitHub Actions, Jenkins, CircleCI</td></tr>
+<tr><td>Live notifications</td><td>Gmail, Slack, email</td></tr>
+</table>
+
+<div class="b bg" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">
+<span class="hi">Performance:</span> <strong>10K–100K</strong> connections/server, <strong>2–5KB</strong> memory/connection, <strong>~10 bytes</strong> overhead vs 400+ for HTTP.
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- WebSocket vs SSE: Detailed Comparison -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="T" id="realtime-comparison">
+<h2>WebSocket vs SSE — Design Choices</h2><p class="su">When to pick each technology based on application requirements</p>
+
+<div class="d-title"><span class="num d-green">▸</span> Feature Comparison Matrix</div>
+<table style="margin:4px 0;font-size:.82rem">
+<tr><th>Feature</th><th>WebSocket</th><th>SSE</th><th>Long Polling</th></tr>
+<tr><td><span class="hi">Communication</span></td><td>Bidirectional ✓</td><td>Server only</td><td>Client asks repeatedly</td></tr>
+<tr><td><span class="hi">Protocol Overhead</span></td><td>2-14 bytes/msg</td><td>10-50 bytes/msg</td><td>400+ bytes/msg</td></tr>
+<tr><td><span class="hi">Browser Support</span></td><td>All modern (IE10+)</td><td>All modern (no IE)</td><td>Universal</td></tr>
+<tr><td><span class="hi">Binary Support</span></td><td>✓ Yes</td><td>✗ Text only</td><td>✓ Yes</td></tr>
+<tr><td><span class="hi">Auto-Reconnect</span></td><td>Manual required</td><td>Built-in browser</td><td>Built-in (polling loop)</td></tr>
+<tr><td><span class="hi">Message Replay</span></td><td>Manual required</td><td>Built-in (Last-Event-ID)</td><td>No standard</td></tr>
+<tr><td><span class="hi">HTTP/2 Multiplexing</span></td><td>No (separate connection)</td><td>✓ Yes (single connection)</td><td>✓ Yes (http requests)</td></tr>
+<tr><td><span class="hi">Stateful</span></td><td>Very (per-client state)</td><td>Mostly (stream state)</td><td>Stateless</td></tr>
+<tr><td><span class="hi">Proxy Friendly</span></td><td>Sometimes blocked</td><td>✓ Standard HTTP</td><td>✓ Standard HTTP</td></tr>
+<tr><td><span class="hi">Connections/Server</span></td><td>100K–500K</td><td>10K–100K</td><td>1K–10K</td></tr>
+<tr><td><span class="hi">Latency</span></td><td>~1-50ms</td><td>~100-200ms</td><td>~0.5-5s</td></tr>
+<tr><td><span class="hi">Memory/Connection</span></td><td>5-20KB</td><td>2-5KB</td><td>Minimal</td></tr>
+</table>
+
+<div class="d-title"><span class="num d-yellow">▸</span> Decision Matrix: Which to Use?</div>
+<div class="d-grid tri" style="margin:4px 0">
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="text-align:center;color:var(--y)">✓ Use WebSocket When:</h4>
+<div style="font-size:.78rem;line-height:1.6">
+  <span class="d-tick">▸</span> Client ↔ Server messaging needed<br>
+  <span class="d-tick">▸</span> High frequency updates (100s/sec)<br>
+  <span class="d-tick">▸</span> Low latency critical (<10ms)<br>
+  <span class="d-tick">▸</span> Binary data needed<br>
+  <span class="d-tick">▸</span> Multiplayer games, trading apps<br>
+  <span class="d-tick">▸</span> Real-time collaboration (Figma)<br>
+  <span class="d-tick">▸</span> Chat apps (Slack, Discord)<br>
+  <span class="d-tick">▸</span> Live stock/crypto prices<br>
+</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="text-align:center;color:var(--c)">✓ Use SSE When:</h4>
+<div style="font-size:.78rem;line-height:1.6">
+  <span class="d-tick">▸</span> Server → Client only (no client send)<br>
+  <span class="d-tick">▸</span> Auto-reconnect needed (free feature)<br>
+  <span class="d-tick">▸</span> Event replay on disconnect<br>
+  <span class="d-tick">▸</span> Simple browser API (EventSource)<br>
+  <span class="d-tick">▸</span> AI token streaming (ChatGPT)<br>
+  <span class="d-tick">▸</span> Build logs (GitHub Actions)<br>
+  <span class="d-tick">▸</span> Live notifications / dashboards<br>
+  <span class="d-tick">▸</span> Text/JSON data only<br>
+</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="text-align:center;color:var(--g)">✓ Use Long Polling When:</h4>
+<div style="font-size:.78rem;line-height:1.6">
+  <span class="d-tick">▸</span> Serverless environment (timeouts)<br>
+  <span class="d-tick">▸</span> IE support required<br>
+  <span class="d-tick">▸</span> WebSocket blocked by proxy/firewall<br>
+  <span class="d-tick">▸</span> Simple infrequent updates OK<br>
+  <span class="d-tick">▸</span> Existing polling infrastructure<br>
+  <span class="d-tick">▸</span> Cost sensitive (minimal server state)<br>
+  <span class="d-tick">▸</span> Doesn't need real-time urgency<br>
+  <span class="d-tick">▸</span> Stateless is a hard requirement<br>
+</div>
+</div>
+</div>
+
+<div class="d-title"><span class="num d-blue">▸</span> Hybrid Approaches</div>
+<div class="b bg" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">
+<span class="hi">SSE + HTTP POST:</span> Use SSE for server-to-client push, regular POST for client commands (e.g., Twitch chat, YouTube comments)<br>
+<span class="hi">WebSocket + REST fallback:</span> Try WS first, fallback to long polling if blocked (Socket.IO does this)<br>
+<span class="hi">WebSocket + Redis:</span> For scale — WS per client, Redis Pub/Sub for multi-server broadcast (Slack, Figma pattern)<br>
+<span class="hi">WebSocket + Kafka:</span> For event sourcing — all events stored in Kafka, clients subscribe via WS (high-scale trading systems)
+</div>
+
+<div class="d-title"><span class="num d-red">▸</span> Common Failure Scenarios</div>
+<table style="margin:4px 0">
+<tr><th>Scenario</th><th>WebSocket Impact</th><th>SSE Impact</th></tr>
+<tr><td>Network disconnection</td><td>Connection drops, client must reconnect + resync state</td><td>Browser auto-reconnects, replays events via Last-Event-ID ✓</td></tr>
+<tr><td>Server restart</td><td>All clients lose connection, must reconnect</td><td>Clients reconnect, get missed events if stored ✓</td></tr>
+<tr><td>Proxy timeouts (>60s idle)</td><td>Connection dies, must detect + reconnect</td><td>Heartbeat prevents timeout ✓</td></tr>
+<tr><td>High load spike</td><td>100K+ connections: high memory, CPU consumed</td><td>Fewer connections, easier to scale with multi-server ✓</td></tr>
+<tr><td>Message ordering</td><td>Not guaranteed across reconnects</td><td>Event IDs allow ordering verification ✓</td></tr>
+<tr><td>Browser refresh</td><td>Connection lost, full state resync needed</td><td>Can optionally restore via session storage + server replay ✓</td></tr>
+</table>
+
+<div class="b by"><span class="hi">Key Insight:</span> SSE excels at resilience (auto-reconnect, event replay), WebSocket excels at latency & bidirectionality. Most real-time apps benefit from a <span class="hg">hybrid approach</span>: SSE for notifications, WebSocket for interactive features.</div>
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>

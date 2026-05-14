@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat & Messaging Systems — Real-Time System Design Problems</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p>Chat & Messaging Systems</p></div>
+
+<div class="breadcrumb">
+  <a href="index.html">Home</a> / <span>Chat & Messaging Systems</span>
+</div>
+
+<div class="ct">
+
+<div class="sd sd-1"><span class="e">💬</span> 1 · CHAT & MESSAGING</div>
+
+<div class="problems-list">
+
+<!-- Problem -->
+<div class="problem-card" id="slack-10b">
+  <h3 class="problem-title">How does Slack handle 10+ billion messages per day across the globe?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> 10+ billion messages/day | <strong>Requirements:</strong> Message ordering, channel fanout, searchability, near real-time delivery across multiple regions
+  </div>
+  
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">WebSockets</span>
+      <span class="topic-tag">Kafka</span>
+      <span class="topic-tag">Fanout Service</span>
+      <span class="topic-tag">Presence Service</span>
+      <span class="topic-tag">Elasticsearch</span>
+      <span class="topic-tag">Multi-region Replication</span>
+      <span class="topic-tag">Offline Delivery</span>
+      <span class="topic-tag">Event Streaming</span>
+      <span class="topic-tag">Redis</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Real-Time Path:</strong> Client → WebSocket Gateway → Message Service → Kafka (persistence) → Redis Pub/Sub (fanout) → Connected clients
+      <ul class="architecture-points">
+        <li><strong>Ingestion:</strong> WebSocket gateways accept messages, write to Kafka for durability and ordering</li>
+        <li><strong>Fanout:</strong> Kafka → Fanout Service → Redis Pub/Sub channels by channel_id for instant delivery to connected users</li>
+        <li><strong>Offline Delivery:</strong> Messages queued in database for offline users, delivered on reconnection</li>
+        <li><strong>Search:</strong> Kafka → Elasticsearch pipeline for instant full-text search across billions of messages</li>
+        <li><strong>Ordering:</strong> Partition messages by channel_id in Kafka, process in order per partition</li>
+        <li><strong>Multi-region:</strong> Primary datacenter ingests all messages, replicate to secondary regions for read replicas and failover</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="whatsapp-offline">
+  <h3 class="problem-title">How does WhatsApp deliver messages to billions of users even when they're offline?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Billions of users | <strong>Requirements:</strong> Reliable offline delivery, read receipts, typing indicators, push notifications, end-to-end encryption
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">WebSockets</span>
+      <span class="topic-tag">Push Gateway</span>
+      <span class="topic-tag">Retry Queue</span>
+      <span class="topic-tag">Encryption</span>
+      <span class="topic-tag">Presence</span>
+      <span class="topic-tag">Cassandra</span>
+      <span class="topic-tag">Message ACKs</span>
+      <span class="topic-tag">Fanout</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Delivery Guarantee:</strong> Message → Queue → Recipient check (online/offline) → if offline: persist + push notification
+      <ul class="architecture-points">
+        <li><strong>Message Storage:</strong> Cassandra (write-heavy, distributed) for durable message history per user</li>
+        <li><strong>ACK System:</strong> Three-state ACKs (sent, delivered, read) via WebSocket or push notification</li>
+        <li><strong>Offline Delivery:</strong> Redis queue per user; retry up to 30 days before discarding</li>
+        <li><strong>Push Notifications:</strong> APNS/FCM gateway handles retries and device token management</li>
+        <li><strong>Typing Indicators:</strong> Ephemeral WebSocket events (no persistence), immediate fanout to conversation participants</li>
+        <li><strong>Encryption:</strong> End-to-end keys managed client-side; server never sees plaintext</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="discord-websockets">
+  <h3 class="problem-title">How does Discord handle millions of concurrent WebSocket connections without crashing?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Millions of concurrent WebSocket connections | <strong>Requirements:</strong> Real-time messaging, presence updates, voice signaling, minimal latency
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Gateway Servers</span>
+      <span class="topic-tag">WebSockets</span>
+      <span class="topic-tag">Sharding</span>
+      <span class="topic-tag">Heartbeats</span>
+      <span class="topic-tag">Presence Tracking</span>
+      <span class="topic-tag">Event Routing</span>
+      <span class="topic-tag">Voice Signaling</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Sharding Strategy:</strong> Partition users by shard ID to distribute millions of connections across multiple gateway servers
+      <ul class="architecture-points">
+        <li><strong>Sharding:</strong> Hash user_id mod N shards; each gateway owns subset of connections; clients know shard assignment</li>
+        <li><strong>Inter-shard communication:</strong> Redis Pub/Sub for events crossing shard boundaries (e.g., send message in guild visible to multiple shards)</li>
+        <li><strong>Heartbeats:</strong> Client sends heartbeat every 45s; server responds; missing 2 heartbeats = timeout/reconnect</li>
+        <li><strong>Presence:</strong> On connect: publish to Redis; on disconnect: clear; subscribers notified instantly</li>
+        <li><strong>Voice Signaling:</strong> SDP offer/answer exchanged via WebSocket before P2P connection established</li>
+        <li><strong>Failover:</strong> Other gateways detect connection loss, clients auto-reconnect to healthy gateway</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="multi-region-ordering">
+  <h3 class="problem-title">How do chat apps guarantee message ordering when entire regions go down?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Multi-region deployment | <strong>Challenge:</strong> Guarantee message ordering within conversations during regional failures and network partitions
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Kafka Partitioning</span>
+      <span class="topic-tag">Vector Clocks</span>
+      <span class="topic-tag">Lamport Timestamps</span>
+      <span class="topic-tag">Consensus</span>
+      <span class="topic-tag">Replication</span>
+      <span class="topic-tag">Eventual Consistency</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Ordering Guarantee:</strong> Use Lamport timestamps + Kafka partitioning to ensure total ordering within a conversation
+      <ul class="architecture-points">
+        <li><strong>Lamport Timestamp:</strong> Each message gets (logical_clock, server_id); increment on each message, take max(local, received+1)</li>
+        <li><strong>Kafka Partitioning:</strong> Partition by conversation_id; all messages in conversation go to same partition → strict ordering</li>
+        <li><strong>Multi-region:</strong> Primary region (US) receives writes first, generates Lamport timestamp; replicate to secondaries (EU, APAC)</li>
+        <li><strong>Failover:</strong> If primary fails, secondary can become primary; Lamport clock ensures no duplicate or reordered messages</li>
+        <li><strong>Write Handling:</strong> During partition: accept writes locally (queue in Kafka), use vector clocks for causality; merge on heal</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="large-group-fanout">
+  <h3 class="problem-title">How do Telegram groups with 1 million members avoid message delivery meltdown?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> 1 million members in single group | <strong>Challenge:</strong> Prevent fanout bottlenecks and message delivery overload
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Fanout Optimization</span>
+      <span class="topic-tag">Push/Pull Hybrid</span>
+      <span class="topic-tag">Partitioning</span>
+      <span class="topic-tag">Pub/Sub</span>
+      <span class="topic-tag">Batch Delivery</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Hybrid Push/Pull Model:</strong> Large groups use pull-based delivery to prevent fanout explosion
+      <ul class="architecture-points">
+        <li><strong>Push Model:</strong> For groups < 10K members, use Redis Pub/Sub for instant delivery (fanout acceptable)</li>
+        <li><strong>Pull Model:</strong> For groups > 10K members, write message to database; clients poll/long-poll for new messages</li>
+        <li><strong>Hybrid:</strong> Online users (tracked in Redis) receive push instantly; offline users pull on reconnect</li>
+        <li><strong>Partitioning:</strong> Shard the 1M members across 100 partition groups; each partition has <10K connected clients</li>
+        <li><strong>Batch Delivery:</strong> Instead of 1M individual fanout messages, batch and send to partition leaders</li>
+        <li><strong>Caching:</strong> Last 10K messages cached in Redis; new users (pull) fetch from cache + database</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="presence-100m">
+  <h3 class="problem-title">How does WhatsApp show "online" status for 100M+ users instantly?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> 100M+ users | <strong>Challenge:</strong> Detect online/offline status changes in real-time without overloading Redis or gateways
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Heartbeats</span>
+      <span class="topic-tag">Redis TTL</span>
+      <span class="topic-tag">Presence Aggregation</span>
+      <span class="topic-tag">WebSockets</span>
+      <span class="topic-tag">State Sync</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Presence Pipeline:</strong> Heartbeat → Redis TTL → Presence Cache → Event Fanout (only to interested users)
+      <ul class="architecture-points">
+        <li><strong>Heartbeat:</strong> Client sends heartbeat every 30s; server updates Redis key with TTL 60s (grace period)</li>
+        <li><strong>Presence Cache:</strong> In-memory cache per gateway of connected users' presence status (last seen, device, status)</li>
+        <li><strong>Fanout Strategy:</strong> Only send presence updates to users in contact list (not all 100M users globally)</li>
+        <li><strong>Batch Updates:</strong> Collect presence changes for 1s, then batch send (1000 status updates in single message)</li>
+        <li><strong>Sharding:</strong> Hash (user_id, contact_id) to partition presence subscriptions across multiple presence services</li>
+        <li><strong>TTL Expiry:</strong> Background job periodically scan expired keys, emit offline event to interested subscribers</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="typing-indicators">
+  <h3 class="problem-title">How does Slack show "typing..." indicators for millions of users without storing anything?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Millions of ephemeral events/second | <strong>Challenge:</strong> Handle real-time typing events without persisting to database
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Ephemeral Events</span>
+      <span class="topic-tag">WebSockets</span>
+      <span class="topic-tag">In-memory Messaging</span>
+      <span class="topic-tag">Redis Pub/Sub</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>No Persistence:</strong> Typing indicators flow through WebSocket/Redis Pub/Sub, never touch database
+      <ul class="architecture-points">
+        <li><strong>Client Event:</strong> User types → client sends WebSocket event: {type: 'typing', conversation_id, user_id}</li>
+        <li><strong>Fanout:</strong> Gateway publishes to Redis channel: typing:{conversation_id} (no queue, instant Pub/Sub)</li>
+        <li><strong>Delivery:</strong> Other connected clients in conversation subscribed to same channel receive typing event instantly</li>
+        <li><strong>Debounce:</strong> Client displays "user is typing..." for 3s; if no new event, hide (server doesn't need to send "stop typing")</li>
+        <li><strong>Cleanup:</strong> No TTL needed; typing event naturally expires when user stops/disconnects</li>
+        <li><strong>Scalability:</strong> Redis Pub/Sub overhead minimal (~100 bytes per event); can handle 10M events/sec on single Redis instance</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="chat-search">
+  <h3 class="problem-title">How does Slack search through billions of messages in milliseconds?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Billions of messages | <strong>Challenge:</strong> Support instant search with near real-time indexing (< 5s index latency)
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Elasticsearch</span>
+      <span class="topic-tag">Inverted Index</span>
+      <span class="topic-tag">Kafka Streams</span>
+      <span class="topic-tag">Indexing Pipeline</span>
+      <span class="topic-tag">Storage Optimization</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Real-Time Indexing Pipeline:</strong> Kafka → Processing → Elasticsearch bulk indexing every 5s
+      <ul class="architecture-points">
+        <li><strong>Kafka Source:</strong> All messages written to Kafka topic; indexing consumes in real-time</li>
+        <li><strong>Enrichment:</strong> Add conversation_id, sender metadata, timestamps; optionally strip large binary payloads</li>
+        <li><strong>Bulk Indexing:</strong> Batch 10K documents, send bulk index every 5s (balance freshness vs overhead)</li>
+        <li><strong>Inverted Index:</strong> Elasticsearch tokenizes message text, creates index for instant full-text search</li>
+        <li><strong>Sharding:</strong> Shard Elasticsearch by conversation_id or date (old conversations rarely searched; move to cold storage)</li>
+        <li><strong>Query Path:</strong> User searches → Elasticsearch query → ranked results (relevance + recency) → return top 100</li>
+        <li><strong>Storage:</strong> Compress Elasticsearch indices; delete/archive indices > 1 year old</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="push-notifications">
+  <h3 class="problem-title">How does WhatsApp ensure you never get duplicate push notifications?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Millions of devices | <strong>Requirements:</strong> Handle delayed delivery, device reconnection, notification deduplication, retry without duplicates
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">APNS / FCM</span>
+      <span class="topic-tag">Retry Queues</span>
+      <span class="topic-tag">Idempotency</span>
+      <span class="topic-tag">Notification Fanout</span>
+      <span class="topic-tag">Device Management</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Deduplication + Retry:</strong> Use idempotency keys to prevent duplicate push notifications on retries
+      <ul class="architecture-points">
+        <li><strong>Push Event:</strong> Create push notification with idempotency_key = sha256(user_id + message_id + device_id)</li>
+        <li><strong>Retry Queue:</strong> Kafka topic for push notifications; consumer sends to APNS/FCM with idempotency key</li>
+        <li><strong>APNS/FCM Handling:</strong> If device invalid/unregistered, remove device token from user profile</li>
+        <li><strong>Exponential Backoff:</strong> Retry 1s, 5s, 30s, 5min, 1h; give up after 24h (user likely switched devices)</li>
+        <li><strong>Deduplication:</strong> Maintain set of delivered idempotency keys (Redis, 24h TTL); skip re-sending if already sent</li>
+        <li><strong>Silent Failures:</strong> Track delivery metrics (success rate, latency); alert if FCM success rate drops below 95%</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Problem -->
+<div class="problem-card" id="telegram-sync">
+  <h3 class="problem-title">How does Telegram keep your messages perfectly synced across phone, tablet, and desktop?</h3>
+  
+  <div class="problem-constraint">
+    <strong>Scale:</strong> Multiple devices per user | <strong>Challenge:</strong> Keep messages, media, read status consistent across phones, tablets, desktop without conflicts
+  </div>
+
+  <div>
+    <strong>Key Topics:</strong>
+    <div class="topics-list">
+      <span class="topic-tag">Event Sourcing</span>
+      <span class="topic-tag">Sync Tokens</span>
+      <span class="topic-tag">Device Sessions</span>
+      <span class="topic-tag">Conflict Resolution</span>
+      <span class="topic-tag">State Versioning</span>
+    </div>
+  </div>
+
+  <div class="solution-section">
+    <h4>Architecture Solution</h4>
+    <div class="solution-text">
+      <strong>Event Sourcing + Sync Tokens:</strong> Track all state changes as immutable events; devices sync using tokens
+      <ul class="architecture-points">
+        <li><strong>State Events:</strong> All actions (send message, mark read, delete, edit) stored as events with timestamp and device_id</li>
+        <li><strong>Sync Tokens:</strong> Each device maintains last_sync_token; server returns delta (all events since token)</li>
+        <li><strong>Conflict Resolution:</strong> Last-write-wins by timestamp; all devices apply events in chronological order</li>
+        <li><strong>Device Sessions:</strong> Track active sessions per user; on login from new device, include full state snapshot</li>
+        <li><strong>Offline Support:</strong> Device queues events locally; on reconnect, send to server, receive acks, merge with server state</li>
+        <li><strong>Storage:</strong> Event log immutable; compute current state by replaying events (CQRS pattern)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="nav-links">
+  <a href="index.html">← Back to Categories</a>
+  <a href="02-collaboration.html">Next: Real-Time Collaboration →</a>
+</div>
+
+<div class="footer">
+  <p>Real-Time System Design Problems — 100 Scenarios | Chat & Messaging Category</p>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/nav.js"></script>
+</body>
+</html>
