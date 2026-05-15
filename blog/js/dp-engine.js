@@ -1,15 +1,5 @@
-/* ════════════════════════════════════════════════════════════════
-   DP Engine — shared Play / Expand engine for every diagram page
-   Usage: include after the page body content + nav.js (or before nav).
-     <link rel="stylesheet" href="css/dp-engine.css">
-     <script src="js/dp-engine.js"></script>
-   On load, every <svg> inside any .T section gets:
-     • A ▶ Play / Pause button and ⛶ Expand button (top-right of the panel)
-     • A shared fullscreen modal with zoom, play, restart, prev/next steps
-   See 360SystemDesignHTMLCodeContext.md for full design notes.
-   ════════════════════════════════════════════════════════════════ */
+/* DP Engine — shared Play / Expand engine for every diagram page */
 (function(){
-  // 1) Inject the shared modal markup once per page.
   function ensureModal(){
     if(document.getElementById('dp-modal'))return;
     var html=''+
@@ -20,14 +10,14 @@
           '<button class="dp-mbtn" onclick="dpZoom(1.25)" title="Zoom in">+</button>'+
           '<button class="dp-mbtn" onclick="dpZoom(0.8)" title="Zoom out">−</button>'+
           '<button class="dp-mbtn" style="font-size:11px" onclick="dpZoom(0)" title="Reset zoom">Reset zoom</button>'+
-          '<button class="dp-mbtn dp-pan-btn" id="dp-pan-btn" onclick="dpTogglePan()" title="Pan tool — drag to move (Space)" aria-pressed="false">✋</button>'+
+          '<button class="dp-mbtn dp-pan-btn" id="dp-pan-btn" onclick="dpTogglePan()" title="Pan tool" aria-pressed="false">✋</button>'+
           '<button class="dp-mbtn" id="dp-modal-play" onclick="dpModalPlay()" title="Play / Pause">▶</button>'+
           '<button class="dp-mbtn" style="font-size:11px" onclick="dpModalRestart()" title="Restart">↻ Restart</button>'+
           '<div class="dp-speed" role="group" aria-label="Step navigation">'+
             '<span class="dp-speed-lbl">Steps</span>'+
-            '<button class="dp-step-nav" id="dp-step-prev" onclick="dpStepPrev()" title="Previous step (←)">◀ Prev</button>'+
+            '<button class="dp-step-nav" id="dp-step-prev" onclick="dpStepPrev()" title="Previous step">◀ Prev</button>'+
             '<span class="dp-step-ind"><span id="dp-step-cur">0</span> / <span id="dp-step-tot">0</span></span>'+
-            '<button class="dp-step-nav" id="dp-step-next" onclick="dpStepNext()" title="Next step (→)">Next ▶</button>'+
+            '<button class="dp-step-nav" id="dp-step-next" onclick="dpStepNext()" title="Next step">Next ▶</button>'+
           '</div>'+
         '</div>'+
         '<div id="dp-zoom-wrap"><div id="dp-zoom-inner"></div></div>'+
@@ -40,9 +30,6 @@
   var SKIP={defs:1,style:1,title:1,desc:1,marker:1,lineargradient:1,radialgradient:1,clippath:1,filter:1,mask:1,pattern:1,symbol:1};
   function dpCenter(el){try{var b=el.getBBox();return [b.x+b.width/2,b.y+b.height/2];}catch(e){return [0,0];}}
 
-  /* Tag every direct SVG child as a step element, computing its conceptual
-     order via: explicit data-dp-step → numbered badges → connector constraint
-     → document order. See 360SystemDesignHTMLCodeContext.md §9d. */
   function dpAutoTag(panel){
     var svg=panel.querySelector('svg');if(!svg)return [];
     var kids=svg.children,topKids=[];
@@ -128,7 +115,6 @@
       ctrls.className='dp-ctrls';
       wrap.appendChild(ctrls);
       var els=dpAutoTag(wrap);
-      // Diagrams with <3 steps don't benefit from a sequence — show Expand only.
       var play=(els.length>=3)?'<button class="dp-ctrl" onclick="dpToggle(this.closest(\'.dp-panel\'),this)" title="Play / Pause">▶</button>':'';
       ctrls.innerHTML=play+'<button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest(\'.dp-panel\'))" title="Expand diagram">⛶</button>';
     });
@@ -137,21 +123,16 @@
 
   function dpStepsOf(p){return p._dpEls||Array.prototype.slice.call(p.querySelectorAll('.dp-el'));}
   function dpRender(p){
-    var els=dpStepsOf(p);
-    var i=p._step?p._step.i:0;
+    var els=dpStepsOf(p);var i=p._step?p._step.i:0;
     els.forEach(function(el,idx){el.classList.toggle('dp-on',idx<i);});
     var cur=document.getElementById('dp-step-cur');if(cur)cur.textContent=i;
     var tot=document.getElementById('dp-step-tot');if(tot)tot.textContent=els.length;
     var pv=document.getElementById('dp-step-prev'),nx=document.getElementById('dp-step-next');
-    if(pv)pv.disabled=(i<=0);
-    if(nx)nx.disabled=(i>=els.length);
+    if(pv)pv.disabled=(i<=0);if(nx)nx.disabled=(i>=els.length);
   }
   function dpEnterStepped(p){
     if(p._timer){clearInterval(p._timer);p._timer=null;}
-    p.classList.add('dp-stepped');
-    if(!p._step)p._step={i:0};
-    dpAutoTag(p);
-    dpRender(p);
+    p.classList.add('dp-stepped');if(!p._step)p._step={i:0};dpAutoTag(p);dpRender(p);
     var mb=document.getElementById('dp-modal-play');if(mb){mb.textContent='▶';mb.title='Play';}
   }
   function dpModalPanel(){return document.querySelector('#dp-zoom-inner .dp-panel');}
@@ -160,8 +141,7 @@
   window.dpStepPrev=function(){var p=dpModalPanel();if(!p)return;if(!p.classList.contains('dp-stepped'))dpEnterStepped(p);p._step.i=Math.max(0,(p._step.i||0)-1);dpRender(p);};
 
   window.dpToggle=function(p,btn){
-    if(!p)return;
-    if(!p.classList.contains('dp-stepped'))dpEnterStepped(p);
+    if(!p)return;if(!p.classList.contains('dp-stepped'))dpEnterStepped(p);
     var els=dpStepsOf(p);var n=els.length;if(n===0)return;
     if(p._timer){clearInterval(p._timer);p._timer=null;if(btn){btn.textContent='▶';btn.title='Resume';}return;}
     if(p._step.i>=n){p._step.i=0;dpRender(p);}
@@ -183,7 +163,6 @@
   window.dpZoom=function(f){if(f===0){dpScale=5;dpTx=0;dpTy=0;}else dpScale=Math.min(20,Math.max(.5,dpScale*f));dpApplyTransform();};
   window.dpTogglePan=function(){dpPan=!dpPan;dpSetPanUI();};
   function dpSetPanUI(){var b=document.getElementById('dp-pan-btn'),w=document.getElementById('dp-zoom-wrap');if(!w)return;if(dpPan){w.classList.add('dp-pan-on');if(b){b.classList.add('dp-pan-active');b.setAttribute('aria-pressed','true');}}else{w.classList.remove('dp-pan-on','dp-panning');if(b){b.classList.remove('dp-pan-active');b.setAttribute('aria-pressed','false');}}}
-  /* Pan: hold Space, or click ✋ then drag. Middle-mouse always pans. */
   document.addEventListener('mousedown',function(e){
     var w=document.getElementById('dp-zoom-wrap');if(!w||!w.contains(e.target))return;
     var modal=document.getElementById('dp-modal');if(!modal||modal.style.display!=='flex')return;
@@ -194,8 +173,7 @@
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
   });
   window.dpExpand=function(panel){
-    ensureModal();
-    var inner=document.getElementById('dp-zoom-inner');
+    ensureModal();var inner=document.getElementById('dp-zoom-inner');
     inner.innerHTML=panel.outerHTML;
     var ctrls=inner.querySelector('.dp-ctrls');if(ctrls)ctrls.remove();
     var clone=inner.querySelector('.dp-panel');

@@ -1,7 +1,4 @@
-/* ════════════════════════════════════════════════════════════════
-   DP Engine — shared styles for Play / Expand diagram player
-   Used by every cheatsheet page that includes js/dp-engine.js
-   ════════════════════════════════════════════════════════════════ */
+/* DP Engine — shared styles for Play / Expand diagram player */
 .dp-panel{position:relative;display:block}
 .dp-panel .dp-el{transition:opacity .25s ease}
 .dp-stepped .dp-el{opacity:0}
@@ -27,7 +24,6 @@
 .dp-step-ind{height:22px;padding:0 10px;border-radius:4px;background:rgba(255,255,255,.12);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;letter-spacing:.3px;font-variant-numeric:tabular-nums}
 #dp-zoom-wrap{overflow:auto;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:48px 16px 16px}
 #dp-zoom-inner{transform-origin:center center;transition:transform .2s ease}
-/* Pan tool */
 .dp-pan-btn{font-size:14px}
 .dp-pan-btn.dp-pan-active{background:rgba(96,165,250,.32);border-color:rgba(96,165,250,.85);box-shadow:0 0 0 2px rgba(96,165,250,.25) inset}
 #dp-zoom-wrap.dp-pan-on{cursor:grab;overflow:hidden}
@@ -35,7 +31,6 @@
 #dp-zoom-wrap.dp-panning{cursor:grabbing}
 #dp-zoom-wrap.dp-pan-on *{user-select:none}
 
-/* Optional shared keyframes — used by markup-driven panels (e.g. 04-apis.html) */
 @keyframes dpSlideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes dpSlideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes dpFadeIn{from{opacity:0}to{opacity:1}}
