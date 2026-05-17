@@ -1,0 +1,14 @@
+.git
+.gitignore
+README.md
+*.md
+node_modules/
+.env.local
+.env.*.local
+.DS_Store
+fix_anchors.py
+GoogleChecklist.md
+Prod-Coding-Standards.md
+Engineering-Blogs.md
+KafkaInternals.md
+360SystemDesignHTMLCodeContext.md

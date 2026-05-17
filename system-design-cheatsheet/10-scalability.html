@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10. Scalability Patterns — System Design Cheatsheet</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="ct">
+<div class="sd sd-10"><span class="e">📈</span> 10 · SCALABILITY PATTERNS</div>
+
+<div class="T" id="partitioning">
+<h2>Partitioning</h2>
+<p class="su">
+  Splitting data across nodes to improve 
+  <span class="hg">scalability</span> (horizontal growth), 
+  <span class="hg">throughput</span> (parallel processing), and 
+  <span class="hg">storage capacity</span> (distribute data), 
+  with trade-offs in 
+  <span class="hg">complexity</span> (routing, rebalancing) and 
+  <span class="hg">skew</span> (uneven distribution).
+</p>
+<!-- ═══ Horizontal vs Vertical ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Horizontal vs Vertical Partitioning</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Horizontal -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Horizontal (Split Rows)</h4>
+<svg width="100%" viewBox="0 0 240 100" style="max-width:240px;display:block;margin:0 auto">
+  <defs><marker id="pt1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Source table -->
+  <rect x="4" y="2" width="80" height="10" rx="2" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="16" y="10" fill="var(--y)" font-size="5.5" font-weight="700">ID</text>
+  <text x="36" y="10" fill="var(--y)" font-size="5.5" font-weight="700">Name</text>
+  <text x="68" y="10" fill="var(--y)" font-size="5.5" font-weight="700">City</text>
+  <rect x="4" y="12" width="80" height="7" fill="rgba(52,211,153,.06)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="17" fill="var(--g)" font-size="5">1</text><text x="36" y="17" fill="var(--text)" font-size="5">Rohit</text><text x="68" y="17" fill="var(--text)" font-size="5">NYC</text>
+  <rect x="4" y="19" width="80" height="7" fill="rgba(52,211,153,.06)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="24" fill="var(--g)" font-size="5">2</text><text x="36" y="24" fill="var(--text)" font-size="5">Alex</text><text x="68" y="24" fill="var(--text)" font-size="5">LON</text>
+  <rect x="4" y="26" width="80" height="7" fill="rgba(108,140,255,.06)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="31" fill="var(--a)" font-size="5">3</text><text x="36" y="31" fill="var(--text)" font-size="5">Adam</text><text x="68" y="31" fill="var(--text)" font-size="5">BER</text>
+  <rect x="4" y="33" width="80" height="7" fill="rgba(108,140,255,.06)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="38" fill="var(--a)" font-size="5">4</text><text x="36" y="38" fill="var(--text)" font-size="5">Joe</text><text x="68" y="38" fill="var(--text)" font-size="5">TKY</text>
+  <!-- Arrows -->
+  <line x1="84" y1="18" x2="110" y2="12" stroke="var(--g)" stroke-width=".8" marker-end="url(#pt1)"/>
+  <line x1="84" y1="34" x2="110" y2="52" stroke="var(--a)" stroke-width=".8" marker-end="url(#pt1)"/>
+  <text x="98" y="30" text-anchor="middle" fill="var(--muted)" font-size="5.5">split rows</text>
+  <!-- Partition 1 -->
+  <rect x="112" y="2" width="80" height="10" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="152" y="10" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Partition 1 (rows 1-2)</text>
+  <rect x="112" y="12" width="80" height="7" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="124" y="17" fill="var(--text)" font-size="5">1  Rohit  NYC</text>
+  <rect x="112" y="19" width="80" height="7" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="124" y="24" fill="var(--text)" font-size="5">2  Alex   LON</text>
+  <!-- Partition 2 -->
+  <rect x="112" y="42" width="80" height="10" rx="2" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="152" y="50" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Partition 2 (rows 3-4)</text>
+  <rect x="112" y="52" width="80" height="7" fill="rgba(108,140,255,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="124" y="57" fill="var(--text)" font-size="5">3  Adam   BER</text>
+  <rect x="112" y="59" width="80" height="7" fill="rgba(108,140,255,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="124" y="64" fill="var(--text)" font-size="5">4  Joe    TKY</text>
+  <!-- Label -->
+  <text x="120" y="82" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Same columns, different rows per partition</text>
+  <text x="120" y="92" text-anchor="middle" fill="var(--muted)" font-size="6">Most common. Each node holds subset of rows.</text>
+</svg>
+</div>
+
+<!-- Vertical -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Vertical (Split Columns)</h4>
+<svg width="100%" viewBox="0 0 240 100" style="max-width:240px;display:block;margin:0 auto">
+  <!-- Source table -->
+  <rect x="4" y="2" width="100" height="10" rx="2" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="16" y="10" fill="var(--y)" font-size="5.5" font-weight="700">ID</text>
+  <text x="34" y="10" fill="var(--g)" font-size="5.5" font-weight="700">Name</text>
+  <text x="62" y="10" fill="var(--a2)" font-size="5.5" font-weight="700">Bio</text>
+  <text x="88" y="10" fill="var(--a2)" font-size="5.5" font-weight="700">Avatar</text>
+  <rect x="4" y="12" width="100" height="7" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="17" fill="var(--text)" font-size="5">1</text><text x="34" y="17" fill="var(--text)" font-size="5">Rohit</text><text x="62" y="17" fill="var(--muted)" font-size="5">long…</text><text x="88" y="17" fill="var(--muted)" font-size="5">blob</text>
+  <rect x="4" y="19" width="100" height="7" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="24" fill="var(--text)" font-size="5">2</text><text x="34" y="24" fill="var(--text)" font-size="5">Alex</text><text x="62" y="24" fill="var(--muted)" font-size="5">long…</text><text x="88" y="24" fill="var(--muted)" font-size="5">blob</text>
+  <!-- Arrows -->
+  <line x1="50" y1="28" x2="50" y2="42" stroke="var(--g)" stroke-width=".8" marker-end="url(#pt1)"/>
+  <line x1="80" y1="28" x2="180" y2="42" stroke="var(--a2)" stroke-width=".8" marker-end="url(#pt1)"/>
+  <text x="120" y="36" text-anchor="middle" fill="var(--muted)" font-size="5.5">split columns</text>
+  <!-- Partition 1: hot columns -->
+  <rect x="4" y="44" width="60" height="10" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="34" y="52" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Hot (ID + Name)</text>
+  <rect x="4" y="54" width="60" height="7" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="59" fill="var(--text)" font-size="5">1</text><text x="38" y="59" fill="var(--text)" font-size="5">Rohit</text>
+  <rect x="4" y="61" width="60" height="7" fill="rgba(52,211,153,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="16" y="66" fill="var(--text)" font-size="5">2</text><text x="38" y="66" fill="var(--text)" font-size="5">Alex</text>
+  <text x="34" y="78" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">fast, small</text>
+  <!-- Partition 2: cold columns -->
+  <rect x="130" y="44" width="80" height="10" rx="2" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="170" y="52" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">Cold (Bio + Avatar)</text>
+  <rect x="130" y="54" width="80" height="7" fill="rgba(167,139,250,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="142" y="59" fill="var(--text)" font-size="5">1</text><text x="162" y="59" fill="var(--muted)" font-size="5">long text…</text><text x="200" y="59" fill="var(--muted)" font-size="5">blob</text>
+  <rect x="130" y="61" width="80" height="7" fill="rgba(167,139,250,.04)" stroke="var(--border)" stroke-width=".3"/>
+  <text x="142" y="66" fill="var(--text)" font-size="5">2</text><text x="162" y="66" fill="var(--muted)" font-size="5">long text…</text><text x="200" y="66" fill="var(--muted)" font-size="5">blob</text>
+  <text x="170" y="78" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">large, rarely accessed</text>
+  <!-- Label -->
+  <text x="120" y="92" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Same rows, different columns per partition</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ Partitioning Strategies: Range, Hash, List ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Partitioning Strategies</div>
+<div class="d-grid tri" style="margin:4px 0">
+
+<!-- Range -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--o)">Range</h4>
+<svg width="100%" viewBox="0 0 140 70" style="max-width:140px;display:block;margin:0 auto">
+  <!-- Timeline/range bar -->
+  <rect x="6" y="8" width="40" height="20" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="26" y="21" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">A — M</text>
+  <rect x="50" y="8" width="40" height="20" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="70" y="21" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">N — Z</text>
+  <rect x="94" y="8" width="40" height="20" rx="3" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="114" y="21" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="600">dates</text>
+  <!-- Example keys -->
+  <text x="26" y="40" text-anchor="middle" fill="var(--g)" font-size="5.5">Adam, Bob</text>
+  <text x="70" y="40" text-anchor="middle" fill="var(--a)" font-size="5.5">Nick, Zoe</text>
+  <text x="114" y="40" text-anchor="middle" fill="var(--a2)" font-size="5.5">Jan, Feb</text>
+  <text x="70" y="54" text-anchor="middle" fill="var(--g)" font-size="6">✓ Efficient range queries</text>
+  <text x="70" y="64" text-anchor="middle" fill="var(--r)" font-size="6">⚠ Hot spots if skewed</text>
+</svg>
+</div>
+
+<!-- Hash -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a)">Hash</h4>
+<svg width="100%" viewBox="0 0 140 70" style="max-width:140px;display:block;margin:0 auto">
+  <!-- Hash function -->
+  <rect x="30" y="4" width="80" height="16" rx="4" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1"/>
+  <text x="70" y="15" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">hash(key) % N</text>
+  <!-- Arrows to partitions -->
+  <line x1="50" y1="20" x2="20" y2="34" stroke="var(--g)" stroke-width=".7" marker-end="url(#pt1)"/>
+  <line x1="70" y1="20" x2="70" y2="34" stroke="var(--a)" stroke-width=".7" marker-end="url(#pt1)"/>
+  <line x1="90" y1="20" x2="120" y2="34" stroke="var(--a2)" stroke-width=".7" marker-end="url(#pt1)"/>
+  <!-- Partitions -->
+  <rect x="4" y="36" width="36" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="22" y="46" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">P0</text>
+  <rect x="52" y="36" width="36" height="14" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="70" y="46" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">P1</text>
+  <rect x="100" y="36" width="36" height="14" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="118" y="46" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="600">P2</text>
+  <text x="70" y="60" text-anchor="middle" fill="var(--g)" font-size="6">✓ Even distribution</text>
+  <text x="70" y="70" text-anchor="middle" fill="var(--r)" font-size="6">⚠ Resharding remaps keys</text>
+</svg>
+</div>
+
+<!-- List -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--c)">List (Explicit)</h4>
+<svg width="100%" viewBox="0 0 140 70" style="max-width:140px;display:block;margin:0 auto">
+  <!-- Mapping rules -->
+  <rect x="10" y="4" width="120" height="12" rx="3" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="70" y="13" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">region = US → P1 · EU → P2 · Asia → P3</text>
+  <!-- Arrows -->
+  <line x1="36" y1="16" x2="20" y2="30" stroke="var(--g)" stroke-width=".7" marker-end="url(#pt1)"/>
+  <line x1="70" y1="16" x2="70" y2="30" stroke="var(--a)" stroke-width=".7" marker-end="url(#pt1)"/>
+  <line x1="104" y1="16" x2="120" y2="30" stroke="var(--o)" stroke-width=".7" marker-end="url(#pt1)"/>
+  <!-- Partitions -->
+  <rect x="4" y="32" width="36" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="22" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">🇺🇸 P1</text>
+  <rect x="52" y="32" width="36" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="70" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">🇪🇺 P2</text>
+  <rect x="100" y="32" width="36" height="16" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="118" y="40" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">🌏 P3</text>
+  <text x="70" y="58" text-anchor="middle" fill="var(--g)" font-size="6">✓ Geo-partitioning, compliance</text>
+  <text x="70" y="68" text-anchor="middle" fill="var(--muted)" font-size="6">Explicit mapping per value</text>
+</svg>
+</div>
+</div>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Guarantees:</span> Partitioning provides <span class="hg">linear write scaling</span>. <span class="hg">Partition pruning</span> skips irrelevant partitions. <span class="hr">Cross-partition queries are expensive</span> (scatter-gather).</div>
+<div class="b by"><span class="hi">Hotspot Mitigation:</span> Celebrity problem — fix: add random suffix → scatter across shards → aggregate on read.</div>
+</div>
+
+<div class="T" id="distributed-indexing">
+<h2>Distributed Indexing</h2>
+<p class="su">
+  Indexing data across nodes to improve 
+  <span class="hg">query performance</span> (faster lookups), 
+  <span class="hg">scalability</span> (handle large datasets), and 
+  <span class="hg">throughput</span> (parallel queries), 
+  with trade-offs in 
+  <span class="hg">consistency</span> (index lag), 
+  <span class="hg">write overhead</span> (maintain indexes), and 
+  <span class="hg">complexity</span> (coordination).
+</p>
+<p class="su">How indexes work across partitions and shards — <span class="hg">local</span> vs <span class="hg">global</span> indexes</p>
+
+<!-- ═══ Why it matters ═══ -->
+<div class="b br" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">In a single DB, an index covers all rows. Once you partition/shard, the index must either live <span class="hi">inside each partition</span> (local) or span <span class="hi">across all partitions</span> (global). This choice fundamentally affects query routing, write latency, and consistency.</div>
+
+<!-- ═══ Local vs Global Index ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Local Index vs Global Index</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Local Index -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Local Index (per-partition)</h4>
+<svg width="100%" viewBox="0 0 240 110" style="max-width:240px;display:block;margin:0 auto">
+  <defs><marker id="di1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Query -->
+  <rect x="70" y="2" width="100" height="14" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="120" y="12" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">SELECT WHERE city='NYC'</text>
+  <!-- Scatter arrows -->
+  <line x1="90" y1="16" x2="40" y2="32" stroke="var(--r)" stroke-width=".8" marker-end="url(#di1)"/>
+  <line x1="120" y1="16" x2="120" y2="32" stroke="var(--r)" stroke-width=".8" marker-end="url(#di1)"/>
+  <line x1="150" y1="16" x2="200" y2="32" stroke="var(--r)" stroke-width=".8" marker-end="url(#di1)"/>
+  <text x="120" y="28" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">scatter to ALL</text>
+  <!-- Partition 1 -->
+  <rect x="4" y="34" width="72" height="42" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="40" y="44" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Partition 1</text>
+  <rect x="8" y="48" width="30" height="10" rx="2" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="23" y="56" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">data</text>
+  <rect x="42" y="48" width="30" height="10" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="57" y="56" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">index</text>
+  <text x="40" y="70" text-anchor="middle" fill="var(--muted)" font-size="5">city idx: NYC→row2</text>
+  <!-- Partition 2 -->
+  <rect x="84" y="34" width="72" height="42" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="120" y="44" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Partition 2</text>
+  <rect x="88" y="48" width="30" height="10" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="103" y="56" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">data</text>
+  <rect x="122" y="48" width="30" height="10" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="137" y="56" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">index</text>
+  <text x="120" y="70" text-anchor="middle" fill="var(--muted)" font-size="5">city idx: (none)</text>
+  <!-- Partition 3 -->
+  <rect x="164" y="34" width="72" height="42" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="200" y="44" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Partition 3</text>
+  <rect x="168" y="48" width="30" height="10" rx="2" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="183" y="56" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">data</text>
+  <rect x="202" y="48" width="30" height="10" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="217" y="56" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">index</text>
+  <text x="200" y="70" text-anchor="middle" fill="var(--muted)" font-size="5">city idx: NYC→row8</text>
+  <!-- Gather -->
+  <line x1="40" y1="76" x2="100" y2="92" stroke="var(--g)" stroke-width=".7" marker-end="url(#di1)"/>
+  <line x1="120" y1="76" x2="120" y2="92" stroke="var(--g)" stroke-width=".7" marker-end="url(#di1)"/>
+  <line x1="200" y1="76" x2="140" y2="92" stroke="var(--g)" stroke-width=".7" marker-end="url(#di1)"/>
+  <rect x="80" y="94" width="80" height="12" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="120" y="103" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">gather + merge results</text>
+</svg>
+<div style="font-size:.72rem;line-height:1.35;margin-top:2px">
+  <span class="tg">Pro</span> Fast writes — index updated locally, no cross-partition coordination<br>
+  <span class="tr">Con</span> Non-partition-key queries → <span class="hr">scatter-gather</span> (query ALL partitions)<br>
+  <span class="hi">Used by:</span> Cassandra, DynamoDB, MongoDB, Postgres partitions
+</div>
+</div>
+
+<!-- Global Index -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Global Index (cross-partition)</h4>
+<svg width="100%" viewBox="0 0 240 110" style="max-width:240px;display:block;margin:0 auto">
+  <!-- Query -->
+  <rect x="70" y="2" width="100" height="14" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="120" y="12" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">SELECT WHERE city='NYC'</text>
+  <!-- Single arrow to global index -->
+  <line x1="120" y1="16" x2="120" y2="30" stroke="var(--g)" stroke-width="1" marker-end="url(#di1)"/>
+  <text x="136" y="26" fill="var(--g)" font-size="6" font-weight="600">single lookup</text>
+  <!-- Global Index -->
+  <rect x="40" y="32" width="160" height="26" rx="5" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="120" y="42" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Global Index (city)</text>
+  <text x="120" y="52" text-anchor="middle" fill="var(--muted)" font-size="6">NYC → P1:row2, P3:row8 · LON → P2:row5 · BER → P1:row3</text>
+  <!-- Targeted arrows to specific partitions -->
+  <line x1="80" y1="58" x2="40" y2="72" stroke="var(--g)" stroke-width=".8" marker-end="url(#di1)"/>
+  <line x1="160" y1="58" x2="200" y2="72" stroke="var(--a2)" stroke-width=".8" marker-end="url(#di1)"/>
+  <text x="120" y="68" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">only relevant partitions</text>
+  <!-- Partitions (only P1 and P3 hit) -->
+  <rect x="4" y="74" width="72" height="18" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="40" y="86" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Partition 1 ✓</text>
+  <!-- P2 grayed out -->
+  <rect x="84" y="74" width="72" height="18" rx="4" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6" stroke-dasharray="3,2"/>
+  <text x="120" y="86" text-anchor="middle" fill="var(--muted)" font-size="6.5">Partition 2 (skip)</text>
+  <rect x="164" y="74" width="72" height="18" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="200" y="86" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="600">Partition 3 ✓</text>
+  <!-- Result -->
+  <rect x="60" y="96" width="120" height="12" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="120" y="105" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">✓ Only 2 of 3 partitions queried</text>
+</svg>
+<div style="font-size:.72rem;line-height:1.35;margin-top:2px">
+  <span class="tg">Pro</span> Fast reads — index tells you exactly which partitions to hit<br>
+  <span class="tr">Con</span> Slower writes — every write must update the global index (cross-partition)<br>
+  <span class="hi">Used by:</span> DynamoDB GSI, Google Spanner, CockroachDB, Citus
+</div>
+</div>
+</div>
+
+<!-- ═══ Comparison table ═══ -->
+<table style="margin-top:4px">
+<tr><th>Aspect</th><th>Local Index</th><th>Global Index</th></tr>
+<tr><td><span class="hi">Write speed</span></td><td><span class="hg">Fast</span> — update local index only</td><td><span class="hr">Slower</span> — must update global index (cross-partition)</td></tr>
+<tr><td><span class="hi">Read (by partition key)</span></td><td><span class="hg">Fast</span> — single partition</td><td><span class="hg">Fast</span> — single partition</td></tr>
+<tr><td><span class="hi">Read (non-partition key)</span></td><td><span class="hr">Scatter-gather</span> — query ALL partitions</td><td><span class="hg">Targeted</span> — index routes to exact partitions</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Strong</span> (same partition)</td><td><span class="hr">Eventual</span> (async index update) or strong (sync, slower)</td></tr>
+<tr><td><span class="hi">Examples</span></td><td>Cassandra, MongoDB, Postgres partitions</td><td>DynamoDB GSI, Spanner, CockroachDB</td></tr>
+</table>
+
+<!-- ═══ How it fits with Sharding/Replication ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> How Indexing Fits with Sharding &amp; Replication</div>
+<svg width="100%" viewBox="0 0 480 80" style="max-width:480px;display:block;margin:2px auto 4px">
+  <!-- Sharding -->
+  <rect x="4" y="10" width="140" height="56" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="74" y="24" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Sharding</text>
+  <text x="74" y="36" text-anchor="middle" fill="var(--muted)" font-size="6.5">splits data across DB instances</text>
+  <text x="74" y="48" text-anchor="middle" fill="var(--muted)" font-size="6.5">each shard has <tspan fill="var(--y)" font-weight="600">local indexes</tspan></text>
+  <text x="74" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">optional <tspan fill="var(--y)" font-weight="600">global index</tspan> across shards</text>
+  <!-- Arrow -->
+  <line x1="144" y1="38" x2="168" y2="38" stroke="var(--muted)" stroke-width="1" marker-end="url(#di1)"/>
+  <!-- Replication -->
+  <rect x="170" y="10" width="140" height="56" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="240" y="24" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Replication</text>
+  <text x="240" y="36" text-anchor="middle" fill="var(--muted)" font-size="6.5">copies data for availability</text>
+  <text x="240" y="48" text-anchor="middle" fill="var(--muted)" font-size="6.5">indexes <tspan fill="var(--g)" font-weight="600">replicated with data</tspan></text>
+  <text x="240" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">followers serve indexed reads</text>
+  <!-- Arrow -->
+  <line x1="310" y1="38" x2="334" y2="38" stroke="var(--muted)" stroke-width="1" marker-end="url(#di1)"/>
+  <!-- Search -->
+  <rect x="336" y="10" width="140" height="56" rx="6" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
+  <text x="406" y="24" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="700">Search (ES)</text>
+  <text x="406" y="36" text-anchor="middle" fill="var(--muted)" font-size="6.5">inverted index across shards</text>
+  <text x="406" y="48" text-anchor="middle" fill="var(--muted)" font-size="6.5">each shard = <tspan fill="var(--c)" font-weight="600">Lucene index</tspan></text>
+  <text x="406" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">scatter-gather for full-text search</text>
+</svg>
+
+<div class="b bb" style="margin-top:4px"><span class="hi">Rule of thumb:</span> Query by <span class="hg">partition key</span> → local index is enough (fast). Query by <span class="hi">non-partition column</span> → you need a <span class="hg">global secondary index</span> (DynamoDB GSI) or accept scatter-gather. <span class="hi">Search workloads</span> → use a dedicated search engine (Elasticsearch) with its own distributed inverted index.</div>
+</div>
+
+<div class="T" id="replication">
+<h2>Replication</h2>
+<p class="su">
+  Copying data across nodes to improve 
+  <span class="hg">availability</span> (failover), 
+  <span class="hg">fault tolerance</span> (survive failures), 
+  <span class="hg">durability</span> (prevent data loss), 
+  <span class="hg">disaster recovery</span> (region backup), and 
+  <span class="hg">read scalability</span> (higher read throughput), 
+  with trade-offs in 
+  <span class="hg">consistency</span> (stale reads), 
+  <span class="hg">write latency</span> (slower writes), and 
+  <span class="hg">operational complexity</span> (manage replicas).
+</p>
+
+
+<!-- ═══ Sync vs Async visual ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Sync vs Async vs Semi-Sync Replication</div>
+<div class="d-grid tri" style="margin:4px 0">
+
+<!-- Synchronous -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Synchronous</h4>
+<svg width="100%" viewBox="0 0 200 130" style="max-width:200px;display:block;margin:0 auto">
+  <!-- Headers -->
+  <text x="24" y="10" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+  <text x="80" y="10" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Master</text>
+  <text x="140" y="10" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Replica 1</text>
+  <text x="184" y="10" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Replica 2</text>
+  <!-- Lifelines -->
+  <line x1="24" y1="14" x2="24" y2="126" stroke="var(--a)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="80" y1="14" x2="80" y2="126" stroke="var(--g)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="140" y1="14" x2="140" y2="126" stroke="var(--r)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="184" y1="14" x2="184" y2="126" stroke="var(--r)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <!-- Write -->
+  <line x1="24" y1="22" x2="80" y2="22" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
+  <text x="52" y="18" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Write</text>
+  <!-- Master writes to both replicas -->
+  <line x1="80" y1="32" x2="140" y2="32" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)"/>
+  <text x="110" y="28" text-anchor="middle" fill="var(--c)" font-size="5.5">write R1</text>
+  <line x1="80" y1="42" x2="184" y2="42" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)"/>
+  <text x="132" y="38" text-anchor="middle" fill="var(--c)" font-size="5.5">write R2</text>
+  <!-- Client waiting -->
+  <line x1="18" y1="24" x2="18" y2="90" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="6" y="58" fill="var(--r)" font-size="5" font-weight="600">wait</text>
+  <!-- ACKs back -->
+  <line x1="140" y1="60" x2="80" y2="60" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)"/>
+  <text x="110" y="56" text-anchor="middle" fill="var(--g)" font-size="5.5">ok</text>
+  <line x1="184" y1="74" x2="80" y2="74" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)"/>
+  <text x="132" y="70" text-anchor="middle" fill="var(--g)" font-size="5.5">ok</text>
+  <!-- Write complete to client -->
+  <line x1="80" y1="90" x2="24" y2="90" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
+  <text x="52" y="86" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">✓ Complete</text>
+  <!-- Summary -->
+  <text x="100" y="104" text-anchor="middle" fill="var(--g)" font-size="6">✓ Zero data loss</text>
+  <text x="100" y="114" text-anchor="middle" fill="var(--g)" font-size="6">✓ Strong consistency</text>
+  <text x="100" y="124" text-anchor="middle" fill="var(--r)" font-size="6">✗ Slowest (waits for ALL)</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Ex:</span> Spanner (TrueTime), Postgres synchronous_commit=on. Banking, payments — can't lose a single write.</div>
+</div>
+
+<!-- Asynchronous -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--o)">Asynchronous</h4>
+<svg width="100%" viewBox="0 0 200 130" style="max-width:200px;display:block;margin:0 auto">
+  <!-- Headers -->
+  <text x="24" y="10" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+  <text x="80" y="10" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Master</text>
+  <text x="140" y="10" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Replica 1</text>
+  <text x="184" y="10" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Replica 2</text>
+  <!-- Lifelines -->
+  <line x1="24" y1="14" x2="24" y2="126" stroke="var(--a)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="80" y1="14" x2="80" y2="126" stroke="var(--g)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="140" y1="14" x2="140" y2="126" stroke="var(--r)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="184" y1="14" x2="184" y2="126" stroke="var(--r)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <!-- Write -->
+  <line x1="24" y1="22" x2="80" y2="22" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
+  <text x="52" y="18" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Write</text>
+  <!-- Client waiting (short!) -->
+  <line x1="18" y1="24" x2="18" y2="38" stroke="var(--r)" stroke-width="1.5"/>
+  <!-- Write complete immediately -->
+  <line x1="80" y1="38" x2="24" y2="38" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
+  <text x="52" y="34" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">✓ Complete</text>
+  <!-- Background replication (after response) -->
+  <line x1="80" y1="56" x2="140" y2="56" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)" stroke-dasharray="3,2"/>
+  <text x="110" y="52" text-anchor="middle" fill="var(--c)" font-size="5.5">write R1</text>
+  <line x1="80" y1="70" x2="184" y2="70" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)" stroke-dasharray="3,2"/>
+  <text x="132" y="66" text-anchor="middle" fill="var(--c)" font-size="5.5">write R2</text>
+  <!-- ACKs (not needed for client) -->
+  <line x1="140" y1="82" x2="80" y2="82" stroke="var(--c)" stroke-width=".6" marker-end="url(#rp1)" stroke-dasharray="2,2"/>
+  <text x="110" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">ok</text>
+  <line x1="184" y1="92" x2="80" y2="92" stroke="var(--c)" stroke-width=".6" marker-end="url(#rp1)" stroke-dasharray="2,2"/>
+  <text x="132" y="88" text-anchor="middle" fill="var(--muted)" font-size="5">ok</text>
+  <!-- Summary -->
+  <text x="100" y="106" text-anchor="middle" fill="var(--g)" font-size="6">✓ Fastest writes</text>
+  <text x="100" y="116" text-anchor="middle" fill="var(--r)" font-size="6">✗ Replication lag (stale reads)</text>
+  <text x="100" y="126" text-anchor="middle" fill="var(--r)" font-size="6">✗ Data loss if master dies</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Ex:</span> MySQL default, Postgres async replicas, MongoDB secondaries. Social media feeds, analytics — speed over durability.</div>
+</div>
+
+<!-- Semi-Synchronous -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Semi-Synchronous</h4>
+<svg width="100%" viewBox="0 0 200 130" style="max-width:200px;display:block;margin:0 auto">
+  <!-- Headers -->
+  <text x="24" y="10" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+  <text x="80" y="10" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Master</text>
+  <text x="140" y="10" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Replica 1</text>
+  <text x="184" y="10" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Replica 2</text>
+  <!-- Lifelines -->
+  <line x1="24" y1="14" x2="24" y2="126" stroke="var(--a)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="80" y1="14" x2="80" y2="126" stroke="var(--g)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="140" y1="14" x2="140" y2="126" stroke="var(--r)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <line x1="184" y1="14" x2="184" y2="126" stroke="var(--r)" stroke-width=".6" stroke-dasharray="2,2" opacity=".3"/>
+  <!-- Write -->
+  <line x1="24" y1="22" x2="80" y2="22" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
+  <text x="52" y="18" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Write</text>
+  <!-- Master writes to R1 -->
+  <line x1="80" y1="32" x2="140" y2="32" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)"/>
+  <text x="110" y="28" text-anchor="middle" fill="var(--c)" font-size="5.5">write R1</text>
+  <!-- Client waiting (medium) -->
+  <line x1="18" y1="24" x2="18" y2="68" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="6" y="46" fill="var(--r)" font-size="5" font-weight="600">wait</text>
+  <!-- R1 ACK -->
+  <line x1="140" y1="50" x2="80" y2="50" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)"/>
+  <text x="110" y="46" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">ok (1 ACK enough)</text>
+  <!-- Write complete after 1 ACK -->
+  <line x1="80" y1="68" x2="24" y2="68" stroke="var(--y)" stroke-width="1" marker-end="url(#rp1)"/>
+  <text x="52" y="64" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">✓ Complete</text>
+  <!-- R2 async (after response) -->
+  <line x1="80" y1="82" x2="184" y2="82" stroke="var(--c)" stroke-width=".8" marker-end="url(#rp1)" stroke-dasharray="3,2"/>
+  <text x="132" y="78" text-anchor="middle" fill="var(--muted)" font-size="5.5">write R2 (async)</text>
+  <line x1="184" y1="96" x2="80" y2="96" stroke="var(--c)" stroke-width=".6" marker-end="url(#rp1)" stroke-dasharray="2,2"/>
+  <text x="132" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">ok</text>
+  <!-- Summary -->
+  <text x="100" y="108" text-anchor="middle" fill="var(--g)" font-size="6">✓ Wait for 1 replica only</text>
+  <text x="100" y="118" text-anchor="middle" fill="var(--g)" font-size="6">✓ No data loss (1 copy safe)</text>
+  <text x="100" y="126" text-anchor="middle" fill="var(--a)" font-size="6">⚡ Best balance of speed + safety</text>
+</svg>
+<div style="font-size:.7rem;color:var(--muted);line-height:1.35;margin-top:2px"><span class="hi">Ex:</span> MySQL semi-sync, Postgres synchronous_standby_names (1 of N). E-commerce orders — need durability but not full sync overhead.</div>
+</div>
+</div>
+
+<!-- Comparison table -->
+<table style="margin-top:4px">
+<tr><th>Mode</th><th>Client Waits For</th><th>Data Loss Risk</th><th>Write Latency</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Sync</span></td><td>ALL replicas ACK</td><td><span class="hg">Zero</span></td><td><span class="hr">Highest</span></td><td>Banking, payments (Spanner)</td></tr>
+<tr><td><span class="hi">Semi-Sync</span></td><td>1 replica ACK</td><td><span class="hg">Near-zero</span></td><td><span class="hi">Medium</span></td><td>E-commerce, orders (MySQL semi-sync)</td></tr>
+<tr><td><span class="hi">Async</span></td><td>Master only</td><td><span class="hr">Possible</span> (lag window)</td><td><span class="hg">Lowest</span></td><td>Social feeds, analytics (Postgres async)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SINGLE-LEADER DEEP DIVE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="d-title"><span class="num d-green">▸</span> Single-Leader Replication — Deep Dive</div>
+<svg width="100%" viewBox="0 0 700 340" style="max-width:700px;display:block;margin:2px auto 6px">
+  <defs><marker id="sl1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ WRITE PATH ═══ -->
+  <rect x="4" y="4" width="692" height="130" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+  <text x="350" y="18" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Write Path — All Writes Go Through Single Leader</text>
+
+  <!-- Client -->
+  <rect x="14" y="30" width="60" height="36" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="44" y="44" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Client</text>
+  <text x="44" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">INSERT INTO</text>
+  <text x="44" y="62" text-anchor="middle" fill="var(--muted)" font-size="5">orders ...</text>
+  <line x1="74" y1="48" x2="98" y2="48" stroke="var(--o)" stroke-width="1" marker-end="url(#sl1)"/>
+  <text x="86" y="42" text-anchor="middle" fill="var(--o)" font-size="5">write</text>
+
+  <!-- Leader -->
+  <rect x="100" y="26" width="90" height="44" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="145" y="40" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">Leader ★</text>
+  <text x="145" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">1. Write to WAL/binlog</text>
+  <text x="145" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">2. Apply to storage engine</text>
+  <text x="145" y="66" text-anchor="middle" fill="var(--muted)" font-size="5">3. Stream to followers</text>
+
+  <!-- WAL detail -->
+  <rect x="100" y="74" width="90" height="20" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="145" y="84" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">WAL: LSN 0→1→2→3→4</text>
+  <text x="145" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">Write-Ahead Log (append-only)</text>
+
+  <!-- Replication arrows -->
+  <line x1="190" y1="40" x2="240" y2="30" stroke="var(--a)" stroke-width=".8" marker-end="url(#sl1)"/>
+  <line x1="190" y1="55" x2="240" y2="55" stroke="var(--a)" stroke-width=".8" marker-end="url(#sl1)"/>
+  <line x1="190" y1="65" x2="240" y2="80" stroke="var(--a)" stroke-width=".8" marker-end="url(#sl1)"/>
+  <text x="218" y="46" text-anchor="middle" fill="var(--a)" font-size="5">stream WAL</text>
+
+  <!-- Follower 1 -->
+  <rect x="242" y="20" width="80" height="24" rx="4" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="282" y="32" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="600">Follower 1</text>
+  <text x="282" y="40" text-anchor="middle" fill="var(--muted)" font-size="4.5">LSN: 4 (caught up)</text>
+
+  <!-- Follower 2 -->
+  <rect x="242" y="46" width="80" height="24" rx="4" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="282" y="58" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="600">Follower 2</text>
+  <text x="282" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">LSN: 3 (1 behind)</text>
+
+  <!-- Follower 3 -->
+  <rect x="242" y="72" width="80" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="282" y="84" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Follower 3</text>
+  <text x="282" y="92" text-anchor="middle" fill="var(--r)" font-size="4.5">LSN: 1 (lagging!)</text>
+
+  <!-- Read clients from followers -->
+  <text x="330" y="34" font-size="7">👤</text>
+  <text x="330" y="60" font-size="7">👤</text>
+  <text x="330" y="86" font-size="7">👤</text>
+  <text x="348" y="34" fill="var(--g)" font-size="5">fresh read</text>
+  <text x="348" y="60" fill="var(--y)" font-size="5">slightly stale</text>
+  <text x="348" y="86" fill="var(--r)" font-size="5">stale read!</text>
+
+  <!-- Replication Lag panel -->
+  <rect x="420" y="24" width="268" height="100" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="554" y="38" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Replication Lag Problems</text>
+  <text x="430" y="52" fill="var(--r)" font-size="5.5"><tspan font-weight="600">Read-after-write:</tspan> User writes, reads from follower → sees old data</text>
+  <text x="430" y="64" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Fix:</tspan> Read own writes from leader, or wait for follower to catch up</text>
+  <text x="430" y="78" fill="var(--r)" font-size="5.5"><tspan font-weight="600">Monotonic reads:</tspan> User reads F1 (fresh), then F2 (stale) → time goes backward</text>
+  <text x="430" y="90" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Fix:</tspan> Sticky sessions — always read from same follower</text>
+  <text x="430" y="104" fill="var(--r)" font-size="5.5"><tspan font-weight="600">Consistent prefix:</tspan> Causal order violated across partitions</text>
+  <text x="430" y="116" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Fix:</tspan> Causal ordering / version vectors</text>
+
+  <!-- ═══ FAILOVER FLOW ═══ -->
+  <rect x="4" y="140" width="692" height="90" rx="6" fill="rgba(248,113,113,.02)" stroke="var(--r)" stroke-width="1"/>
+  <text x="350" y="154" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">Failover — Leader Dies, Promote Follower</text>
+
+  <!-- Step 1 -->
+  <rect x="14" y="162" width="100" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="64" y="174" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">① Leader crashes</text>
+  <text x="64" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">heartbeat timeout</text>
+  <text x="64" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">(30s default)</text>
+  <line x1="114" y1="180" x2="128" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 2 -->
+  <rect x="130" y="162" width="100" height="36" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="180" y="174" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">② Detect failure</text>
+  <text x="180" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Sentinel / Patroni /</text>
+  <text x="180" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">Orchestrator detects</text>
+  <line x1="230" y1="180" x2="244" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 3 -->
+  <rect x="246" y="162" width="100" height="36" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="296" y="174" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">③ Elect new leader</text>
+  <text x="296" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Pick follower with</text>
+  <text x="296" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">highest LSN (most data)</text>
+  <line x1="346" y1="180" x2="360" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 4 -->
+  <rect x="362" y="162" width="100" height="36" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="412" y="174" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">④ Reconfigure</text>
+  <text x="412" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Redirect writes to</text>
+  <text x="412" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">new leader, update DNS</text>
+  <line x1="462" y1="180" x2="476" y2="180" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sl1)"/>
+
+  <!-- Step 5 -->
+  <rect x="478" y="162" width="100" height="36" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="528" y="174" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">⑤ Old leader returns</text>
+  <text x="528" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Demoted to follower</text>
+  <text x="528" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">Discard unreplicated writes</text>
+
+  <!-- Danger callout -->
+  <rect x="590" y="162" width="100" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="640" y="174" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">⚠ Split-brain risk</text>
+  <text x="640" y="184" text-anchor="middle" fill="var(--muted)" font-size="4.5">Both think they're leader</text>
+  <text x="640" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">→ fencing (STONITH)</text>
+
+  <!-- Failover danger -->
+  <text x="350" y="222" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Failover risks: data loss (unreplicated writes), split-brain, stale reads during election, client reconnection delay</text>
+
+  <!-- ═══ USE CASES ═══ -->
+  <rect x="4" y="236" width="692" height="100" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1"/>
+  <text x="350" y="250" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Single-Leader — When to Use</text>
+
+  <rect x="14" y="258" width="160" height="34" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="94" y="270" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Read-heavy workloads</text>
+  <text x="94" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">Scale reads with followers</text>
+  <text x="94" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Writes bottleneck at leader</text>
+
+  <rect x="180" y="258" width="160" height="34" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="260" y="270" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Strong consistency needed</text>
+  <text x="260" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">Read from leader = latest data</text>
+  <text x="260" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Banking, inventory, orders</text>
+
+  <rect x="346" y="258" width="160" height="34" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="426" y="270" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Simple operations</text>
+  <text x="426" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">No conflict resolution needed</text>
+  <text x="426" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Mature tooling (Patroni, etc.)</text>
+
+  <rect x="512" y="258" width="178" height="34" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="601" y="270" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Single-region deployments</text>
+  <text x="601" y="280" text-anchor="middle" fill="var(--muted)" font-size="5">Low-latency replication within DC</text>
+  <text x="601" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">Cross-region = high write latency</text>
+
+  <!-- Examples -->
+  <text x="14" y="308" fill="var(--g)" font-size="6"><tspan font-weight="700">Postgres:</tspan> streaming replication + Patroni (auto-failover)</text>
+  <text x="250" y="308" fill="var(--a)" font-size="6"><tspan font-weight="700">MySQL:</tspan> binlog replication + Orchestrator</text>
+  <text x="460" y="308" fill="var(--a2)" font-size="6"><tspan font-weight="700">MongoDB:</tspan> replica set (Raft-based election)</text>
+  <text x="14" y="322" fill="var(--o)" font-size="6"><tspan font-weight="700">Redis:</tspan> master-replica + Sentinel</text>
+  <text x="250" y="322" fill="var(--r)" font-size="6"><tspan font-weight="700">Kafka:</tspan> partition leader + ISR followers</text>
+  <text x="460" y="322" fill="var(--y)" font-size="6"><tspan font-weight="700">etcd/ZooKeeper:</tspan> Raft/ZAB consensus leader</text>
+  <text x="350" y="336" text-anchor="middle" fill="var(--muted)" font-size="5.5">Most common replication model — simple, well-understood, but single point of write bottleneck</text>
+</svg>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MULTI-LEADER DEEP DIVE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="d-title"><span class="num d-blue">▸</span> Multi-Leader Replication — Deep Dive</div>
+<svg width="100%" viewBox="0 0 760 520" style="max-width:760px;display:block;margin:2px auto 6px">
+  <defs><marker id="ml1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ MULTI-REGION ARCHITECTURE ═══ -->
+  <rect x="4" y="4" width="752" height="180" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1"/>
+  <text x="380" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Multi-Leader: Users Write to Nearest Leader → Low Latency</text>
+
+  <!-- Region US -->
+  <rect x="14" y="28" width="220" height="100" rx="6" fill="none" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="124" y="40" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">🇺🇸 US-East Region</text>
+  <rect x="24" y="46" width="60" height="24" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="54" y="58" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Leader A</text>
+  <text x="54" y="66" text-anchor="middle" fill="var(--g)" font-size="5">(r/w)</text>
+  <rect x="94" y="46" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="119" y="58" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <rect x="94" y="66" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="119" y="78" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <line x1="84" y1="54" x2="94" y2="54" stroke="var(--g)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <line x1="84" y1="62" x2="94" y2="72" stroke="var(--g)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <!-- US users -->
+  <text x="160" y="52" font-size="8">👤👤👤</text>
+  <text x="180" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">US users → 5ms</text>
+  <!-- US writes -->
+  <rect x="24" y="90" width="200" height="30" rx="3" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="124" y="102" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Writes: order_created, payment_processed</text>
+  <text x="124" y="114" text-anchor="middle" fill="var(--muted)" font-size="5">Local write latency: ~5ms (same region)</text>
+
+  <!-- Region EU -->
+  <rect x="270" y="28" width="220" height="100" rx="6" fill="none" stroke="var(--a)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="380" y="40" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">🇪🇺 EU-West Region</text>
+  <rect x="280" y="46" width="60" height="24" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="310" y="58" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Leader B</text>
+  <text x="310" y="66" text-anchor="middle" fill="var(--a)" font-size="5">(r/w)</text>
+  <rect x="350" y="46" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="375" y="58" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <rect x="350" y="66" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="375" y="78" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <line x1="340" y1="54" x2="350" y2="54" stroke="var(--a)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <line x1="340" y1="62" x2="350" y2="72" stroke="var(--a)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <!-- EU users -->
+  <text x="416" y="52" font-size="8">👤👤👤</text>
+  <text x="436" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">EU users → 8ms</text>
+  <rect x="280" y="90" width="200" height="30" rx="3" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="380" y="102" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Writes: user_updated, GDPR_delete</text>
+  <text x="380" y="114" text-anchor="middle" fill="var(--muted)" font-size="5">Data sovereignty: EU data stays in EU</text>
+
+  <!-- Region Asia -->
+  <rect x="526" y="28" width="220" height="100" rx="6" fill="none" stroke="var(--a2)" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="636" y="40" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">🌏 Asia-Pacific Region</text>
+  <rect x="536" y="46" width="60" height="24" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="566" y="58" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Leader C</text>
+  <text x="566" y="66" text-anchor="middle" fill="var(--a2)" font-size="5">(r/w)</text>
+  <rect x="606" y="46" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="631" y="58" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <rect x="606" y="66" width="50" height="18" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".5"/>
+  <text x="631" y="78" text-anchor="middle" fill="var(--p)" font-size="5">Follower</text>
+  <line x1="596" y1="54" x2="606" y2="54" stroke="var(--a2)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <line x1="596" y1="62" x2="606" y2="72" stroke="var(--a2)" stroke-width=".5" marker-end="url(#ml1)"/>
+  <!-- Asia users -->
+  <text x="672" y="52" font-size="8">👤👤👤</text>
+  <text x="692" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">Asia users → 6ms</text>
+  <rect x="536" y="90" width="200" height="30" rx="3" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="636" y="102" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Writes: ride_events, IoT_telemetry</text>
+  <text x="636" y="114" text-anchor="middle" fill="var(--muted)" font-size="5">Edge/IoT: write to nearest node</text>
+
+  <!-- Cross-region replication arrows -->
+  <line x1="84" y1="58" x2="280" y2="58" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <line x1="280" y1="52" x2="84" y2="52" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <text x="182" y="48" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">async repl ~80ms</text>
+
+  <line x1="340" y1="58" x2="536" y2="58" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <line x1="536" y1="52" x2="340" y2="52" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ml1)" stroke-dasharray="4,3"/>
+  <text x="438" y="48" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">async repl ~120ms</text>
+
+  <!-- HA callout -->
+  <rect x="14" y="134" width="730" height="20" rx="3" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="380" y="148" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">High Availability: If US region fails → EU and Asia continue serving writes (no failover delay, active-active DR)</text>
+  <text x="380" y="160" text-anchor="middle" fill="var(--muted)" font-size="5.5">Each region is independent — no single point of failure. Offline-first apps sync when reconnected.</text>
+  <text x="380" y="172" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Write-heavy global apps: distribute write load across regions, avoid single-leader bottleneck</text>
+
+  <!-- ═══ CONFLICT RESOLUTION ═══ -->
+  <rect x="4" y="190" width="752" height="160" rx="6" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1"/>
+  <text x="380" y="204" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Handling Write Conflicts — The Core Challenge</text>
+
+  <!-- Conflict scenario -->
+  <rect x="14" y="212" width="340" height="60" rx="4" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="184" y="224" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Conflict Example: Same Row Updated in 2 Regions</text>
+  <text x="24" y="238" fill="var(--g)" font-size="5.5">US Leader A: UPDATE users SET name='Bob' WHERE id=42 <tspan fill="var(--muted)">(t=100)</tspan></text>
+  <text x="24" y="250" fill="var(--a)" font-size="5.5">EU Leader B: UPDATE users SET name='Robert' WHERE id=42 <tspan fill="var(--muted)">(t=101)</tspan></text>
+  <text x="24" y="264" fill="var(--r)" font-size="5.5" font-weight="600">Both succeed locally → conflict detected on replication!</text>
+
+  <!-- Resolution strategies -->
+  <rect x="370" y="212" width="378" height="130" rx="4" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="559" y="224" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Conflict Resolution Strategies</text>
+
+  <rect x="378" y="230" width="84" height="44" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="420" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">LWW</text>
+  <text x="420" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">Last Write Wins</text>
+  <text x="420" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">highest timestamp</text>
+  <text x="420" y="272" text-anchor="middle" fill="var(--r)" font-size="4">⚠ data loss</text>
+
+  <rect x="468" y="230" width="84" height="44" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="510" y="242" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">CRDTs</text>
+  <text x="510" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">Auto-merge types</text>
+  <text x="510" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">G-Counter, OR-Set</text>
+  <text x="510" y="272" text-anchor="middle" fill="var(--g)" font-size="4">✓ no data loss</text>
+
+  <rect x="558" y="230" width="84" height="44" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="600" y="242" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Custom Logic</text>
+  <text x="600" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">App-level handler</text>
+  <text x="600" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">merge/prompt user</text>
+  <text x="600" y="272" text-anchor="middle" fill="var(--a)" font-size="4">flexible but complex</text>
+
+  <rect x="648" y="230" width="92" height="44" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="694" y="242" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">Version Vectors</text>
+  <text x="694" y="252" text-anchor="middle" fill="var(--muted)" font-size="4.5">{A:3, B:2, C:1}</text>
+  <text x="694" y="262" text-anchor="middle" fill="var(--muted)" font-size="4.5">detect concurrent</text>
+  <text x="694" y="272" text-anchor="middle" fill="var(--a2)" font-size="4">causal ordering</text>
+
+  <!-- Version vector detail -->
+  <text x="378" y="286" fill="var(--a2)" font-size="5.5"><tspan font-weight="600">Version Vectors:</tspan> Each leader maintains a vector clock {LeaderA: 3, LeaderB: 2, LeaderC: 1}.</text>
+  <text x="378" y="298" fill="var(--muted)" font-size="5.5">If vector A dominates B → A is newer. If neither dominates → concurrent conflict → resolve with strategy above.</text>
+  <text x="378" y="310" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Google Docs:</tspan> OT (Operational Transform) — transform concurrent edits to converge. <tspan font-weight="600">Figma:</tspan> CRDTs for real-time collab.</text>
+
+  <!-- Conflict avoidance -->
+  <rect x="14" y="278" width="340" height="60" rx="4" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="184" y="290" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Conflict Avoidance Strategies</text>
+  <text x="24" y="304" fill="var(--g)" font-size="5.5"><tspan font-weight="600">Sticky routing:</tspan> user_id=42 always writes to US leader → no cross-region conflict</text>
+  <text x="24" y="316" fill="var(--a)" font-size="5.5"><tspan font-weight="600">Partition by region:</tspan> EU data → EU leader only. US data → US leader only.</text>
+  <text x="24" y="328" fill="var(--a2)" font-size="5.5"><tspan font-weight="600">Schema design:</tspan> append-only events (no updates) → conflicts impossible</text>
+
+  <!-- ═══ TOPOLOGIES ═══ -->
+  <rect x="4" y="356" width="752" height="160" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="380" y="370" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">Multi-Leader Replication Topologies</text>
+
+  <!-- Circular -->
+  <rect x="14" y="380" width="230" height="80" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="129" y="394" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Circular Topology</text>
+  <!-- Circle of 4 nodes -->
+  <circle cx="80" cy="430" r="8" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="80" y="433" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">A</text>
+  <circle cx="130" cy="410" r="8" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="130" y="413" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">B</text>
+  <circle cx="180" cy="430" r="8" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="180" y="433" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">C</text>
+  <circle cx="130" cy="450" r="8" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width="1"/>
+  <text x="130" y="453" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">D</text>
+  <!-- Arrows in circle -->
+  <line x1="88" y1="426" x2="122" y2="416" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="138" y1="414" x2="172" y2="426" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="176" y1="438" x2="138" y2="448" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="122" y1="448" x2="86" y2="436" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <text x="129" y="468" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">⚠ Single node failure breaks ring</text>
+
+  <!-- Star -->
+  <rect x="264" y="380" width="230" height="80" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="379" y="394" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Star Topology (Hub-Spoke)</text>
+  <!-- Hub -->
+  <circle cx="379" cy="430" r="10" fill="rgba(251,191,36,.15)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="379" y="433" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="700">Hub</text>
+  <!-- Spokes -->
+  <circle cx="329" cy="415" r="7" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="329" y="418" text-anchor="middle" fill="var(--g)" font-size="4.5">A</text>
+  <circle cx="429" cy="415" r="7" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="429" y="418" text-anchor="middle" fill="var(--a)" font-size="4.5">B</text>
+  <circle cx="329" cy="450" r="7" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="329" y="453" text-anchor="middle" fill="var(--a2)" font-size="4.5">C</text>
+  <circle cx="429" cy="450" r="7" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="429" y="453" text-anchor="middle" fill="var(--o)" font-size="4.5">D</text>
+  <line x1="336" y1="418" x2="369" y2="427" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="422" y1="418" x2="389" y2="427" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="336" y1="448" x2="369" y2="435" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <line x1="422" y1="448" x2="389" y2="435" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ml1)"/>
+  <text x="379" y="468" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">⚠ Hub is SPOF, but simpler routing</text>
+
+  <!-- All-to-All -->
+  <rect x="514" y="380" width="234" height="80" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="631" y="394" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">All-to-All (Mesh) ✓ Best</text>
+  <!-- Mesh nodes -->
+  <circle cx="581" cy="415" r="7" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="581" y="418" text-anchor="middle" fill="var(--g)" font-size="4.5">A</text>
+  <circle cx="681" cy="415" r="7" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="681" y="418" text-anchor="middle" fill="var(--a)" font-size="4.5">B</text>
+  <circle cx="581" cy="450" r="7" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="581" y="453" text-anchor="middle" fill="var(--a2)" font-size="4.5">C</text>
+  <circle cx="681" cy="450" r="7" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="681" y="453" text-anchor="middle" fill="var(--o)" font-size="4.5">D</text>
+  <!-- All connections -->
+  <line x1="588" y1="415" x2="674" y2="415" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="588" y1="450" x2="674" y2="450" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="581" y1="422" x2="581" y2="443" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="681" y1="422" x2="681" y2="443" stroke="var(--g)" stroke-width=".5"/>
+  <line x1="588" y1="419" x2="674" y2="446" stroke="var(--g)" stroke-width=".4"/>
+  <line x1="588" y1="446" x2="674" y2="419" stroke="var(--g)" stroke-width=".4"/>
+  <text x="631" y="468" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">✓ Most fault-tolerant, no SPOF</text>
+
+  <!-- Topology comparison -->
+  <text x="14" y="500" fill="var(--muted)" font-size="5.5"><tspan fill="var(--r)" font-weight="600">Circular:</tspan> MySQL circular replication — simple but fragile. <tspan fill="var(--y)" font-weight="600">Star:</tspan> easier conflict detection at hub. <tspan fill="var(--g)" font-weight="600">All-to-All:</tspan> CouchDB, Postgres BDR — most resilient.</text>
+  <text x="14" y="514" fill="var(--muted)" font-size="5.5"><tspan fill="var(--a)" font-weight="600">Real-world:</tspan> Google Docs (OT), Figma (CRDTs), CouchDB (multi-master), Postgres BDR, MySQL Group Replication, Cassandra (peer-to-peer is leaderless but similar topology).</text>
+</svg>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- LEADERLESS DEEP DIVE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="d-title"><span class="num d-purple">▸</span> Leaderless Replication — Deep Dive</div>
+<svg width="100%" viewBox="0 0 760 480" style="max-width:760px;display:block;margin:2px auto 6px">
+  <defs><marker id="ll1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ QUORUM WRITE + READ ═══ -->
+  <rect x="4" y="4" width="752" height="180" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="380" y="18" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">Leaderless: Write to ALL Replicas, Quorum Decides Success</text>
+
+  <!-- Write side -->
+  <rect x="14" y="28" width="360" height="148" rx="5" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="194" y="42" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Write: W=2 of N=3 (quorum)</text>
+
+  <!-- Client write -->
+  <rect x="24" y="52" width="60" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="54" y="66" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client</text>
+  <text x="54" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">PUT user:42</text>
+
+  <!-- Arrows to all 3 replicas -->
+  <line x1="84" y1="58" x2="130" y2="52" stroke="var(--g)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="84" y1="66" x2="130" y2="80" stroke="var(--g)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="84" y1="74" x2="130" y2="110" stroke="var(--r)" stroke-width=".8" marker-end="url(#ll1)" stroke-dasharray="3,2"/>
+  <text x="108" y="50" fill="var(--g)" font-size="5">write</text>
+
+  <!-- Replica 1 -->
+  <rect x="132" y="42" width="80" height="24" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="172" y="54" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Replica 1 (v2)</text>
+  <text x="172" y="62" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">✓ ACK</text>
+
+  <!-- Replica 2 -->
+  <rect x="132" y="70" width="80" height="24" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="172" y="82" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Replica 2 (v2)</text>
+  <text x="172" y="90" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">✓ ACK</text>
+
+  <!-- Replica 3 (down) -->
+  <rect x="132" y="100" width="80" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="172" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Replica 3 (v1)</text>
+  <text x="172" y="120" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">✗ offline</text>
+
+  <!-- Success -->
+  <rect x="230" y="68" width="130" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="295" y="80" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">W=2 ≥ quorum → SUCCESS</text>
+  <text x="295" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">Client gets OK even with 1 down</text>
+
+  <!-- Quorum formula -->
+  <rect x="24" y="130" width="340" height="38" rx="3" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="194" y="144" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Quorum Formula: W + R > N</text>
+  <text x="194" y="156" text-anchor="middle" fill="var(--muted)" font-size="5.5">N=3, W=2, R=2 → 2+2=4 > 3 → at least 1 replica has latest version in every read</text>
+  <text x="194" y="166" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Tunable: W=1,R=3 (fast writes) | W=3,R=1 (fast reads) | W=1,R=1 (eventual)</text>
+
+  <!-- Read side -->
+  <rect x="386" y="28" width="362" height="148" rx="5" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="567" y="42" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Read: R=2 of N=3 (quorum)</text>
+
+  <!-- Client read -->
+  <rect x="396" y="52" width="60" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="426" y="66" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client</text>
+  <text x="426" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">GET user:42</text>
+
+  <!-- Read arrows -->
+  <line x1="456" y1="58" x2="502" y2="52" stroke="var(--a)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="456" y1="66" x2="502" y2="80" stroke="var(--a)" stroke-width=".8" marker-end="url(#ll1)"/>
+  <line x1="456" y1="74" x2="502" y2="110" stroke="var(--a)" stroke-width=".8" marker-end="url(#ll1)"/>
+
+  <!-- Replica responses -->
+  <rect x="504" y="42" width="80" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="544" y="54" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">R1: v2 ✓</text>
+  <text x="544" y="62" text-anchor="middle" fill="var(--g)" font-size="5">(latest)</text>
+
+  <rect x="504" y="70" width="80" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="544" y="82" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">R2: v2 ✓</text>
+  <text x="544" y="90" text-anchor="middle" fill="var(--g)" font-size="5">(latest)</text>
+
+  <rect x="504" y="100" width="80" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="544" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">R3: v1 (stale)</text>
+  <text x="544" y="120" text-anchor="middle" fill="var(--r)" font-size="5">was offline</text>
+
+  <!-- Resolution -->
+  <rect x="600" y="52" width="140" height="50" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="670" y="66" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Client picks highest</text>
+  <text x="670" y="78" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">version: v2 ✓</text>
+  <text x="670" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">+ triggers read repair on R3</text>
+
+  <!-- Read repair detail -->
+  <rect x="396" y="130" width="340" height="38" rx="3" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="566" y="144" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Read Repair: Fix Stale Replicas on Read</text>
+  <text x="566" y="156" text-anchor="middle" fill="var(--muted)" font-size="5.5">Client reads R3=v1 (stale) → sends v2 to R3 → R3 now has v2. Lazy repair, no background process.</text>
+  <text x="566" y="166" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Anti-entropy: background Merkle tree sync catches anything read repair misses</text>
+
+  <!-- ═══ REPAIR MECHANISMS ═══ -->
+  <rect x="4" y="190" width="752" height="120" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+  <text x="380" y="204" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Repair Mechanisms — Keeping Replicas in Sync</text>
+
+  <!-- Read Repair -->
+  <rect x="14" y="214" width="236" height="86" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="132" y="228" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Read Repair</text>
+  <text x="132" y="242" text-anchor="middle" fill="var(--muted)" font-size="5.5">On read: detect stale replica</text>
+  <text x="132" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ push latest version to it</text>
+  <text x="132" y="268" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">✓ Lazy, no extra traffic</text>
+  <text x="132" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Only fixes data that's read</text>
+  <text x="132" y="292" text-anchor="middle" fill="var(--muted)" font-size="5">Used by: Cassandra, DynamoDB, Riak</text>
+
+  <!-- Anti-Entropy -->
+  <rect x="262" y="214" width="236" height="86" rx="5" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="380" y="228" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Anti-Entropy (Merkle Trees)</text>
+  <text x="380" y="242" text-anchor="middle" fill="var(--muted)" font-size="5.5">Background process compares</text>
+  <text x="380" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">Merkle tree hashes between replicas</text>
+  <text x="380" y="268" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">✓ Catches ALL inconsistencies</text>
+  <text x="380" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Background CPU/network cost</text>
+  <text x="380" y="292" text-anchor="middle" fill="var(--muted)" font-size="5">Used by: Cassandra, DynamoDB, Riak</text>
+
+  <!-- Hinted Handoff -->
+  <rect x="510" y="214" width="238" height="86" rx="5" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="629" y="228" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Hinted Handoff</text>
+  <text x="629" y="242" text-anchor="middle" fill="var(--muted)" font-size="5.5">Node X is down → neighbor Y</text>
+  <text x="629" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">stores writes as "hints" for X</text>
+  <text x="629" y="268" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">✓ X comes back → Y replays hints</text>
+  <text x="629" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Y runs out of space if X is down long</text>
+  <text x="629" y="292" text-anchor="middle" fill="var(--muted)" font-size="5">Used by: Cassandra, Riak, Voldemort</text>
+
+  <!-- ═══ SLOPPY QUORUM + USE CASES ═══ -->
+  <rect x="4" y="316" width="752" height="164" rx="6" fill="rgba(251,146,60,.02)" stroke="var(--o)" stroke-width="1"/>
+  <text x="380" y="330" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">Sloppy Quorum, Version Vectors &amp; Use Cases</text>
+
+  <!-- Sloppy Quorum -->
+  <rect x="14" y="340" width="360" height="60" rx="4" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="194" y="354" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Sloppy Quorum</text>
+  <text x="194" y="368" text-anchor="middle" fill="var(--muted)" font-size="5.5">If not enough "home" replicas are reachable, accept writes on ANY available node</text>
+  <text x="194" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ higher availability (writes always succeed) but weaker consistency guarantee</text>
+  <text x="194" y="392" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Cassandra: consistency=ANY uses sloppy quorum. DynamoDB: similar approach.</text>
+
+  <!-- Version Vectors -->
+  <rect x="386" y="340" width="362" height="60" rx="4" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="567" y="354" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Version Vectors (Crux of Leaderless)</text>
+  <text x="567" y="368" text-anchor="middle" fill="var(--muted)" font-size="5.5">Each replica tracks: {R1: 3, R2: 2, R3: 4} — vector clock per key</text>
+  <text x="567" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">{R1:3, R2:2} vs {R1:2, R2:3} → concurrent! Neither dominates → conflict → resolve</text>
+  <text x="567" y="392" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">{R1:3, R2:2} vs {R1:2, R2:1} → first dominates → no conflict, first is newer</text>
+
+  <!-- Use cases grid -->
+  <rect x="14" y="408" width="178" height="58" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="103" y="422" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">High Availability</text>
+  <text x="103" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">No single point of failure</text>
+  <text x="103" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">Any node can serve r/w</text>
+  <text x="103" y="458" text-anchor="middle" fill="var(--g)" font-size="5">Shopping carts, sessions</text>
+
+  <rect x="198" y="408" width="178" height="58" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="287" y="422" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Tunable Consistency</text>
+  <text x="287" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">W=1,R=1 → eventual (fast)</text>
+  <text x="287" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">W=N,R=1 → strong (slow writes)</text>
+  <text x="287" y="458" text-anchor="middle" fill="var(--a)" font-size="5">Per-query consistency level</text>
+
+  <rect x="382" y="408" width="178" height="58" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="471" y="422" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">Write-Heavy / Global</text>
+  <text x="471" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">No write bottleneck (no leader)</text>
+  <text x="471" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">Multi-DC: write to local replicas</text>
+  <text x="471" y="458" text-anchor="middle" fill="var(--a2)" font-size="5">IoT, time-series, metrics</text>
+
+  <rect x="566" y="408" width="182" height="58" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="657" y="422" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="700">Partition Tolerant</text>
+  <text x="657" y="434" text-anchor="middle" fill="var(--muted)" font-size="5">Network splits → still serve</text>
+  <text x="657" y="446" text-anchor="middle" fill="var(--muted)" font-size="5">AP in CAP theorem</text>
+  <text x="657" y="458" text-anchor="middle" fill="var(--o)" font-size="5">DNS, CDN edge caches</text>
+
+  <!-- Examples -->
+  <text x="14" y="478" fill="var(--a2)" font-size="6"><tspan font-weight="700">Cassandra:</tspan> CL=QUORUM (W+R>N). <tspan font-weight="700">DynamoDB:</tspan> eventually consistent reads (fast) or strongly consistent (slower). <tspan font-weight="700">Riak:</tspan> CRDTs + version vectors. <tspan font-weight="700">Voldemort:</tspan> LinkedIn's key-value store.</text>
+</svg>
+
+<!-- ═══ REPLICATION COMPARISON TABLE ═══ -->
+<table style="margin-top:4px">
+<tr><th>Aspect</th><th>Single-Leader</th><th>Multi-Leader</th><th>Leaderless</th></tr>
+<tr><td><span class="hi">Write path</span></td><td>All writes → 1 leader</td><td>Writes → nearest leader</td><td>Writes → ALL replicas (W of N)</td></tr>
+<tr><td><span class="hi">Read scaling</span></td><td><span class="hg">Followers serve reads</span></td><td><span class="hg">Local leader + followers</span></td><td><span class="hg">Any replica serves reads</span></td></tr>
+<tr><td><span class="hi">Write scaling</span></td><td><span class="hr">Bottleneck at leader</span></td><td><span class="hg">Distributed across leaders</span></td><td><span class="hg">No bottleneck (no leader)</span></td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Strong</span> (read from leader)</td><td><span class="hr">Eventual</span> (conflicts possible)</td><td><span class="hi">Tunable</span> (W+R>N = strong)</td></tr>
+<tr><td><span class="hi">Conflicts</span></td><td><span class="hg">None</span> (single writer)</td><td><span class="hr">Yes</span> — LWW, CRDTs, custom</td><td><span class="hr">Yes</span> — version vectors, CRDTs</td></tr>
+<tr><td><span class="hi">Failover</span></td><td><span class="hr">Election needed</span> (downtime)</td><td><span class="hg">Other leaders continue</span></td><td><span class="hg">No failover needed</span></td></tr>
+<tr><td><span class="hi">Complexity</span></td><td><span class="hg">Simple</span></td><td><span class="hr">High</span> (conflict resolution)</td><td><span class="hi">Medium</span> (quorum tuning)</td></tr>
+<tr><td><span class="hi">Best for</span></td><td>Read-heavy, single-region</td><td>Multi-region writes, collab</td><td>High availability, write-heavy</td></tr>
+<tr><td><span class="hi">Examples</span></td><td>Postgres, MySQL, MongoDB, Redis</td><td>CouchDB, Postgres BDR, Google Docs</td><td>Cassandra, DynamoDB, Riak</td></tr>
+</table>
+<div class="b bg" style="margin-top:4px"><span class="hi">Decision Guide:</span> Need <span class="hg">strong consistency</span> + simple ops? → <span class="hg">Single-Leader</span>. Need <span class="hg">multi-region low-latency writes</span>? → <span class="hg">Multi-Leader</span>. Need <span class="hg">maximum availability</span> + no SPOF? → <span class="hg">Leaderless</span>. Most systems start single-leader and evolve as scale demands.</div>
+</div>
+
+<div class="T" id="sharding">
+<h2>Sharding</h2>
+<p class="su">
+  <span class="hg">Horizontal partitioning</span> across independent database instances to improve 
+  <span class="hg">write scalability</span> (distribute writes), 
+  <span class="hg">read scalability</span> (parallel reads), and 
+  <span class="hg">storage capacity</span> (split data), 
+  with trade-offs in 
+  <span class="hg">complexity</span> (routing, rebalancing), 
+  <span class="hg">cross-shard queries</span> (expensive joins), and 
+  <span class="hg">hotspots</span> (uneven key distribution).
+</p>
+<!-- ═══ Sharding vs Replication visual ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Sharding vs Replication</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Sharding (Split Data)</h4>
+<svg width="100%" viewBox="0 0 180 70" style="max-width:180px;display:block;margin:0 auto">
+  <defs><marker id="sh1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Big DB -->
+  <rect x="4" y="16" width="44" height="28" rx="5" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="26" y="28" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">1 Large</text>
+  <text x="26" y="38" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">DB</text>
+  <!-- Arrow -->
+  <line x1="48" y1="30" x2="68" y2="30" stroke="var(--g)" stroke-width="1.2" marker-end="url(#sh1)"/>
+  <!-- Shards -->
+  <rect x="72" y="4" width="32" height="18" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="88" y="16" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Shard 1</text>
+  <rect x="72" y="26" width="32" height="18" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="88" y="38" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Shard 2</text>
+  <rect x="72" y="48" width="32" height="18" rx="3" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="88" y="60" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="600">Shard 3</text>
+  <!-- Label -->
+  <text x="140" y="24" fill="var(--muted)" font-size="6.5">Each shard holds</text>
+  <text x="140" y="34" fill="var(--g)" font-size="6.5" font-weight="600">different rows</text>
+  <text x="140" y="48" fill="var(--muted)" font-size="6.5">Write scaling ✓</text>
+</svg>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Replication (Copy Data)</h4>
+<svg width="100%" viewBox="0 0 180 70" style="max-width:180px;display:block;margin:0 auto">
+  <!-- Primary -->
+  <rect x="4" y="16" width="44" height="28" rx="5" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="26" y="28" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">1 Large</text>
+  <text x="26" y="38" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">DB</text>
+  <!-- Arrow -->
+  <line x1="48" y1="30" x2="68" y2="30" stroke="var(--a)" stroke-width="1.2" marker-end="url(#sh1)"/>
+  <!-- Replicas -->
+  <rect x="72" y="4" width="32" height="18" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="88" y="16" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Replica 1</text>
+  <rect x="72" y="26" width="32" height="18" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="88" y="38" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Replica 2</text>
+  <rect x="72" y="48" width="32" height="18" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="88" y="60" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Replica 3</text>
+  <!-- Label -->
+  <text x="140" y="24" fill="var(--muted)" font-size="6.5">Each replica holds</text>
+  <text x="140" y="34" fill="var(--a)" font-size="6.5" font-weight="600">same data (copy)</text>
+  <text x="140" y="48" fill="var(--muted)" font-size="6.5">Read scaling ✓</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ Range vs Hash Sharding visual ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Range vs Hash (Key-Based) Sharding</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Range Based -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--o)">Range-Based Sharding</h4>
+<svg width="100%" viewBox="0 0 240 120" style="max-width:240px;display:block;margin:0 auto">
+  <!-- Source table -->
+  <rect x="70" y="2" width="100" height="10" rx="2" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="86" y="10" fill="var(--y)" font-size="6" font-weight="700">Name</text>
+  <text x="146" y="10" fill="var(--y)" font-size="6" font-weight="700">Age</text>
+  <rect x="70" y="12" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="86" y="18" fill="var(--text)" font-size="5.5">Rohit</text><text x="146" y="18" fill="var(--text)" font-size="5.5">28</text>
+  <rect x="70" y="20" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="86" y="26" fill="var(--text)" font-size="5.5">Alex</text><text x="146" y="26" fill="var(--text)" font-size="5.5">32</text>
+  <rect x="70" y="28" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="86" y="34" fill="var(--text)" font-size="5.5">Adam</text><text x="146" y="34" fill="var(--text)" font-size="5.5">34</text>
+  <rect x="70" y="36" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="86" y="42" fill="var(--text)" font-size="5.5">John</text><text x="146" y="42" fill="var(--text)" font-size="5.5">45</text>
+  <rect x="70" y="44" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="86" y="50" fill="var(--text)" font-size="5.5">Anshu</text><text x="146" y="50" fill="var(--text)" font-size="5.5">50</text>
+  <!-- Arrows to shards -->
+  <line x1="80" y1="52" x2="30" y2="68" stroke="var(--g)" stroke-width=".8" marker-end="url(#sh1)"/>
+  <line x1="120" y1="52" x2="120" y2="68" stroke="var(--a)" stroke-width=".8" marker-end="url(#sh1)"/>
+  <line x1="160" y1="52" x2="210" y2="68" stroke="var(--a2)" stroke-width=".8" marker-end="url(#sh1)"/>
+  <!-- Shard 1: age 20-30 -->
+  <rect x="2" y="70" width="56" height="10" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="30" y="78" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">20 &lt; age ≤ 30</text>
+  <rect x="2" y="80" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="18" y="86" fill="var(--text)" font-size="5.5">Rohit</text><text x="46" y="86" fill="var(--text)" font-size="5.5">28</text>
+  <text x="30" y="98" text-anchor="middle" fill="var(--g)" font-size="5.5">1 row</text>
+  <!-- Shard 2: age 30-40 -->
+  <rect x="92" y="70" width="56" height="10" rx="2" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="120" y="78" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">30 &lt; age ≤ 40</text>
+  <rect x="92" y="80" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="108" y="86" fill="var(--text)" font-size="5.5">Alex</text><text x="136" y="86" fill="var(--text)" font-size="5.5">32</text>
+  <rect x="92" y="88" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="108" y="94" fill="var(--text)" font-size="5.5">Adam</text><text x="136" y="94" fill="var(--text)" font-size="5.5">34</text>
+  <text x="120" y="106" text-anchor="middle" fill="var(--a)" font-size="5.5">2 rows</text>
+  <!-- Shard 3: age 40-50 -->
+  <rect x="182" y="70" width="56" height="10" rx="2" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="210" y="78" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">40 &lt; age ≤ 50</text>
+  <rect x="182" y="80" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="198" y="86" fill="var(--text)" font-size="5.5">John</text><text x="226" y="86" fill="var(--text)" font-size="5.5">45</text>
+  <rect x="182" y="88" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="198" y="94" fill="var(--text)" font-size="5.5">Anshu</text><text x="226" y="94" fill="var(--text)" font-size="5.5">50</text>
+  <text x="210" y="106" text-anchor="middle" fill="var(--a2)" font-size="5.5">2 rows</text>
+  <!-- Warning -->
+  <text x="120" y="118" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">⚠ Uneven distribution — hot spots possible</text>
+</svg>
+</div>
+
+<!-- Hash Based -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Key-Based (Hash) Sharding</h4>
+<svg width="100%" viewBox="0 0 240 120" style="max-width:240px;display:block;margin:0 auto">
+  <!-- Source table -->
+  <rect x="70" y="2" width="100" height="10" rx="2" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="82" y="10" fill="var(--y)" font-size="6" font-weight="700">ID</text>
+  <text x="110" y="10" fill="var(--y)" font-size="6" font-weight="700">Name</text>
+  <text x="156" y="10" fill="var(--y)" font-size="6" font-weight="700">Last</text>
+  <rect x="70" y="12" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="18" fill="var(--text)" font-size="5.5">1</text><text x="110" y="18" fill="var(--text)" font-size="5.5">Rohit</text><text x="156" y="18" fill="var(--text)" font-size="5.5">Sehgal</text>
+  <rect x="70" y="20" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="26" fill="var(--text)" font-size="5.5">2</text><text x="110" y="26" fill="var(--text)" font-size="5.5">Alex</text><text x="156" y="26" fill="var(--text)" font-size="5.5">Xu</text>
+  <rect x="70" y="28" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="34" fill="var(--text)" font-size="5.5">3</text><text x="110" y="34" fill="var(--text)" font-size="5.5">Foo</text><text x="156" y="34" fill="var(--text)" font-size="5.5">Bar</text>
+  <rect x="70" y="36" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="42" fill="var(--text)" font-size="5.5">4</text><text x="110" y="42" fill="var(--text)" font-size="5.5">Adam</text><text x="156" y="42" fill="var(--text)" font-size="5.5">Doe</text>
+  <rect x="70" y="44" width="100" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="50" fill="var(--text)" font-size="5.5">5</text><text x="110" y="50" fill="var(--text)" font-size="5.5">Joe</text><text x="156" y="50" fill="var(--text)" font-size="5.5">Jonas</text>
+  <!-- Hash function -->
+  <rect x="90" y="54" width="60" height="14" rx="4" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1"/>
+  <text x="120" y="64" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">ID % 3</text>
+  <!-- Hash results -->
+  <text x="20" y="64" fill="var(--muted)" font-size="5.5">1%3=1 · 2%3=2 · 3%3=0 · 4%3=1 · 5%3=2</text>
+  <!-- Arrows to shards -->
+  <line x1="100" y1="68" x2="30" y2="80" stroke="var(--g)" stroke-width=".8" marker-end="url(#sh1)"/>
+  <line x1="120" y1="68" x2="120" y2="80" stroke="var(--a)" stroke-width=".8" marker-end="url(#sh1)"/>
+  <line x1="140" y1="68" x2="210" y2="80" stroke="var(--a2)" stroke-width=".8" marker-end="url(#sh1)"/>
+  <!-- Shard 0: hash=0 -->
+  <rect x="2" y="82" width="56" height="10" rx="2" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="30" y="90" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">hash = 0</text>
+  <rect x="2" y="92" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="12" y="98" fill="var(--text)" font-size="5.5">3</text><text x="26" y="98" fill="var(--text)" font-size="5.5">Foo</text><text x="46" y="98" fill="var(--text)" font-size="5.5">Bar</text>
+  <!-- Shard 1: hash=1 -->
+  <rect x="92" y="82" width="56" height="10" rx="2" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="120" y="90" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">hash = 1</text>
+  <rect x="92" y="92" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="102" y="98" fill="var(--text)" font-size="5.5">1</text><text x="116" y="98" fill="var(--text)" font-size="5.5">Rohit</text><text x="140" y="98" fill="var(--text)" font-size="5.5">S.</text>
+  <rect x="92" y="100" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="102" y="106" fill="var(--text)" font-size="5.5">4</text><text x="116" y="106" fill="var(--text)" font-size="5.5">Adam</text><text x="140" y="106" fill="var(--text)" font-size="5.5">D.</text>
+  <!-- Shard 2: hash=2 -->
+  <rect x="182" y="82" width="56" height="10" rx="2" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="210" y="90" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">hash = 2</text>
+  <rect x="182" y="92" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="192" y="98" fill="var(--text)" font-size="5.5">2</text><text x="206" y="98" fill="var(--text)" font-size="5.5">Alex</text><text x="230" y="98" fill="var(--text)" font-size="5.5">Xu</text>
+  <rect x="182" y="100" width="56" height="8" rx="0" fill="none" stroke="var(--border)" stroke-width=".3"/>
+  <text x="192" y="106" fill="var(--text)" font-size="5.5">5</text><text x="206" y="106" fill="var(--text)" font-size="5.5">Joe</text><text x="230" y="106" fill="var(--text)" font-size="5.5">J.</text>
+  <!-- Even label -->
+  <text x="120" y="118" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">✓ Even distribution — almost equal partitions</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ Directory + Geo Sharding ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Directory &amp; Geo Sharding</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Directory Sharding -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--y)">Directory-Based Sharding</h4>
+<svg width="100%" viewBox="0 0 240 90" style="max-width:240px;display:block;margin:0 auto">
+  <defs><marker id="ds1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- App -->
+  <rect x="4" y="28" width="40" height="22" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="24" y="42" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">App</text>
+  <!-- Arrow to lookup -->
+  <line x1="44" y1="39" x2="62" y2="39" stroke="var(--y)" stroke-width="1" marker-end="url(#ds1)"/>
+  <circle cx="52" cy="33" r="6" fill="var(--y)"/><text x="52" y="36" text-anchor="middle" fill="#fff" font-size="5.5" font-weight="700">1</text>
+  <!-- Lookup table -->
+  <rect x="64" y="14" width="66" height="50" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="97" y="26" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Lookup Table</text>
+  <!-- Table rows -->
+  <rect x="68" y="30" width="28" height="8" rx="1" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="37" text-anchor="middle" fill="var(--text)" font-size="5.5">user_1</text>
+  <rect x="98" y="30" width="28" height="8" rx="1" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".4"/>
+  <text x="112" y="37" text-anchor="middle" fill="var(--g)" font-size="5.5">→ S1</text>
+  <rect x="68" y="39" width="28" height="8" rx="1" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="46" text-anchor="middle" fill="var(--text)" font-size="5.5">user_2</text>
+  <rect x="98" y="39" width="28" height="8" rx="1" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".4"/>
+  <text x="112" y="46" text-anchor="middle" fill="var(--a)" font-size="5.5">→ S2</text>
+  <rect x="68" y="48" width="28" height="8" rx="1" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".4"/>
+  <text x="82" y="55" text-anchor="middle" fill="var(--text)" font-size="5.5">user_3</text>
+  <rect x="98" y="48" width="28" height="8" rx="1" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".4"/>
+  <text x="112" y="55" text-anchor="middle" fill="var(--a2)" font-size="5.5">→ S3</text>
+  <!-- Arrows to shards -->
+  <line x1="130" y1="34" x2="160" y2="14" stroke="var(--g)" stroke-width=".8" marker-end="url(#ds1)"/>
+  <line x1="130" y1="43" x2="160" y2="39" stroke="var(--a)" stroke-width=".8" marker-end="url(#ds1)"/>
+  <line x1="130" y1="52" x2="160" y2="64" stroke="var(--a2)" stroke-width=".8" marker-end="url(#ds1)"/>
+  <circle cx="144" cy="28" r="6" fill="var(--g)"/><text x="144" y="31" text-anchor="middle" fill="#fff" font-size="5.5" font-weight="700">2</text>
+  <!-- Shards -->
+  <rect x="162" y="4" width="36" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="180" y="15" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Shard 1</text>
+  <rect x="162" y="30" width="36" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="180" y="41" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Shard 2</text>
+  <rect x="162" y="56" width="36" height="16" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="180" y="67" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="600">Shard 3</text>
+  <!-- Pros/Cons -->
+  <text x="120" y="82" text-anchor="middle" fill="var(--g)" font-size="6">✓ Flexible — any key→shard mapping</text>
+  <text x="120" y="90" text-anchor="middle" fill="var(--r)" font-size="6">⚠ Lookup table = SPOF + bottleneck</text>
+</svg>
+</div>
+
+<!-- Geo Sharding -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--c)">Geo-Based Sharding</h4>
+<svg width="100%" viewBox="0 0 240 90" style="max-width:240px;display:block;margin:0 auto">
+  <!-- Users -->
+  <text x="14" y="14" font-size="8">👤</text><text x="14" y="24" text-anchor="middle" fill="var(--g)" font-size="5.5" dx="4" font-weight="600">US user</text>
+  <text x="14" y="48" font-size="8">👤</text><text x="14" y="58" text-anchor="middle" fill="var(--a)" font-size="5.5" dx="4" font-weight="600">EU user</text>
+  <text x="14" y="76" font-size="8">👤</text><text x="14" y="86" text-anchor="middle" fill="var(--o)" font-size="5.5" dx="4" font-weight="600">Asia user</text>
+  <!-- Router -->
+  <line x1="30" y1="10" x2="62" y2="10" stroke="var(--g)" stroke-width=".8" marker-end="url(#ds1)"/>
+  <line x1="30" y1="44" x2="62" y2="44" stroke="var(--a)" stroke-width=".8" marker-end="url(#ds1)"/>
+  <line x1="30" y1="72" x2="62" y2="72" stroke="var(--o)" stroke-width=".8" marker-end="url(#ds1)"/>
+  <!-- Geo Router -->
+  <rect x="64" y="24" width="50" height="28" rx="5" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="89" y="36" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Geo</text>
+  <text x="89" y="46" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Router</text>
+  <!-- Route lines -->
+  <line x1="64" y1="30" x2="64" y2="10" stroke="var(--muted)" stroke-width=".5"/>
+  <line x1="64" y1="46" x2="64" y2="44" stroke="var(--muted)" stroke-width=".5"/>
+  <line x1="64" y1="52" x2="64" y2="72" stroke="var(--muted)" stroke-width=".5"/>
+  <!-- Arrows to regional shards -->
+  <line x1="114" y1="30" x2="146" y2="10" stroke="var(--g)" stroke-width="1" marker-end="url(#ds1)"/>
+  <line x1="114" y1="38" x2="146" y2="42" stroke="var(--a)" stroke-width="1" marker-end="url(#ds1)"/>
+  <line x1="114" y1="46" x2="146" y2="72" stroke="var(--o)" stroke-width="1" marker-end="url(#ds1)"/>
+  <!-- Regional shards -->
+  <rect x="148" y="2" width="56" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="176" y="10" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">🇺🇸 US Shard</text>
+  <text x="176" y="18" text-anchor="middle" fill="var(--muted)" font-size="5">us-east-1</text>
+  <rect x="148" y="32" width="56" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
+  <text x="176" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">🇪🇺 EU Shard</text>
+  <text x="176" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">eu-west-1</text>
+  <rect x="148" y="62" width="56" height="18" rx="4" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width="1"/>
+  <text x="176" y="70" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">🌏 Asia Shard</text>
+  <text x="176" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">ap-south-1</text>
+  <!-- Labels -->
+  <text x="176" y="88" text-anchor="middle" fill="var(--g)" font-size="6">✓ Low latency + GDPR compliance</text>
+</svg>
+</div>
+</div>
+
+<!-- Strategy comparison table -->
+<table style="margin-top:4px">
+<tr><th>Strategy</th><th>How</th><th>Guarantee</th><th>Risk</th></tr>
+<tr><td><span class="hi">Hash</span></td><td><code>hash(key) % N</code></td><td><span class="hg">Even distribution</span></td><td>Resharding requires data migration</td></tr>
+<tr><td><span class="hi">Range</span></td><td>Split by value range (age, date)</td><td>Efficient range queries within shard</td><td><span class="hr">Hot spots</span> for sequential keys</td></tr>
+<tr><td><span class="hi">Directory</span></td><td>Lookup table maps key → shard</td><td>Flexible, any mapping</td><td>Lookup table = SPOF</td></tr>
+<tr><td><span class="hi">Geo</span></td><td>Region-based (US→shard1, EU→shard2)</td><td>Data locality + compliance</td><td>Cross-region queries expensive</td></tr>
+</table>
+<div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Instagram</strong> shards Postgres by user_id (hash). <strong>Vitess</strong> (YouTube) — MySQL sharding middleware. <strong>Citus</strong> — distributed Postgres.</div>
+</div>
+
+<div class="T" id="consistent-hashing">
+<h2>Consistent Hashing &amp; Bounded Load</h2>
+<p class="su">
+  Map keys to nodes via a hash ring to improve 
+  <span class="hg">scalability</span> (easy node add/remove), 
+  <span class="hg">load distribution</span> (even spread with virtual nodes), and 
+  <span class="hg">stability</span> (minimal key movement), 
+  with trade-offs in 
+  <span class="hg">complexity</span> (ring management) and 
+  <span class="hg">hotspots</span> (skewed keys).
+</p>
+<!-- ═══ 1. THE PROBLEM ═══ -->
+<div class="d-title"><span class="num d-red">1</span> The Problem with Modulo Hashing</div>
+
+<div class="d-grid">
+<div class="d-panel">
+<h4>With 3 servers</h4>
+<div style="margin:4px 0;font-size:.8rem;color:var(--muted)"><code>server = hash(key) % 3</code></div>
+<div class="d-flow">
+  <div class="d-box d-green">S1</div>
+  <div class="d-box d-blue">S2</div>
+  <div class="d-box d-orange">S3</div>
+</div>
+<div class="d-flow" style="gap:5px;margin-top:6px">
+  <div class="d-pill">K1→S1</div><div class="d-pill">K2→S2</div><div class="d-pill">K3→S3</div>
+  <div class="d-pill">K4→S1</div><div class="d-pill">K5→S2</div><div class="d-pill">K6→S3</div>
+</div>
+</div>
+<div class="d-panel">
+<h4>Add 1 server (N=3 → 4)</h4>
+<div style="margin:4px 0;font-size:.8rem;color:var(--muted)"><code>server = hash(key) % 4</code></div>
+<div class="d-flow">
+  <div class="d-box d-green">S1</div>
+  <div class="d-box d-blue">S2</div>
+  <div class="d-box d-orange">S3</div>
+  <div class="d-box d-purple">S4</div>
+</div>
+<div class="d-flow" style="gap:5px;margin-top:6px">
+  <div class="d-pill" style="border-color:var(--r)">K1→S2</div>
+  <div class="d-pill" style="border-color:var(--r)">K2→S3</div>
+  <div class="d-pill">K3→S4</div>
+  <div class="d-pill" style="border-color:var(--r)">K4→S1</div>
+  <div class="d-pill" style="border-color:var(--r)">K5→S2</div>
+  <div class="d-pill">K6→S3</div>
+</div>
+</div>
+</div>
+<div style="text-align:center;margin:4px 0"><div class="d-badge warn">⚠ Almost all keys remapped → massive data movement, cache invalidation, latency spikes</div></div>
+
+<!-- ═══ 2. THE BASIC IDEA ═══ -->
+<div class="d-title"><span class="num d-green">2</span> Consistent Hashing — The Basic Idea</div>
+
+<ol class="d-steps">
+  <li>Hash <strong>servers</strong> onto a ring (0 to 2³²)</li>
+  <li>Hash <strong>keys</strong> onto the same ring</li>
+  <li>Each key goes to the <span class="hg">first server clockwise</span></li>
+</ol>
+
+<div class="d-grid">
+<div class="d-panel" style="display:flex;align-items:center;justify-content:center">
+<svg class="svg-ring" width="260" height="260" viewBox="0 0 300 300">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8b8fa3"/></marker>
+  </defs>
+  <!-- Ring -->
+  <circle class="ring-line" cx="150" cy="150" r="120"/>
+  <!-- Position labels -->
+  <text class="pos-text" x="150" y="20" text-anchor="middle">0 / 2³²</text>
+  <text class="pos-text" x="280" y="154" text-anchor="start">75</text>
+  <text class="pos-text" x="150" y="290" text-anchor="middle">150</text>
+  <text class="pos-text" x="14" y="154" text-anchor="end">225</text>
+  <!-- Arc segments (ownership ranges) -->
+  <!-- S1 owns 225→75 (top-right, through 0) -->
+  <path class="arc-segment" stroke="#34d399" d="M 150 30 A 120 120 0 0 1 270 150"/>
+  <!-- S2 owns 75→150 -->
+  <path class="arc-segment" stroke="#6c8cff" d="M 270 150 A 120 120 0 0 1 150 270"/>
+  <!-- S3 owns 150→225 -->
+  <path class="arc-segment" stroke="#fb923c" d="M 150 270 A 120 120 0 0 1 30 150"/>
+  <!-- S1 also owns 225→360(=0) -->
+  <path class="arc-segment" stroke="#34d399" d="M 30 150 A 120 120 0 0 1 150 30"/>
+  <!-- Servers (large dots) -->
+  <circle class="server-dot" cx="270" cy="150" r="16" fill="#34d399"/>
+  <text x="270" y="154" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">S1</text>
+  <circle class="server-dot" cx="150" cy="270" r="16" fill="#6c8cff"/>
+  <text x="150" y="274" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">S2</text>
+  <circle class="server-dot" cx="30" cy="150" r="16" fill="#fb923c"/>
+  <text x="30" y="154" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">S3</text>
+  <!-- Keys (small dots) -->
+  <!-- K1 at ~340° (near top-right, before S1@0°=right) → goes to S1 -->
+  <circle class="key-dot" cx="232" cy="52" r="9" fill="#22d3ee"/>
+  <text x="232" y="56" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">K1</text>
+  <!-- K2 at ~310° → goes to S1 -->
+  <circle class="key-dot" cx="258" cy="88" r="9" fill="#22d3ee"/>
+  <text x="258" y="92" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">K2</text>
+  <!-- K3 at ~120° → goes to S2 -->
+  <circle class="key-dot" cx="210" cy="254" r="9" fill="#a78bfa"/>
+  <text x="210" y="258" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">K3</text>
+  <!-- K4 at ~160° → goes to S3 -->
+  <circle class="key-dot" cx="100" cy="266" r="9" fill="#a78bfa"/>
+  <text x="100" y="270" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">K4</text>
+  <!-- K5 at ~200° → goes to S3 -->
+  <circle class="key-dot" cx="42" cy="218" r="9" fill="#f472b6"/>
+  <text x="42" y="222" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">K5</text>
+  <!-- K6 at ~30° → goes to S1 -->
+  <circle class="key-dot" cx="210" cy="46" r="9" fill="#22d3ee"/>
+  <text x="210" y="50" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">K6</text>
+  <!-- Dashed arrows from keys to their server (clockwise) -->
+  <path class="arrow-path" d="M 240,56 Q 260,70 264,82"/>
+  <path class="arrow-path" d="M 262,96 Q 272,120 270,134"/>
+  <path class="arrow-path" d="M 204,260 Q 180,272 162,272"/>
+  <path class="arrow-path" d="M 92,264 Q 60,250 42,226"/>
+  <path class="arrow-path" d="M 38,210 Q 30,190 30,166"/>
+  <path class="arrow-path" d="M 218,42 Q 240,38 256,44"/>
+</svg>
+</div>
+<div class="d-panel">
+<h4>Key → Server Mapping</h4>
+<div class="d-map" style="font-size:.85rem;gap:3px 12px;margin:10px auto;width:fit-content">
+  <span class="k" style="color:var(--c)">K1</span><span class="ar">→</span><span class="v" style="color:var(--g)">S1</span>
+  <span class="k" style="color:var(--c)">K2</span><span class="ar">→</span><span class="v" style="color:var(--g)">S1</span>
+  <span class="k" style="color:var(--a2)">K3</span><span class="ar">→</span><span class="v" style="color:var(--a)">S2</span>
+  <span class="k" style="color:var(--a2)">K4</span><span class="ar">→</span><span class="v" style="color:var(--o)">S3</span>
+  <span class="k" style="color:var(--p)">K5</span><span class="ar">→</span><span class="v" style="color:var(--o)">S3</span>
+  <span class="k" style="color:var(--c)">K6</span><span class="ar">→</span><span class="v" style="color:var(--g)">S1</span>
+</div>
+<div style="margin-top:8px;font-size:.8rem;color:var(--muted);line-height:1.5">
+  <span class="hg">S1</span> owns range (225, 75]<br>
+  <span class="ha">S2</span> owns range (75, 150]<br>
+  <span class="ho">S3</span> owns range (150, 225]
+</div>
+<div style="margin-top:6px"><div class="d-badge ok">Only keys in a server's range belong to that server</div></div>
+</div>
+</div>
+
+<!-- ═══ 3. CLUSTER CHANGES ═══ -->
+<div class="d-title"><span class="num d-blue">3</span> What Happens When the Cluster Changes?</div>
+
+<div class="d-grid" style="grid-template-columns:1fr 1fr">
+<!-- ADD SERVER -->
+<div class="d-panel">
+<h4 style="color:var(--g)">Add S4 at position 200</h4>
+<svg class="svg-ring" width="200" height="200" viewBox="0 0 240 240">
+  <circle class="ring-line" cx="120" cy="120" r="96"/>
+  <!-- Servers -->
+  <circle class="server-dot" cx="216" cy="120" r="13" fill="#34d399"/>
+  <text x="216" y="124" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">S1</text>
+  <circle class="server-dot" cx="120" cy="216" r="13" fill="#6c8cff"/>
+  <text x="120" y="220" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">S2</text>
+  <circle class="server-dot" cx="24" cy="120" r="13" fill="#fb923c"/>
+  <text x="24" y="124" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">S3</text>
+  <!-- NEW S4 at ~200° (between S2 and S3) -->
+  <circle class="server-dot" cx="53" cy="193" r="13" fill="#a78bfa" stroke="#a78bfa" stroke-width="3"/>
+  <text x="53" y="197" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">S4</text>
+  <!-- Highlight: keys that moved -->
+  <circle class="key-dot" cx="42" cy="175" r="7" fill="#f472b6"/>
+  <text x="42" y="178" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">K5</text>
+  <text class="pos-text" x="120" y="14" text-anchor="middle">0</text>
+</svg>
+<div style="font-size:.76rem;margin-top:4px;line-height:1.4">
+  <span class="hg">K5</span> was on S3 → now on <span class="hv">S4</span><br>
+  <span style="color:var(--muted)">All other keys unchanged</span>
+</div>
+<div class="d-badge ok" style="margin-top:4px">Only keys in (150, 200] move from S3 → S4</div>
+</div>
+
+<!-- REMOVE SERVER -->
+<div class="d-panel">
+<h4 style="color:var(--r)">Remove S2</h4>
+<svg class="svg-ring" width="200" height="200" viewBox="0 0 240 240">
+  <circle class="ring-line" cx="120" cy="120" r="96"/>
+  <!-- Servers -->
+  <circle class="server-dot" cx="216" cy="120" r="13" fill="#34d399"/>
+  <text x="216" y="124" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">S1</text>
+  <!-- S2 removed (ghost) -->
+  <circle cx="120" cy="216" r="13" fill="none" stroke="var(--r)" stroke-width="2" stroke-dasharray="4,3" opacity=".5"/>
+  <text x="120" y="220" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="700" opacity=".5">S2</text>
+  <line x1="108" y1="208" x2="132" y2="224" stroke="var(--r)" stroke-width="2"/>
+  <circle class="server-dot" cx="24" cy="120" r="13" fill="#fb923c"/>
+  <text x="24" y="124" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">S3</text>
+  <!-- Keys that moved -->
+  <circle class="key-dot" cx="168" cy="210" r="7" fill="#a78bfa"/>
+  <text x="168" y="213" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">K3</text>
+  <text class="pos-text" x="120" y="14" text-anchor="middle">0</text>
+</svg>
+<div style="font-size:.76rem;margin-top:4px;line-height:1.4">
+  <span class="ha">K3</span> was on S2 → now on <span class="ho">S3</span> (next clockwise)<br>
+  <span style="color:var(--muted)">All other keys unchanged</span>
+</div>
+<div class="d-badge ok" style="margin-top:4px">Keys in (75, 150] move to next server clockwise</div>
+</div>
+</div>
+
+<!-- ═══ 4. WHY VIRTUAL NODES ═══ -->
+<div class="d-title"><span class="num d-purple">4</span> Why Virtual Nodes?</div>
+
+<div class="d-grid">
+<div class="d-panel">
+<h4>Without vnodes (3 servers, 1 point each)</h4>
+<svg class="svg-ring" width="160" height="160" viewBox="0 0 200 200">
+  <circle class="ring-line" cx="100" cy="100" r="80"/>
+  <circle class="server-dot" cx="180" cy="100" r="11" fill="#34d399"/>
+  <text x="180" y="104" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">A</text>
+  <circle class="server-dot" cx="60" cy="169" r="11" fill="#6c8cff"/>
+  <text x="60" y="173" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">B</text>
+  <circle class="server-dot" cx="60" cy="31" r="11" fill="#fb923c"/>
+  <text x="60" y="35" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">C</text>
+</svg>
+<div class="d-bar-wrap" style="margin-top:4px">
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--g)">A</span><div class="d-bar d-green" style="width:60%">60%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--a)">B</span><div class="d-bar d-blue" style="width:30%">30%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--o)">C</span><div class="d-bar d-orange" style="width:10%">10%</div></div>
+</div>
+<div class="d-badge warn" style="margin-top:4px">Uneven — A gets 6x more than C</div>
+</div>
+
+<div class="d-panel">
+<h4>With vnodes (each server × N points)</h4>
+<svg class="svg-ring" width="160" height="160" viewBox="0 0 200 200">
+  <circle class="ring-line" cx="100" cy="100" r="80"/>
+  <!-- A vnodes -->
+  <circle cx="180" cy="100" r="8" fill="#34d399"/><text x="180" y="103" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">A</text>
+  <circle cx="120" cy="21" r="8" fill="#34d399"/><text x="120" y="24" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">A</text>
+  <circle cx="100" cy="180" r="8" fill="#34d399"/><text x="100" y="183" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">A</text>
+  <!-- B vnodes -->
+  <circle cx="155" cy="169" r="8" fill="#6c8cff"/><text x="155" y="172" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">B</text>
+  <circle cx="30" cy="130" r="8" fill="#6c8cff"/><text x="30" y="133" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">B</text>
+  <circle cx="155" cy="31" r="8" fill="#6c8cff"/><text x="155" y="34" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">B</text>
+  <!-- C vnodes -->
+  <circle cx="45" cy="169" r="8" fill="#fb923c"/><text x="45" y="172" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">C</text>
+  <circle cx="80" cy="21" r="8" fill="#fb923c"/><text x="80" y="24" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">C</text>
+  <circle cx="22" cy="80" r="8" fill="#fb923c"/><text x="22" y="83" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">C</text>
+</svg>
+<div class="d-bar-wrap" style="margin-top:4px">
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--g)">A</span><div class="d-bar d-green" style="width:35%">~33%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--a)">B</span><div class="d-bar d-blue" style="width:34%">~33%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--o)">C</span><div class="d-bar d-orange" style="width:33%">~33%</div></div>
+</div>
+<div class="d-badge ok" style="margin-top:6px">Even — many small ranges balance load</div>
+</div>
+</div>
+
+<div class="b bg" style="text-align:center;margin-top:4px"><span class="hi">Virtual nodes</span> = <span class="hg">better balance</span> + <span class="hg">smoother failover</span> + <span class="hg">supports weighted capacity</span> (bigger server → more vnodes)</div>
+
+<!-- ═══ 5. HOW THE RING IS BUILT ═══ -->
+<div class="d-title"><span class="num d-cyan">5</span> How the Ring is Built (High Level)</div>
+
+<ol class="d-steps">
+  <li><strong>Discover servers</strong> in cluster — get the list of active nodes</li>
+  <li><strong>Generate virtual nodes</strong> — <code>hash(serverId + i)</code> for i = 1..N</li>
+  <li><strong>Sort points on the ring</strong> — keep a sorted structure (e.g., array / skip list)</li>
+  <li><strong>Locate key</strong> — <code>hash(key)</code> → find first node clockwise (binary search)</li>
+  <li><strong>Handle replicas</strong> (optional) — pick next R distinct physical nodes on the ring for replication</li>
+</ol>
+
+<!-- ═══ 6. WHERE IS IT USED ═══ -->
+<div class="d-title"><span class="num d-teal">6</span> Where is it Used?</div>
+
+<table>
+<tr><th>System</th><th>How it Uses Consistent Hashing</th></tr>
+<tr><td><span class="hi">Caching</span> (Redis Cluster, Memcached)</td><td>Stable key-to-node mapping, minimal cache churn on scale</td></tr>
+<tr><td><span class="hi">Databases / KV Stores</span> (DynamoDB, Cassandra)</td><td>Sharding data with minimal resharding</td></tr>
+<tr><td><span class="hi">Rate Limiting</span></td><td>Same user always hits the same limiter instance</td></tr>
+<tr><td><span class="hi">CDN / Load Balancing</span></td><td>Same content routes to the same cache node</td></tr>
+<tr><td><span class="hi">Message Brokers</span> (Kafka)</td><td>Partition ownership with minimal movement</td></tr>
+</table>
+
+<!-- ═══ 7. BOUNDED LOAD ═══ -->
+<div class="d-title"><span class="num d-yellow">7</span> Bounded Load (Google, 2017)</div>
+
+<div class="d-grid">
+<div class="d-panel">
+<h4>Problem: Hot Keys</h4>
+<div class="d-bar-wrap">
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--g)">S1</span><div class="d-bar d-green" style="width:20%">20%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--a)">S2</span><div class="d-bar d-blue" style="width:15%">15%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--r)">S3</span><div class="d-bar d-red" style="width:65%">65% 🔥</div></div>
+</div>
+<div style="font-size:.76rem;color:var(--muted);margin-top:4px">Even with vnodes, hash collisions or hot keys can overload one node</div>
+</div>
+<div class="d-panel">
+<h4>Fix: Cap at (1+ε) × avg</h4>
+<div class="d-bar-wrap">
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--g)">S1</span><div class="d-bar d-green" style="width:30%">30%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--a)">S2</span><div class="d-bar d-blue" style="width:32%">32%</div></div>
+  <div class="d-bar-row"><span class="d-bar-label" style="color:var(--o)">S3</span><div class="d-bar d-orange" style="width:38%">38% ✓</div></div>
+</div>
+<div style="font-size:.76rem;color:var(--muted);margin-top:4px">If node is "full", key spills to next node on ring. No node exceeds cap.</div>
+</div>
+</div>
+
+<!-- ═══ 8. KEY TAKEAWAYS + WATCH OUT ═══ -->
+<div class="d-grid">
+<div class="d-panel" style="text-align:left">
+<h4 style="color:var(--g)">✓ Key Takeaways</h4>
+<div style="font-size:.8rem;line-height:1.55">
+  <span class="d-tick">✓</span> Minimizes movement when nodes change<br>
+  <span class="d-tick">✓</span> Virtual nodes essential for even distribution<br>
+  <span class="d-tick">✓</span> Solves <em>placement stability</em>, not hot keys<br>
+  <span class="d-tick">✓</span> Topology consistency across clients is critical<br>
+  <span class="d-tick">✓</span> Think: <span class="hg">minimize disruption under change</span>
+</div>
+</div>
+<div class="d-panel" style="text-align:left">
+<h4 style="color:var(--r)">⚠ Watch Out For</h4>
+<div style="font-size:.8rem;line-height:1.55">
+  <span class="d-cross">⚠</span> Hot keys can still overwhelm a node<br>
+  <span class="d-cross">⚠</span> Data <em>size</em> imbalance (not just key count)<br>
+  <span class="d-cross">⚠</span> Different ring views → inconsistent routing<br>
+  <span class="d-cross">⚠</span> Too few virtual nodes → uneven load<br>
+  <span class="d-cross">⚠</span> Rebalancing is not free — do it intentionally
+</div>
+</div>
+</div>
+
+<div class="b bb" style="text-align:center;margin-top:6px"><span class="hi">Mental Model:</span> Consistent hashing is not about hashing. <span class="hg">It's about stable key placement under change.</span></div>
+</div>
+
+<div class="T" id="bloom-filters">
+<h2>Bloom Filters</h2><p class="su"><span class="hg">Probabilistic membership test</span> — "definitely not in set" or "probably in set". <span class="hi">~100KB for 1M items</span></p>
+
+<!-- ═══ INSERT: How it works ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Insert: "user123" into Bloom Filter</div>
+<svg width="100%" viewBox="0 0 500 120" style="max-width:500px;display:block;margin:2px auto">
+  <defs><marker id="bf1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Element -->
+  <rect x="4" y="10" width="76" height="22" rx="6" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="42" y="24" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">"user123"</text>
+
+  <!-- 3 Hash functions -->
+  <line x1="80" y1="16" x2="110" y2="8" stroke="var(--r)" stroke-width=".8" marker-end="url(#bf1)"/>
+  <line x1="80" y1="21" x2="110" y2="36" stroke="var(--g)" stroke-width=".8" marker-end="url(#bf1)"/>
+  <line x1="80" y1="26" x2="110" y2="64" stroke="var(--o)" stroke-width=".8" marker-end="url(#bf1)"/>
+
+  <circle cx="124" cy="6" r="10" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width="1"/>
+  <text x="124" y="10" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">H1</text>
+  <circle cx="124" cy="36" r="10" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width="1"/>
+  <text x="124" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">H2</text>
+  <circle cx="124" cy="66" r="10" fill="rgba(251,146,60,.15)" stroke="var(--o)" stroke-width="1"/>
+  <text x="124" y="70" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">H3</text>
+
+  <!-- Hash results -->
+  <text x="142" y="10" fill="var(--r)" font-size="6.5" font-weight="600">% 15 = 1</text>
+  <text x="142" y="40" fill="var(--g)" font-size="6.5" font-weight="600">% 15 = 6</text>
+  <text x="142" y="70" fill="var(--o)" font-size="6.5" font-weight="600">% 15 = 11</text>
+
+  <!-- Arrows to bit array -->
+  <line x1="172" y1="6" x2="200" y2="84" stroke="var(--r)" stroke-width=".8" marker-end="url(#bf1)"/>
+  <line x1="172" y1="36" x2="280" y2="84" stroke="var(--g)" stroke-width=".8" marker-end="url(#bf1)"/>
+  <line x1="172" y1="66" x2="360" y2="84" stroke="var(--o)" stroke-width=".8" marker-end="url(#bf1)"/>
+
+  <!-- Bit Array label -->
+  <text x="340" y="78" text-anchor="middle" fill="var(--text)" font-size="7.5" font-weight="700">Bit Array (m = 15 bits)</text>
+
+  <!-- Bit array: indices 0-14 -->
+  <!-- Index labels -->
+  <text x="196" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">0</text>
+  <text x="212" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">1</text>
+  <text x="228" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">2</text>
+  <text x="244" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">3</text>
+  <text x="260" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">4</text>
+  <text x="276" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">5</text>
+  <text x="292" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">6</text>
+  <text x="308" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">7</text>
+  <text x="324" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">8</text>
+  <text x="340" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">9</text>
+  <text x="356" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">10</text>
+  <text x="372" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">11</text>
+  <text x="388" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">12</text>
+  <text x="404" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">13</text>
+  <text x="420" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">14</text>
+
+  <!-- Bit cells -->
+  <rect x="188" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="195" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <!-- Bit 1 = SET (H1) -->
+  <rect x="204" y="96" width="14" height="14" rx="2" fill="rgba(248,113,113,.2)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="211" y="106" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">1</text>
+  <rect x="220" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="227" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="236" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="243" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="252" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="259" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="268" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="275" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <!-- Bit 6 = SET (H2) -->
+  <rect x="284" y="96" width="14" height="14" rx="2" fill="rgba(52,211,153,.2)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="291" y="106" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">1</text>
+  <rect x="300" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="307" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="316" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="323" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="332" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="339" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="348" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="355" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <!-- Bit 11 = SET (H3) -->
+  <rect x="364" y="96" width="14" height="14" rx="2" fill="rgba(251,146,60,.2)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="371" y="106" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">1</text>
+  <rect x="380" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="387" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="396" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="403" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="412" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="419" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+</svg>
+
+<!-- ═══ LOOKUP: Two scenarios ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Lookup Process</div>
+<div class="d-grid" style="margin:4px 0">
+
+<!-- Definite NO -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--r)">Query: "bob" → Definitely NOT in set</h4>
+<svg width="100%" viewBox="0 0 220 50" style="max-width:220px;display:block;margin:0 auto">
+  <text x="10" y="12" fill="var(--a)" font-size="7" font-weight="600">"bob"</text>
+  <line x1="36" y1="8" x2="52" y2="8" stroke="var(--muted)" stroke-width=".7" marker-end="url(#bf1)"/>
+  <text x="60" y="12" fill="var(--r)" font-size="6.5">H1→pos 1</text>
+  <rect x="92" y="2" width="14" height="12" rx="2" fill="rgba(248,113,113,.2)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="99" y="11" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">1</text>
+  <text x="110" y="11" fill="var(--g)" font-size="7" font-weight="700">✓</text>
+
+  <text x="60" y="26" fill="var(--r)" font-size="6.5">H2→pos 4</text>
+  <rect x="92" y="18" width="14" height="12" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".8"/>
+  <text x="99" y="27" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <text x="110" y="27" fill="var(--r)" font-size="7" font-weight="700">✗</text>
+
+  <!-- Result -->
+  <rect x="126" y="8" width="90" height="18" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="171" y="20" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">❌ DEFINITELY NOT</text>
+  <text x="110" y="44" text-anchor="middle" fill="var(--muted)" font-size="6.5">Any bit = 0 → item is 100% absent</text>
+</svg>
+</div>
+
+<!-- Probably YES -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Query: "user123" → Probably in set</h4>
+<svg width="100%" viewBox="0 0 220 50" style="max-width:220px;display:block;margin:0 auto">
+  <text x="10" y="12" fill="var(--a)" font-size="7" font-weight="600">"user123"</text>
+  <line x1="56" y1="8" x2="68" y2="8" stroke="var(--muted)" stroke-width=".7" marker-end="url(#bf1)"/>
+  <text x="74" y="12" fill="var(--g)" font-size="6.5">H1→1</text>
+  <rect x="96" y="2" width="10" height="12" rx="2" fill="rgba(248,113,113,.2)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="101" y="11" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">1</text>
+  <text x="110" y="12" fill="var(--g)" font-size="6.5">H2→6</text>
+  <rect x="130" y="2" width="10" height="12" rx="2" fill="rgba(52,211,153,.2)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="135" y="11" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">1</text>
+  <text x="146" y="12" fill="var(--o)" font-size="6.5">H3→11</text>
+  <rect x="172" y="2" width="10" height="12" rx="2" fill="rgba(251,146,60,.2)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="177" y="11" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">1</text>
+  <text x="190" y="11" fill="var(--g)" font-size="7" font-weight="700">✓✓✓</text>
+
+  <!-- Result -->
+  <rect x="50" y="20" width="120" height="18" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="110" y="32" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">⚠ PROBABLY YES</text>
+  <text x="110" y="44" text-anchor="middle" fill="var(--muted)" font-size="6.5">All bits = 1 → might be present (false positive possible)</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ Key Insight callout ═══ -->
+<div class="b bg" style="text-align:center;margin-top:4px"><span class="hi">Key Insight:</span> If <span class="hr">ANY bit is 0</span> → <span class="hr">Definitely NOT present</span> (zero false negatives). If <span class="hg">ALL bits are 1</span> → <span class="hi">Might be present</span> (false positive possible). Memory: <span class="hg">~100KB for 1M items</span> · O(K) insert + lookup.</div>
+
+<!-- ═══ Real-world use cases ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Why It Matters — Real-World</div>
+<div class="d-grid quad" style="margin:4px 0">
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--g)">Cassandra / Bigtable</h4>
+<div style="font-size:.72rem;color:var(--muted);line-height:1.35">"Is key in this SSTable?" Check filter first → skip disk read if NO. Saves <span class="hg">millions of I/O ops</span>.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--r)">Chrome Safe Browsing</h4>
+<div style="font-size:.72rem;color:var(--muted);line-height:1.35">"Is this URL malware?" Check local bloom filter → only fetch from server if MAYBE. <span class="hg">No network call for 99% of URLs</span>.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a2)">Medium / Recommendations</h4>
+<div style="font-size:.72rem;color:var(--muted);line-height:1.35">"Has user read this article?" Filter per user → <span class="hg">never recommend already-read content</span>. Tiny memory per user.</div>
+</div>
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--c)">CDN / Cache Check</h4>
+<div style="font-size:.72rem;color:var(--muted);line-height:1.35">"Is content cached at this edge?" Check filter → <span class="hg">skip origin fetch if definitely not cached</span>. Reduces origin load.</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="rate-limiting">
+<h2>Rate Limiting</h2>
+<p class="su">
+  Throttle requests to improve 
+  <span class="hg">availability</span> (prevent overload), 
+  <span class="hg">fairness</span> (per-user limits), and 
+  <span class="hg">cost control</span> (limit usage), 
+  with trade-offs in 
+  <span class="hg">user experience</span> (rejected requests) — return 
+  <span class="hr">429 Too Many Requests</span>.
+</p>
+<!-- ═══ How it works (basic flow) ═══ -->
+<svg width="100%" viewBox="0 0 460 60" style="max-width:460px;display:block;margin:2px auto 6px">
+  <defs><marker id="rl1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Client -->
+  <text x="14" y="30" font-size="14">🌐</text><text x="14" y="46" text-anchor="middle" fill="var(--muted)" font-size="6" dx="6">Client</text>
+  <!-- Arrow -->
+  <line x1="34" y1="26" x2="62" y2="26" stroke="var(--muted)" stroke-width="1" marker-end="url(#rl1)"/>
+  <!-- Rate Limiter -->
+  <rect x="64" y="10" width="70" height="32" rx="6" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="99" y="24" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Rate Limiter</text>
+  <text x="99" y="34" text-anchor="middle" fill="var(--muted)" font-size="6">check rules</text>
+  <!-- Check Redis -->
+  <line x1="99" y1="42" x2="99" y2="54" stroke="var(--muted)" stroke-width=".8" marker-end="url(#rl1)"/>
+  <rect x="74" y="48" width="50" height="12" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="99" y="57" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Redis counter</text>
+  <!-- Allow path -->
+  <line x1="134" y1="22" x2="170" y2="22" stroke="var(--g)" stroke-width="1.2" marker-end="url(#rl1)"/>
+  <text x="152" y="16" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">✓ allow</text>
+  <rect x="172" y="12" width="56" height="22" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+  <text x="200" y="26" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">API Server</text>
+  <!-- Reject path -->
+  <line x1="80" y1="10" x2="60" y2="2" stroke="var(--r)" stroke-width="1" marker-end="url(#rl1)" stroke-dasharray="3,2"/>
+  <text x="50" y="6" text-anchor="end" fill="var(--r)" font-size="6.5" font-weight="600">429 ✗</text>
+  <!-- Rules -->
+  <rect x="250" y="6" width="60" height="18" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="280" y="18" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">Rules Config</text>
+  <line x1="250" y1="15" x2="134" y2="15" stroke="var(--y)" stroke-width=".7" stroke-dasharray="3,2"/>
+</svg>
+
+<!-- ═══ 4 Algorithm Visuals ═══ -->
+<div class="d-grid quad" style="margin:4px 0">
+
+<!-- 1. Fixed Window -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--c)">Fixed Window</h4>
+<svg width="100%" viewBox="0 0 150 80" style="max-width:150px;display:block;margin:0 auto">
+  <!-- Windows -->
+  <rect x="6" y="20" width="40" height="36" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <rect x="50" y="20" width="40" height="36" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <rect x="94" y="20" width="40" height="36" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <!-- Capacity label -->
+  <text x="75" y="14" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Capacity: 3 per window</text>
+  <!-- Window 1: 3 green (full) -->
+  <circle cx="16" cy="34" r="5" fill="var(--g)"/><circle cx="28" cy="34" r="5" fill="var(--g)"/><circle cx="36" cy="34" r="5" fill="var(--g)"/>
+  <circle cx="22" cy="46" r="5" fill="var(--r)"/>
+  <!-- Window 2: 2 green, 1 red -->
+  <circle cx="60" cy="34" r="5" fill="var(--g)"/><circle cx="72" cy="34" r="5" fill="var(--g)"/><circle cx="80" cy="34" r="5" fill="var(--g)"/>
+  <!-- Window 3: 1 green -->
+  <circle cx="104" cy="34" r="5" fill="var(--g)"/><circle cx="116" cy="34" r="5" fill="var(--g)"/>
+  <!-- Timeline -->
+  <line x1="6" y1="62" x2="134" y2="62" stroke="var(--muted)" stroke-width=".6"/>
+  <text x="26" y="72" text-anchor="middle" fill="var(--muted)" font-size="6">02:00</text>
+  <text x="70" y="72" text-anchor="middle" fill="var(--muted)" font-size="6">02:10</text>
+  <text x="114" y="72" text-anchor="middle" fill="var(--muted)" font-size="6">02:20</text>
+  <!-- Legend -->
+  <circle cx="10" cy="8" r="3" fill="var(--g)"/><text x="16" y="10" fill="var(--g)" font-size="5.5">OK</text>
+  <circle cx="32" cy="8" r="3" fill="var(--r)"/><text x="38" y="10" fill="var(--r)" font-size="5.5">Dropped</text>
+</svg>
+<div style="font-size:.68rem;color:var(--muted);line-height:1.3;margin-top:2px">Simple counter per window. <span class="hr">Edge burst</span>: 2× at window boundary.</div>
+</div>
+
+<!-- 2. Sliding Window -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--g)">Sliding Window</h4>
+<svg width="100%" viewBox="0 0 150 80" style="max-width:150px;display:block;margin:0 auto">
+  <!-- Previous window -->
+  <rect x="6" y="20" width="56" height="36" rx="3" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6" stroke-dasharray="3,2"/>
+  <text x="34" y="16" text-anchor="middle" fill="var(--muted)" font-size="6">Previous min</text>
+  <!-- Current window -->
+  <rect x="66" y="20" width="56" height="36" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="94" y="16" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Current min</text>
+  <!-- Sliding overlay -->
+  <rect x="36" y="18" width="60" height="40" rx="4" fill="none" stroke="var(--c)" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="66" y="12" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="700">Sliding Window</text>
+  <!-- Dots in previous -->
+  <circle cx="16" cy="34" r="4" fill="var(--g)" opacity=".5"/><circle cx="28" cy="34" r="4" fill="var(--g)" opacity=".5"/>
+  <circle cx="40" cy="34" r="4" fill="var(--g)" opacity=".5"/><circle cx="16" cy="46" r="4" fill="var(--g)" opacity=".5"/>
+  <circle cx="28" cy="46" r="4" fill="var(--g)" opacity=".5"/><circle cx="40" cy="46" r="4" fill="var(--g)" opacity=".5"/>
+  <!-- Dots in current -->
+  <circle cx="76" cy="34" r="4" fill="var(--g)"/><circle cx="88" cy="34" r="4" fill="var(--g)"/>
+  <circle cx="100" cy="34" r="4" fill="var(--g)"/>
+  <!-- Weighted label -->
+  <text x="34" y="60" text-anchor="middle" fill="var(--muted)" font-size="6">2/3rd</text>
+  <text x="94" y="60" text-anchor="middle" fill="var(--muted)" font-size="6">1/3rd</text>
+  <!-- Accepted -->
+  <circle cx="112" cy="46" r="4" fill="var(--g)"/>
+  <text x="128" y="48" fill="var(--g)" font-size="6" font-weight="600">✓</text>
+  <!-- Rate -->
+  <text x="130" y="14" fill="var(--y)" font-size="5.5" font-weight="600">Limit: 10/min</text>
+</svg>
+<div style="font-size:.68rem;color:var(--muted);line-height:1.3;margin-top:2px">Weighted blend of prev + current window. <span class="hg">No edge burst</span>, memory efficient.</div>
+</div>
+
+<!-- 3. Token Bucket -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--a)">Token Bucket</h4>
+<svg width="100%" viewBox="0 0 150 80" style="max-width:150px;display:block;margin:0 auto">
+  <!-- Tokens refill -->
+  <circle cx="20" cy="8" r="5" fill="var(--a)"/><circle cx="34" cy="8" r="5" fill="var(--a)"/><circle cx="48" cy="8" r="5" fill="var(--a)"/>
+  <text x="62" y="10" fill="var(--muted)" font-size="6">new tokens</text>
+  <line x1="34" y1="14" x2="34" y2="22" stroke="var(--a)" stroke-width=".8" marker-end="url(#rl1)"/>
+  <text x="50" y="20" fill="var(--a)" font-size="5.5">add at fixed rate</text>
+  <!-- Bucket -->
+  <rect x="14" y="24" width="40" height="28" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <circle cx="22" cy="36" r="4" fill="var(--a)"/><circle cx="34" cy="36" r="4" fill="var(--a)"/><circle cx="46" cy="36" r="4" fill="var(--a)"/>
+  <circle cx="28" cy="44" r="4" fill="var(--a)"/><circle cx="40" cy="44" r="4" fill="var(--a)"/>
+  <text x="34" y="58" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Bucket</text>
+  <!-- Request comes in -->
+  <rect x="70" y="28" width="40" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="90" y="38" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Request</text>
+  <line x1="54" y1="36" x2="68" y2="36" stroke="var(--g)" stroke-width="1" marker-end="url(#rl1)"/>
+  <text x="61" y="32" fill="var(--g)" font-size="5.5">token?</text>
+  <!-- Forward -->
+  <line x1="110" y1="35" x2="130" y2="35" stroke="var(--g)" stroke-width="1" marker-end="url(#rl1)"/>
+  <text x="136" y="38" fill="var(--g)" font-size="6" font-weight="600">✓</text>
+  <!-- Drop -->
+  <line x1="90" y1="42" x2="90" y2="58" stroke="var(--r)" stroke-width=".8" marker-end="url(#rl1)" stroke-dasharray="2,2"/>
+  <text x="90" y="68" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">✗ drop</text>
+  <text x="90" y="76" text-anchor="middle" fill="var(--muted)" font-size="5.5">(no tokens left)</text>
+</svg>
+<div style="font-size:.68rem;color:var(--muted);line-height:1.3;margin-top:2px"><span class="hg">Allows bursts</span> up to bucket size. Most common (AWS, Stripe).</div>
+</div>
+
+<!-- 4. Leaky Bucket -->
+<div class="d-panel" style="padding:6px">
+<h4 style="color:var(--o)">Leaky Bucket</h4>
+<svg width="100%" viewBox="0 0 150 80" style="max-width:150px;display:block;margin:0 auto">
+  <!-- Incoming requests -->
+  <circle cx="10" cy="10" r="4" fill="var(--g)"/><circle cx="22" cy="10" r="4" fill="var(--g)"/><circle cx="34" cy="10" r="4" fill="var(--g)"/>
+  <circle cx="10" cy="22" r="4" fill="var(--g)"/><circle cx="22" cy="22" r="4" fill="var(--r)"/>
+  <text x="22" y="36" text-anchor="middle" fill="var(--muted)" font-size="6">incoming</text>
+  <!-- Arrow to queue -->
+  <line x1="42" y1="16" x2="56" y2="16" stroke="var(--muted)" stroke-width="1" marker-end="url(#rl1)"/>
+  <!-- FIFO Queue -->
+  <rect x="58" y="6" width="50" height="20" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width="1"/>
+  <rect x="62" y="10" width="8" height="12" rx="1" fill="var(--o)" opacity=".3"/>
+  <rect x="72" y="10" width="8" height="12" rx="1" fill="var(--o)" opacity=".4"/>
+  <rect x="82" y="10" width="8" height="12" rx="1" fill="var(--o)" opacity=".5"/>
+  <rect x="92" y="10" width="8" height="12" rx="1" fill="var(--o)" opacity=".6"/>
+  <text x="83" y="34" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">FIFO Queue</text>
+  <!-- Fixed rate output -->
+  <line x1="108" y1="16" x2="126" y2="16" stroke="var(--g)" stroke-width="1" marker-end="url(#rl1)"/>
+  <text x="117" y="10" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">fixed rate</text>
+  <!-- Server -->
+  <rect x="128" y="6" width="18" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="137" y="19" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Srv</text>
+  <!-- Overflow drop -->
+  <line x1="83" y1="26" x2="83" y2="44" stroke="var(--r)" stroke-width=".8" marker-end="url(#rl1)" stroke-dasharray="2,2"/>
+  <text x="83" y="54" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">✗ overflow</text>
+  <text x="83" y="64" text-anchor="middle" fill="var(--muted)" font-size="5.5">(queue full → drop)</text>
+</svg>
+<div style="font-size:.68rem;color:var(--muted);line-height:1.3;margin-top:2px"><span class="hg">Smooth output</span>, no bursts. Queue absorbs spikes, fixed drain rate.</div>
+</div>
+</div>
+
+<!-- Comparison table -->
+<table style="margin-top:4px">
+<tr><th>Algorithm</th><th>Burst?</th><th>Memory</th><th>Accuracy</th><th>Best For</th></tr>
+<tr><td><span class="hi">Fixed Window</span></td><td><span class="hr">2× at edge</span></td><td><span class="hg">Low</span></td><td>Approximate</td><td>Simple, low-stakes</td></tr>
+<tr><td><span class="hi">Sliding Window</span></td><td><span class="hg">No</span></td><td><span class="hg">Low</span></td><td><span class="hg">Accurate</span></td><td>Production APIs (most balanced)</td></tr>
+<tr><td><span class="hi">Token Bucket</span></td><td><span class="hg">Yes (controlled)</span></td><td>Low</td><td>Good</td><td><span class="hg">Most common</span> (AWS, Stripe, NGINX)</td></tr>
+<tr><td><span class="hi">Leaky Bucket</span></td><td><span class="hg">No</span></td><td>Queue size</td><td>Exact</td><td>Smooth output (traffic shaping)</td></tr>
+</table>
+<div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Stripe</strong> — 100 req/sec per API key (token bucket). <strong>GitHub</strong> — 5000 req/hour (sliding window). Apply at: <span class="hg">API Gateway</span> (preferred), reverse proxy, or Redis (<code>INCR</code>+<code>EXPIRE</code>).</div>
+</div><!-- ═══ Scalability: separate compact lessons ═══ -->
+<div class="T" id="backpressure">
+<h2>Backpressure</h2><p class="su">When the consumer can’t keep up with the producer</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Backpressure strategies">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="60" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="70" y="86" fill="#fff">Producer</text>
+    <rect x="170" y="60" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="220" y="80" fill="#fff">Buffer</text>
+    <text x="220" y="94" fill="#8b93ac">queue / channel</text>
+    <rect x="320" y="60" width="100" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="370" y="86" fill="#fff">Consumer</text>
+    <rect x="450" y="30" width="90" height="30" fill="#1e2230" stroke="#f87171" rx="4"/>
+    <text x="495" y="50" fill="#f87171">drop / shed</text>
+    <rect x="450" y="70" width="90" height="30" fill="#1e2230" stroke="#fbbf24" rx="4"/>
+    <text x="495" y="90" fill="#fbbf24">slow producer</text>
+    <rect x="450" y="110" width="90" height="30" fill="#1e2230" stroke="#34d399" rx="4"/>
+    <text x="495" y="130" fill="#34d399">batch / yield</text>
+  </g>
+  <path d="M120 80 L170 80" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#bp1)"/>
+  <path d="M270 80 L320 80" stroke="#34d399" stroke-width="1.5" marker-end="url(#bp1)"/>
+  <path d="M220 100 L495 30" stroke="#f87171" stroke-width="1" stroke-dasharray="3 2"/>
+  <path d="M220 100 L495 85" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 2"/>
+  <path d="M220 100 L495 125" stroke="#34d399" stroke-width="1" stroke-dasharray="3 2"/>
+  <defs><marker id="bp1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+</svg>
+<table>
+<tr><th>Strategy</th><th>When</th><th>Example</th></tr>
+<tr><td>Drop / 503</td><td>Real-time, freshness &gt; completeness</td><td>Live metrics, ad bids</td></tr>
+<tr><td>Bounded buffer + block</td><td>Want lossless, can wait</td><td>Reactive Streams, Akka</td></tr>
+<tr><td>Slow producer (TCP / lag)</td><td>End-to-end flow control</td><td>Kafka consumer lag, HTTP/2</td></tr>
+</table>
+<div class="b br"><b>Always alarm on queue depth.</b> Unbounded buffers are how outages turn into OOMs.</div>
+</div>
+
+<div class="T" id="auto-scaling">
+<h2>Auto-Scaling</h2><p class="su">Match capacity to load — reactively or predictively</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto scaling signals">
+  <g font-family="Inter" font-size="10" fill="#c8cee0">
+    <rect x="20" y="30" width="160" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
+    <text x="100" y="50" text-anchor="middle" fill="#fff">CPU &gt; 70%</text>
+    <text x="100" y="64" text-anchor="middle" fill="#8b93ac">simple, laggy</text>
+    <rect x="200" y="30" width="160" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="50" text-anchor="middle" fill="#fff">Queue depth</text>
+    <text x="280" y="64" text-anchor="middle" fill="#8b93ac">SQS+Lambda, KEDA</text>
+    <rect x="380" y="30" width="160" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
+    <text x="460" y="50" text-anchor="middle" fill="#fff">RPS / latency</text>
+    <text x="460" y="64" text-anchor="middle" fill="#8b93ac">closest to UX</text>
+    <rect x="110" y="100" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
+    <text x="190" y="120" text-anchor="middle" fill="#fff">Predictive (ML)</text>
+    <text x="190" y="134" text-anchor="middle" fill="#8b93ac">pre-warm peaks</text>
+    <rect x="290" y="100" width="160" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
+    <text x="370" y="120" text-anchor="middle" fill="#fff">Schedule</text>
+    <text x="370" y="134" text-anchor="middle" fill="#8b93ac">9am traffic, batch jobs</text>
+  </g>
+</svg>
+<div class="b bp"><b>Combine signals:</b> base on CPU, but shrink scale-down cooldown using predictive models so you scale up early and shed slowly.</div>
+<div class="b by"><b>Tools:</b> K8s HPA + KEDA, AWS ASG + Target Tracking, GCP autoscaler. Pair with cluster autoscaler for nodes.</div>
+</div>
+
+<div class="T" id="graceful-degradation">
+<h2>Graceful Degradation</h2><p class="su">Stay partially up instead of fully down</p>
+<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceful degradation tiers">
+  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
+    <rect x="20" y="30" width="520" height="30" fill="#34d399" opacity=".25" stroke="#34d399" rx="6"/>
+    <text x="280" y="50" fill="#fff">Healthy: full features</text>
+    <rect x="60" y="68" width="440" height="30" fill="#fbbf24" opacity=".25" stroke="#fbbf24" rx="6"/>
+    <text x="280" y="88" fill="#fff">Stressed: serve stale cache, disable recs/analytics</text>
+    <rect x="110" y="106" width="340" height="30" fill="#fb923c" opacity=".25" stroke="#fb923c" rx="6"/>
+    <text x="280" y="126" fill="#fff">Overloaded: read-only, simplified UI</text>
+    <rect x="160" y="144" width="240" height="22" fill="#f87171" opacity=".25" stroke="#f87171" rx="6"/>
+    <text x="280" y="159" fill="#fff">Critical-only: login + checkout</text>
+  </g>
+</svg>
+<div class="b bg"><b>Tactics:</b> feature flags (LaunchDarkly), tier traffic by importance (paid &gt; free), cached fallbacks, circuit breakers, request hedging.</div>
+</div>
+
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../css/dp-engine.css">
+<script src="../js/dp-engine.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+</body>
+</html>

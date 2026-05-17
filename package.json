@@ -1,0 +1,24 @@
+{
+  "name": "system-design-cheatsheet",
+  "version": "1.0.0",
+  "description": "Comprehensive System Design Reference - 100+ Real-Time Problems & Solutions",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "build": "echo 'No build required for static site'"
+  },
+  "keywords": [
+    "system-design",
+    "real-time",
+    "distributed-systems",
+    "interview-prep",
+    "web-scale",
+    "cheatsheet"
+  ],
+  "author": "System Design Community",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/SystemDesignBySureshVuppala"
+  }
+}
