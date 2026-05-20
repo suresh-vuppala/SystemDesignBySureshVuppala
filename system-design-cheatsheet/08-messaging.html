@@ -13,14 +13,14 @@
 <div class="sd sd-5"><span class="e">📨</span> 8 · MESSAGING</div>
 
 <div class="T" id="message-queues">
-<h2>Message Queues (RabbitMQ / SQS)</h2><p class="su"><span class="hg">Decouple</span> producers from consumers — work distribution with retry + DLQ</p>
+<h2>Message Queues (RabbitMQ / SQS)</h2><p class="su">Messages wait in a queue for consumers to process — <span class="hg">task distribution &amp; load balancing</span> with retry + DLQ</p>
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">At-least-once delivery</span> (consumer must be idempotent). <span class="hg">Ordering</span> per queue (FIFO). <span class="hg">Dead Letter Queue</span> — after N retries, message moved to DLQ. <span class="hg">Visibility timeout</span> — message invisible to others while being processed.</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">No message replay</span>. <span class="hr">Limited throughput</span> for high-volume streaming. <span class="hr">Fan-out harder</span> than Kafka. <span class="hr">No long-term retention</span>.</div>
 <div class="b bb"><span class="hi">RabbitMQ exchanges:</span> Direct (exact key) · Fanout (broadcast) · Topic (pattern: <code>order.*.created</code>) · Headers. <span class="hi">SQS:</span> Standard (at-least-once, best-effort order) vs FIFO (exactly-once, strict order, 3K msg/sec).</div>
 </div>
 
 <div class="T" id="kafka">
-<h2>Message Streams - Apache Kafka</h2><p class="su"><span class="hg">Distributed event streaming</span> — <span class="hi">1M+ events/sec</span>. Durable, replayable log, multiple readers.</p>
+<h2>Message Streams - Apache Kafka</h2><p class="su">Messages continuously appended to a <span class="hg">durable ordered log</span> — <span class="hi">1M+ events/sec</span>, replayable history, multiple independent readers.</p>
 
 <!-- ═══ Kafka Architecture Visual ═══ -->
 <div class="d-title"><span class="num d-cyan">▸</span> How Kafka Works</div>
@@ -620,7 +620,7 @@
 </div>
 
 <div class="T" id="pubsub">
-<h2>Pub/Sub (SNS / Google Pub/Sub)</h2><p class="su"><span class="hg">Fan-out messaging(broadcast)</span> — one event published, <span class="hi">all subscribers</span> receive a copy independently</p>
+<h2>Pub/Sub (SNS / Google Pub/Sub)</h2><p class="su">Publishers <span class="hg">broadcast (fan-out)</span> to a topic — every subscriber receives its <span class="hi">own independent copy</span></p>
 <pre><code>Producer publishes to TOPIC (not a queue)
        ↓ topic: "order-events"
   ┌────┼────────┬────────────┐
@@ -660,8 +660,16 @@ Producer → [ Topic ]
       One event → many independent receivers</code></pre>
 <table>
 <tr><th>Feature</th><th>Message Queue</th><th>Event Stream</th><th>Pub/Sub</th></tr>
+<tr><td><span class="hi">Definition</span></td><td>Messages <span class="hg">wait in a queue</span> for a consumer to pick up &amp; process</td><td>Messages <span class="hg">appended to a durable ordered log</span> — replayable history</td><td>Publisher <span class="hg">broadcasts</span> to a topic; every subscriber gets its own copy</td></tr>
+<tr><td><span class="hi">Core Idea</span></td><td>Queue of <span class="hg">tasks / jobs</span></td><td>Durable <span class="hg">ordered event log</span></td><td><span class="hg">Broadcast</span> events to subscribers</td></tr>
+<tr><td><span class="hi">Concrete Question</span></td><td><em>"Which worker should process this image upload / email / payment retry?"</em></td><td><em>"What exactly happened in this system / user journey over time?"</em></td><td><em>"Which systems should know that an order was placed?"</em></td></tr>
+<tr><td><span class="hi">Why this fits best</span></td><td>Best when <span class="hg">exactly one worker</span> should process a task / job</td><td>Best when events must be <span class="hg">retained as an ordered replayable history</span></td><td>Best when one event must be <span class="hg">broadcast (fan-out)</span> to many independent subscribers</td></tr>
+<tr><td><span class="hi">Why others don't fit</span></td><td><span class="hr">Pub/Sub</span> broadcasts to many consumers causing duplicate processing; <span class="hr">Streams</span> retain/replay history — unnecessary for one-time task execution</td><td><span class="hr">Queue</span> removes messages after processing; <span class="hr">Pub/Sub</span> focuses on live delivery rather than durable replayable event history</td><td><span class="hr">Queue</span> is designed for task distribution where only one consumer gets the message; <span class="hr">Streams</span> add retention/replay/ordering overhead when only real-time notification is needed</td></tr>
+<tr><td><span class="hi">Model</span></td><td><span class="hg">Competing consumers</span> — task distribution &amp; load balancing</td><td><span class="hg">Independent readers</span> — each group reads the full log at its own pace</td><td><span class="hg">Fan-out</span> — one publish, N independent deliveries</td></tr>
 <tr><td><span class="hi">Consumption</span></td><td><span class="hg">One consumer</span> per message</td><td><span class="hg">Multiple groups</span>, each reads all</td><td><span class="hg">All subscribers</span> get copy</td></tr>
 <tr><td><span class="hi">After read</span></td><td><span class="hr">Deleted</span></td><td><span class="hg">Retained</span></td><td><span class="hr">Gone</span> (SNS) or short retention</td></tr>
+<tr><td><span class="hi">Delivery</span></td><td>At-least-once (consumer must be idempotent)</td><td>At-least-once · exactly-once (idempotent producer + transactions)</td><td>At-least-once to every subscriber</td></tr>
+<tr><td><span class="hi">Retention</span></td><td><span class="hr">No long-term retention</span> — gone after ACK</td><td><span class="hg">Configurable</span> (days / size / compaction)</td><td>Short (SNS: none · Pub/Sub: 7 days)</td></tr>
 <tr><td><span class="hi">Replay</span></td><td>✗</td><td><span class="hg">✓ (rewind to any offset)</span></td><td>Limited</td></tr>
 <tr><td><span class="hi">Ordering</span></td><td>✓ per queue (FIFO)</td><td>✓ per partition</td><td>✗ by default</td></tr>
 <tr><td><span class="hi">Throughput</span></td><td>~10K-100K msg/sec</td><td><span class="hg">~1M+ msg/sec</span></td><td>~100K-1M msg/sec</td></tr>
