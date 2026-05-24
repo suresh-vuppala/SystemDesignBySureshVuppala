@@ -1,0 +1,292 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Search at 10B Messages — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a search system index 10B+ messages with near-real-time indexing?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🔍</span> Design a chat search system that indexes 10B+ messages with &lt;5s indexing latency and returns full-text results in &lt;100ms</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<p class="su">How does a search system index 10B+ messages with &lt;5s indexing latency from send to searchable, and return full-text results in &lt;100ms across the entire message corpus?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Full-text search across message history — not real-time delivery, not file search, not people search. The hard question: <span class="hr">how do you make a message searchable within 5 seconds of being sent while maintaining &lt;100ms query latency across 10B documents?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">10B+</div>
+<div style="font-size:.72rem;color:var(--muted)">indexed messages</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">growing at ~10B/day</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;5s</div>
+<div style="font-size:.72rem;color:var(--muted)">index latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">send → searchable</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;100ms</div>
+<div style="font-size:.72rem;color:var(--muted)">query P99 latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">full-text + ranking</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">100%</div>
+<div style="font-size:.72rem;color:var(--muted)">permission-aware</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">only show accessible channels</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — full-text search with permission enforcement and near-real-time indexing</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Full-text search</strong> across all messages in a workspace<br>
+  <span class="hg">2.</span> Results are <strong>permission-aware</strong> — only show messages from channels the user has access to<br>
+  <span class="hg">3.</span> <strong>Near-real-time indexing</strong> — message searchable within 5 seconds of being sent<br>
+  <span class="hg">4.</span> <strong>Relevance ranking</strong> — combine text relevance (TF-IDF/BM25) with recency boost<br>
+  <span class="hg">5.</span> <strong>Snippet highlighting</strong> — show matching text fragments in search results<br>
+  <span class="hg">6.</span> Support <strong>filters</strong>: by channel, user, date range, has:file, has:link
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> <strong>File content search</strong> (separate pipeline for PDF/doc indexing)<br>
+  <span class="hr">✗</span> <strong>People/channel search</strong> (simple prefix match on metadata, not full-text)<br>
+  <span class="hr">✗</span> <strong>Message delivery</strong> (see Slack Real-Time Messaging for the write path)<br>
+  <span class="hr">✗</span> <strong>Analytics queries</strong> (OLAP workload, different system)<br>
+  <span class="hr">✗</span> <strong>Semantic/AI search</strong> (vector embeddings — future enhancement)
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for search at 10B+ document scale</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Indexing latency</span></td><td><span class="hg">&lt;5s</span> from message send to searchable</td><td>Users expect to find a message they just sent. Longer lag causes confusion and re-sends.</td></tr>
+<tr><td><span class="hi">Query latency</span></td><td><span class="hg">P99 &lt;100ms</span> for full-text search</td><td>Search must feel instant. Slow search drives users to scroll manually instead.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">200K+ msgs/sec</span> indexed, 10K+ queries/sec served</td><td>Must keep up with message ingestion rate without falling behind.</td></tr>
+<tr><td><span class="hi">Corpus size</span></td><td><span class="hg">10B+ documents</span> indexed</td><td>Full message history must be searchable — not just recent messages.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.9%</span> for search (degraded = stale results, not outage)</td><td>Search unavailability is tolerable briefly if results are stale rather than missing entirely.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Eventually consistent</span> (~5s lag acceptable)</td><td>Near-real-time indexing is sufficient — strong consistency would kill throughput.</td></tr>
+<tr><td><span class="hi">Security</span></td><td><span class="hg">Permission-aware</span></td><td>Never show messages from channels user can't access. Filter at query time, not index time.</td></tr>
+</table>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Deriving cluster sizing from message volume and query patterns</p>
+<table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>1</td><td>10B msgs/day ÷ 86400</td><td>~115K msgs/sec to index</td></tr>
+<tr><td>2</td><td>Avg message 500 bytes → 115K × 500B</td><td>~57MB/sec ingestion</td></tr>
+<tr><td>3</td><td>ES cluster sizing: 10B docs × 1KB indexed</td><td>~10TB index storage</td></tr>
+<tr><td>4</td><td>Shards: 10TB ÷ 50GB/shard</td><td>~200 shards across cluster</td></tr>
+<tr><td>5</td><td>Query load: 10M users × 2 searches/day ÷ 86400</td><td>~230 queries/sec avg</td></tr>
+<tr><td>6</td><td>Permission filter: avg user in 50 channels</td><td>Terms filter with 50 channel_ids per query</td></tr>
+</table>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Kafka consumer indexes messages into Elasticsearch sharded by workspace_id — permission filtering at query time</p>
+
+<svg width="100%" viewBox="0 0 740 290" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs>
+<marker id="cs1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+<marker id="cs2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+</defs>
+
+<!-- ═══ INDEXING PATH ═══ -->
+<rect x="4" y="4" width="732" height="110" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">INDEXING PATH — Message sent → searchable in &lt;5s</text>
+
+<!-- Message Service -->
+<rect x="14" y="30" width="90" height="32" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="59" y="42" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Message Service</text>
+<text x="59" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">persists to Vitess</text>
+<text x="59" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">publishes to Kafka</text>
+<line x1="104" y1="46" x2="128" y2="46" stroke="var(--g)" stroke-width="1" marker-end="url(#cs1)"/>
+
+<!-- Kafka -->
+<rect x="130" y="30" width="80" height="32" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+<text x="170" y="42" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Kafka</text>
+<text x="170" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">messages topic</text>
+<text x="170" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">partition by workspace_id</text>
+<line x1="210" y1="46" x2="234" y2="46" stroke="var(--a)" stroke-width="1" marker-end="url(#cs1)"/>
+
+<!-- Search Indexer -->
+<rect x="236" y="26" width="120" height="40" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text x="296" y="40" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Search Indexer</text>
+<text x="296" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">Kafka consumer group</text>
+<text x="296" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">batch: 500 docs per bulk request</text>
+<line x1="356" y1="46" x2="380" y2="46" stroke="var(--o)" stroke-width="1" marker-end="url(#cs1)"/>
+
+<!-- Elasticsearch -->
+<rect x="382" y="26" width="140" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text x="452" y="40" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Elasticsearch Cluster</text>
+<text x="452" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">index: messages-{workspace_id}</text>
+<text x="452" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">refresh_interval: 1s (NRT)</text>
+
+<!-- Latency annotation -->
+<rect x="550" y="26" width="176" height="50" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="638" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Indexing Latency Breakdown</text>
+<text x="560" y="50" fill="var(--muted)" font-size="5.5">Kafka produce + consume: ~50ms</text>
+<text x="560" y="60" fill="var(--muted)" font-size="5.5">Batch accumulation: ~2s</text>
+<text x="560" y="70" fill="var(--muted)" font-size="5.5">ES bulk index + refresh: ~1s</text>
+<text x="680" y="60" fill="var(--g)" font-size="5.5" font-weight="600">Total: ~3-5s</text>
+
+<!-- ═══ QUERY PATH ═══ -->
+<rect x="4" y="120" width="732" height="100" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+<text x="370" y="134" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">QUERY PATH — User searches "project update" → results in &lt;100ms</text>
+
+<!-- User -->
+<rect x="14" y="146" width="70" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text x="49" y="158" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">User</text>
+<text x="49" y="168" text-anchor="middle" fill="var(--muted)" font-size="5">search query</text>
+<line x1="84" y1="160" x2="108" y2="160" stroke="var(--a)" stroke-width="1" marker-end="url(#cs1)"/>
+
+<!-- Search API -->
+<rect x="110" y="142" width="100" height="36" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text x="160" y="154" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Search API</text>
+<text x="160" y="164" text-anchor="middle" fill="var(--muted)" font-size="5">fetch user's channel list</text>
+<text x="160" y="174" text-anchor="middle" fill="var(--muted)" font-size="4.5">build permission filter</text>
+<line x1="210" y1="160" x2="234" y2="160" stroke="var(--a2)" stroke-width="1" marker-end="url(#cs1)"/>
+
+<!-- ES Query -->
+<rect x="236" y="142" width="140" height="36" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text x="306" y="154" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Elasticsearch Query</text>
+<text x="306" y="164" text-anchor="middle" fill="var(--muted)" font-size="5">BM25 + recency boost</text>
+<text x="306" y="174" text-anchor="middle" fill="var(--muted)" font-size="4.5">filter: channel_id IN [user's channels]</text>
+<line x1="376" y1="160" x2="400" y2="160" stroke="var(--y)" stroke-width="1" marker-end="url(#cs1)"/>
+
+<!-- Results -->
+<rect x="402" y="142" width="120" height="36" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="462" y="154" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Results + Highlights</text>
+<text x="462" y="164" text-anchor="middle" fill="var(--muted)" font-size="5">top 20 results</text>
+<text x="462" y="174" text-anchor="middle" fill="var(--muted)" font-size="4.5">snippet with <em> tags</text>
+
+<!-- Query latency -->
+<rect x="550" y="142" width="176" height="46" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="638" y="154" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Query Latency Breakdown</text>
+<text x="560" y="166" fill="var(--muted)" font-size="5.5">Permission lookup (Redis): ~2ms</text>
+<text x="560" y="176" fill="var(--muted)" font-size="5.5">ES query + highlight: ~60ms</text>
+<text x="560" y="186" fill="var(--muted)" font-size="5.5">Network + serialization: ~10ms</text>
+<text x="680" y="176" fill="var(--g)" font-size="5.5" font-weight="600">Total: ~72ms</text>
+
+<!-- ═══ SHARDING STRATEGY ═══ -->
+<rect x="4" y="228" width="732" height="54" rx="6" fill="rgba(244,114,182,.03)" stroke="var(--p)" stroke-width="1"/>
+<text x="370" y="242" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="800">SHARDING — workspace_id routing for data isolation</text>
+<text x="370" y="258" text-anchor="middle" fill="var(--muted)" font-size="6">Each workspace gets its own ES index (or index alias with routing). Queries never cross workspace boundaries.</text>
+<text x="370" y="270" text-anchor="middle" fill="var(--muted)" font-size="5.5">Large workspaces: multiple shards per index. Small workspaces: shared index with routing key. Hot/warm/cold tiering by message age.</text>
+</svg>
+</div>
+
+<!-- ═══ KEY DESIGN DECISIONS ═══ -->
+<div class="T" id="design-decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Balancing indexing speed, query latency, and permission correctness</p>
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
+<tr><td><span class="hi">Search Engine</span></td><td><span class="hg">Elasticsearch</span></td><td>Purpose-built for full-text search. BM25 scoring, highlighting, aggregations. Proven at 10B+ doc scale.</td><td>MySQL FULLTEXT: doesn't scale. Solr: operationally heavier. Meilisearch: not proven at this scale.</td></tr>
+<tr><td><span class="hi">Indexing Pipeline</span></td><td><span class="hg">Kafka consumer → ES bulk API</span></td><td>Decouples indexing from message delivery. Batch 500 docs per bulk request for throughput. Consumer lag = indexing delay, not message delay.</td><td>Synchronous index on write: adds latency to message send path. CDC from DB: more complex, same result.</td></tr>
+<tr><td><span class="hi">Shard Strategy</span></td><td><span class="hg">Route by workspace_id</span></td><td>Queries never cross workspace boundaries. Data isolation for enterprise. Hot/warm tiering per workspace.</td><td>Shard by channel_id: cross-channel search requires scatter-gather across all shards.</td></tr>
+<tr><td><span class="hi">Permission Model</span></td><td><span class="hg">Query-time filter</span> (channel_id IN user's channels)</td><td>Channel membership changes instantly reflected. No re-indexing needed when user joins/leaves channel.</td><td>Index-time ACL: requires re-indexing all messages when membership changes — too expensive.</td></tr>
+<tr><td><span class="hi">Ranking</span></td><td><span class="hg">BM25 + recency decay</span></td><td>Text relevance as primary signal, with exponential decay favoring recent messages. Tunable per workspace.</td><td>Pure recency: ignores relevance. Pure BM25: old messages dominate for common terms.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> The indexing pipeline consumes from the same Kafka topic used by the <a href="slack-real-time-messaging.html">Slack Real-Time Messaging</a> fan-out workers. Vitess remains the source of truth — Elasticsearch is a derived, eventually-consistent search index.</div>
+</div>
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Search must be eventually consistent with the source of truth (Vitess) and handle permission changes correctly</p>
+<table>
+<tr><th>#</th><th>Failure / Edge Case</th><th>What Breaks</th><th>How It's Handled</th></tr>
+<tr><td><span class="hi">1</span></td><td><span class="hr">Indexer consumer lag spike</span></td><td>Messages not searchable for minutes instead of seconds</td><td>Auto-scale indexer consumers. Alert on lag &gt;10s. Kafka retains messages — no data loss, just delay.</td></tr>
+<tr><td><span class="hi">2</span></td><td><span class="hr">User removed from channel</span></td><td>Should no longer see messages from that channel in search</td><td>Query-time permission filter uses live channel membership. Removal is instant — no re-indexing needed.</td></tr>
+<tr><td><span class="hi">3</span></td><td><span class="hr">Message edited or deleted</span></td><td>Search returns stale content or deleted messages</td><td>Edit/delete events flow through same Kafka topic → indexer updates/deletes ES document. Eventual consistency (~5s).</td></tr>
+<tr><td><span class="hi">4</span></td><td><span class="hr">ES cluster node failure</span></td><td>Queries to affected shards fail</td><td>Each shard has 1 primary + 2 replicas. Replica promoted automatically. Query routes to healthy replica.</td></tr>
+<tr><td><span class="hi">5</span></td><td><span class="hr">Hot workspace (10M+ messages)</span></td><td>Single shard too large, queries slow</td><td>Split into time-based indices (messages-W123-2025-01). Query across recent indices first, paginate to older.</td></tr>
+</table>
+<div class="b by"><span class="hi">Consistency model:</span> Search is <span class="hg">eventually consistent</span> with a ~5s lag. This is acceptable because users don't expect to search for a message they sent 2 seconds ago. The source of truth is always Vitess — if ES is corrupted, rebuild the index from the Kafka topic or Vitess directly.</div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack &amp; Tradeoffs</h2>
+<p class="su">Each component chosen for a specific role in the search pipeline</p>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
+<tr><td><span class="hi">Search Engine</span></td><td>Elasticsearch (Lucene)</td><td>BM25 scoring, inverted index, highlighting, aggregations. Proven at 10B+ docs. Near-real-time refresh.</td><td>Solr: same engine, harder ops. Typesense/Meilisearch: not proven at this scale.</td></tr>
+<tr><td><span class="hi">Indexing Pipeline</span></td><td>Kafka → Custom Consumer</td><td>Decoupled from write path. Batch bulk indexing (500 docs/request). Replay from offset on failure.</td><td>Logstash: less control over batching/error handling. Direct DB polling: higher latency, more load on Vitess.</td></tr>
+<tr><td><span class="hi">Permission Cache</span></td><td>Redis (user → channel set)</td><td>Sub-ms lookup of user's accessible channels. TTL 60s, refreshed on membership change event.</td><td>Query Vitess on every search: adds 5-10ms per query. Embed in ES doc: re-index on membership change.</td></tr>
+<tr><td><span class="hi">Source of Truth</span></td><td>Vitess/MySQL</td><td>Durable message store. ES index can be rebuilt from Vitess at any time. Single source of truth.</td><td>ES as primary: not designed for transactional writes, no strong consistency guarantees.</td></tr>
+<tr><td><span class="hi">Query Routing</span></td><td>Custom Search API (Go)</td><td>Builds ES query with permission filter, handles pagination, caches frequent queries.</td><td>Direct ES access from client: exposes internal schema, no permission enforcement.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> The source of truth for messages is the same <a href="slack-real-time-messaging.html">Vitess/MySQL data model</a> used by the real-time messaging system. Search is a read-optimized derived view — never the primary store.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 5 things an interviewer wants to hear about chat search at scale</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a)">
+<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">① Kafka Consumer → ES Bulk API (NRT Indexing)</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Messages flow through Kafka to a dedicated search indexer consumer group. Batch 500 docs per ES bulk request. ES refresh_interval=1s gives near-real-time searchability. Total send-to-searchable latency: ~3-5 seconds.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
+<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">② Workspace-Scoped Sharding</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Shard by workspace_id — queries never cross workspace boundaries. Each workspace's data is co-located for fast queries. Large workspaces get time-based index splits (monthly). Small workspaces share indices with routing keys.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
+<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">③ Query-Time Permission Filtering</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">On every search, fetch user's channel list from Redis cache, inject as <code>terms</code> filter in ES query. Channel membership changes are instantly reflected — no re-indexing. This is the key insight: permissions at query time, not index time.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
+<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">④ BM25 + Recency Decay Ranking</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Combine Elasticsearch's BM25 text relevance with a function_score decay on timestamp. Recent messages get a boost. Result: "meeting notes" returns last week's messages before year-old ones, even if older ones have higher term frequency.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">⑤ ES is Derived — Vitess is Source of Truth</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Elasticsearch is a read-optimized derived index. If corrupted, rebuild from Kafka replay or Vitess scan. Never write to ES directly from the client. Edit/delete events flow through the same Kafka pipeline to keep ES consistent.</div>
+</div>
+</div>
+<div class="b bg" style="margin-top:8px"><span class="hi">One-liner answer:</span> <em>"Kafka consumer batches messages into Elasticsearch bulk API for near-real-time indexing (~5s), workspace-scoped sharding for data isolation, query-time permission filtering via cached channel membership, BM25 + recency decay ranking, and ES as a derived index with Vitess as the source of truth."</em></div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<div id="read-progress" style="position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--a),var(--g));z-index:9998;transition:width .1s linear"></div>
+<script>
+window.addEventListener('scroll',function(){var d=document.documentElement;var pct=(d.scrollTop/(d.scrollHeight-d.clientHeight))*100;document.getElementById('read-progress').style.width=Math.min(100,pct)+'%';});
+var b=document.getElementById('topBtn');window.addEventListener('scroll',function(){b.style.display=window.scrollY>400?'flex':'none'});
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

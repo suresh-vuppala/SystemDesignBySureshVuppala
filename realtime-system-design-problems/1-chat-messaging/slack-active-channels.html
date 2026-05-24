@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top Active Channels — Real-Time Ranking System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How do you continuously compute top active channels without scanning historical data?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">📊</span> Design a real-time ranking system that computes top active channels/users for the last 1 hour, updating within seconds of activity changes</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<p class="su">Given message events across millions of channels, design a system that continuously computes the top active channels/users for the last 1 hour without scanning historical data, updating rankings within seconds of activity changes.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time top-K computation over a sliding time window — not batch analytics, not historical reporting. The hard question: <span class="hr">how do you maintain accurate rankings over a sliding 1-hour window at millions of events/sec without re-scanning all data on every query?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">200K</div>
+<div style="font-size:.72rem;color:var(--muted)">events / sec ingested</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">from Kafka message topic</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">1 hour</div>
+<div style="font-size:.72rem;color:var(--muted)">sliding window</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">old activity expires continuously</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;5s</div>
+<div style="font-size:.72rem;color:var(--muted)">ranking freshness</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">activity → reflected in top-K</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Top 100</div>
+<div style="font-size:.72rem;color:var(--muted)">channels per workspace</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">approximate is acceptable</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — streaming top-K computation over a sliding window</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Compute <strong>top 100 most active channels</strong> per workspace in the last 1 hour<br>
+  <span class="hg">2.</span> Rankings update within <strong>5 seconds</strong> of new activity<br>
+  <span class="hg">3.</span> Old activity <strong>expires automatically</strong> as it falls outside the 1-hour window<br>
+  <span class="hg">4.</span> Support <strong>per-workspace</strong> and <strong>global</strong> (cross-workspace) rankings<br>
+  <span class="hg">5.</span> Handle <strong>200K events/sec</strong> without scanning historical data<br>
+  <span class="hg">6.</span> <strong>Approximate</strong> results acceptable (±5% accuracy for top-K)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> <strong>Historical analytics</strong> (daily/weekly reports — batch pipeline)<br>
+  <span class="hr">✗</span> <strong>Message content analysis</strong> (topic detection, sentiment)<br>
+  <span class="hr">✗</span> <strong>User activity scoring</strong> (engagement metrics for product analytics)<br>
+  <span class="hr">✗</span> <strong>Exact counts</strong> (approximate top-K is sufficient for ranking)<br>
+  <span class="hr">✗</span> <strong>Custom time windows</strong> (fixed at 1 hour for this design)
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for real-time ranking computation over sliding windows</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Freshness</span></td><td>Rankings update within <span class="hg">5 seconds</span> of activity</td><td>Stale rankings mislead users. Must reflect recent bursts immediately.</td></tr>
+<tr><td><span class="hi">Query latency</span></td><td><span class="hg">P99 &lt;50ms</span> for top-K retrieval</td><td>Rankings are displayed in sidebar — must load faster than the page itself.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">200K+ message events/sec</span> ingested</td><td>Must keep up with full message stream without falling behind or dropping events.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">Approximate acceptable</span> (±5% for ranking position)</td><td>Exact counts unnecessary — relative ordering is what matters for top-K display.</td></tr>
+<tr><td><span class="hi">Window</span></td><td><span class="hg">Sliding 1-hour window</span> with automatic expiry</td><td>Old activity must decay without explicit cleanup. Time-bucketed approach enables this.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td><span class="hg">Per-workspace rankings</span> + global aggregation</td><td>Each workspace is independent. Global view aggregates across workspaces on demand.</td></tr>
+<tr><td><span class="hi">Memory</span></td><td><span class="hg">Bounded</span> regardless of total channel count</td><td>Only active channels consume memory. Inactive channels naturally expire from sorted sets.</td></tr>
+</table>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Deriving Redis capacity from event rate and workspace distribution</p>
+<table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>1</td><td>200K msgs/sec from Kafka → 200K ZINCRBY ops/sec to Redis</td><td>200K write ops/sec</td></tr>
+<tr><td>2</td><td>60 time buckets × avg 10K active channels/workspace</td><td>600K ZSET entries</td></tr>
+<tr><td>3</td><td>Memory: 600K entries × 16 bytes</td><td>~10MB per workspace (trivial)</td></tr>
+<tr><td>4</td><td>ZUNIONSTORE across 60 keys: O(60 × 10K)</td><td>600K ops every 5s</td></tr>
+<tr><td>5</td><td>Total workspaces: 500K × 10MB</td><td>~5TB if all active (but most are small)</td></tr>
+<tr><td>6</td><td>Realistic: top 1000 workspaces need dedicated Redis</td><td>Rest share multi-tenant clusters</td></tr>
+</table>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Kafka stream → sliding window aggregation → Redis sorted sets with time-decay scoring → top-K query</p>
+
+<svg width="100%" viewBox="0 0 740 310" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs>
+<marker id="ac1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+<marker id="ac2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+</defs>
+
+<!-- ═══ INGESTION PATH ═══ -->
+<rect x="4" y="4" width="732" height="100" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">INGESTION — Message events from Kafka → sliding window counters</text>
+
+<!-- Kafka source -->
+<rect x="14" y="30" width="100" height="32" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+<text x="64" y="42" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Kafka</text>
+<text x="64" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">messages topic</text>
+<text x="64" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">200K events/sec</text>
+<line x1="114" y1="46" x2="138" y2="46" stroke="var(--a)" stroke-width="1" marker-end="url(#ac1)"/>
+
+<!-- Stream Processor -->
+<rect x="140" y="26" width="130" height="40" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text x="205" y="38" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Stream Processor</text>
+<text x="205" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">extract: workspace_id, channel_id</text>
+<text x="205" y="58" text-anchor="middle" fill="var(--muted)" font-size="4.5">assign to 1-min time bucket</text>
+<text x="205" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">ZINCRBY per channel per bucket</text>
+<line x1="270" y1="46" x2="294" y2="46" stroke="var(--o)" stroke-width="1" marker-end="url(#ac1)"/>
+
+<!-- Redis Sorted Sets -->
+<rect x="296" y="26" width="150" height="40" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text x="371" y="38" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis Sorted Sets</text>
+<text x="371" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">active:{workspace}:{bucket} → ZSET</text>
+<text x="371" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">member=channel_id, score=msg_count</text>
+<text x="371" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">60 buckets per workspace (1 per minute)</text>
+
+<!-- TTL expiry -->
+<rect x="470" y="26" width="130" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="535" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">TTL Auto-Expiry</text>
+<text x="535" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">Each bucket key: EXPIRE 3660s</text>
+<text x="535" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">Bucket older than 1hr → auto-deleted</text>
+<text x="535" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">No manual cleanup needed</text>
+
+<!-- Latency annotation -->
+<rect x="620" y="26" width="106" height="40" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="673" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Ingestion Latency</text>
+<text x="630" y="50" fill="var(--muted)" font-size="5.5">Kafka → Redis: ~5ms</text>
+<text x="630" y="60" fill="var(--muted)" font-size="5.5">ZINCRBY: ~0.1ms</text>
+
+<!-- ═══ QUERY PATH ═══ -->
+<rect x="4" y="110" width="732" height="90" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+<text x="370" y="124" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">QUERY PATH — "What are the top 100 active channels right now?"</text>
+
+<!-- API request -->
+<rect x="14" y="136" width="80" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text x="54" y="148" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Client</text>
+<text x="54" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">GET /top-channels</text>
+<line x1="94" y1="150" x2="118" y2="150" stroke="var(--a)" stroke-width="1" marker-end="url(#ac1)"/>
+
+<!-- Aggregation Service -->
+<rect x="120" y="132" width="140" height="36" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text x="190" y="144" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Aggregation Service</text>
+<text x="190" y="154" text-anchor="middle" fill="var(--muted)" font-size="5">ZUNIONSTORE across 60 buckets</text>
+<text x="190" y="164" text-anchor="middle" fill="var(--muted)" font-size="4.5">or pre-computed every 5s</text>
+<line x1="260" y1="150" x2="284" y2="150" stroke="var(--a2)" stroke-width="1" marker-end="url(#ac1)"/>
+
+<!-- Redis union -->
+<rect x="286" y="132" width="150" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text x="361" y="144" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis ZUNIONSTORE</text>
+<text x="361" y="154" text-anchor="middle" fill="var(--muted)" font-size="5">sum scores across 60 minute-buckets</text>
+<text x="361" y="164" text-anchor="middle" fill="var(--muted)" font-size="4.5">ZREVRANGE 0 99 → top 100</text>
+<line x1="436" y1="150" x2="460" y2="150" stroke="var(--r)" stroke-width="1" marker-end="url(#ac1)"/>
+
+<!-- Result -->
+<rect x="462" y="132" width="130" height="36" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="527" y="144" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Top 100 Channels</text>
+<text x="527" y="154" text-anchor="middle" fill="var(--muted)" font-size="5">ranked by 1hr msg count</text>
+<text x="527" y="164" text-anchor="middle" fill="var(--muted)" font-size="4.5">cached 5s, served to clients</text>
+
+<!-- Query latency -->
+<rect x="610" y="132" width="116" height="36" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="668" y="144" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Query Latency</text>
+<text x="620" y="156" fill="var(--muted)" font-size="5.5">ZUNIONSTORE: ~10ms</text>
+<text x="620" y="166" fill="var(--muted)" font-size="5.5">ZREVRANGE: ~1ms</text>
+
+<!-- ═══ APPROXIMATE TOP-K ═══ -->
+<rect x="4" y="208" width="732" height="94" rx="6" fill="rgba(244,114,182,.03)" stroke="var(--p)" stroke-width="1"/>
+<text x="370" y="222" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="800">APPROXIMATE TOP-K — Count-Min Sketch + Min-Heap (for extreme scale)</text>
+
+<rect x="14" y="234" width="230" height="56" rx="4" fill="rgba(244,114,182,.04)" stroke="var(--p)" stroke-width=".6"/>
+<text x="129" y="246" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="700">Count-Min Sketch</text>
+<text x="129" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Fixed memory: ~1MB regardless of channel count</text>
+<text x="129" y="268" text-anchor="middle" fill="var(--muted)" font-size="5">Increment on every message event</text>
+<text x="129" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">Query: approximate count for any channel</text>
+<text x="129" y="288" text-anchor="middle" fill="var(--muted)" font-size="4.5">Error: ε·N (configurable accuracy vs. memory)</text>
+
+<rect x="260" y="234" width="230" height="56" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+<text x="375" y="246" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Min-Heap (size K=100)</text>
+<text x="375" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Maintains top-100 channels by count</text>
+<text x="375" y="268" text-anchor="middle" fill="var(--muted)" font-size="5">New event: if count > heap min → replace</text>
+<text x="375" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">O(log K) per update = O(log 100) = O(7)</text>
+<text x="375" y="288" text-anchor="middle" fill="var(--muted)" font-size="4.5">Memory: 100 entries × 16 bytes = 1.6KB</text>
+
+<rect x="506" y="234" width="220" height="56" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="616" y="246" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">When to Use Which</text>
+<text x="616" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Redis ZSET: &lt;1M channels (exact counts)</text>
+<text x="616" y="268" text-anchor="middle" fill="var(--muted)" font-size="5">CMS + Heap: &gt;1M channels (approximate)</text>
+<text x="616" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">Hierarchical: per-workspace exact + global approx</text>
+<text x="616" y="288" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Most workspaces: Redis ZSET is sufficient</text>
+</svg>
+</div>
+
+<!-- ═══ KEY DESIGN DECISIONS ═══ -->
+<div class="T" id="design-decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Streaming computation with time-bucketed aggregation — no batch jobs, no historical scans</p>
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
+<tr><td><span class="hi">Window Strategy</span></td><td><span class="hg">Time-bucketed (1-min buckets × 60)</span></td><td>Each minute gets its own Redis sorted set. Union 60 buckets = 1-hour window. Old buckets auto-expire via TTL.</td><td>Single counter with decay: hard to expire exactly at 1hr. Tumbling window: stale for up to window-size.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td><span class="hg">Redis Sorted Sets (ZSET)</span></td><td>ZINCRBY O(log N) for increment. ZUNIONSTORE for aggregation. ZREVRANGE for top-K. All sub-ms operations.</td><td>Database: too slow for 200K writes/sec. In-memory only: lost on restart (acceptable for rankings).</td></tr>
+<tr><td><span class="hi">Expiry</span></td><td><span class="hg">TTL on bucket keys (3660s)</span></td><td>Redis auto-deletes expired buckets. No background cleanup job needed. Sliding window maintained passively.</td><td>Manual cleanup cron: adds operational complexity. Explicit delete: race conditions with writers.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">Exact per-workspace, approximate global</span></td><td>Per-workspace has &lt;10K channels → Redis ZSET is exact. Global across millions → CMS + heap is approximate but bounded.</td><td>Exact global: requires scanning all workspaces. Too expensive for real-time.</td></tr>
+<tr><td><span class="hi">Computation Model</span></td><td><span class="hg">Streaming (no batch)</span></td><td>Every message event immediately increments the counter. No periodic batch job. Rankings are always fresh within 5s.</td><td>Batch (every 5 min): stale rankings, spiky compute load. Lambda architecture: unnecessary complexity.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> The event source is the same <a href="slack-real-time-messaging.html">Kafka messages topic</a> used by the fan-out workers and search indexer. The ranking system is just another consumer group on the same topic — no additional event production needed.</div>
+</div>
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Rankings are ephemeral and rebuildable — the system optimizes for freshness over durability</p>
+<table>
+<tr><th>#</th><th>Failure / Edge Case</th><th>What Breaks</th><th>How It's Handled</th></tr>
+<tr><td><span class="hi">1</span></td><td><span class="hr">Redis node failure</span></td><td>Current bucket data lost — rankings temporarily inaccurate</td><td>Rankings rebuild within 1 minute as new events flow in. Redis Sentinel promotes replica. Stale data acceptable for rankings.</td></tr>
+<tr><td><span class="hi">2</span></td><td><span class="hr">Kafka consumer lag</span></td><td>Rankings lag behind real activity</td><td>Alert on lag &gt;30s. Auto-scale consumers. Rankings are eventually consistent — 30s staleness is acceptable.</td></tr>
+<tr><td><span class="hi">3</span></td><td><span class="hr">Bot spam in a channel (10K msgs/min)</span></td><td>Bot-spammed channel dominates rankings</td><td>Rate-limit per user at ingestion. Optionally: weight by unique users, not raw message count. Filter known bots.</td></tr>
+<tr><td><span class="hi">4</span></td><td><span class="hr">ZUNIONSTORE on 60 keys is slow</span></td><td>Query latency spikes during aggregation</td><td>Pre-compute union every 5s into a result key. Clients read from cached result. ZUNIONSTORE runs in background.</td></tr>
+<tr><td><span class="hi">5</span></td><td><span class="hr">Workspace with 100K+ channels</span></td><td>ZSET per bucket becomes large</td><td>Only track channels with &gt;0 messages in the bucket. Most channels are inactive — ZSET stays small. Worst case: shard across Redis nodes.</td></tr>
+</table>
+<div class="b by"><span class="hi">Design philosophy:</span> Rankings are a <span class="hg">derived, ephemeral view</span>. They can be rebuilt from the Kafka topic at any time. A few seconds of staleness or inaccuracy is invisible to users. This allows aggressive optimization for write throughput over read consistency.</div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack &amp; Tradeoffs</h2>
+<p class="su">Minimal stack — streaming aggregation with Redis as the computation engine</p>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
+<tr><td><span class="hi">Event Source</span></td><td>Kafka (messages topic)</td><td>Same topic as message delivery. Ranking is just another consumer group. No additional event production needed.</td><td>Separate event stream: duplicates data, adds complexity. CDC from DB: higher latency.</td></tr>
+<tr><td><span class="hi">Stream Processor</span></td><td>Custom consumer (Go/Java)</td><td>Simple logic: extract workspace+channel, ZINCRBY Redis. No need for Flink/Spark complexity.</td><td>Flink: powerful but operationally heavy for simple counting. Spark Streaming: batch-oriented, higher latency.</td></tr>
+<tr><td><span class="hi">Aggregation Store</span></td><td>Redis Sorted Sets</td><td>ZINCRBY for counting, ZUNIONSTORE for window aggregation, ZREVRANGE for top-K. All O(log N) or better.</td><td>TimescaleDB: too slow for 200K writes/sec. ClickHouse: batch-oriented, not real-time enough.</td></tr>
+<tr><td><span class="hi">Approximate Counting</span></td><td>Count-Min Sketch (for global)</td><td>Fixed memory (~1MB) regardless of cardinality. Bounded error. Perfect for "approximate top-K" requirement.</td><td>Exact counting at global scale: requires O(channels) memory. HyperLogLog: counts uniques, not frequencies.</td></tr>
+<tr><td><span class="hi">Result Cache</span></td><td>Redis key with 5s TTL</td><td>Pre-computed top-100 result. Clients read cached result. Background job refreshes every 5s.</td><td>Compute on every query: ZUNIONSTORE on 60 keys per request is wasteful. CDN: too aggressive caching.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> This system consumes from the same <a href="slack-real-time-messaging.html">Kafka pipeline</a> that powers message delivery, search indexing, and offline delivery. It's a read-only consumer that never affects the write path.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 5 things an interviewer wants to hear about real-time ranking systems</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a)">
+<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">① Time-Bucketed Sliding Window (60 × 1-min buckets)</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Split the 1-hour window into 60 one-minute buckets. Each bucket is a Redis sorted set. ZINCRBY on every message. Union all 60 buckets for the full window. Old buckets auto-expire via Redis TTL — no cleanup job needed.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
+<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">② Redis Sorted Sets for O(log N) Ranking</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">ZINCRBY for counting (O(log N)), ZUNIONSTORE for window aggregation (O(N×K)), ZREVRANGE for top-K (O(log N + K)). All operations are sub-ms. Redis is the computation engine, not just a cache.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
+<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">③ Count-Min Sketch + Min-Heap for Extreme Scale</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">When exact counting is too expensive (millions of channels globally): CMS gives approximate frequency in O(1) with fixed memory. Min-heap of size K maintains the top-K candidates. Together: O(1) per event, O(K) memory for results.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
+<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">④ Streaming, Not Batch — Always Fresh</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Every message event immediately increments the counter via Kafka consumer. No periodic batch job. Rankings reflect activity within 5 seconds. Pre-compute the union result every 5s into a cached key for fast reads.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">⑤ Hierarchical: Per-Workspace Exact → Global Approximate</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Per-workspace rankings use exact Redis ZSETs (most workspaces have &lt;10K channels). Global cross-workspace rankings use approximate structures (CMS + heap). This gives exact results where users care most and approximate where scale demands it.</div>
+</div>
+</div>
+<div class="b bg" style="margin-top:8px"><span class="hi">One-liner answer:</span> <em>"Kafka consumer increments Redis sorted sets in 1-minute time buckets, ZUNIONSTORE across 60 buckets for the sliding 1-hour window, TTL auto-expires old buckets, pre-computed top-100 result cached every 5 seconds, with Count-Min Sketch + min-heap for approximate global rankings at extreme scale."</em></div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<div id="read-progress" style="position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--a),var(--g));z-index:9998;transition:width .1s linear"></div>
+<script>
+window.addEventListener('scroll',function(){var d=document.documentElement;var pct=(d.scrollTop/(d.scrollHeight-d.clientHeight))*100;document.getElementById('read-progress').style.width=Math.min(100,pct)+'%';});
+var b=document.getElementById('topBtn');window.addEventListener('scroll',function(){b.style.display=window.scrollY>400?'flex':'none'});
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

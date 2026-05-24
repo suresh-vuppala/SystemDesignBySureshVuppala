@@ -1,0 +1,307 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Push Notifications at Scale — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a notification system deliver push notifications to millions of devices reliably?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🔔</span> Design a push notification system that delivers to millions of devices without duplicates, handling token lifecycle and cross-platform delivery</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<p class="su">How does a notification system deliver push notifications to millions of devices without duplicates, handling device token lifecycle, retry logic, and cross-platform delivery (iOS/Android) reliably?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Push notification delivery to mobile devices when the app is backgrounded or the device is offline. The hard question: <span class="hr">how do you guarantee exactly-once delivery semantics across unreliable APNs/FCM gateways while managing millions of device tokens that constantly change?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">1B+</div>
+<div style="font-size:.72rem;color:var(--muted)">push notifications / day</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~12K/sec average</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">0</div>
+<div style="font-size:.72rem;color:var(--muted)">duplicate notifications</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">idempotency key per push</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">2</div>
+<div style="font-size:.72rem;color:var(--muted)">platforms (iOS + Android)</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">APNs + FCM integration</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">&lt;2s</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery P95</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">trigger → device display</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — reliable cross-platform push delivery with deduplication</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Deliver push notifications to <strong>iOS (APNs)</strong> and <strong>Android (FCM)</strong> devices<br>
+  <span class="hg">2.</span> <strong>No duplicate notifications</strong> — idempotency key ensures exactly-once display<br>
+  <span class="hg">3.</span> Handle <strong>device token lifecycle</strong> — registration, refresh, invalidation<br>
+  <span class="hg">4.</span> Support <strong>priority levels</strong> — high (new message), normal (status update), low (marketing)<br>
+  <span class="hg">5.</span> <strong>Badge count management</strong> — accurate unread count on app icon<br>
+  <span class="hg">6.</span> <strong>Retry with backoff</strong> for transient APNs/FCM failures (not for invalid tokens)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> <strong>In-app notifications</strong> (delivered via WebSocket — see Real-Time Messaging)<br>
+  <span class="hr">✗</span> <strong>Email/SMS notifications</strong> (different delivery channels, same trigger system)<br>
+  <span class="hr">✗</span> <strong>Notification preferences UI</strong> (user settings, mute, DND schedules)<br>
+  <span class="hr">✗</span> <strong>Rich media in notifications</strong> (images, action buttons — platform-specific)<br>
+  <span class="hr">✗</span> <strong>Analytics</strong> (open rates, click-through — separate pipeline)
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for reliable cross-platform push delivery at billion-device scale</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Delivery latency</span></td><td><span class="hg">P95 &lt;2s</span> from trigger to device display</td><td>Notifications must arrive while context is fresh — delayed push loses relevance.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">1B+ notifications/day</span> (~12K/sec avg, 50K/sec peak)</td><td>Must sustain high throughput without backpressure on message delivery pipeline.</td></tr>
+<tr><td><span class="hi">Deduplication</span></td><td><span class="hg">Zero duplicate notifications</span> (idempotency key)</td><td>Duplicate buzzes annoy users and erode trust. Idempotency key per push event.</td></tr>
+<tr><td><span class="hi">Reliability</span></td><td><span class="hg">At-least-once trigger, at-most-once display</span></td><td>Never miss a trigger event, but never show the same notification twice on device.</td></tr>
+<tr><td><span class="hi">Token freshness</span></td><td>Handle <span class="hg">10M+ token rotations/day</span></td><td>Stale tokens cause silent delivery failures. Must detect and refresh proactively.</td></tr>
+<tr><td><span class="hi">Platform coverage</span></td><td><span class="hg">iOS (APNs) + Android (FCM) + Web (WebPush)</span></td><td>Each platform has different protocols, rate limits, and error semantics.</td></tr>
+<tr><td><span class="hi">Batching</span></td><td><span class="hg">Collapse multiple msgs</span> in same chat into single notification</td><td>Prevents notification spam when user receives burst of messages in one conversation.</td></tr>
+</table>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Deriving push volume from message patterns and device registry size</p>
+<table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>1</td><td>2B users × 50% with push enabled</td><td>1B push-eligible devices</td></tr>
+<tr><td>2</td><td>100B msgs/day × 30% to offline users</td><td>30B offline msgs → triggers</td></tr>
+<tr><td>3</td><td>Collapse/batch: 30B triggers ÷ 30 (avg batch)</td><td>~1B actual pushes/day</td></tr>
+<tr><td>4</td><td>1B ÷ 86400</td><td>~12K pushes/sec avg, peak 50K/sec</td></tr>
+<tr><td>5</td><td>Device registry: 1B devices × 200 bytes</td><td>~200GB (Cassandra)</td></tr>
+<tr><td>6</td><td>Dedup store: 1B keys/day × 32 bytes × 24h TTL</td><td>~32GB Redis</td></tr>
+</table>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Event trigger → Notification Service → Platform Router → APNs/FCM delivery with retry and dedup</p>
+
+<svg width="100%" viewBox="0 0 740 300" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs>
+<marker id="pn1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+<marker id="pn2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+</defs>
+
+<!-- ═══ TRIGGER PATH ═══ -->
+<rect x="4" y="4" width="732" height="90" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">TRIGGER PATH — Message arrives for offline user → push notification</text>
+
+<!-- Trigger Event -->
+<rect x="14" y="30" width="100" height="32" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="64" y="42" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Message Event</text>
+<text x="64" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">user is offline</text>
+<text x="64" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">(from offline delivery)</text>
+<line x1="114" y1="46" x2="138" y2="46" stroke="var(--g)" stroke-width="1" marker-end="url(#pn1)"/>
+
+<!-- Notification Service -->
+<rect x="140" y="26" width="120" height="40" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text x="200" y="40" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Notification Service</text>
+<text x="200" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">dedup check (idempotency)</text>
+<text x="200" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">priority assignment + batching</text>
+<line x1="260" y1="46" x2="284" y2="46" stroke="var(--a2)" stroke-width="1" marker-end="url(#pn1)"/>
+
+<!-- Device Registry -->
+<rect x="286" y="26" width="120" height="40" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text x="346" y="40" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Device Token Registry</text>
+<text x="346" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">user_id → [{token, platform}]</text>
+<text x="346" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">handles multi-device</text>
+<line x1="406" y1="40" x2="430" y2="34" stroke="var(--r)" stroke-width=".8" marker-end="url(#pn1)"/>
+<line x1="406" y1="52" x2="430" y2="58" stroke="var(--r)" stroke-width=".8" marker-end="url(#pn1)"/>
+
+<!-- APNs path -->
+<rect x="432" y="22" width="100" height="24" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text x="482" y="34" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">APNs Sender</text>
+<text x="482" y="42" text-anchor="middle" fill="var(--muted)" font-size="4.5">HTTP/2 persistent conn</text>
+<line x1="532" y1="34" x2="556" y2="34" stroke="var(--a)" stroke-width=".8" marker-end="url(#pn1)"/>
+<rect x="558" y="24" width="70" height="20" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="593" y="37" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Apple APNs</text>
+
+<!-- FCM path -->
+<rect x="432" y="50" width="100" height="24" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="482" y="62" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">FCM Sender</text>
+<text x="482" y="70" text-anchor="middle" fill="var(--muted)" font-size="4.5">HTTP/2 batch API</text>
+<line x1="532" y1="62" x2="556" y2="62" stroke="var(--g)" stroke-width=".8" marker-end="url(#pn1)"/>
+<rect x="558" y="52" width="70" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+<text x="593" y="65" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Google FCM</text>
+
+<!-- Devices -->
+<line x1="628" y1="34" x2="652" y2="34" stroke="var(--a)" stroke-width=".8" marker-end="url(#pn1)"/>
+<text x="670" y="37" fill="var(--a)" font-size="6">📱 iOS</text>
+<line x1="628" y1="62" x2="652" y2="62" stroke="var(--g)" stroke-width=".8" marker-end="url(#pn1)"/>
+<text x="670" y="65" fill="var(--g)" font-size="6">📱 Android</text>
+
+<!-- ═══ TOKEN LIFECYCLE ═══ -->
+<rect x="4" y="100" width="732" height="90" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text x="370" y="114" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">DEVICE TOKEN LIFECYCLE — Registration, Refresh, Invalidation</text>
+
+<rect x="14" y="124" width="170" height="54" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="99" y="136" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Registration</text>
+<text x="99" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">App launch → get token from OS</text>
+<text x="99" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">POST /v1/devices {token, platform, user_id}</text>
+<text x="99" y="168" text-anchor="middle" fill="var(--muted)" font-size="4.5">Upsert: same device_id updates token</text>
+
+<rect x="200" y="124" width="170" height="54" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+<text x="285" y="136" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Token Refresh</text>
+<text x="285" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">OS rotates token periodically</text>
+<text x="285" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">App detects change → re-register</text>
+<text x="285" y="168" text-anchor="middle" fill="var(--muted)" font-size="4.5">Old token invalidated automatically</text>
+
+<rect x="386" y="124" width="170" height="54" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+<text x="471" y="136" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Invalidation</text>
+<text x="471" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">APNs/FCM returns "invalid token"</text>
+<text x="471" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">Mark token as dead in registry</text>
+<text x="471" y="168" text-anchor="middle" fill="var(--muted)" font-size="4.5">Causes: app uninstall, token rotation</text>
+
+<rect x="572" y="124" width="154" height="54" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text x="649" y="136" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Deduplication</text>
+<text x="649" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">idempotency_key = hash(user_id + msg_id)</text>
+<text x="649" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">Redis SET with 24h TTL</text>
+<text x="649" y="168" text-anchor="middle" fill="var(--muted)" font-size="4.5">Prevents retry storms from causing dupes</text>
+
+<!-- ═══ RETRY & PRIORITY ═══ -->
+<rect x="4" y="198" width="732" height="94" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+<text x="370" y="212" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">RETRY LOGIC & PRIORITY LEVELS</text>
+
+<rect x="14" y="222" width="230" height="60" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+<text x="129" y="234" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Retry Strategy</text>
+<text x="129" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Transient failure (5xx, timeout): retry 3× with exponential backoff</text>
+<text x="129" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Invalid token (410 Gone): delete token, no retry</text>
+<text x="129" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">Rate limited (429): backoff per APNs/FCM guidance</text>
+
+<rect x="260" y="222" width="230" height="60" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+<text x="375" y="234" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Priority Levels</text>
+<text x="375" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">HIGH: new message → immediate delivery, wake device</text>
+<text x="375" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">NORMAL: status update → batched by OS</text>
+<text x="375" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">LOW: marketing → silent, OS may delay hours</text>
+
+<rect x="506" y="222" width="220" height="60" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+<text x="616" y="234" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Batching for Efficiency</text>
+<text x="616" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Group chat: 5 msgs in 10s → 1 push "5 new messages"</text>
+<text x="616" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Collapse key: same chat → replace previous push</text>
+<text x="616" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">Badge count: atomic increment per notification</text>
+</svg>
+</div>
+
+<!-- ═══ KEY DESIGN DECISIONS ═══ -->
+<div class="T" id="design-decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Reliability and deduplication are the primary concerns — not speed</p>
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
+<tr><td><span class="hi">Deduplication</span></td><td><span class="hg">Idempotency key per notification</span></td><td>hash(user_id + message_id) stored in Redis with 24h TTL. Prevents duplicate pushes on retry.</td><td>No dedup: users receive same notification 2-3× on transient failures. Unacceptable UX.</td></tr>
+<tr><td><span class="hi">Token Storage</span></td><td><span class="hg">Device Registry (Cassandra)</span></td><td>user_id → list of {device_id, token, platform, last_seen}. Supports multi-device. Handles token rotation.</td><td>Single token per user: breaks multi-device. In-memory: lost on restart.</td></tr>
+<tr><td><span class="hi">Platform Routing</span></td><td><span class="hg">Separate sender per platform</span></td><td>APNs and FCM have different APIs, rate limits, and error codes. Separate senders allow independent scaling.</td><td>Unified sender: complex error handling, can't scale platforms independently.</td></tr>
+<tr><td><span class="hi">Trigger Mechanism</span></td><td><span class="hg">Kafka consumer on offline-delivery topic</span></td><td>Same event that triggers offline message storage also triggers push. Decoupled from message delivery path.</td><td>Synchronous push on message send: adds latency to sender, couples systems.</td></tr>
+<tr><td><span class="hi">Collapse Strategy</span></td><td><span class="hg">Collapse key = conversation_id</span></td><td>Multiple messages in same chat → single notification updated. Reduces notification fatigue.</td><td>One push per message: 50 messages = 50 notifications. Terrible UX in active group chats.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> The push notification system is triggered by the same offline delivery mechanism described in <a href="whatsapp-offline-delivery.html">WhatsApp Offline Delivery</a>. When a message can't be delivered via WebSocket (user offline), it's queued for offline delivery AND triggers a push notification.</div>
+</div>
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Push delivery is inherently unreliable — the system must handle every failure mode gracefully</p>
+<table>
+<tr><th>#</th><th>Failure / Edge Case</th><th>What Breaks</th><th>How It's Handled</th></tr>
+<tr><td><span class="hi">1</span></td><td><span class="hr">APNs returns "invalid token" (410)</span></td><td>Token is stale — app was uninstalled or token rotated</td><td>Mark token as dead in registry. Do not retry. Wait for app to re-register with new token on next launch.</td></tr>
+<tr><td><span class="hi">2</span></td><td><span class="hr">FCM rate limit (429)</span></td><td>Too many requests to FCM — pushes delayed</td><td>Exponential backoff per FCM's Retry-After header. Queue notifications in Kafka — no data loss.</td></tr>
+<tr><td><span class="hi">3</span></td><td><span class="hr">User has 3 devices, message sent to all</span></td><td>User reads on one device, still gets push on others</td><td>On message read (any device), cancel pending pushes for that message via collapse key update.</td></tr>
+<tr><td><span class="hi">4</span></td><td><span class="hr">Notification service crashes mid-batch</span></td><td>Some notifications sent, some not — risk of duplicates on restart</td><td>Idempotency key check before every send. On restart, re-process Kafka offset — dupes are caught by Redis dedup set.</td></tr>
+<tr><td><span class="hi">5</span></td><td><span class="hr">Badge count drift</span></td><td>App icon shows wrong unread count</td><td>Badge count is server-authoritative. On each push, include absolute badge count (not increment). App syncs on foreground.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key insight:</span> Push notifications are <span class="hg">best-effort with dedup</span>. You can't guarantee delivery (device may be off, in airplane mode, or have notifications disabled). But you CAN guarantee <span class="hg">no duplicates</span> — which is what users actually notice and complain about.</div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack &amp; Tradeoffs</h2>
+<p class="su">Optimized for reliability and deduplication over raw speed</p>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
+<tr><td><span class="hi">Event Source</span></td><td>Kafka (offline-delivery topic)</td><td>Same event triggers offline storage + push. Decoupled, replayable. Consumer group for push senders.</td><td>Direct call from message service: couples systems, no replay on failure.</td></tr>
+<tr><td><span class="hi">Device Registry</span></td><td>Cassandra</td><td>High write throughput for token updates. Partition by user_id. Multi-device support. No single point of failure.</td><td>MySQL: write bottleneck at scale. Redis: not durable enough for token registry.</td></tr>
+<tr><td><span class="hi">Dedup Store</span></td><td>Redis (SET with TTL)</td><td>O(1) idempotency check. 24h TTL auto-cleans. Handles retry storms without duplicates.</td><td>Cassandra: too slow for per-notification check. In-memory: lost on restart.</td></tr>
+<tr><td><span class="hi">APNs Client</span></td><td>HTTP/2 persistent connection</td><td>Apple requires HTTP/2. Persistent connection avoids TLS handshake per push. Multiplexed streams.</td><td>Legacy binary protocol: deprecated. New connection per push: 100ms+ TLS overhead.</td></tr>
+<tr><td><span class="hi">FCM Client</span></td><td>HTTP/2 + batch API</td><td>Send up to 500 notifications per batch request. Reduces HTTP overhead by 100×.</td><td>Individual sends: 1 HTTP request per notification — doesn't scale to millions/day.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> The trigger mechanism connects to the <a href="whatsapp-offline-delivery.html">WhatsApp Offline Delivery</a> system. When a user comes back online, they receive messages via the offline queue AND the push notification is automatically superseded (collapse key).</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 5 things an interviewer wants to hear about push notifications at scale</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a)">
+<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">① Idempotency Key for Zero Duplicates</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Every notification gets a unique key: hash(user_id + message_id). Before sending, check Redis SET. If key exists, skip. This handles retry storms, consumer restarts, and network timeouts without ever showing a duplicate notification.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
+<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">② Device Token Lifecycle Management</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Tokens are ephemeral — they change on app reinstall, OS update, or periodic rotation. Registry stores user_id → [{device_id, token, platform}]. On "invalid token" response from APNs/FCM, immediately mark dead. On app launch, always re-register.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
+<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">③ Collapse Key for Notification Batching</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Set collapse_key = conversation_id. Multiple messages in same chat within a short window → single notification that updates (not stacks). "5 new messages from #general" instead of 5 separate notifications. Reduces notification fatigue dramatically.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
+<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">④ Separate Senders per Platform (APNs/FCM)</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">APNs and FCM have different APIs, rate limits, error semantics, and scaling characteristics. Separate sender services allow independent scaling, isolated failures, and platform-specific optimizations (HTTP/2 multiplexing for APNs, batch API for FCM).</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">⑤ Retry Only Transient Failures</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Critical distinction: 5xx/timeout → retry with exponential backoff (transient). 410 Gone → delete token, never retry (permanent). 429 → backoff per Retry-After header. Wrong retry strategy = wasted resources or lost notifications.</div>
+</div>
+</div>
+<div class="b bg" style="margin-top:8px"><span class="hi">One-liner answer:</span> <em>"Kafka-triggered push with idempotency key dedup in Redis, device token registry in Cassandra with lifecycle management, collapse keys for notification batching per conversation, separate APNs/FCM senders with platform-specific scaling, and retry only on transient failures with exponential backoff."</em></div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<div id="read-progress" style="position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--a),var(--g));z-index:9998;transition:width .1s linear"></div>
+<script>
+window.addEventListener('scroll',function(){var d=document.documentElement;var pct=(d.scrollTop/(d.scrollHeight-d.clientHeight))*100;document.getElementById('read-progress').style.width=Math.min(100,pct)+'%';});
+var b=document.getElementById('topBtn');window.addEventListener('scroll',function(){b.style.display=window.scrollY>400?'flex':'none'});
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>8. Messaging — System Design Cheatsheet</title>
+<title>8. Messaging — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-5"><span class="e">📨</span> 8 · MESSAGING</div>
 
@@ -679,147 +680,764 @@ Producer → [ Topic ]
 <div class="b bg"><span class="hi">Key Insight:</span> The fundamental difference is the <span class="hg">consumption model</span>. Queues are <span class="hg">competing consumers</span> (work distribution). Streams are <span class="hg">independent consumers</span> (each reads everything). Pub/Sub is <span class="hg">broadcast</span> (everyone gets a copy). Many real systems combine them — e.g., SNS → SQS → Lambda.</div>
 </div><!-- ═══ Messaging: separate compact lessons ═══ -->
 <div class="T" id="dlq">
-<h2>Dead Letter Queue (DLQ)</h2><p class="su">Quarantine poison messages so the main queue keeps flowing</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DLQ flow">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="60" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="75" y="86" fill="#fff">Producer</text>
-    <rect x="170" y="60" width="110" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="225" y="80" fill="#fff">Main queue</text>
-    <text x="225" y="94" fill="#8b93ac">maxReceive=5</text>
-    <rect x="320" y="60" width="110" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="375" y="86" fill="#fff">Consumer</text>
-    <rect x="320" y="120" width="110" height="40" fill="#1e2230" stroke="#f87171" rx="6"/>
-    <text x="375" y="140" fill="#f87171">DLQ</text>
-    <text x="375" y="154" fill="#8b93ac">alarm + inspect</text>
-  </g>
-  <path d="M130 80 L170 80" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#dl1)"/>
-  <path d="M280 80 L320 80" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#dl1)"/>
-  <path d="M225 100 L225 140 L320 140" fill="none" stroke="#f87171" stroke-width="1.5" marker-end="url(#dl1)"/>
-  <text x="235" y="122" text-anchor="start" fill="#f87171" font-family="Inter" font-size="9">after N fails</text>
-  <defs><marker id="dl1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+<h2>Dead Letter Queue (DLQ)</h2><p class="su">Quarantine <span class="hg">poison messages</span> so the main queue keeps flowing — critical for <span class="hi">fault isolation</span> &amp; <span class="hi">observability</span></p>
+
+<!-- ═══ DLQ Complete Flow Diagram ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> DLQ Lifecycle — Retry, Quarantine &amp; Recovery</div>
+<svg width="100%" viewBox="0 0 680 280" style="max-width:680px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DLQ complete lifecycle flow showing retry loop, quarantine, and recovery paths">
+  <defs>
+    <marker id="dlq-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+    <marker id="dlq-arr-r" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#f87171"/></marker>
+    <marker id="dlq-arr-g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#34d399"/></marker>
+    <marker id="dlq-arr-o" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#fb923c"/></marker>
+  </defs>
+
+  <!-- ═══ PRODUCER ═══ -->
+  <rect x="10" y="55" width="80" height="40" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="50" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Producer</text>
+  <text x="50" y="84" text-anchor="middle" fill="var(--muted)" font-size="6">publishes msg</text>
+
+  <!-- Arrow: Producer → Main Queue -->
+  <line x1="90" y1="75" x2="130" y2="75" stroke="var(--a)" stroke-width="1.2" marker-end="url(#dlq-arr)"/>
+
+  <!-- ═══ MAIN QUEUE ═══ -->
+  <rect x="132" y="45" width="110" height="60" rx="6" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="187" y="64" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Main Queue</text>
+  <text x="187" y="76" text-anchor="middle" fill="var(--muted)" font-size="6">maxReceiveCount = 5</text>
+  <text x="187" y="87" text-anchor="middle" fill="var(--muted)" font-size="6">visibilityTimeout = 30s</text>
+  <text x="187" y="98" text-anchor="middle" fill="var(--muted)" font-size="6">retention = 14 days</text>
+
+  <!-- Arrow: Main Queue → Consumer -->
+  <line x1="242" y1="75" x2="282" y2="75" stroke="var(--y)" stroke-width="1.2" marker-end="url(#dlq-arr)"/>
+
+  <!-- ═══ CONSUMER (with retry loop) ═══ -->
+  <rect x="284" y="45" width="100" height="60" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="334" y="64" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Consumer</text>
+  <text x="334" y="76" text-anchor="middle" fill="var(--muted)" font-size="6">process message</text>
+  <text x="334" y="87" text-anchor="middle" fill="var(--muted)" font-size="6">ACK on success</text>
+  <text x="334" y="98" text-anchor="middle" fill="var(--muted)" font-size="6">NACK on failure</text>
+
+  <!-- Retry loop arrow (Consumer back to Queue) -->
+  <path d="M334 45 C334 28, 187 28, 187 45" fill="none" stroke="var(--o)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#dlq-arr-o)"/>
+  <text x="260" y="24" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="600">retry (back-off: 1s → 2s → 4s → 8s → 16s)</text>
+
+  <!-- ═══ FAILURE PATH: Queue → DLQ ═══ -->
+  <path d="M187 105 L187 160 L282 160" fill="none" stroke="var(--r)" stroke-width="1.5" marker-end="url(#dlq-arr-r)"/>
+  <text x="195" y="135" fill="var(--r)" font-size="7" font-weight="600">after 5 failures</text>
+  <text x="195" y="145" fill="var(--muted)" font-size="5.5">receiveCount &gt; max</text>
+
+  <!-- ═══ DLQ ═══ -->
+  <rect x="284" y="135" width="120" height="55" rx="6" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="2"/>
+  <text x="344" y="154" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="800">☠ DLQ</text>
+  <text x="344" y="166" text-anchor="middle" fill="var(--muted)" font-size="6">poison messages</text>
+  <text x="344" y="177" text-anchor="middle" fill="var(--muted)" font-size="6">retention = 14 days</text>
+  <text x="344" y="188" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">⚠ ALARM: depth &gt; 0</text>
+
+  <!-- ═══ MONITORING / ALERTING ═══ -->
+  <line x1="344" y1="190" x2="344" y2="220" stroke="var(--r)" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#dlq-arr-r)"/>
+  <rect x="294" y="222" width="100" height="36" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="344" y="237" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">🔔 CloudWatch</text>
+  <text x="344" y="249" text-anchor="middle" fill="var(--muted)" font-size="5.5">PagerDuty / Slack alert</text>
+
+  <!-- ═══ RECOVERY PATHS ═══ -->
+  <!-- Path 1: Redrive back to main queue -->
+  <line x1="404" y1="150" x2="460" y2="150" stroke="var(--g)" stroke-width="1.2" marker-end="url(#dlq-arr-g)"/>
+  <rect x="462" y="130" width="100" height="44" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="512" y="146" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">♻ Redrive</text>
+  <text x="512" y="158" text-anchor="middle" fill="var(--muted)" font-size="5.5">fix bug → replay</text>
+  <text x="512" y="169" text-anchor="middle" fill="var(--muted)" font-size="5.5">back to main queue</text>
+
+  <!-- Path 2: Manual inspection / S3 archive -->
+  <line x1="404" y1="170" x2="460" y2="195" stroke="var(--a2)" stroke-width="1" marker-end="url(#dlq-arr)"/>
+  <rect x="462" y="182" width="100" height="44" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="512" y="198" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">🔍 Inspect</text>
+  <text x="512" y="210" text-anchor="middle" fill="var(--muted)" font-size="5.5">debug payload</text>
+  <text x="512" y="221" text-anchor="middle" fill="var(--muted)" font-size="5.5">archive to S3</text>
+
+  <!-- Path 3: Drop / purge -->
+  <line x1="404" y1="180" x2="460" y2="245" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="2,2" marker-end="url(#dlq-arr)"/>
+  <rect x="462" y="232" width="100" height="34" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--muted)" stroke-width=".7"/>
+  <text x="512" y="247" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">🗑 Purge</text>
+  <text x="512" y="259" text-anchor="middle" fill="var(--muted)" font-size="5.5">discard if obsolete</text>
+
+  <!-- ═══ SUCCESS PATH ═══ -->
+  <line x1="384" y1="75" x2="430" y2="75" stroke="var(--g)" stroke-width="1.2" marker-end="url(#dlq-arr-g)"/>
+  <rect x="432" y="55" width="80" height="40" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+  <text x="472" y="72" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">✓ ACK</text>
+  <text x="472" y="84" text-anchor="middle" fill="var(--muted)" font-size="5.5">msg deleted</text>
+
+  <!-- ═══ LEGEND ═══ -->
+  <rect x="560" y="40" width="110" height="100" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="615" y="54" text-anchor="middle" fill="var(--muted)" font-size="6.5" font-weight="700">Legend</text>
+  <line x1="570" y1="64" x2="590" y2="64" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="595" y="67" fill="var(--muted)" font-size="5.5">happy path</text>
+  <line x1="570" y1="78" x2="590" y2="78" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="595" y="81" fill="var(--muted)" font-size="5.5">failure path</text>
+  <line x1="570" y1="92" x2="590" y2="92" stroke="var(--o)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="595" y="95" fill="var(--muted)" font-size="5.5">retry loop</text>
+  <line x1="570" y1="106" x2="590" y2="106" stroke="var(--g)" stroke-width="1"/>
+  <text x="595" y="109" fill="var(--muted)" font-size="5.5">recovery</text>
+  <line x1="570" y1="120" x2="590" y2="120" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="2,2"/>
+  <text x="595" y="123" fill="var(--muted)" font-size="5.5">optional</text>
 </svg>
+
+<!-- ═══ DLQ Concepts Table ═══ -->
 <table>
-<tr><th>Broker</th><th>Mechanism</th></tr>
-<tr><td>SQS</td><td>Source queue → redrive policy → DLQ</td></tr>
-<tr><td>RabbitMQ</td><td>Dead-letter exchange (DLX) on TTL/reject</td></tr>
-<tr><td>Kafka</td><td>App writes failed events to <code>topic.DLT</code> (Spring Cloud, Kafka Connect)</td></tr>
+<tr><th>Concept</th><th>Detail</th><th>Best Practice</th></tr>
+<tr><td><span class="hi">maxReceiveCount</span></td><td>Number of delivery attempts before moving to DLQ</td><td><span class="hg">3–5 retries</span> with exponential back-off</td></tr>
+<tr><td><span class="hi">Visibility Timeout</span></td><td>Time message is hidden from other consumers during processing</td><td>Set to <span class="hg">6× avg processing time</span></td></tr>
+<tr><td><span class="hi">Redrive Policy</span></td><td>Config linking source queue to its DLQ</td><td>Always configure — <span class="hr">never lose messages silently</span></td></tr>
+<tr><td><span class="hi">Redrive Allow Policy</span></td><td>Controls which source queues can target this DLQ</td><td>Restrict to <span class="hg">specific source queues</span></td></tr>
+<tr><td><span class="hi">Retention Period</span></td><td>How long DLQ keeps messages before auto-deletion</td><td><span class="hg">14 days</span> (max for SQS) — gives time to investigate</td></tr>
 </table>
-<div class="b br"><b>Always alarm on DLQ depth &gt; 0.</b> Use redrive to replay after fixing the bug.</div>
+
+<!-- ═══ Broker-Specific DLQ Mechanisms ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> DLQ Implementation by Broker</div>
+<table>
+<tr><th>Broker</th><th>Mechanism</th><th>Configuration</th><th>Recovery</th></tr>
+<tr><td><span class="hi">SQS</span></td><td>Source queue → redrive policy → DLQ (separate queue)</td><td><code>RedrivePolicy: {deadLetterTargetArn, maxReceiveCount}</code></td><td><span class="hg">StartMessageMoveTask</span> API (redrive)</td></tr>
+<tr><td><span class="hi">RabbitMQ</span></td><td>Dead-letter exchange (DLX) on TTL/reject/nack</td><td><code>x-dead-letter-exchange</code> + <code>x-dead-letter-routing-key</code></td><td>Shovel plugin or manual republish</td></tr>
+<tr><td><span class="hi">Kafka</span></td><td>App writes failed events to <code>topic.DLT</code></td><td>Spring Kafka: <code>@RetryableTopic(attempts=3)</code> + <code>@DltHandler</code></td><td>Replay from DLT topic (seek to beginning)</td></tr>
+<tr><td><span class="hi">Azure SB</span></td><td>Built-in <code>$DeadLetterQueue</code> sub-queue</td><td><code>MaxDeliveryCount</code> on subscription/queue</td><td><span class="hg">Service Bus Explorer</span> — peek &amp; resubmit</td></tr>
+<tr><td><span class="hi">GCP Pub/Sub</span></td><td>Dead-letter topic on subscription</td><td><code>deadLetterPolicy: {deadLetterTopic, maxDeliveryAttempts}</code></td><td>Pull from dead-letter subscription</td></tr>
+</table>
+
+<!-- ═══ Common DLQ Failure Reasons ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Why Messages End Up in DLQ</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Poison Messages</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Malformed payload (invalid JSON/XML)</li>
+<li>Schema mismatch (missing required fields)</li>
+<li>Encoding errors (wrong charset)</li>
+<li>Message too large for consumer buffer</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Transient Failures</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Downstream service unavailable</li>
+<li>Database connection timeout</li>
+<li>Rate limiting / throttling</li>
+<li>Network partition (temporary)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a2)">Logic Errors</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Unhandled exception in consumer code</li>
+<li>Business rule violation</li>
+<li>Referential integrity failure</li>
+<li>Idempotency key collision</li>
+</ul>
+</div>
+</div>
+
+<!-- ═══ DLQ Best Practices ═══ -->
+<div class="b bg"><span class="hi">Best Practices:</span> <span class="hg">Always alarm on DLQ depth &gt; 0</span> — even 1 message means something is broken. Set up <span class="hg">CloudWatch / Prometheus metrics</span> on ApproximateNumberOfMessagesVisible. Include <span class="hg">correlation IDs</span> and <span class="hg">original timestamps</span> in message headers for debugging. Use <span class="hg">separate DLQs per source queue</span> to isolate failure domains.</div>
+<div class="b by"><span class="hi">Recovery Playbook:</span> ① Alert fires → ② Inspect DLQ messages (peek, don't consume) → ③ Identify root cause (schema? downstream? bug?) → ④ Fix the consumer/downstream → ⑤ <span class="hg">Redrive</span> messages back to source queue → ⑥ Verify processing succeeds → ⑦ Post-mortem if recurring.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Ignoring DLQ</span> — messages expire silently. <span class="hr">No alarm</span> — failures go unnoticed for days. <span class="hr">Infinite retries without DLQ</span> — blocks the entire queue. <span class="hr">Same retention on DLQ as source</span> — messages may expire before investigation. <span class="hr">No metadata</span> — can't trace why message failed.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Uber</strong> — DLQ per microservice, auto-redrive after circuit breaker resets. <strong>Netflix</strong> — DLQ + S3 archival for compliance audit trail. <strong>Stripe</strong> — webhook DLQ with exponential backoff (5 retries over 3 days).</div>
 </div>
 
 <div class="T" id="event-sourcing">
-<h2>Event Sourcing</h2><p class="su">Persist <em>facts</em>, derive state by replaying them</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Event sourcing log">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="30" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="50" fill="#fff">AccountOpened</text>
-    <rect x="20" y="66" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="86" fill="#fff">Deposited 100</text>
-    <rect x="20" y="102" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="122" fill="#fff">Withdrew 30</text>
-    <rect x="20" y="138" width="100" height="30" fill="#1e2230" stroke="#6c8cff" rx="4"/><text x="70" y="158" fill="#fff">Deposited 50</text>
+<h2>Event Sourcing</h2><p class="su">Persist <em>facts</em> (events) as the source of truth — <span class="hg">derive state by replaying</span> the event log. Never mutate, only append.</p>
 
-    <text x="170" y="100" fill="#8b93ac">replay →</text>
+<!-- ═══ Event Sourcing Complete Architecture ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Event Sourcing Architecture — Append, Replay, Project</div>
+<svg width="100%" viewBox="0 0 720 300" style="max-width:720px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Event sourcing architecture showing command handling, event store, projections, and snapshots">
+  <defs>
+    <marker id="es-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+    <marker id="es-arr-b" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#6c8cff"/></marker>
+    <marker id="es-arr-g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#34d399"/></marker>
+    <marker id="es-arr-p" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#a78bfa"/></marker>
+  </defs>
 
-    <rect x="230" y="60" width="140" height="80" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="300" y="82" fill="#fff">Current state</text>
-    <text x="300" y="104" fill="#34d399">balance = 120</text>
-    <text x="300" y="122" fill="#8b93ac">opened: yes</text>
+  <!-- ═══ COMMAND SIDE ═══ -->
+  <rect x="10" y="30" width="90" height="40" rx="5" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="55" y="47" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Command</text>
+  <text x="55" y="60" text-anchor="middle" fill="var(--muted)" font-size="5.5">CreateOrder</text>
 
-    <rect x="410" y="30" width="130" height="50" fill="#1e2230" stroke="#a78bfa" rx="6"/>
-    <text x="475" y="50" fill="#fff">Snapshot @ N</text>
-    <text x="475" y="66" fill="#8b93ac">speeds replay</text>
+  <line x1="100" y1="50" x2="130" y2="50" stroke="var(--a)" stroke-width="1.2" marker-end="url(#es-arr-b)"/>
 
-    <rect x="410" y="100" width="130" height="50" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="475" y="120" fill="#fff">Audit trail</text>
-    <text x="475" y="136" fill="#8b93ac">free, exact</text>
-  </g>
+  <!-- Aggregate -->
+  <rect x="132" y="20" width="110" height="60" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="187" y="38" text-anchor="middle" fill="var(--a2)" font-size="7.5" font-weight="700">Aggregate</text>
+  <text x="187" y="50" text-anchor="middle" fill="var(--muted)" font-size="5.5">validate business rules</text>
+  <text x="187" y="61" text-anchor="middle" fill="var(--muted)" font-size="5.5">emit event(s)</text>
+  <text x="187" y="72" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">optimistic concurrency</text>
+
+  <line x1="242" y1="50" x2="272" y2="50" stroke="var(--a2)" stroke-width="1.2" marker-end="url(#es-arr-p)"/>
+
+  <!-- ═══ EVENT STORE (central) ═══ -->
+  <rect x="274" y="10" width="180" height="100" rx="8" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="2"/>
+  <text x="364" y="26" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Event Store</text>
+  <text x="364" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">append-only, immutable log</text>
+
+  <!-- Event blocks inside store -->
+  <rect x="282" y="44" width="52" height="20" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="308" y="53" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">OrderCreated</text>
+  <text x="308" y="62" text-anchor="middle" fill="var(--muted)" font-size="4">v1 | seq 0</text>
+
+  <rect x="338" y="44" width="52" height="20" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="364" y="53" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">ItemAdded</text>
+  <text x="364" y="62" text-anchor="middle" fill="var(--muted)" font-size="4">v1 | seq 1</text>
+
+  <rect x="394" y="44" width="52" height="20" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="420" y="53" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">OrderPaid</text>
+  <text x="420" y="62" text-anchor="middle" fill="var(--muted)" font-size="4">v2 | seq 2</text>
+
+  <!-- Stream metadata -->
+  <text x="364" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">stream: order-{orderId}</text>
+  <text x="364" y="90" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">expectedVersion for concurrency control</text>
+  <text x="364" y="100" text-anchor="middle" fill="var(--muted)" font-size="5">retention: forever (or compacted snapshots)</text>
+
+  <!-- ═══ SNAPSHOT ═══ -->
+  <line x1="454" y1="55" x2="490" y2="55" stroke="var(--a2)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#es-arr-p)"/>
+  <rect x="492" y="30" width="100" height="50" rx="5" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="542" y="47" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">📸 Snapshot</text>
+  <text x="542" y="58" text-anchor="middle" fill="var(--muted)" font-size="5.5">state @ seq N</text>
+  <text x="542" y="69" text-anchor="middle" fill="var(--muted)" font-size="5.5">speeds up replay</text>
+  <text x="542" y="78" text-anchor="middle" fill="var(--a2)" font-size="5">every 100 events</text>
+
+  <!-- ═══ PROJECTIONS (read side) ═══ -->
+  <line x1="364" y1="110" x2="364" y2="135" stroke="var(--g)" stroke-width="1.2" marker-end="url(#es-arr-g)"/>
+  <text x="364" y="130" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">subscribe / poll</text>
+
+  <rect x="200" y="140" width="330" height="70" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="365" y="155" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Projections (Read Models)</text>
+
+  <!-- Individual projections -->
+  <rect x="210" y="162" width="90" height="38" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="255" y="176" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Order List</text>
+  <text x="255" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">PostgreSQL</text>
+  <text x="255" y="197" text-anchor="middle" fill="var(--muted)" font-size="4.5">denormalized view</text>
+
+  <rect x="310" y="162" width="90" height="38" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="355" y="176" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Search Index</text>
+  <text x="355" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Elasticsearch</text>
+  <text x="355" y="197" text-anchor="middle" fill="var(--muted)" font-size="4.5">full-text search</text>
+
+  <rect x="410" y="162" width="90" height="38" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="455" y="176" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">Analytics</text>
+  <text x="455" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">ClickHouse</text>
+  <text x="455" y="197" text-anchor="middle" fill="var(--muted)" font-size="4.5">OLAP aggregates</text>
+
+  <!-- Query side -->
+  <rect x="10" y="165" width="80" height="35" rx="5" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width="1"/>
+  <text x="50" y="180" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Query</text>
+  <text x="50" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">GetOrderById</text>
+  <line x1="90" y1="182" x2="208" y2="182" stroke="var(--c)" stroke-width="1" marker-end="url(#es-arr)"/>
+
+  <!-- ═══ TIME TRAVEL ═══ -->
+  <rect x="10" y="230" width="200" height="55" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
+  <text x="110" y="246" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">⏪ Time Travel / Replay</text>
+  <text x="110" y="260" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rebuild projection from event 0</text>
+  <text x="110" y="272" text-anchor="middle" fill="var(--muted)" font-size="5.5">Debug: "what was state at 3pm yesterday?"</text>
+  <text x="110" y="284" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Fix bug → replay → corrected view</text>
+
+  <!-- ═══ AUDIT TRAIL ═══ -->
+  <rect x="230" y="230" width="200" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="330" y="246" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">📋 Audit Trail (Free)</text>
+  <text x="330" y="260" text-anchor="middle" fill="var(--muted)" font-size="5.5">Every state change is an event</text>
+  <text x="330" y="272" text-anchor="middle" fill="var(--muted)" font-size="5.5">Who did what, when, why</text>
+  <text x="330" y="284" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Compliance: SOX, GDPR, PCI-DSS</text>
+
+  <!-- ═══ TEMPORAL QUERIES ═══ -->
+  <rect x="450" y="230" width="200" height="55" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="550" y="246" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">🔄 Temporal Queries</text>
+  <text x="550" y="260" text-anchor="middle" fill="var(--muted)" font-size="5.5">Point-in-time state reconstruction</text>
+  <text x="550" y="272" text-anchor="middle" fill="var(--muted)" font-size="5.5">Bi-temporal: valid time + transaction time</text>
+  <text x="550" y="284" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Retroactive corrections possible</text>
 </svg>
-<div class="b bg"><b>Wins:</b> perfect audit, time-travel debugging, rebuild any projection, natural fit for ledgers.</div>
-<div class="b br"><b>Costs:</b> schema evolution of events, eventual consistency on reads, snapshot/compaction strategy needed.</div>
+
+<!-- ═══ Event Sourcing Concepts ═══ -->
+<table>
+<tr><th>Concept</th><th>Detail</th><th>Implementation</th></tr>
+<tr><td><span class="hi">Event</span></td><td>Immutable fact that happened — past tense naming</td><td><code>OrderCreated</code>, <code>PaymentReceived</code>, <code>ItemShipped</code></td></tr>
+<tr><td><span class="hi">Stream</span></td><td>Ordered sequence of events for one aggregate</td><td><code>order-{orderId}</code> — one stream per entity instance</td></tr>
+<tr><td><span class="hi">Aggregate</span></td><td>Consistency boundary — validates commands, emits events</td><td>Load from stream → apply events → check invariants → emit</td></tr>
+<tr><td><span class="hi">Projection</span></td><td>Read model built by processing events</td><td>Subscribe to stream → update denormalized view (async)</td></tr>
+<tr><td><span class="hi">Snapshot</span></td><td>Materialized state at a point in time</td><td>Store every N events — replay only from snapshot forward</td></tr>
+<tr><td><span class="hi">Idempotency</span></td><td>Processing same event twice must produce same result</td><td>Track last processed position / use event ID as dedup key</td></tr>
+</table>
+
+<!-- ═══ Event Store Technologies ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Event Store Technologies</div>
+<table>
+<tr><th>Store</th><th>Type</th><th>Strengths</th><th>Considerations</th></tr>
+<tr><td><span class="hi">EventStoreDB</span></td><td>Purpose-built</td><td>Native projections, subscriptions, optimistic concurrency</td><td>Smaller community, self-hosted</td></tr>
+<tr><td><span class="hi">Kafka</span></td><td>Log-based</td><td>High throughput, built-in replication, ecosystem</td><td>No per-stream concurrency, compaction ≠ snapshots</td></tr>
+<tr><td><span class="hi">PostgreSQL</span></td><td>RDBMS</td><td>ACID, familiar, NOTIFY for subscriptions</td><td>Manual stream management, polling for projections</td></tr>
+<tr><td><span class="hi">DynamoDB</span></td><td>NoSQL</td><td>Serverless, DynamoDB Streams for projections</td><td>25-item transaction limit, cost at scale</td></tr>
+<tr><td><span class="hi">Marten</span></td><td>Library (.NET)</td><td>PostgreSQL-backed, projections built-in</td><td>.NET ecosystem only</td></tr>
+</table>
+
+<!-- ═══ Event Sourcing Patterns ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Key Patterns &amp; Challenges</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Schema Evolution</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Upcasting:</strong> transform old events to new schema on read</li>
+<li><strong>Versioning:</strong> <code>OrderCreated_v2</code> with migration</li>
+<li><strong>Weak schema:</strong> add optional fields (backward compatible)</li>
+<li>Never delete/modify stored events</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Snapshotting Strategy</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Snapshot every N events (e.g., 100)</li>
+<li>Snapshot on time interval (e.g., daily)</li>
+<li>Snapshot on aggregate complexity threshold</li>
+<li>Store snapshot + version in separate stream</li>
+</ul>
+</div>
+</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a2)">Handling Side Effects</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Process managers / sagas for multi-aggregate workflows</li>
+<li>Outbox pattern: event + side-effect in same transaction</li>
+<li>Idempotent handlers: safe to replay</li>
+<li>Compensating events for "undo" (not delete)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Common Pitfalls</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>GDPR: "right to erasure" conflicts with immutability → crypto-shredding</li>
+<li>Large aggregates: too many events → slow replay → need snapshots</li>
+<li>Event granularity: too fine = noise, too coarse = lost info</li>
+<li>Projection lag: eventual consistency confuses users</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Wins:</span> <span class="hg">Perfect audit trail</span> — every state change recorded. <span class="hg">Time-travel debugging</span> — reconstruct state at any point. <span class="hg">Rebuild projections</span> — fix bugs, replay, get corrected views. <span class="hg">Natural fit</span> for financial ledgers, order systems, collaboration tools.</div>
+<div class="b br"><span class="hi">Costs:</span> <span class="hr">Schema evolution</span> of events is hard (upcasting, versioning). <span class="hr">Eventual consistency</span> on read models. <span class="hr">Snapshot/compaction</span> strategy needed for long-lived aggregates. <span class="hr">Steeper learning curve</span> — team must think in events, not state.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Stripe</strong> — payment state machine as events. <strong>Datomic</strong> — immutable database (event-sourced by design). <strong>LMAX Exchange</strong> — event-sourced trading engine (6M orders/sec). <strong>Git</strong> — commits are events, working tree is projection.</div>
 </div>
 
 <div class="T" id="cqrs">
-<h2>CQRS</h2><p class="su">Separate the write model from the read model</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CQRS">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="30" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="75" y="56" fill="#fff">Command</text>
-    <rect x="170" y="30" width="140" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
-    <text x="240" y="50" fill="#fff">Write model</text>
-    <text x="240" y="64" fill="#8b93ac">aggregate → events</text>
-    <rect x="350" y="30" width="190" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="445" y="50" fill="#fff">Event store / Kafka</text>
+<h2>CQRS (Command Query Responsibility Segregation)</h2><p class="su">Separate the <span class="hg">write model</span> (commands) from the <span class="hg">read model</span> (queries) — scale, optimize, and evolve them independently</p>
 
-    <rect x="170" y="110" width="140" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="240" y="130" fill="#fff">Projection</text>
-    <text x="240" y="144" fill="#8b93ac">denormalized view</text>
+<!-- ═══ CQRS Complete Architecture ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> CQRS Architecture — Write Path vs Read Path</div>
+<svg width="100%" viewBox="0 0 720 320" style="max-width:720px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CQRS architecture showing separate command and query paths with event-driven synchronization">
+  <defs>
+    <marker id="cq-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+    <marker id="cq-arr-b" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#6c8cff"/></marker>
+    <marker id="cq-arr-g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#34d399"/></marker>
+    <marker id="cq-arr-y" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#fbbf24"/></marker>
+  </defs>
 
-    <rect x="20" y="110" width="110" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
-    <text x="75" y="136" fill="#fff">Query</text>
-  </g>
-  <path d="M130 50 L170 50" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#cq1)"/>
-  <path d="M310 50 L350 50" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#cq1)"/>
-  <path d="M445 70 L240 110" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#cq1)"/>
-  <path d="M170 130 L130 130" stroke="#34d399" stroke-width="1.5" marker-end="url(#cq1)"/>
-  <defs><marker id="cq1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+  <!-- ═══ WRITE SIDE (top) ═══ -->
+  <rect x="10" y="10" width="700" height="120" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="360" y="26" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">WRITE SIDE (Command Path)</text>
+
+  <!-- Client -->
+  <rect x="20" y="50" width="70" height="35" rx="5" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="55" y="65" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Client</text>
+  <text x="55" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">POST /orders</text>
+
+  <line x1="90" y1="67" x2="120" y2="67" stroke="var(--a)" stroke-width="1" marker-end="url(#cq-arr-b)"/>
+
+  <!-- Command Handler -->
+  <rect x="122" y="40" width="100" height="55" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="172" y="56" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Command Handler</text>
+  <text x="172" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">validate input</text>
+  <text x="172" y="77" text-anchor="middle" fill="var(--muted)" font-size="5.5">load aggregate</text>
+  <text x="172" y="87" text-anchor="middle" fill="var(--muted)" font-size="5.5">apply business rules</text>
+
+  <line x1="222" y1="67" x2="252" y2="67" stroke="var(--a)" stroke-width="1" marker-end="url(#cq-arr-b)"/>
+
+  <!-- Write DB -->
+  <rect x="254" y="42" width="100" height="50" rx="5" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="304" y="58" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Write Store</text>
+  <text x="304" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">normalized schema</text>
+  <text x="304" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">optimized for writes</text>
+  <text x="304" y="90" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">PostgreSQL / EventStore</text>
+
+  <line x1="354" y1="67" x2="384" y2="67" stroke="var(--a2)" stroke-width="1" marker-end="url(#cq-arr)"/>
+
+  <!-- Event Bus -->
+  <rect x="386" y="42" width="110" height="50" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="441" y="58" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Event Bus</text>
+  <text x="441" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">publish domain events</text>
+  <text x="441" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">Kafka / SNS / EventBridge</text>
+  <text x="441" y="90" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">guaranteed delivery</text>
+
+  <!-- Sync arrow down to read side -->
+  <line x1="441" y1="92" x2="441" y2="155" stroke="var(--y)" stroke-width="1.5" marker-end="url(#cq-arr-y)"/>
+  <text x="450" y="130" fill="var(--y)" font-size="6" font-weight="600">async sync</text>
+  <text x="450" y="140" fill="var(--muted)" font-size="5">(eventual consistency)</text>
+
+  <!-- ═══ READ SIDE (bottom) ═══ -->
+  <rect x="10" y="150" width="700" height="120" rx="8" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="360" y="166" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">READ SIDE (Query Path)</text>
+
+  <!-- Projector -->
+  <rect x="386" y="175" width="110" height="45" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1"/>
+  <text x="441" y="192" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Projector</text>
+  <text x="441" y="203" text-anchor="middle" fill="var(--muted)" font-size="5.5">consume events</text>
+  <text x="441" y="213" text-anchor="middle" fill="var(--muted)" font-size="5.5">update read models</text>
+
+  <!-- Read stores -->
+  <line x1="386" y1="197" x2="356" y2="197" stroke="var(--g)" stroke-width="1" marker-end="url(#cq-arr-g)"/>
+  <rect x="230" y="178" width="124" height="60" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="292" y="193" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Read Stores</text>
+  <rect x="238" y="198" width="50" height="16" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="263" y="209" text-anchor="middle" fill="var(--g)" font-size="5">Redis</text>
+  <rect x="294" y="198" width="50" height="16" rx="2" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="319" y="209" text-anchor="middle" fill="var(--a)" font-size="5">Elastic</text>
+  <rect x="238" y="218" width="50" height="16" rx="2" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".5"/>
+  <text x="263" y="229" text-anchor="middle" fill="var(--o)" font-size="5">DynamoDB</text>
+  <rect x="294" y="218" width="50" height="16" rx="2" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="319" y="229" text-anchor="middle" fill="var(--a2)" font-size="5">Materialized</text>
+
+  <!-- Query handler -->
+  <line x1="230" y1="207" x2="200" y2="207" stroke="var(--g)" stroke-width="1" marker-end="url(#cq-arr-g)"/>
+  <rect x="100" y="185" width="100" height="45" rx="5" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="150" y="201" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Query Handler</text>
+  <text x="150" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">GET /orders?status=</text>
+  <text x="150" y="222" text-anchor="middle" fill="var(--muted)" font-size="5.5">optimized reads</text>
+
+  <!-- Client query -->
+  <rect x="20" y="190" width="70" height="35" rx="5" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width="1"/>
+  <text x="55" y="205" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Client</text>
+  <text x="55" y="216" text-anchor="middle" fill="var(--muted)" font-size="5">GET (fast)</text>
+  <line x1="90" y1="207" x2="100" y2="207" stroke="var(--c)" stroke-width="1" marker-end="url(#cq-arr)"/>
+
+  <!-- ═══ KEY INSIGHT LABELS ═══ -->
+  <rect x="540" y="50" width="150" height="70" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="615" y="64" text-anchor="middle" fill="var(--muted)" font-size="6" font-weight="700">Key Benefits</text>
+  <text x="615" y="78" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Scale reads independently</text>
+  <text x="615" y="90" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Optimize each store for its job</text>
+  <text x="615" y="102" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Multiple read models per write</text>
+  <text x="615" y="114" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Evolve independently</text>
+
+  <rect x="540" y="175" width="150" height="60" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="615" y="189" text-anchor="middle" fill="var(--muted)" font-size="6" font-weight="700">Tradeoffs</text>
+  <text x="615" y="203" text-anchor="middle" fill="var(--r)" font-size="5.5">⚠ Eventual consistency</text>
+  <text x="615" y="215" text-anchor="middle" fill="var(--r)" font-size="5.5">⚠ More infrastructure</text>
+  <text x="615" y="227" text-anchor="middle" fill="var(--r)" font-size="5.5">⚠ Sync failure handling</text>
 </svg>
-<div class="b bp"><b>Use when:</b> reads vs writes scale very differently, or queries demand multiple shapes (search index, cache, OLAP).</div>
-<div class="b br"><b>Avoid when:</b> simple CRUD — the dual-model overhead isn't worth it.</div>
+
+<!-- ═══ CQRS Concepts ═══ -->
+<table>
+<tr><th>Concept</th><th>Write Side</th><th>Read Side</th></tr>
+<tr><td><span class="hi">Model</span></td><td>Domain model / aggregates — enforces invariants</td><td>Denormalized views — optimized for specific queries</td></tr>
+<tr><td><span class="hi">Store</span></td><td>Normalized RDBMS or event store</td><td>Redis, Elasticsearch, DynamoDB, materialized views</td></tr>
+<tr><td><span class="hi">Scale</span></td><td>Vertical (consistency matters)</td><td>Horizontal (read replicas, caches, CDN)</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td>Strong (ACID transactions)</td><td>Eventual (async projection updates)</td></tr>
+<tr><td><span class="hi">Schema</span></td><td>3NF — no redundancy</td><td>Denormalized — pre-joined, pre-computed</td></tr>
+</table>
+
+<!-- ═══ When to Use CQRS ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> When to Use (and When NOT to)</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">✓ Good Fit</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Read/write ratio heavily skewed (100:1 reads)</li>
+<li>Complex queries need different data shapes</li>
+<li>Write model has complex business rules</li>
+<li>Multiple read representations needed (search, reports, API)</li>
+<li>Event sourcing already in use</li>
+<li>Microservices with separate read/write services</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">✗ Bad Fit</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Simple CRUD — overhead not justified</li>
+<li>Strong consistency required on reads (banking UI)</li>
+<li>Small team — dual model doubles maintenance</li>
+<li>Low traffic — no scaling benefit</li>
+<li>Read-after-write needed immediately</li>
+<li>Domain is simple with no complex queries</li>
+</ul>
+</div>
+</div>
+
+<!-- ═══ CQRS + Event Sourcing Combo ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> CQRS + Event Sourcing (Power Combo)</div>
+<div class="b bb"><span class="hi">Pattern:</span> Commands → Aggregate → <span class="hg">Events persisted</span> → Projectors subscribe → <span class="hg">Read models updated async</span>. The event store IS the write model. Projections ARE the read models. Rebuild any projection by replaying events from the beginning.</div>
+
+<div class="b bg"><span class="hi">Consistency strategies:</span> <span class="hg">Pull-based:</span> query handler checks if projection is up-to-date (compare position). <span class="hg">Push-based:</span> projector publishes "ready" event. <span class="hg">Hybrid:</span> serve stale + indicate "updating" in UI. <span class="hg">Inline projection:</span> update synchronously in same transaction (sacrifices scalability for consistency).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Querying the write model</span> — defeats the purpose. <span class="hr">Bidirectional sync</span> — creates conflicts. <span class="hr">Shared database</span> for read/write — coupling returns. <span class="hr">Over-engineering</span> — CQRS for a TODO app.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Microsoft</strong> — Azure architecture patterns (official CQRS guidance). <strong>Uber</strong> — trip service (write) + rider-facing API (read from cache). <strong>Netflix</strong> — catalog writes vs personalized read views. <strong>Shopify</strong> — order writes vs merchant dashboard reads.</div>
 </div>
 
 <div class="T" id="ordering">
-<h2>Ordering Guarantees</h2><p class="su">Where order is preserved — and where it is not</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kafka per-partition ordering">
-  <g font-family="Inter" font-size="10" fill="#c8cee0">
-    <text x="20" y="22" fill="#fff">Topic “orders” (3 partitions — ordered <em>within</em>, not across)</text>
-    <rect x="20" y="36" width="500" height="30" fill="#252a3a" stroke="#6c8cff" rx="4"/>
-    <text x="30" y="55">P0:</text>
-    <text x="60" y="55" fill="#34d399">A1 → A2 → A3</text>
-    <rect x="20" y="72" width="500" height="30" fill="#252a3a" stroke="#6c8cff" rx="4"/>
-    <text x="30" y="91">P1:</text>
-    <text x="60" y="91" fill="#fbbf24">B1 → B2 → B3</text>
-    <rect x="20" y="108" width="500" height="30" fill="#252a3a" stroke="#6c8cff" rx="4"/>
-    <text x="30" y="127">P2:</text>
-    <text x="60" y="127" fill="#a78bfa">C1 → C2 → C3</text>
-  </g>
+<h2>Ordering Guarantees</h2><p class="su">Where order is preserved — and where it is <span class="hr">not</span>. Critical for <span class="hg">financial transactions</span>, <span class="hg">state machines</span>, and <span class="hg">causal consistency</span>.</p>
+
+<!-- ═══ Ordering Visualization ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Partition-Based Ordering — How Keys Determine Order</div>
+<svg width="100%" viewBox="0 0 680 220" style="max-width:680px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Partition-based ordering showing how partition keys determine message ordering">
+  <defs><marker id="ord-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <text x="340" y="14" text-anchor="middle" fill="var(--muted)" font-size="7">Topic: "orders" — 3 partitions, key = orderId</text>
+
+  <!-- Producers -->
+  <rect x="10" y="28" width="90" height="65" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
+  <text x="55" y="42" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Producers</text>
+  <text x="55" y="54" text-anchor="middle" fill="var(--muted)" font-size="5.5">order-A → P0</text>
+  <text x="55" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">order-B → P1</text>
+  <text x="55" y="76" text-anchor="middle" fill="var(--muted)" font-size="5.5">order-C → P2</text>
+  <text x="55" y="88" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">murmur2(key) % N</text>
+
+  <line x1="100" y1="45" x2="130" y2="45" stroke="var(--g)" stroke-width=".8" marker-end="url(#ord-arr)"/>
+  <line x1="100" y1="60" x2="130" y2="95" stroke="var(--a)" stroke-width=".8" marker-end="url(#ord-arr)"/>
+  <line x1="100" y1="75" x2="130" y2="145" stroke="var(--a2)" stroke-width=".8" marker-end="url(#ord-arr)"/>
+
+  <!-- P0 -->
+  <rect x="132" y="28" width="370" height="42" rx="4" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+  <text x="142" y="40" fill="var(--g)" font-size="6" font-weight="700">P0 (order-A)</text>
+  <rect x="142" y="44" width="50" height="16" rx="2" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="167" y="52" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">CREATED</text>
+  <text x="167" y="59" text-anchor="middle" fill="var(--muted)" font-size="4">off:0</text>
+  <rect x="196" y="44" width="50" height="16" rx="2" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="221" y="52" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">PAID</text>
+  <text x="221" y="59" text-anchor="middle" fill="var(--muted)" font-size="4">off:1</text>
+  <rect x="250" y="44" width="50" height="16" rx="2" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="275" y="52" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">SHIPPED</text>
+  <text x="275" y="59" text-anchor="middle" fill="var(--muted)" font-size="4">off:2</text>
+  <rect x="304" y="44" width="50" height="16" rx="2" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="329" y="52" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">DELIVERED</text>
+  <text x="329" y="59" text-anchor="middle" fill="var(--muted)" font-size="4">off:3</text>
+  <text x="420" y="54" fill="var(--g)" font-size="5.5" font-weight="600">✓ ORDERED</text>
+
+  <!-- P1 -->
+  <rect x="132" y="76" width="370" height="42" rx="4" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+  <text x="142" y="88" fill="var(--a)" font-size="6" font-weight="700">P1 (order-B)</text>
+  <rect x="142" y="92" width="50" height="16" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="167" y="100" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">CREATED</text>
+  <text x="167" y="107" text-anchor="middle" fill="var(--muted)" font-size="4">off:0</text>
+  <rect x="196" y="92" width="50" height="16" rx="2" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="221" y="100" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">CANCELLED</text>
+  <text x="221" y="107" text-anchor="middle" fill="var(--muted)" font-size="4">off:1</text>
+  <text x="320" y="102" fill="var(--a)" font-size="5.5" font-weight="600">✓ ORDERED</text>
+
+  <!-- P2 -->
+  <rect x="132" y="124" width="370" height="42" rx="4" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="142" y="136" fill="var(--a2)" font-size="6" font-weight="700">P2 (order-C)</text>
+  <rect x="142" y="140" width="50" height="16" rx="2" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="167" y="148" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">CREATED</text>
+  <text x="167" y="155" text-anchor="middle" fill="var(--muted)" font-size="4">off:0</text>
+  <rect x="196" y="140" width="50" height="16" rx="2" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="221" y="148" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">PAID</text>
+  <text x="221" y="155" text-anchor="middle" fill="var(--muted)" font-size="4">off:1</text>
+  <rect x="250" y="140" width="50" height="16" rx="2" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="275" y="148" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">SHIPPED</text>
+  <text x="275" y="155" text-anchor="middle" fill="var(--muted)" font-size="4">off:2</text>
+  <text x="370" y="150" fill="var(--a2)" font-size="5.5" font-weight="600">✓ ORDERED</text>
+
+  <!-- Cross-partition warning -->
+  <rect x="132" y="174" width="370" height="20" rx="3" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="317" y="187" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">⚠ NO ordering across partitions (A vs B vs C independent)</text>
+
+  <!-- Consumers -->
+  <rect x="530" y="40" width="130" height="90" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+  <text x="595" y="54" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Consumer Group</text>
+  <rect x="540" y="60" width="50" height="16" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="565" y="71" text-anchor="middle" fill="var(--g)" font-size="5">C1 ← P0</text>
+  <rect x="540" y="80" width="50" height="16" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="565" y="91" text-anchor="middle" fill="var(--a)" font-size="5">C2 ← P1</text>
+  <rect x="540" y="100" width="50" height="16" rx="2" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="565" y="111" text-anchor="middle" fill="var(--a2)" font-size="5">C3 ← P2</text>
+  <text x="595" y="124" text-anchor="middle" fill="var(--muted)" font-size="5">1 partition : 1 consumer</text>
+
+  <line x1="502" y1="49" x2="530" y2="68" stroke="var(--g)" stroke-width=".7" marker-end="url(#ord-arr)"/>
+  <line x1="502" y1="97" x2="530" y2="88" stroke="var(--a)" stroke-width=".7" marker-end="url(#ord-arr)"/>
+  <line x1="502" y1="145" x2="530" y2="108" stroke="var(--a2)" stroke-width=".7" marker-end="url(#ord-arr)"/>
+
+  <!-- Strategies -->
+  <text x="340" y="210" text-anchor="middle" fill="var(--muted)" font-size="6.5" font-weight="700">Ordering Strategies</text>
+  <text x="140" y="220" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Same key = same partition = ordered</text>
+  <text x="340" y="220" text-anchor="middle" fill="var(--y)" font-size="5.5">⚡ Single partition = global order (no parallelism)</text>
+  <text x="560" y="220" text-anchor="middle" fill="var(--a)" font-size="5.5">🔢 Sequence numbers for cross-partition</text>
 </svg>
+
+<!-- ═══ Ordering by Broker ═══ -->
 <table>
-<tr><th>Broker</th><th>Order scope</th></tr>
-<tr><td>Kafka</td><td>Per-partition (key → partition)</td></tr>
-<tr><td>SQS standard</td><td>Best effort — may reorder</td></tr>
-<tr><td>SQS FIFO</td><td>Strict per <code>MessageGroupId</code></td></tr>
-<tr><td>RabbitMQ</td><td>Per queue</td></tr>
-<tr><td>Pub/Sub</td><td>Optional ordering keys</td></tr>
+<tr><th>Broker</th><th>Order Scope</th><th>Mechanism</th><th>Throughput Impact</th></tr>
+<tr><td><span class="hi">Kafka</span></td><td>Per-partition (key → partition)</td><td><code>murmur2(key) % numPartitions</code></td><td>More partitions = more parallelism, less global order</td></tr>
+<tr><td><span class="hi">SQS Standard</span></td><td>Best effort — <span class="hr">may reorder</span></td><td>Distributed architecture, no ordering guarantee</td><td>Unlimited throughput</td></tr>
+<tr><td><span class="hi">SQS FIFO</span></td><td>Strict per <code>MessageGroupId</code></td><td>Deduplication + sequencing per group</td><td><span class="hr">3,000 msg/sec</span> (batching: 30K)</td></tr>
+<tr><td><span class="hi">RabbitMQ</span></td><td>Per queue (single consumer)</td><td>FIFO within a single queue</td><td>Prefetch count affects perceived order</td></tr>
+<tr><td><span class="hi">Pub/Sub</span></td><td>Optional ordering keys</td><td><code>orderingKey</code> on publish</td><td>Ordered messages go to same region</td></tr>
+<tr><td><span class="hi">Kinesis</span></td><td>Per shard (partition key)</td><td><code>MD5(partitionKey)</code> → shard</td><td>1 MB/sec or 1000 records/sec per shard</td></tr>
+<tr><td><span class="hi">Azure Event Hubs</span></td><td>Per partition</td><td>Partition key → consistent hash</td><td>1 MB/sec ingress per throughput unit</td></tr>
 </table>
-<div class="b by"><b>Trick:</b> use a stable partition key (userId, accountId) so all related events land in the same partition and stay ordered.</div>
+
+<!-- ═══ Ordering Patterns ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Patterns for Maintaining Order</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Partition Key Design</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>userId:</strong> all user events ordered (profile, orders, sessions)</li>
+<li><strong>orderId:</strong> order lifecycle events in sequence</li>
+<li><strong>accountId:</strong> financial transactions ordered per account</li>
+<li><strong>deviceId:</strong> IoT telemetry ordered per device</li>
+<li>⚠ Hot keys: popular users → partition hotspot</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Cross-Partition Ordering</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Sequence numbers:</strong> embed monotonic seq in payload</li>
+<li><strong>Vector clocks:</strong> causal ordering across partitions</li>
+<li><strong>Lamport timestamps:</strong> logical ordering</li>
+<li><strong>Single partition:</strong> sacrifice parallelism for global order</li>
+<li><strong>External sequencer:</strong> Redis INCR or DB sequence</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Key Insight:</span> <span class="hg">Use a stable partition key</span> (userId, accountId, orderId) so all related events land in the same partition and stay ordered. Choose the key based on your <span class="hg">consistency boundary</span> — what entity needs its events in order?</div>
+<div class="b by"><span class="hi">Rebalancing risk:</span> When partitions are added/removed, key-to-partition mapping changes. Use <span class="hg">sticky partitioning</span> or <span class="hg">consistent hashing</span> to minimize disruption. During rebalance, consumers may see temporary out-of-order delivery — handle with <span class="hg">buffering + reordering window</span>.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Random partition key</span> — destroys ordering. <span class="hr">Too few partitions</span> — bottleneck on throughput. <span class="hr">Assuming global order</span> in multi-partition topics. <span class="hr">Processing out-of-order without idempotency</span> — corrupted state.</div>
 </div>
 
 <div class="T" id="schema-registry">
-<h2>Schema Registry</h2><p class="su">Central contract for event payloads — prevents “it broke prod”</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schema registry">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="30" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/><text x="75" y="56" fill="#fff">Producer</text>
-    <rect x="230" y="60" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="280" y="80" fill="#fff">Registry</text>
-    <text x="280" y="94" fill="#8b93ac">v1, v2, v3 (Avro)</text>
-    <rect x="430" y="30" width="110" height="40" fill="#1e2230" stroke="#34d399" rx="6"/><text x="485" y="56" fill="#fff">Consumer</text>
-    <rect x="230" y="120" width="100" height="30" fill="#1e2230" stroke="#a78bfa" rx="6"/>
-    <text x="280" y="140" fill="#a78bfa">Kafka topic</text>
-  </g>
-  <path d="M130 50 L230 80" stroke="#6c8cff" stroke-width="1.4" marker-end="url(#sr1)"/>
-  <text x="170" y="60" fill="#6c8cff" font-size="9" font-family="Inter">register schema</text>
-  <path d="M330 80 L430 50" stroke="#34d399" stroke-width="1.4" marker-end="url(#sr1)"/>
-  <text x="395" y="58" text-anchor="middle" fill="#34d399" font-size="9" font-family="Inter">fetch by id</text>
-  <path d="M130 70 L230 130" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#sr1)"/>
-  <path d="M330 130 L430 70" stroke="#a78bfa" stroke-width="1.4" marker-end="url(#sr1)"/>
-  <defs><marker id="sr1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+<h2>Schema Registry</h2><p class="su">Central contract for event payloads — prevents <span class="hr">"it broke prod"</span>. Enforces <span class="hg">backward/forward compatibility</span> across producer and consumer versions.</p>
+
+<!-- ═══ Schema Registry Architecture ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Schema Registry — Serialize, Register, Validate</div>
+<svg width="100%" viewBox="0 0 700 250" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schema registry architecture showing producer registration, consumer fetching, and compatibility checks">
+  <defs><marker id="sr-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Producer -->
+  <rect x="10" y="40" width="100" height="55" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="60" y="56" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Producer</text>
+  <text x="60" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">serialize payload</text>
+  <text x="60" y="79" text-anchor="middle" fill="var(--muted)" font-size="5.5">embed schema ID</text>
+  <text x="60" y="90" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">[magic byte][schema_id][data]</text>
+
+  <!-- Arrow: Producer → Registry (register) -->
+  <path d="M110 55 C140 55, 140 40, 180 40" fill="none" stroke="var(--a)" stroke-width="1" marker-end="url(#sr-arr)"/>
+  <text x="145" y="38" fill="var(--a)" font-size="5.5" font-weight="600">① register schema</text>
+
+  <!-- Arrow: Producer → Kafka -->
+  <line x1="110" y1="75" x2="180" y2="120" stroke="var(--y)" stroke-width="1.2" marker-end="url(#sr-arr)"/>
+  <text x="130" y="105" fill="var(--y)" font-size="5.5">② produce</text>
+
+  <!-- Schema Registry (center top) -->
+  <rect x="182" y="15" width="160" height="65" rx="7" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="2"/>
+  <text x="262" y="32" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Schema Registry</text>
+  <text x="262" y="44" text-anchor="middle" fill="var(--muted)" font-size="5.5">stores schema versions</text>
+  <text x="262" y="55" text-anchor="middle" fill="var(--muted)" font-size="5.5">validates compatibility</text>
+  <text x="262" y="66" text-anchor="middle" fill="var(--muted)" font-size="5.5">returns schema ID</text>
+  <text x="262" y="76" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">v1 → v2 → v3 (Avro/Protobuf/JSON)</text>
+
+  <!-- Kafka (center) -->
+  <rect x="182" y="100" width="160" height="50" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="262" y="118" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Kafka Topic</text>
+  <text x="262" y="132" text-anchor="middle" fill="var(--muted)" font-size="5.5">[0][schema_id=42][avro bytes...]</text>
+  <text x="262" y="143" text-anchor="middle" fill="var(--muted)" font-size="5.5">schema ID embedded in every message</text>
+
+  <!-- Consumer -->
+  <rect x="400" y="40" width="100" height="55" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="450" y="56" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Consumer</text>
+  <text x="450" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">read schema ID</text>
+  <text x="450" y="79" text-anchor="middle" fill="var(--muted)" font-size="5.5">fetch schema</text>
+  <text x="450" y="90" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">deserialize with schema</text>
+
+  <!-- Arrow: Registry → Consumer (fetch) -->
+  <path d="M342 40 C370 40, 370 55, 400 55" fill="none" stroke="var(--g)" stroke-width="1" marker-end="url(#sr-arr)"/>
+  <text x="365" y="38" fill="var(--g)" font-size="5.5" font-weight="600">④ fetch schema by ID</text>
+
+  <!-- Arrow: Kafka → Consumer -->
+  <line x1="342" y1="120" x2="400" y2="75" stroke="var(--g)" stroke-width="1.2" marker-end="url(#sr-arr)"/>
+  <text x="380" y="105" fill="var(--g)" font-size="5.5">③ consume</text>
+
+  <!-- CI/CD Integration -->
+  <rect x="10" y="130" width="100" height="45" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
+  <text x="60" y="146" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">CI/CD Pipeline</text>
+  <text x="60" y="158" text-anchor="middle" fill="var(--muted)" font-size="5.5">validate schema</text>
+  <text x="60" y="169" text-anchor="middle" fill="var(--muted)" font-size="5.5">before merge</text>
+  <line x1="110" y1="145" x2="180" y2="47" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#sr-arr)"/>
+  <text x="135" y="90" fill="var(--r)" font-size="5">compatibility check</text>
+
+  <!-- Compatibility Modes (bottom section) -->
+  <rect x="10" y="190" width="490" height="50" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="255" y="205" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Compatibility Modes</text>
+  <rect x="20" y="212" width="90" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="65" y="225" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">BACKWARD</text>
+  <rect x="120" y="212" width="90" height="20" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="165" y="225" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">FORWARD</text>
+  <rect x="220" y="212" width="90" height="20" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="265" y="225" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">FULL</text>
+  <rect x="320" y="212" width="90" height="20" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="365" y="225" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">NONE</text>
+  <text x="420" y="225" text-anchor="start" fill="var(--muted)" font-size="5">(dangerous)</text>
+
+  <!-- Serialization Formats -->
+  <rect x="520" y="100" width="160" height="90" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="600" y="115" text-anchor="middle" fill="var(--muted)" font-size="6.5" font-weight="700">Serialization Formats</text>
+  <text x="600" y="130" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Avro — compact binary, schema evolution</text>
+  <text x="600" y="143" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Protobuf — typed, fast, gRPC native</text>
+  <text x="600" y="156" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">JSON Schema — human readable</text>
+  <text x="600" y="169" text-anchor="middle" fill="var(--muted)" font-size="5.5">Thrift — legacy, Facebook origin</text>
+  <text x="600" y="182" text-anchor="middle" fill="var(--r)" font-size="5.5">Plain JSON — no schema (risky)</text>
 </svg>
+
+<!-- ═══ Compatibility Rules Table ═══ -->
 <table>
-<tr><th>Compatibility</th><th>Producers may add</th><th>Consumers may read</th></tr>
-<tr><td>Backward</td><td>new optional fields</td><td>old data with new code</td></tr>
-<tr><td>Forward</td><td>fields can be removed safely later</td><td>new data with old code</td></tr>
-<tr><td>Full</td><td>both — safest</td><td>both</td></tr>
+<tr><th>Compatibility</th><th>Rule</th><th>Producers May</th><th>Consumers May</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Backward</span></td><td>New schema can read old data</td><td>Add optional fields, remove fields</td><td>Read old data with new code</td><td><span class="hg">Most common</span> — consumers upgrade first</td></tr>
+<tr><td><span class="hi">Forward</span></td><td>Old schema can read new data</td><td>Add fields, remove optional fields</td><td>Read new data with old code</td><td>Producers upgrade first</td></tr>
+<tr><td><span class="hi">Full</span></td><td>Both backward + forward</td><td>Only add/remove optional fields</td><td>Both directions work</td><td><span class="hg">Safest</span> — independent deployments</td></tr>
+<tr><td><span class="hi">Transitive</span></td><td>Compatible with ALL previous versions</td><td>Strictest constraints</td><td>Any version reads any other</td><td>Long-lived topics, many consumers</td></tr>
+<tr><td><span class="hi">None</span></td><td>No checks</td><td>Anything</td><td><span class="hr">May break</span></td><td>Development only — never in prod</td></tr>
 </table>
-<div class="b bg"><b>Tools:</b> Confluent Schema Registry, AWS Glue Schema Registry, Apicurio. Enforce in CI before merging schema PRs.</div>
+
+<!-- ═══ Schema Registry Tools ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Schema Registry Implementations</div>
+<table>
+<tr><th>Tool</th><th>Formats</th><th>Integration</th><th>Key Feature</th></tr>
+<tr><td><span class="hi">Confluent Schema Registry</span></td><td>Avro, Protobuf, JSON Schema</td><td>Kafka native, REST API</td><td>De facto standard, subject strategies, schema references</td></tr>
+<tr><td><span class="hi">AWS Glue Schema Registry</span></td><td>Avro, JSON Schema, Protobuf</td><td>MSK, Kinesis, Lambda</td><td>Serverless, IAM integration, auto-registration</td></tr>
+<tr><td><span class="hi">Apicurio Registry</span></td><td>Avro, Protobuf, JSON, OpenAPI, GraphQL</td><td>Kafka, HTTP, gRPC</td><td>Open source, CNCF, multi-format</td></tr>
+<tr><td><span class="hi">Azure Schema Registry</span></td><td>Avro</td><td>Event Hubs</td><td>Azure-native, RBAC, client-side caching</td></tr>
+<tr><td><span class="hi">Buf (BSR)</span></td><td>Protobuf</td><td>gRPC, Connect</td><td>Breaking change detection, linting, code gen</td></tr>
+</table>
+
+<!-- ═══ Schema Evolution Patterns ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Schema Evolution Best Practices</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Safe Changes (Backward Compatible)</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Add optional field with default value</li>
+<li>Add new enum value (if consumer ignores unknown)</li>
+<li>Widen numeric type (int → long)</li>
+<li>Add new union member (Avro)</li>
+<li>Deprecate field (keep, stop writing)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Breaking Changes (Avoid)</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Remove required field</li>
+<li>Rename field (without alias)</li>
+<li>Change field type (string → int)</li>
+<li>Remove enum value</li>
+<li>Change field from optional to required</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Best Practices:</span> <span class="hg">Enforce compatibility in CI</span> — reject PRs that break schema contracts. Use <span class="hg">subject naming strategies</span> (TopicNameStrategy, RecordNameStrategy) to control scope. <span class="hg">Cache schemas</span> on producer/consumer side (schema ID → schema). Set <span class="hg">FULL_TRANSITIVE</span> for critical topics.</div>
+<div class="b by"><span class="hi">Subject Strategies:</span> <span class="hg">TopicNameStrategy</span> (default) — one schema per topic. <span class="hg">RecordNameStrategy</span> — schema per record type (multiple types in one topic). <span class="hg">TopicRecordNameStrategy</span> — schema per topic+record combo (most flexible).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No schema registry</span> — "just use JSON" leads to silent breakage. <span class="hr">Compatibility = NONE in prod</span> — ticking time bomb. <span class="hr">Not versioning schemas</span> — can't roll back. <span class="hr">Tight coupling</span> — producer and consumer must deploy simultaneously.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>LinkedIn</strong> — Avro + Confluent SR for all Kafka topics (thousands of schemas). <strong>Uber</strong> — Protobuf + custom registry for gRPC services. <strong>Netflix</strong> — Avro schemas with automated compatibility testing in CI. <strong>Shopify</strong> — Protobuf for event-driven architecture with Buf for linting.</div>
 </div>
 
 </div>
@@ -828,6 +1446,11 @@ Producer → [ Topic ]
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

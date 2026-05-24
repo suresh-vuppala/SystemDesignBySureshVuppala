@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4. APIs & Communication — System Design Cheatsheet</title>
+<title>4. APIs & Communication — System Design Concepts</title>
 <meta name="description" content="Complete guide to API design patterns: REST, gRPC, GraphQL, WebSocket, SSE, async APIs, idempotency, CORS, pagination. Real-world examples from Stripe, Slack, Netflix.">
 <meta name="keywords" content="REST API, gRPC, GraphQL, WebSocket, SSE, API design, idempotency, async APIs, real-time communication, system design">
 <link rel="canonical" href="https://yourdomain.com/system-design-cheatsheet/04-apis.html">
@@ -11,11 +11,12 @@
 <meta property="og:description" content="REST, gRPC, GraphQL, WebSocket, SSE patterns with real-world examples.">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://yourdomain.com/system-design-cheatsheet/04-apis.html">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-6"><span class="e">🔌</span> 4 · APIs &amp; COMMUNICATION</div>
 
@@ -122,6 +123,99 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
 
 <div class="T" id="grpc">
 <h2>gRPC</h2><p class="su"><span class="hg">HTTP/2 + Protobuf</span> — <span class="hi">10x faster</span> than REST. 4 call types: unary, server-stream, client-stream, bidirectional</p>
+
+<!-- ═══ gRPC 4 Streaming Modes Visual ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> 4 gRPC Streaming Modes</div>
+<svg width="100%" viewBox="0 0 520 160" style="max-width:520px;display:block;margin:2px auto 6px">
+  <!-- Panel 1: Unary -->
+  <rect x="4" y="10" width="122" height="140" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="65" y="28" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Unary</text>
+  <rect x="14" y="50" width="36" height="20" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="32" y="63" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Client</text>
+  <rect x="80" y="50" width="36" height="20" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="98" y="63" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Server</text>
+  <line x1="50" y1="56" x2="78" y2="56" stroke="var(--g)" stroke-width="1.2"/>
+  <polygon points="76,54 80,56 76,58" fill="var(--g)"/>
+  <text x="65" y="52" text-anchor="middle" fill="var(--muted)" font-size="6">1 req</text>
+  <line x1="80" y1="64" x2="52" y2="64" stroke="var(--g)" stroke-width="1.2"/>
+  <polygon points="54,62 50,64 54,66" fill="var(--g)"/>
+  <text x="65" y="74" text-anchor="middle" fill="var(--muted)" font-size="6">1 res</text>
+  <text x="65" y="100" text-anchor="middle" fill="var(--muted)" font-size="6.5">Simple RPC</text>
+  <text x="65" y="112" text-anchor="middle" fill="var(--muted)" font-size="6">1 request → 1 response</text>
+  <text x="65" y="130" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">GetUser()</text>
+
+  <!-- Panel 2: Server Streaming -->
+  <rect x="134" y="10" width="122" height="140" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="195" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">Server Stream</text>
+  <rect x="144" y="50" width="36" height="20" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="162" y="63" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">Client</text>
+  <rect x="210" y="50" width="36" height="20" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="228" y="63" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">Server</text>
+  <line x1="180" y1="55" x2="208" y2="55" stroke="var(--a)" stroke-width="1"/>
+  <polygon points="206,53 210,55 206,57" fill="var(--a)"/>
+  <text x="195" y="51" text-anchor="middle" fill="var(--muted)" font-size="6">1 req</text>
+  <line x1="210" y1="62" x2="182" y2="62" stroke="var(--a)" stroke-width=".8"/>
+  <line x1="210" y1="66" x2="182" y2="66" stroke="var(--a)" stroke-width=".8"/>
+  <line x1="210" y1="70" x2="182" y2="70" stroke="var(--a)" stroke-width=".8"/>
+  <polygon points="184,60 180,62 184,64" fill="var(--a)"/>
+  <polygon points="184,64 180,66 184,68" fill="var(--a)"/>
+  <polygon points="184,68 180,70 184,72" fill="var(--a)"/>
+  <text x="195" y="80" text-anchor="middle" fill="var(--muted)" font-size="6">stream of res</text>
+  <text x="195" y="100" text-anchor="middle" fill="var(--muted)" font-size="6.5">Server pushes N msgs</text>
+  <text x="195" y="112" text-anchor="middle" fill="var(--muted)" font-size="6">1 request → N responses</text>
+  <text x="195" y="130" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">ListPrices()</text>
+
+  <!-- Panel 3: Client Streaming -->
+  <rect x="264" y="10" width="122" height="140" rx="6" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
+  <text x="325" y="28" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">Client Stream</text>
+  <rect x="274" y="50" width="36" height="20" rx="4" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="292" y="63" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Client</text>
+  <rect x="340" y="50" width="36" height="20" rx="4" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="358" y="63" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Server</text>
+  <line x1="310" y1="55" x2="338" y2="55" stroke="var(--o)" stroke-width=".8"/>
+  <line x1="310" y1="59" x2="338" y2="59" stroke="var(--o)" stroke-width=".8"/>
+  <line x1="310" y1="63" x2="338" y2="63" stroke="var(--o)" stroke-width=".8"/>
+  <polygon points="336,53 340,55 336,57" fill="var(--o)"/>
+  <polygon points="336,57 340,59 336,61" fill="var(--o)"/>
+  <polygon points="336,61 340,63 336,65" fill="var(--o)"/>
+  <text x="325" y="51" text-anchor="middle" fill="var(--muted)" font-size="6">stream of req</text>
+  <line x1="340" y1="68" x2="312" y2="68" stroke="var(--o)" stroke-width="1"/>
+  <polygon points="314,66 310,68 314,70" fill="var(--o)"/>
+  <text x="325" y="78" text-anchor="middle" fill="var(--muted)" font-size="6">1 res</text>
+  <text x="325" y="100" text-anchor="middle" fill="var(--muted)" font-size="6.5">Client sends N msgs</text>
+  <text x="325" y="112" text-anchor="middle" fill="var(--muted)" font-size="6">N requests → 1 response</text>
+  <text x="325" y="130" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">UploadFile()</text>
+
+  <!-- Panel 4: Bidirectional -->
+  <rect x="394" y="10" width="122" height="140" rx="6" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="455" y="28" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="700">Bidirectional</text>
+  <rect x="404" y="50" width="36" height="20" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="422" y="63" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">Client</text>
+  <rect x="470" y="50" width="36" height="20" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="488" y="63" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">Server</text>
+  <line x1="440" y1="55" x2="468" y2="55" stroke="var(--a2)" stroke-width=".8"/>
+  <line x1="440" y1="59" x2="468" y2="59" stroke="var(--a2)" stroke-width=".8"/>
+  <polygon points="466,53 470,55 466,57" fill="var(--a2)"/>
+  <polygon points="466,57 470,59 466,61" fill="var(--a2)"/>
+  <line x1="470" y1="63" x2="442" y2="63" stroke="var(--a2)" stroke-width=".8"/>
+  <line x1="470" y1="67" x2="442" y2="67" stroke="var(--a2)" stroke-width=".8"/>
+  <polygon points="444,61 440,63 444,65" fill="var(--a2)"/>
+  <polygon points="444,65 440,67 444,69" fill="var(--a2)"/>
+  <text x="455" y="80" text-anchor="middle" fill="var(--muted)" font-size="6">streams both ways</text>
+  <text x="455" y="100" text-anchor="middle" fill="var(--muted)" font-size="6.5">Both send N msgs</text>
+  <text x="455" y="112" text-anchor="middle" fill="var(--muted)" font-size="6">N requests ↔ N responses</text>
+  <text x="455" y="130" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="600">Chat()</text>
+</svg>
+
+<!-- ═══ gRPC Streaming Modes Table ═══ -->
+<table>
+<tr><th>Mode</th><th>Use Case</th><th>Example</th></tr>
+<tr><td>Unary</td><td>Simple request/response</td><td>GetUser, CreateOrder</td></tr>
+<tr><td>Server Stream</td><td>Server pushes multiple results</td><td>Stock ticker, log tailing</td></tr>
+<tr><td>Client Stream</td><td>Client sends batch</td><td>File upload, telemetry</td></tr>
+<tr><td>Bidirectional</td><td>Real-time two-way</td><td>Chat, multiplayer game</td></tr>
+</table>
+
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Type safety</span> — .proto schema + codegen catches incompatibility at compile time. <span class="hg">Deadline propagation</span> — timeout flows through entire call chain. <span class="hg">Multiplexing</span> — multiple concurrent calls on single HTTP/2 connection.</div>
 <div class="b by"><span class="hi">Real-world:</span> <strong>Google</strong> internal comms. <strong>Netflix/Uber</strong> microservice-to-microservice. Best for: internal APIs, 10K+ RPS, bidirectional streaming. <span class="hr">Not for browsers</span> (use gRPC-Web proxy).</div>
 </div>
@@ -172,155 +266,155 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
 .async-panel.dp-playing .as-ws{animation:dpFadeIn .5s ease-out 9.5s forwards}
 .async-panel.dp-playing .as-sum{animation:dpPop .5s ease-out 10.4s forwards}
 </style>
-<svg width="100%" viewBox="0 0 520 294" style="display:block;margin:0 auto">
+<svg width="100%" viewBox="0 0 520 308" style="display:block;margin:0 auto">
   <defs><marker id="as1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
   <!-- Actors + lifelines -->
   <g class="dp-el as-actors">
-  <text x="40" y="12" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Client</text>
-  <text x="160" y="12" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">API</text>
-  <text x="280" y="12" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Job Queue</text>
-  <text x="380" y="12" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Processor</text>
-  <text x="480" y="12" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Database</text>
-  <line x1="40" y1="18" x2="40" y2="254" stroke="var(--a)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
-  <line x1="160" y1="18" x2="160" y2="254" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
-  <line x1="280" y1="18" x2="280" y2="254" stroke="var(--o)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
-  <line x1="380" y1="18" x2="380" y2="254" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
-  <line x1="480" y1="18" x2="480" y2="254" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
+  <text x="40" y="10" text-anchor="middle" font-size="11">💻</text><text x="40" y="22" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+  <text x="160" y="8" text-anchor="middle" fill="var(--g)" font-size="10">🌐</text><text x="160" y="17" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">API</text>
+  <text x="280" y="10" text-anchor="middle" font-size="11">📋</text><text x="280" y="22" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Queue</text>
+  <text x="380" y="10" text-anchor="middle" font-size="11">⚙️</text><text x="380" y="22" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Worker</text>
+  <text x="480" y="10" text-anchor="middle" font-size="11">🗄️</text><text x="480" y="22" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">DB</text>
+  <line x1="40" y1="26" x2="40" y2="268" stroke="var(--a)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
+  <line x1="160" y1="26" x2="160" y2="268" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
+  <line x1="280" y1="26" x2="280" y2="268" stroke="var(--o)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
+  <line x1="380" y1="26" x2="380" y2="268" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
+  <line x1="480" y1="26" x2="480" y2="268" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,3" opacity=".25"/>
   </g>
 
   <!-- ── Phase 1: Submit ── -->
   <g class="dp-el as-p1">
-  <rect x="4" y="22" width="510" height="60" rx="5" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width=".6" stroke-dasharray="5,3"/>
-  <text x="260" y="32" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Phase 1: Submit Request</text>
+  <rect x="4" y="36" width="510" height="60" rx="5" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width=".6" stroke-dasharray="5,3"/>
+  <text x="260" y="46" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Phase 1: Submit Request</text>
   </g>
 
   <!-- Step 1: POST -->
   <g class="dp-el as-post">
-  <line x1="40" y1="42" x2="160" y2="42" stroke="var(--a)" stroke-width="1.2" marker-end="url(#as1)"/>
-  <text x="100" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">POST /api/images</text>
+  <line x1="40" y1="56" x2="160" y2="56" stroke="var(--a)" stroke-width="1.2" marker-end="url(#as1)"/>
+  <text x="100" y="52" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">POST /api/images</text>
   </g>
 
   <!-- Step 2: Save to DB -->
   <g class="dp-el as-save">
-  <line x1="160" y1="50" x2="480" y2="50" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="320" y="48" text-anchor="middle" fill="var(--muted)" font-size="6">save original image + create job record</text>
+  <line x1="160" y1="64" x2="480" y2="64" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="320" y="62" text-anchor="middle" fill="var(--muted)" font-size="6">save original image + create job record</text>
   </g>
 
   <!-- Step 3: Queue job -->
   <g class="dp-el as-queue">
-  <line x1="160" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="220" y="56" text-anchor="middle" fill="var(--o)" font-size="6">queue processing job</text>
+  <line x1="160" y1="72" x2="280" y2="72" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="220" y="70" text-anchor="middle" fill="var(--o)" font-size="6">queue processing job</text>
   </g>
 
   <!-- Step 4: 202 Accepted -->
   <g class="dp-el as-202">
-  <line x1="160" y1="68" x2="40" y2="68" stroke="var(--g)" stroke-width="1.2" marker-end="url(#as1)"/>
-  <rect x="60" y="62" width="80" height="12" rx="3" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="100" y="71" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">202 Accepted</text>
-  <text x="100" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">Location: /api/images/{id}/status</text>
+  <line x1="160" y1="82" x2="40" y2="82" stroke="var(--g)" stroke-width="1.2" marker-end="url(#as1)"/>
+  <rect x="60" y="76" width="80" height="12" rx="3" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="100" y="85" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">202 Accepted</text>
+  <text x="100" y="96" text-anchor="middle" fill="var(--muted)" font-size="5.5">Location: /api/images/{id}/status</text>
   </g>
 
   <!-- ── Phase 2: Poll ── -->
   <g class="dp-el as-p2">
-  <rect x="4" y="88" width="200" height="52" rx="5" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width=".6" stroke-dasharray="5,3"/>
-  <text x="104" y="98" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Phase 2: Client Polls</text>
-  <rect x="8" y="100" width="24" height="10" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
-  <text x="20" y="108" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">loop</text>
+  <rect x="4" y="102" width="200" height="52" rx="5" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width=".6" stroke-dasharray="5,3"/>
+  <text x="104" y="112" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Phase 2: Client Polls</text>
+  <rect x="8" y="114" width="24" height="10" rx="2" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="20" y="122" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">loop</text>
   </g>
 
   <!-- Poll 1: still processing -->
   <g class="dp-el as-poll1q">
-  <line x1="40" y1="114" x2="160" y2="114" stroke="var(--a)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="100" y="110" text-anchor="middle" fill="var(--a)" font-size="6">GET /api/images/{id}/status</text>
+  <line x1="40" y1="128" x2="160" y2="128" stroke="var(--a)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="100" y="124" text-anchor="middle" fill="var(--a)" font-size="6">GET /api/images/{id}/status</text>
   </g>
   <g class="dp-el as-poll1r">
-  <line x1="160" y1="122" x2="40" y2="122" stroke="var(--y)" stroke-width=".8" marker-end="url(#as1)" stroke-dasharray="3,2"/>
-  <text x="100" y="120" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">200 OK {status: "processing"}</text>
+  <line x1="160" y1="136" x2="40" y2="136" stroke="var(--y)" stroke-width=".8" marker-end="url(#as1)" stroke-dasharray="3,2"/>
+  <text x="100" y="134" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">200 OK {status: "processing"}</text>
   </g>
 
   <!-- Poll 2: complete -->
   <g class="dp-el as-poll2q">
-  <line x1="40" y1="132" x2="160" y2="132" stroke="var(--a)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="100" y="128" text-anchor="middle" fill="var(--a)" font-size="6">GET /api/images/{id}/status</text>
+  <line x1="40" y1="146" x2="160" y2="146" stroke="var(--a)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="100" y="142" text-anchor="middle" fill="var(--a)" font-size="6">GET /api/images/{id}/status</text>
   </g>
   <g class="dp-el as-poll2r">
-  <line x1="160" y1="140" x2="40" y2="140" stroke="var(--g)" stroke-width="1" marker-end="url(#as1)"/>
-  <text x="100" y="138" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">200 OK {status: "complete", url: "..."}</text>
+  <line x1="160" y1="154" x2="40" y2="154" stroke="var(--g)" stroke-width="1" marker-end="url(#as1)"/>
+  <text x="100" y="152" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">200 OK {status: "complete", url: "..."}</text>
   </g>
 
   <!-- ── Phase 3: Background Processing ── -->
   <g class="dp-el as-p3">
-  <rect x="220" y="88" width="296" height="100" rx="5" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width=".6" stroke-dasharray="5,3"/>
-  <text x="368" y="98" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Phase 3: Background Processing</text>
+  <rect x="220" y="102" width="296" height="100" rx="5" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width=".6" stroke-dasharray="5,3"/>
+  <text x="368" y="112" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Phase 3: Background Processing</text>
   </g>
 
   <!-- Dequeue -->
   <g class="dp-el as-dq">
-  <line x1="280" y1="110" x2="380" y2="110" stroke="var(--o)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="330" y="106" text-anchor="middle" fill="var(--o)" font-size="6">dequeue job</text>
+  <line x1="280" y1="124" x2="380" y2="124" stroke="var(--o)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="330" y="120" text-anchor="middle" fill="var(--o)" font-size="6">dequeue job</text>
   </g>
 
   <!-- Update status: processing -->
   <g class="dp-el as-stp">
-  <line x1="380" y1="120" x2="480" y2="120" stroke="var(--a2)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="430" y="116" text-anchor="middle" fill="var(--a2)" font-size="6">status → "processing"</text>
+  <line x1="380" y1="134" x2="480" y2="134" stroke="var(--a2)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="430" y="130" text-anchor="middle" fill="var(--a2)" font-size="6">status → "processing"</text>
   </g>
 
   <!-- Process -->
   <g class="dp-el as-proc">
-  <rect x="354" y="130" width="52" height="16" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
-  <text x="380" y="141" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="600">⚙️ process</text>
-  <text x="380" y="154" text-anchor="middle" fill="var(--muted)" font-size="5.5">resize, compress, etc.</text>
+  <rect x="354" y="144" width="52" height="16" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="380" y="155" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="600">⚙️ process</text>
+  <text x="380" y="168" text-anchor="middle" fill="var(--muted)" font-size="5.5">resize, compress, etc.</text>
   </g>
 
   <!-- Update status: complete -->
   <g class="dp-el as-stc">
-  <line x1="380" y1="162" x2="480" y2="162" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="430" y="158" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">status → "complete"</text>
+  <line x1="380" y1="176" x2="480" y2="176" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="430" y="172" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">status → "complete"</text>
   </g>
 
   <!-- Save result -->
   <g class="dp-el as-srs">
-  <line x1="380" y1="174" x2="480" y2="174" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
-  <text x="430" y="172" text-anchor="middle" fill="var(--muted)" font-size="5.5">save processed image URL</text>
+  <line x1="380" y1="188" x2="480" y2="188" stroke="var(--g)" stroke-width=".8" marker-end="url(#as1)"/>
+  <text x="430" y="186" text-anchor="middle" fill="var(--muted)" font-size="5.5">save processed image URL</text>
   </g>
 
   <!-- ── Alternatives: Webhook or WebSocket ── -->
   <g class="dp-el as-altd">
-  <line x1="4" y1="196" x2="516" y2="196" stroke="var(--border)" stroke-width=".5" stroke-dasharray="4,3"/>
-  <text x="260" y="206" text-anchor="middle" fill="var(--text)" font-size="7.5" font-weight="700">Alternatives to Polling</text>
+  <line x1="4" y1="210" x2="516" y2="210" stroke="var(--border)" stroke-width=".5" stroke-dasharray="4,3"/>
+  <text x="260" y="220" text-anchor="middle" fill="var(--text)" font-size="7.5" font-weight="700">Alternatives to Polling</text>
   </g>
 
   <!-- LEFT: Webhook -->
   <g class="dp-el as-wh">
-  <rect x="8" y="212" width="240" height="56" rx="5" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width=".8"/>
-  <text x="128" y="222" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">🔔 Webhook</text>
-  <line x1="160" y1="232" x2="40" y2="232" stroke="var(--o)" stroke-width="1" marker-end="url(#as1)"/>
-  <rect x="44" y="226" width="100" height="12" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".7"/>
-  <text x="94" y="235" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">POST /your-webhook</text>
-  <line x1="40" y1="244" x2="160" y2="244" stroke="var(--g)" stroke-width=".7" marker-end="url(#as1)"/>
-  <text x="100" y="242" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">200 OK</text>
-  <text x="128" y="258" text-anchor="middle" fill="var(--muted)" font-size="5.5">Server pushes when done · HMAC signed</text>
-  <text x="128" y="266" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Best for: server-to-server (Stripe, GitHub)</text>
+  <rect x="8" y="226" width="240" height="56" rx="5" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="128" y="236" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">🔔 Webhook</text>
+  <line x1="160" y1="246" x2="40" y2="246" stroke="var(--o)" stroke-width="1" marker-end="url(#as1)"/>
+  <rect x="44" y="240" width="100" height="12" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="94" y="249" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">POST /your-webhook</text>
+  <line x1="40" y1="258" x2="160" y2="258" stroke="var(--g)" stroke-width=".7" marker-end="url(#as1)"/>
+  <text x="100" y="256" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">200 OK</text>
+  <text x="128" y="272" text-anchor="middle" fill="var(--muted)" font-size="5.5">Server pushes when done · HMAC signed</text>
+  <text x="128" y="280" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Best for: server-to-server (Stripe, GitHub)</text>
   </g>
 
   <!-- RIGHT: WebSocket -->
   <g class="dp-el as-ws">
-  <rect x="260" y="212" width="250" height="56" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="385" y="222" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">⚡ WebSocket</text>
-  <rect x="280" y="228" width="210" height="14" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
-  <text x="385" y="238" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">🔗 persistent conn — server pushes {status: "complete"}</text>
-  <line x1="310" y1="246" x2="460" y2="246" stroke="var(--y)" stroke-width=".6"/>
-  <line x1="460" y1="246" x2="310" y2="246" stroke="var(--y)" stroke-width=".6"/>
-  <text x="385" y="256" text-anchor="middle" fill="var(--muted)" font-size="5.5">Bidirectional — client can cancel, get progress %</text>
-  <text x="385" y="266" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Best for: real-time UIs, live progress bars</text>
+  <rect x="260" y="226" width="250" height="56" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="385" y="236" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">⚡ WebSocket</text>
+  <rect x="280" y="242" width="210" height="14" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="385" y="252" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">🔗 persistent conn — server pushes {status: "complete"}</text>
+  <line x1="310" y1="260" x2="460" y2="260" stroke="var(--y)" stroke-width=".6"/>
+  <line x1="460" y1="260" x2="310" y2="260" stroke="var(--y)" stroke-width=".6"/>
+  <text x="385" y="270" text-anchor="middle" fill="var(--muted)" font-size="5.5">Bidirectional — client can cancel, get progress %</text>
+  <text x="385" y="280" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Best for: real-time UIs, live progress bars</text>
   </g>
 
   <!-- Summary -->
   <g class="dp-el as-sum">
-  <rect x="60" y="276" width="400" height="14" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
-  <text x="260" y="286" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Submit (202) → get result via: Poll (200) · Webhook (POST) · WebSocket (push)</text>
+  <rect x="60" y="290" width="400" height="14" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="260" y="300" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Submit (202) → get result via: Poll (200) · Webhook (POST) · WebSocket (push)</text>
   </g>
 </svg>
 </div>
@@ -497,6 +591,31 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
   <text x="380" y="58" text-anchor="middle" fill="#fff" font-family="Inter" font-size="11">Body</text>
   <text x="380" y="74" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">operation + parameters</text>
 </svg>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">SOAP</h4>
+<div style="font-size:.78rem;line-height:1.6">
+<span class="hi">Protocol:</span> Strict XML envelope (Header + Body)<br>
+<span class="hi">Contract:</span> WSDL (machine-generated clients)<br>
+<span class="hi">Transport:</span> HTTP, SMTP, JMS (transport-agnostic)<br>
+<span class="hi">Security:</span> WS-Security (message-level encryption)<br>
+<span class="hi">State:</span> Can be stateful (WS-ReliableMessaging)<br>
+<span class="hr">Verbose:</span> 10-100× larger payloads than REST/JSON
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">REST (comparison)</h4>
+<div style="font-size:.78rem;line-height:1.6">
+<span class="hi">Protocol:</span> HTTP methods (GET/POST/PUT/DELETE)<br>
+<span class="hi">Contract:</span> OpenAPI (optional, human-friendly)<br>
+<span class="hi">Transport:</span> HTTP only<br>
+<span class="hi">Security:</span> TLS + OAuth2 (transport-level)<br>
+<span class="hi">State:</span> Stateless by design<br>
+<span class="hg">Lightweight:</span> JSON, minimal overhead
+</div>
+</div>
+</div>
+<div class="b by"><span class="hi">When SOAP still wins:</span> <span class="hg">Banking/finance</span> (WS-Security for signed transactions), <span class="hg">Government</span> (strict contracts, audit trails), <span class="hg">Legacy integration</span> (SAP, Oracle ERP). If you're building new: use REST or gRPC. If integrating with enterprise: expect SOAP.</div>
 <div class="b br"><b>Why heavier than REST:</b> XML parsing, verbose envelope, mandatory schemas, stateful sessions.</div>
 </div>
 
@@ -517,6 +636,17 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
   <text x="280" y="114" text-anchor="middle" fill="#6c8cff" font-family="Inter" font-size="10">3. Real GET / POST</text>
   <defs><marker id="cor1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
 </svg>
+<table>
+<tr><th>Header</th><th>Direction</th><th>Purpose</th><th>Example</th></tr>
+<tr><td><span class="hi">Origin</span></td><td>Request →</td><td>Browser sends the requesting origin</td><td><code>Origin: https://app.com</code></td></tr>
+<tr><td><span class="hi">Access-Control-Allow-Origin</span></td><td>← Response</td><td>Server declares which origins are allowed</td><td><code>*</code> or <code>https://app.com</code></td></tr>
+<tr><td><span class="hi">Access-Control-Allow-Methods</span></td><td>← Response</td><td>Allowed HTTP methods</td><td><code>GET, POST, PUT, DELETE</code></td></tr>
+<tr><td><span class="hi">Access-Control-Allow-Headers</span></td><td>← Response</td><td>Allowed custom headers</td><td><code>Authorization, Content-Type</code></td></tr>
+<tr><td><span class="hi">Access-Control-Max-Age</span></td><td>← Response</td><td>Cache preflight result (seconds)</td><td><code>86400</code> (24 hours)</td></tr>
+<tr><td><span class="hi">Access-Control-Allow-Credentials</span></td><td>← Response</td><td>Allow cookies/auth headers</td><td><code>true</code> (cannot use with <code>*</code> origin)</td></tr>
+</table>
+<div class="b bg"><span class="hi">Simple vs Preflight:</span> <span class="hg">Simple requests</span> (GET/POST with standard headers) go directly — browser adds Origin, checks response. <span class="hg">Preflight</span> (PUT/DELETE, custom headers, non-standard Content-Type) triggers an OPTIONS request first. Server must respond with allowed methods/headers before browser sends the real request.</div>
+<div class="b br"><span class="hi">Common CORS mistakes:</span> <span class="hr">Using <code>*</code> with credentials</span> (browsers reject this). <span class="hr">Forgetting OPTIONS handler</span> (preflight fails → request blocked). <span class="hr">Not caching preflight</span> (Max-Age=0 → OPTIONS on every request = 2× latency). <span class="hr">Reflecting Origin without validation</span> (security vulnerability — allows any site).</div>
 <table>
 <tr><th>Header</th><th>Purpose</th></tr>
 <tr><td><code>Access-Control-Allow-Origin</code></td><td>Which origins may read the response</td></tr>
@@ -546,6 +676,47 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
           schema: { type: string }
       responses:
         '200': { $ref: '#/components/schemas/User' }</code></pre>
+
+<!-- ═══ OpenAPI Workflow Visual ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> OpenAPI Development Workflow</div>
+<svg width="100%" viewBox="0 0 520 100" style="max-width:520px;display:block;margin:2px auto 6px">
+  <!-- Step 1: Design -->
+  <rect x="10" y="30" width="100" height="40" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="60" y="46" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">📝 Design</text>
+  <text x="60" y="60" text-anchor="middle" fill="var(--muted)" font-size="7">Write YAML spec</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="112" y1="50" x2="138" y2="50" stroke="var(--g)" stroke-width="1.2"/>
+  <polygon points="136,47 142,50 136,53" fill="var(--g)"/>
+
+  <!-- Step 2: Lint -->
+  <rect x="142" y="30" width="100" height="40" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="192" y="46" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">🔍 Lint</text>
+  <text x="192" y="60" text-anchor="middle" fill="var(--muted)" font-size="7">Spectral rules</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="244" y1="50" x2="270" y2="50" stroke="var(--g)" stroke-width="1.2"/>
+  <polygon points="268,47 274,50 268,53" fill="var(--g)"/>
+
+  <!-- Step 3: Generate -->
+  <rect x="274" y="30" width="110" height="40" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="329" y="46" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">⚙️ Generate</text>
+  <text x="329" y="60" text-anchor="middle" fill="var(--muted)" font-size="7">SDKs + Docs + Mocks</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="386" y1="50" x2="412" y2="50" stroke="var(--g)" stroke-width="1.2"/>
+  <polygon points="410,47 416,50 410,53" fill="var(--g)"/>
+
+  <!-- Step 4: Validate -->
+  <rect x="416" y="30" width="96" height="40" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="464" y="46" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">✓ Validate</text>
+  <text x="464" y="60" text-anchor="middle" fill="var(--muted)" font-size="7">Runtime checks</text>
+
+  <!-- Bottom summary -->
+  <rect x="60" y="80" width="400" height="14" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="260" y="90" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Single source of truth: spec drives docs, SDKs, mocks, and runtime validation</text>
+</svg>
+
 <div class="b bg"><b>Workflow:</b> design → lint (Spectral) → commit YAML → CI generates SDKs + docs → server validates against same spec.</div>
 </div>
 
@@ -557,6 +728,42 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
 <tr><td>Header</td><td><code>Accept: application/vnd.api.v2+json</code></td><td>Clean URLs, content-negotiation native</td><td>Hidden, harder to test in browser</td></tr>
 <tr><td>Query param</td><td><code>?version=2</code></td><td>Quick to try</td><td>Pollutes cache keys</td></tr>
 </table>
+
+<!-- ═══ API Versioning Styles Visual ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Versioning Styles at a Glance</div>
+<svg width="100%" viewBox="0 0 520 90" style="max-width:520px;display:block;margin:2px auto 6px">
+  <!-- Left box: URL Path -->
+  <rect x="4" y="8" width="164" height="74" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <circle cx="16" cy="18" r="4" fill="var(--g)"/>
+  <text x="24" y="21" fill="var(--g)" font-size="8" font-weight="700">URL Path</text>
+  <text x="148" y="21" text-anchor="end" fill="var(--g)" font-size="6.5" font-weight="600">★ recommended</text>
+  <rect x="14" y="30" width="144" height="16" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="86" y="41" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="600">/v1/users</text>
+  <rect x="14" y="50" width="144" height="16" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="86" y="61" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="600">/v2/users</text>
+  <text x="86" y="76" text-anchor="middle" fill="var(--muted)" font-size="6.5">Cacheable, obvious, browseable</text>
+
+  <!-- Middle box: Header -->
+  <rect x="178" y="8" width="164" height="74" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
+  <circle cx="190" cy="18" r="4" fill="var(--y)"/>
+  <text x="198" y="21" fill="var(--y)" font-size="8" font-weight="700">Header</text>
+  <rect x="188" y="30" width="144" height="16" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="260" y="41" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">Accept: app/vnd.api.v2+json</text>
+  <rect x="188" y="50" width="144" height="16" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="260" y="61" text-anchor="middle" fill="var(--muted)" font-size="7">Content-Negotiation</text>
+  <text x="260" y="76" text-anchor="middle" fill="var(--muted)" font-size="6.5">Clean URLs, harder to test</text>
+
+  <!-- Right box: Query Param -->
+  <rect x="352" y="8" width="164" height="74" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
+  <circle cx="364" cy="18" r="4" fill="var(--y)"/>
+  <text x="372" y="21" fill="var(--y)" font-size="8" font-weight="700">Query Param</text>
+  <rect x="362" y="30" width="144" height="16" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="434" y="41" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="600">/users?version=2</text>
+  <rect x="362" y="50" width="144" height="16" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="434" y="61" text-anchor="middle" fill="var(--muted)" font-size="7">Quick to try in browser</text>
+  <text x="434" y="76" text-anchor="middle" fill="var(--muted)" font-size="6.5">Pollutes cache keys</text>
+</svg>
+
 <div class="b bp"><b>Default to URL path</b> (Stripe, GitHub do). Bump major version only on breaking changes; add fields backward-compatibly otherwise.</div>
 </div>
 
@@ -1338,9 +1545,9 @@ document.addEventListener('keydown',function(e){
   </g>
   
   <!-- Connections from servers to Redis -->
-  <line x1="76" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
-  <line x1="156" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
-  <line x1="236" y1="58" x2="280" y2="58" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
+  <line x1="76" y1="72" x2="280" y2="72" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
+  <line x1="156" y1="72" x2="280" y2="72" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
+  <line x1="236" y1="72" x2="280" y2="72" stroke="var(--g)" stroke-width="1" marker-end="url(#rdsm1)"/>
   
   <!-- Event producer -->
   <g>
@@ -1569,6 +1776,13 @@ document.addEventListener('keydown',function(e){
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<link rel="stylesheet" href="../css/dp-engine.css">
+<script src="../js/dp-engine.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

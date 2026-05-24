@@ -1,0 +1,238 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Google manage sessions for 2B+ users across devices? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google manage sessions for 2B+ users across multiple devices?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🔐</span> Design a session management system: 2B users, instant revocation, multi-device, sliding expiry</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a platform manage sessions for 2B+ users across multiple devices, supporting instant revocation (password change invalidates all sessions), sliding expiry, and device-specific session limits without checking a central store on every request?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> 2B users × 3 devices each = 6B active sessions. Checking a central session store on <span class="hr">every single request</span> would require millions of DB lookups/sec. But you need instant revocation (password change = all sessions dead immediately). How do you balance stateless verification with revocation?</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">2B+</div>
+<div style="font-size:.72rem;color:var(--muted)">active users</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~6B sessions</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">Instant</div>
+<div style="font-size:.72rem;color:var(--muted)">revocation</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">password change → all dead</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Multi-device</div>
+<div style="font-size:.72rem;color:var(--muted)">per-device limits</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">phone, laptop, tablet</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">No central</div>
+<div style="font-size:.72rem;color:var(--muted)">check per request</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">stateless verification</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture — Short-Lived JWT + Refresh Token + Revocation List</h2>
+
+<!-- ═══ Session Management SVG ═══ -->
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Session management end-to-end: JWT auth, refresh flow, revocation, and token lifecycle">
+  <defs><marker id="ss-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="var(--muted)"/></marker></defs>
+
+  <!-- LAYER 1: AUTH -->
+  <rect x="10" y="10" width="560" height="120" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="290" y="28" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 1 — AUTH (Stateless JWT Verification — NO DB Call)</text>
+
+  <rect x="30" y="40" width="100" height="78" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
+  <text x="80" y="56" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+  <text x="80" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">Authorization:</text>
+  <text x="80" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">Bearer &lt;JWT&gt;</text>
+  <text x="80" y="96" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Every request</text>
+  <text x="80" y="110" text-anchor="middle" fill="var(--muted)" font-size="5">+ device fingerprint</text>
+
+  <line x1="130" y1="75" x2="158" y2="75" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ss-arr)"/>
+  <text x="144" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">JWT</text>
+
+  <rect x="160" y="38" width="240" height="82" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="280" y="54" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">API Service</text>
+  <text x="280" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">1. Verify JWT signature (local, HMAC/RSA)</text>
+  <text x="280" y="81" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Check exp claim (expired? → 401)</text>
+  <text x="280" y="94" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">3. Check revocation bloom filter (in-memory)</text>
+  <text x="280" y="107" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">✓ No DB call — O(1) total</text>
+  <text x="280" y="118" text-anchor="middle" fill="var(--muted)" font-size="5">Extract: user_id, roles, device_id</text>
+
+  <line x1="400" y1="75" x2="428" y2="75" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ss-arr)"/>
+
+  <rect x="430" y="45" width="125" height="70" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="492" y="62" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Serve Request</text>
+  <text x="492" y="76" text-anchor="middle" fill="var(--muted)" font-size="5.5">Authorized ✓</text>
+  <text x="492" y="89" text-anchor="middle" fill="var(--muted)" font-size="5.5">No network hop</text>
+  <text x="492" y="102" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Sub-ms verification</text>
+
+  <!-- LAYER 2: REFRESH -->
+  <rect x="10" y="140" width="560" height="115" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="290" y="158" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 2 — REFRESH (Token Rotation + Theft Detection)</text>
+
+  <rect x="30" y="168" width="90" height="72" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="75" y="184" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Client</text>
+  <text x="75" y="198" text-anchor="middle" fill="var(--muted)" font-size="5.5">refresh_token</text>
+  <text x="75" y="211" text-anchor="middle" fill="var(--muted)" font-size="5.5">(single-use)</text>
+  <text x="75" y="226" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Every 15 min</text>
+
+  <line x1="120" y1="200" x2="148" y2="200" stroke="var(--y)" stroke-width="1" marker-end="url(#ss-arr)"/>
+
+  <rect x="150" y="168" width="90" height="72" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="195" y="184" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">API</text>
+  <text x="195" y="198" text-anchor="middle" fill="var(--muted)" font-size="5.5">Validate refresh</text>
+  <text x="195" y="211" text-anchor="middle" fill="var(--muted)" font-size="5.5">Check not revoked</text>
+  <text x="195" y="226" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Device match?</text>
+
+  <line x1="240" y1="200" x2="268" y2="200" stroke="var(--y)" stroke-width="1" marker-end="url(#ss-arr)"/>
+
+  <rect x="270" y="168" width="140" height="72" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="340" y="184" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Session DB (Redis)</text>
+  <text x="340" y="198" text-anchor="middle" fill="var(--muted)" font-size="5.5">user → [active sessions]</text>
+  <text x="340" y="211" text-anchor="middle" fill="var(--muted)" font-size="5.5">per device tracking</text>
+  <text x="340" y="226" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Detect replay (theft)</text>
+  <text x="340" y="237" text-anchor="middle" fill="var(--muted)" font-size="4.5">Old token reused → kill family</text>
+
+  <line x1="410" y1="200" x2="438" y2="200" stroke="var(--y)" stroke-width="1" marker-end="url(#ss-arr)"/>
+
+  <rect x="440" y="168" width="120" height="72" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+  <text x="500" y="184" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Issue New</text>
+  <text x="500" y="198" text-anchor="middle" fill="var(--muted)" font-size="5.5">New access (15m)</text>
+  <text x="500" y="211" text-anchor="middle" fill="var(--muted)" font-size="5.5">New refresh (rotated)</text>
+  <text x="500" y="226" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Old refresh killed</text>
+
+  <!-- LAYER 3: REVOCATION -->
+  <rect x="10" y="265" width="560" height="120" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="290" y="283" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 3 — REVOCATION (Password Change → Instant Invalidation)</text>
+
+  <rect x="30" y="295" width="120" height="78" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1"/>
+  <text x="90" y="311" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Password Change</text>
+  <text x="90" y="325" text-anchor="middle" fill="var(--muted)" font-size="5.5">or security event</text>
+  <text x="90" y="339" text-anchor="middle" fill="var(--muted)" font-size="5.5">or "sign out all"</text>
+  <text x="90" y="355" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Trigger: revoke all</text>
+
+  <line x1="150" y1="330" x2="175" y2="330" stroke="var(--r)" stroke-width="1.2" marker-end="url(#ss-arr)"/>
+
+  <rect x="177" y="295" width="120" height="78" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
+  <text x="237" y="311" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Invalidate All</text>
+  <text x="237" y="325" text-anchor="middle" fill="var(--muted)" font-size="5.5">Delete all refresh</text>
+  <text x="237" y="339" text-anchor="middle" fill="var(--muted)" font-size="5.5">tokens in Redis</text>
+  <text x="237" y="355" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">All devices affected</text>
+
+  <line x1="297" y1="330" x2="322" y2="330" stroke="var(--y)" stroke-width="1" marker-end="url(#ss-arr)"/>
+
+  <rect x="324" y="295" width="120" height="78" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="384" y="311" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Bloom Filter</text>
+  <text x="384" y="325" text-anchor="middle" fill="var(--muted)" font-size="5.5">Add user_id to</text>
+  <text x="384" y="339" text-anchor="middle" fill="var(--muted)" font-size="5.5">revocation filter</text>
+  <text x="384" y="355" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Pub/sub → all svcs</text>
+  <text x="384" y="368" text-anchor="middle" fill="var(--muted)" font-size="5">&lt;1s propagation</text>
+
+  <line x1="444" y1="330" x2="469" y2="330" stroke="var(--r)" stroke-width="1" marker-end="url(#ss-arr)"/>
+
+  <rect x="471" y="295" width="90" height="78" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="516" y="311" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Old JWTs</text>
+  <text x="516" y="325" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rejected by</text>
+  <text x="516" y="339" text-anchor="middle" fill="var(--muted)" font-size="5.5">bloom check</text>
+  <text x="516" y="355" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">&lt;1s effective</text>
+
+  <!-- SIDE: Token Lifecycle + Device Binding -->
+  <rect x="585" y="10" width="185" height="375" rx="8" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="677" y="30" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">TOKEN LIFECYCLE</text>
+
+  <rect x="600" y="42" width="155" height="55" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="677" y="58" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Access JWT</text>
+  <rect x="610" y="64" width="50" height="10" rx="2" fill="rgba(108,140,255,.2)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="680" y="73" fill="var(--muted)" font-size="5.5">15 min TTL</text>
+  <text x="677" y="87" text-anchor="middle" fill="var(--muted)" font-size="5.5">Stateless, verified locally</text>
+  <text x="677" y="95" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">No DB call per request</text>
+
+  <rect x="600" y="105" width="155" height="55" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
+  <text x="677" y="121" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Refresh Token</text>
+  <rect x="610" y="127" width="120" height="10" rx="2" fill="rgba(251,191,36,.2)" stroke="var(--y)" stroke-width=".5"/>
+  <text x="677" y="136" text-anchor="middle" fill="var(--muted)" font-size="5.5">30 days TTL</text>
+  <text x="677" y="150" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rotate on each use</text>
+  <text x="677" y="158" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Single-use, detect replay</text>
+
+  <rect x="600" y="168" width="155" height="50" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
+  <text x="677" y="184" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Revocation</text>
+  <rect x="610" y="190" width="12" height="10" rx="2" fill="rgba(248,113,113,.3)" stroke="var(--r)" stroke-width=".5"/>
+  <text x="640" y="199" fill="var(--muted)" font-size="5.5">&lt;1s via bloom</text>
+  <text x="677" y="212" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Worst case: 15min (JWT exp)</text>
+
+  <rect x="600" y="226" width="155" height="65" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
+  <text x="677" y="242" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Device Binding</text>
+  <text x="677" y="257" text-anchor="middle" fill="var(--muted)" font-size="5.5">Fingerprint in JWT claim</text>
+  <text x="677" y="270" text-anchor="middle" fill="var(--muted)" font-size="5.5">+ stored in session DB</text>
+  <text x="677" y="283" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Prevents cross-device theft</text>
+
+  <rect x="600" y="299" width="155" height="55" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
+  <text x="677" y="315" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Critical Actions</text>
+  <text x="677" y="330" text-anchor="middle" fill="var(--muted)" font-size="5.5">Money transfer, pwd change</text>
+  <text x="677" y="343" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">ALWAYS check Session DB</text>
+  <text x="677" y="356" text-anchor="middle" fill="var(--muted)" font-size="5">Never rely on JWT alone</text>
+
+  <!-- BOTTOM INSIGHT -->
+  <rect x="10" y="400" width="760" height="44" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="390" y="418" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">No central check per request | Worst case revocation: 15min | Critical actions always check DB</text>
+  <text x="390" y="435" text-anchor="middle" fill="var(--muted)" font-size="6">Bloom filter: in-memory O(1) | Pub/sub propagation &lt;1s | Refresh rotation detects theft | Device binding prevents replay</text>
+
+  <rect x="10" y="452" width="760" height="40" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="470" text-anchor="middle" fill="var(--muted)" font-size="6" font-weight="600">Normal: JWT verified locally (sub-ms) | Refresh: every 15min hits Redis | Revocation: bloom updated via pub/sub</text>
+  <text x="390" y="485" text-anchor="middle" fill="var(--muted)" font-size="5.5">2B users × 3 devices = 6B sessions | Redis cluster handles refresh | Bloom: ~10MB for 10M revoked users</text>
+</svg>
+<table>
+<tr><th>Component</th><th>Mechanism</th><th>Purpose</th></tr>
+<tr><td><span class="hi">Access Token (JWT)</span></td><td>Short-lived (15 min), signed, stateless</td><td>Verified locally by any service (no DB call). Contains user_id, roles, device_id, exp.</td></tr>
+<tr><td><span class="hi">Refresh Token</span></td><td>Long-lived (30 days), opaque, stored server-side</td><td>Used to get new access token. Stored in session DB. Rotated on each use.</td></tr>
+<tr><td><span class="hi">Session DB</span></td><td>Redis cluster (user_id → [sessions])</td><td>Tracks active refresh tokens per user per device. Enables revocation.</td></tr>
+<tr><td><span class="hi">Revocation List</span></td><td>Bloom filter / short-lived blocklist</td><td>On password change: add user_id to blocklist. Services check blocklist (cached, &lt;1ms).</td></tr>
+<tr><td><span class="hi">Device Binding</span></td><td>device_fingerprint in token + session</td><td>Token only valid from same device. Prevents token theft across devices.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">How instant revocation works without per-request DB check:</span> Access tokens are valid for only <span class="hg">15 minutes</span>. On password change: ① Invalidate all refresh tokens in session DB ② Add user_id to revocation bloom filter (propagated to all services within seconds via pub/sub) ③ Services check bloom filter (in-memory, &lt;1ms) before accepting JWT ④ Within 15 min, all old access tokens expire naturally. <span class="hg">Worst case: 15 min window</span>. For critical actions (transfer money): always check session DB.</div>
+<div class="b by"><span class="hi">Refresh token rotation:</span> Each refresh token is <span class="hg">single-use</span>. On use: issue new access + new refresh token, invalidate old refresh. If old refresh is reused (stolen token replay) → <span class="hr">invalidate entire session family</span> (all tokens for that device). This detects token theft.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Long-lived JWT (24h+)</span> — can't revoke for hours. <span class="hr">Session in cookie only</span> — no server-side revocation. <span class="hr">No device binding</span> — stolen token works from any device. <span class="hr">Checking DB on every request</span> — doesn't scale to billions of requests.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Google</strong> — short-lived access tokens + refresh via OAuth. <strong>Auth0</strong> — rotating refresh tokens with theft detection. <strong>GitHub</strong> — fine-grained PATs with expiry. <strong>Netflix</strong> — device-bound sessions with concurrent device limits (4 screens).</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 7 things to say for session management design</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Short-lived JWT (15 min) + long-lived refresh token (30 days)</strong> — balance stateless verification with revocation<br>
+<span class="hg">2.</span> <strong>Refresh token rotation</strong> — single-use, issue new on each refresh, detect replay (theft)<br>
+<span class="hg">3.</span> <strong>Revocation bloom filter</strong> — propagated via pub/sub, checked in-memory (&lt;1ms), catches revoked users<br>
+<span class="hg">4.</span> <strong>Device binding</strong> — token only valid from same device fingerprint (prevents cross-device theft)<br>
+<span class="hg">5.</span> <strong>Session DB in Redis</strong> — user_id → [active sessions per device], enables "sign out all devices"<br>
+<span class="hg">6.</span> <strong>Critical actions always check DB</strong> — money transfer, password change → verify session server-side<br>
+<span class="hg">7.</span> <strong>Worst-case revocation window = 15 min</strong> — access token expiry is the upper bound for stale sessions
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

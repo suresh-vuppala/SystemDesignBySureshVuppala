@@ -1,24 +1,221 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>13. Observability — System Design Cheatsheet</title>
+<title>13. Observability — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-12"><span class="e">📊</span> 13 · OBSERVABILITY</div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 1: LOGGING
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="logging">
-<h2>Logging</h2><p class="su">Structured JSON logs with correlation IDs. Levels: DEBUG → INFO → WARN → ERROR → FATAL</p>
+<h2>Logging</h2>
+<p class="su">Structured JSON logs with correlation IDs. Levels: DEBUG → INFO → WARN → ERROR → FATAL. The foundation of observability — <span class="hg">immutable forensic records</span> of system behavior.</p>
+
+<!-- ═══ Log Pipeline Architecture SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Log Pipeline Architecture</div>
+<svg width="100%" viewBox="0 0 740 130" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ob1g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+    <marker id="ob1a" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker>
+  </defs>
+  <title>Log Pipeline Architecture: App → Shipper → Buffer → Storage → Visualization</title>
+  <!-- Applications -->
+  <rect data-dp-step="1" x="10" y="20" width="90" height="90" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="55" y="38" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">Applications</text>
+  <rect x="18" y="46" width="74" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="55" y="56" text-anchor="middle" fill="var(--o)" font-size="7">Service A (Java)</text>
+  <rect x="18" y="64" width="74" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="55" y="74" text-anchor="middle" fill="var(--o)" font-size="7">Service B (Node)</text>
+  <rect x="18" y="82" width="74" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="55" y="92" text-anchor="middle" fill="var(--o)" font-size="7">Service C (Go)</text>
+
+  <!-- Arrow: Apps → Shipper -->
+  <line data-dp-step="2" x1="100" y1="65" x2="148" y2="65" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob1)"/>
+  <text x="124" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">stdout/file</text>
+
+  <!-- Log Shipper -->
+  <rect data-dp-step="3" x="150" y="35" width="110" height="60" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="205" y="52" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Log Shipper</text>
+  <rect x="158" y="60" width="44" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="180" y="70" text-anchor="middle" fill="var(--g)" font-size="6.5">Fluentd</text>
+  <rect x="208" y="60" width="44" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="230" y="70" text-anchor="middle" fill="var(--g)" font-size="6.5">Filebeat</text>
+  <text x="205" y="86" text-anchor="middle" fill="var(--muted)" font-size="6">Parse · Enrich · Filter</text>
+  <!-- Arrow: Shipper → Kafka -->
+  <line data-dp-step="4" x1="260" y1="65" x2="308" y2="65" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob1)"/>
+  <text x="284" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">forward</text>
+
+  <!-- Kafka Buffer -->
+  <rect data-dp-step="5" x="310" y="35" width="100" height="60" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="360" y="52" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">Kafka Buffer</text>
+  <rect x="320" y="60" width="80" height="14" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="360" y="70" text-anchor="middle" fill="var(--a)" font-size="6.5">topic: logs.*</text>
+  <text x="360" y="86" text-anchor="middle" fill="var(--muted)" font-size="6">Decouple · Backpressure</text>
+
+  <!-- Arrow: Kafka → Elasticsearch -->
+  <line data-dp-step="6" x1="410" y1="65" x2="458" y2="65" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob1)"/>
+  <text x="434" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">consume</text>
+
+  <!-- Elasticsearch -->
+  <rect data-dp-step="7" x="460" y="35" width="110" height="60" rx="6" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="515" y="52" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">Elasticsearch</text>
+  <rect x="470" y="60" width="90" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="515" y="70" text-anchor="middle" fill="var(--y)" font-size="6.5">Index · Search · Retain</text>
+  <text x="515" y="86" text-anchor="middle" fill="var(--muted)" font-size="6">Hot/Warm/Cold tiers</text>
+
+  <!-- Arrow: ES → Kibana -->
+  <line data-dp-step="8" x1="570" y1="65" x2="618" y2="65" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob1)"/>
+  <text x="594" y="58" text-anchor="middle" fill="var(--muted)" font-size="6.5">query</text>
+
+  <!-- Kibana -->
+  <rect data-dp-step="9" x="620" y="35" width="100" height="60" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="670" y="52" text-anchor="middle" fill="var(--p)" font-size="9" font-weight="700">Kibana</text>
+  <rect x="630" y="60" width="80" height="14" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--p)" stroke-width=".6"/>
+  <text x="670" y="70" text-anchor="middle" fill="var(--p)" font-size="6.5">Dashboards · Alerts</text>
+  <text x="670" y="86" text-anchor="middle" fill="var(--muted)" font-size="6">Visualize · Explore</text>
+
+  <!-- Bottom labels -->
+  <text x="370" y="120" text-anchor="middle" fill="var(--muted)" font-size="7.5">ELK Stack / EFK Stack — handles 100K+ logs/sec with Kafka buffering</text>
+</svg>
+
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Immutability</span> (forensics, compliance). <span class="hg">Searchability</span>. <span class="hg">Correlation IDs</span> trace flow across services. Never log passwords/PII. Tools: <span class="hg">ELK</span>, Splunk, Loki, CloudWatch. Sample: 100% errors, 1-10% normal.</div>
+
+<!-- Structured Logging Format -->
+<div class="d-title"><span class="num d-green">▸</span> Structured Logging Format (JSON)</div>
+<div class="b bb" style="font-family:monospace;font-size:0.82em;line-height:1.5">
+<pre style="margin:0;white-space:pre-wrap">{
+  "timestamp": "2024-03-15T10:23:45.123Z",
+  "level": "ERROR",
+  "service": "payment-service",
+  "version": "2.4.1",
+  "trace_id": "abc123def456",
+  "span_id": "span-789",
+  "correlation_id": "order-98765",
+  "message": "Payment processing failed",
+  "metadata": {
+    "user_id": "u-12345",
+    "amount": 99.99,
+    "currency": "USD",
+    "error_code": "GATEWAY_TIMEOUT",
+    "retry_count": 2
+  },
+  "context": {
+    "host": "pod-payment-7b4f9",
+    "region": "us-east-1",
+    "environment": "production"
+  }
+}</pre>
 </div>
 
+<!-- Log Levels Decision Table -->
+<div class="d-title"><span class="num d-cyan">▸</span> Log Levels Decision Guide</div>
+<table>
+<tr><th>Level</th><th>When to Use</th><th>Example</th><th>Alert?</th></tr>
+<tr><td><span class="hv">FATAL</span></td><td>System cannot continue — process will exit</td><td>Cannot bind to port, OOM killer</td><td><span class="hr">Page immediately</span></td></tr>
+<tr><td><span class="hr">ERROR</span></td><td>Operation failed — needs attention</td><td>Payment gateway timeout, DB connection lost</td><td><span class="hr">Alert if rate > threshold</span></td></tr>
+<tr><td><span class="ho">WARN</span></td><td>Unexpected but recoverable — degraded state</td><td>Retry succeeded, cache miss fallback, deprecated API call</td><td>Monitor trend</td></tr>
+<tr><td><span class="hi">INFO</span></td><td>Normal business events — audit trail</td><td>Order placed, user login, deployment started</td><td>No</td></tr>
+<tr><td><span class="hg">DEBUG</span></td><td>Developer troubleshooting — verbose</td><td>SQL query, request/response body, cache key</td><td>No — <span class="hr">never in prod</span></td></tr>
+<tr><td><span class="hc">TRACE</span></td><td>Extremely detailed — method entry/exit</td><td>Function arguments, loop iterations</td><td>No — dev only</td></tr>
+</table>
+
+<!-- Log Sampling Strategies -->
+<div class="d-title"><span class="num d-green">▸</span> Log Sampling Strategies</div>
+<table>
+<tr><th>Strategy</th><th>How It Works</th><th>Sample Rate</th><th>Best For</th></tr>
+<tr><td><span class="hi">Always sample errors</span></td><td>100% of ERROR/FATAL logs retained</td><td>100%</td><td>All environments</td></tr>
+<tr><td><span class="hi">Rate-based</span></td><td>Keep 1 in N logs per time window</td><td>1-10%</td><td>High-volume INFO logs</td></tr>
+<tr><td><span class="hi">Priority-based</span></td><td>Sample based on log level + service criticality</td><td>Varies</td><td>Cost optimization</td></tr>
+<tr><td><span class="hi">Tail-based</span></td><td>Decide after request completes (keep if slow/error)</td><td>Dynamic</td><td>Distributed tracing correlation</td></tr>
+<tr><td><span class="hi">Hash-based</span></td><td>Consistent sampling by trace_id hash</td><td>Configurable</td><td>Correlated log/trace sampling</td></tr>
+</table>
+
+<div class="b by"><span class="hi">⚠️ Log Anti-Patterns:</span> <span class="hr">Logging PII/secrets</span> · <span class="hr">Unstructured string concatenation</span> · <span class="hr">Logging inside tight loops</span> · <span class="hr">No correlation ID</span> · <span class="hr">Logging full request bodies in prod</span> · <span class="hr">Missing timestamps</span></div>
+
+<div class="b bb"><span class="hi">One-liner:</span> Emit <span class="hg">structured JSON</span> with <span class="hg">correlation_id</span> + <span class="hg">trace_id</span>. Ship via <span class="hg">Fluentd → Kafka → ES</span>. Sample 100% errors, 1-10% info. Never log PII. Use <span class="hg">log levels</span> as severity contracts.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 2: METRICS
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="metrics">
 <h2>Metrics</h2>
-<p class="su"><span class="hg">Golden Signals</span> (Google SRE): Latency · Traffic · Errors · Saturation</p>
+<p class="su"><span class="hg">Golden Signals</span> (Google SRE): Latency · Traffic · Errors · Saturation — numeric time-series data for <span class="hi">alerting and trending</span></p>
+
+<!-- ═══ Metrics Collection Flow SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Metrics Collection Flow</div>
+<svg width="100%" viewBox="0 0 740 120" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ob2g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>Metrics Collection: App → OTel SDK → Collector → Prometheus → Grafana</title>
+  <!-- Application -->
+  <rect data-dp-step="1" x="10" y="25" width="100" height="70" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="60" y="42" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">Application</text>
+  <rect x="18" y="50" width="84" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="60" y="60" text-anchor="middle" fill="var(--o)" font-size="7">OTel SDK (auto-instr)</text>
+  <rect x="18" y="68" width="84" height="14" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="60" y="78" text-anchor="middle" fill="var(--o)" font-size="7">counter / histogram</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="2" x1="110" y1="60" x2="158" y2="60" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob2)"/>
+  <text x="134" y="53" text-anchor="middle" fill="var(--muted)" font-size="6.5">OTLP</text>
+
+  <!-- OTel Collector -->
+  <rect data-dp-step="3" x="160" y="25" width="120" height="70" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="220" y="42" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">OTel Collector</text>
+  <rect x="168" y="50" width="104" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="220" y="60" text-anchor="middle" fill="var(--g)" font-size="7">Receive → Process → Export</text>
+  <rect x="168" y="68" width="104" height="14" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="220" y="78" text-anchor="middle" fill="var(--g)" font-size="7">Batch · Filter · Transform</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="4" x1="280" y1="60" x2="328" y2="60" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob2)"/>
+  <text x="304" y="53" text-anchor="middle" fill="var(--muted)" font-size="6.5">remote write</text>
+
+  <!-- Prometheus -->
+  <rect data-dp-step="5" x="330" y="25" width="120" height="70" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="390" y="42" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">Prometheus</text>
+  <rect x="338" y="50" width="104" height="14" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="390" y="60" text-anchor="middle" fill="var(--a)" font-size="7">TSDB (time-series)</text>
+  <rect x="338" y="68" width="104" height="14" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="390" y="78" text-anchor="middle" fill="var(--a)" font-size="7">PromQL · Rules · Alerts</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="6" x1="450" y1="60" x2="498" y2="60" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob2)"/>
+  <text x="474" y="53" text-anchor="middle" fill="var(--muted)" font-size="6.5">query</text>
+
+  <!-- Grafana -->
+  <rect data-dp-step="7" x="500" y="25" width="110" height="70" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="555" y="42" text-anchor="middle" fill="var(--p)" font-size="9" font-weight="700">Grafana</text>
+  <rect x="508" y="50" width="94" height="14" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--p)" stroke-width=".6"/>
+  <text x="555" y="60" text-anchor="middle" fill="var(--p)" font-size="7">Dashboards · Panels</text>
+  <rect x="508" y="68" width="94" height="14" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--p)" stroke-width=".6"/>
+  <text x="555" y="78" text-anchor="middle" fill="var(--p)" font-size="7">Alert Manager</text>
+
+  <!-- Alert outputs -->
+  <line data-dp-step="8" x1="610" y1="50" x2="648" y2="38" stroke="var(--r)" stroke-width=".8" marker-end="url(#ob2)"/>
+  <line x1="610" y1="60" x2="648" y2="60" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ob2)"/>
+  <line x1="610" y1="70" x2="648" y2="80" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ob2)"/>
+  <text x="680" y="40" text-anchor="middle" fill="var(--r)" font-size="7.5">🚨 PagerDuty</text>
+  <text x="680" y="62" text-anchor="middle" fill="var(--muted)" font-size="7.5">💬 Slack</text>
+  <text x="680" y="82" text-anchor="middle" fill="var(--muted)" font-size="7.5">📧 Email</text>
+
+  <text x="370" y="112" text-anchor="middle" fill="var(--muted)" font-size="7.5">OpenTelemetry → Prometheus → Grafana — the modern open-source metrics stack</text>
+</svg>
+
+<!-- Golden Signals Table -->
 <table>
 <tr><th>Signal</th><th>What It Measures</th><th>Key Metrics</th><th>Alert When</th></tr>
 <tr><td><span class="hi">Latency</span></td><td>Time to serve a request</td><td><span class="hg">p50</span> · <span class="hg">p95</span> · <span class="hg">p99</span> · <span class="hg">p999</span>. Never use avg — <span class="hr">hides tail latency</span></td><td>p99 &gt; SLA threshold</td></tr>
@@ -26,33 +223,647 @@
 <tr><td><span class="hi">Errors</span></td><td>Rate of failed requests</td><td><span class="hg">Error rate %</span> · 5xx count · timeout count · <span class="hg">DLQ depth</span></td><td>Error rate &gt; 1% or any 5xx spike</td></tr>
 <tr><td><span class="hi">Saturation</span></td><td>How full / overloaded the system is</td><td><span class="hg">CPU %</span> · <span class="hg">Memory %</span> · <span class="hg">Disk I/O</span> · <span class="hg">Thread pool queue depth</span></td><td>CPU &gt; 80% sustained</td></tr>
 </table>
+
+<!-- RED / USE Table -->
 <table>
 <tr><th>Method</th><th>Full Form</th><th>Best For</th><th>Metrics</th></tr>
 <tr><td><span class="hi">RED</span></td><td><span class="hg">Rate · Errors · Duration</span></td><td>Microservices, APIs</td><td>Requests/sec · Error % · p99 response time</td></tr>
 <tr><td><span class="hi">USE</span></td><td><span class="hg">Utilization · Saturation · Errors</span></td><td>Infrastructure — CPU, memory, disk, network</td><td>CPU % · queue depth · device error count</td></tr>
 </table>
-<div class="b bg"><span class="hi">p-values explained:</span> <span class="hg">p50</span> — median. <span class="hg">p95</span> — 95% of requests faster. <span class="hg">p99</span> — SLA boundary. <span class="hg">p999</span> — worst-case outliers. Average <span class="hr">hides outliers</span>.</div>
-<div class="b bg"><span class="hi">SLI / SLO / SLA:</span> <span class="hg">SLI</span> (indicator) — actual measured metric. <span class="hg">SLO</span> (objective) — internal target. <span class="hg">SLA</span> (agreement) — contractual commitment with penalty. SLO should be <span class="hg">stricter than SLA</span>.</div>
-<div class="b by"><span class="hi">Tools:</span> <span class="hg">Prometheus</span> — scrape + store time-series. <span class="hg">Grafana</span> — dashboards + alerting. <span class="hg">Datadog</span> — managed APM. <span class="hg">CloudWatch</span> — AWS native. <span class="hg">OpenTelemetry</span> — vendor-neutral standard.</div>
-<div class="b bb"><span class="hi">One-liner:</span> Track <span class="hg">p99 not average</span> — use <span class="hg">RED for services</span>, <span class="hg">USE for infra</span>, alert on Golden Signals, define SLOs stricter than SLA.</div>
+
+<!-- ═══ Percentile Visualization SVG ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Why p99 Matters More Than Average</div>
+<svg width="100%" viewBox="0 0 720 160" style="max-width:720px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob2b" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker>
+  </defs>
+  <title>Percentile Distribution: Histogram showing why p99 matters more than average</title>
+
+  <!-- Axes -->
+  <line x1="60" y1="130" x2="680" y2="130" stroke="var(--border)" stroke-width="1"/>
+  <line x1="60" y1="130" x2="60" y2="20" stroke="var(--border)" stroke-width="1"/>
+  <text x="370" y="155" text-anchor="middle" fill="var(--text)" font-size="8">Response Time (ms)</text>
+  <text x="30" y="75" text-anchor="middle" fill="var(--text)" font-size="8" transform="rotate(-90,30,75)">Request Count</text>
+
+  <!-- Histogram bars - bell curve shape with long tail -->
+  <rect data-dp-step="1" x="80" y="118" width="20" height="12" rx="1" fill="var(--g)" opacity=".3"/>
+  <rect data-dp-step="1" x="105" y="108" width="20" height="22" rx="1" fill="var(--g)" opacity=".4"/>
+  <rect data-dp-step="1" x="130" y="90" width="20" height="40" rx="1" fill="var(--g)" opacity=".5"/>
+  <rect data-dp-step="2" x="155" y="65" width="20" height="65" rx="1" fill="var(--g)" opacity=".7"/>
+  <rect data-dp-step="2" x="180" y="40" width="20" height="90" rx="1" fill="var(--g)" opacity=".85"/>
+  <rect data-dp-step="2" x="205" y="30" width="20" height="100" rx="1" fill="var(--g)" opacity="1"/>
+  <rect data-dp-step="3" x="230" y="38" width="20" height="92" rx="1" fill="var(--g)" opacity=".9"/>
+  <rect data-dp-step="3" x="255" y="55" width="20" height="75" rx="1" fill="var(--g)" opacity=".75"/>
+  <rect data-dp-step="3" x="280" y="72" width="20" height="58" rx="1" fill="var(--g)" opacity=".6"/>
+  <rect data-dp-step="4" x="305" y="88" width="20" height="42" rx="1" fill="var(--g)" opacity=".5"/>
+  <rect data-dp-step="4" x="330" y="100" width="20" height="30" rx="1" fill="var(--g)" opacity=".4"/>
+  <rect data-dp-step="4" x="355" y="108" width="20" height="22" rx="1" fill="var(--g)" opacity=".35"/>
+  <rect data-dp-step="5" x="380" y="114" width="20" height="16" rx="1" fill="var(--y)" opacity=".5"/>
+  <rect data-dp-step="5" x="405" y="118" width="20" height="12" rx="1" fill="var(--y)" opacity=".5"/>
+  <rect data-dp-step="5" x="430" y="120" width="20" height="10" rx="1" fill="var(--y)" opacity=".4"/>
+  <!-- Long tail - the p99 region -->
+  <rect data-dp-step="6" x="455" y="122" width="20" height="8" rx="1" fill="var(--o)" opacity=".5"/>
+  <rect data-dp-step="6" x="480" y="124" width="20" height="6" rx="1" fill="var(--o)" opacity=".5"/>
+  <rect data-dp-step="7" x="505" y="125" width="20" height="5" rx="1" fill="var(--r)" opacity=".6"/>
+  <rect data-dp-step="7" x="530" y="126" width="20" height="4" rx="1" fill="var(--r)" opacity=".6"/>
+  <rect data-dp-step="7" x="555" y="127" width="20" height="3" rx="1" fill="var(--r)" opacity=".7"/>
+  <rect data-dp-step="7" x="580" y="127" width="20" height="3" rx="1" fill="var(--r)" opacity=".7"/>
+  <rect data-dp-step="7" x="605" y="128" width="20" height="2" rx="1" fill="var(--r)" opacity=".8"/>
+  <rect data-dp-step="7" x="630" y="128" width="20" height="2" rx="1" fill="var(--r)" opacity=".8"/>
+
+  <!-- Percentile markers -->
+  <line x1="215" y1="25" x2="215" y2="130" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="215" y="18" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">p50 (50ms)</text>
+
+  <line x1="340" y1="25" x2="340" y2="130" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="340" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">p95 (120ms)</text>
+
+  <line x1="500" y1="25" x2="500" y2="130" stroke="var(--o)" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="500" y="18" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">p99 (800ms)</text>
+
+  <line x1="620" y1="25" x2="620" y2="130" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="620" y="18" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">p999 (2.5s)</text>
+
+  <!-- Average line -->
+  <line x1="250" y1="28" x2="250" y2="130" stroke="var(--r)" stroke-width="1" stroke-dasharray="2,2"/>
+  <text x="250" y="145" text-anchor="middle" fill="var(--r)" font-size="7">avg=85ms (misleading!)</text>
+
+  <!-- Annotation -->
+  <rect x="460" y="40" width="200" height="50" rx="4" fill="rgba(239,68,68,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="560" y="55" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="600">⚠️ The "long tail"</text>
+  <text x="560" y="68" text-anchor="middle" fill="var(--text)" font-size="7">1% of users see 800ms+</text>
+  <text x="560" y="80" text-anchor="middle" fill="var(--text)" font-size="7">At 1M req/day = 10K bad experiences</text>
+</svg>
+
+<!-- SLI/SLO/SLA Relationship -->
+<div class="d-title"><span class="num d-cyan">▸</span> SLI / SLO / SLA Relationship</div>
+<svg width="100%" viewBox="0 0 700 100" style="max-width:700px;display:block;margin:4px auto 10px">
+  <title>SLI/SLO/SLA: Indicator → Objective → Agreement hierarchy</title>
+  <!-- SLA (outermost) -->
+  <rect data-dp-step="3" x="30" y="10" width="640" height="80" rx="10" fill="rgba(239,68,68,.04)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="80" y="26" fill="var(--r)" font-size="8.5" font-weight="700">SLA (Agreement)</text>
+  <text x="80" y="38" fill="var(--muted)" font-size="7">Contractual — penalty if breached</text>
+  <text x="580" y="26" text-anchor="middle" fill="var(--r)" font-size="7.5">99.9% availability</text>
+
+  <!-- SLO (middle) -->
+  <rect data-dp-step="2" x="60" y="42" width="580" height="40" rx="8" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="110" y="58" fill="var(--a)" font-size="8.5" font-weight="700">SLO (Objective)</text>
+  <text x="110" y="70" fill="var(--muted)" font-size="7">Internal target — stricter than SLA</text>
+  <text x="540" y="58" text-anchor="middle" fill="var(--a)" font-size="7.5">99.95% availability</text>
+
+  <!-- SLI (innermost) -->
+  <rect data-dp-step="1" x="260" y="50" width="200" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="310" y="65" fill="var(--g)" font-size="8.5" font-weight="700">SLI (Indicator)</text>
+  <text x="420" y="65" fill="var(--muted)" font-size="7">Actual measured: 99.97%</text>
+</svg>
+
+<div class="b bg"><span class="hi">SLI / SLO / SLA:</span> <span class="hg">SLI</span> (indicator) — actual measured metric. <span class="hg">SLO</span> (objective) — internal target. <span class="hg">SLA</span> (agreement) — contractual commitment with penalty. SLO should be <span class="hg">stricter than SLA</span>. Error Budget = 100% − SLO.</div>
+
+<!-- Cardinality Warning -->
+<div class="b br"><span class="hi">⚠️ Cardinality Explosion:</span> Every unique combination of label values creates a new time series. <span class="hr">user_id</span> as a label = millions of series → OOM. <span class="hr">request_path with IDs</span> (/users/12345) = unbounded. Fix: use <span class="hg">bounded labels</span> (method, status_code, service) and move high-cardinality to <span class="hg">logs/traces</span>. Rule of thumb: &lt;10 values per label.</div>
+
+<div class="b by"><span class="hi">Tools:</span> <span class="hg">Prometheus</span> — scrape + store time-series. <span class="hg">Grafana</span> — dashboards + alerting. <span class="hg">Datadog</span> — managed APM. <span class="hg">CloudWatch</span> — AWS native. <span class="hg">OpenTelemetry</span> — vendor-neutral standard. <span class="hg">Thanos/Cortex</span> — long-term Prometheus storage.</div>
+
+<div class="b bb"><span class="hi">One-liner:</span> Track <span class="hg">p99 not average</span> — use <span class="hg">RED for services</span>, <span class="hg">USE for infra</span>, alert on Golden Signals, define SLOs stricter than SLA. Watch for <span class="hr">cardinality explosion</span>.</div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 3: DISTRIBUTED TRACING
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="tracing">
-<h2>Distributed Tracing</h2><p class="su">Track single request across services. Trace ID → Spans → Parent-child relationships → Latency breakdown.</p>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Request correlation</span> across all services. <span class="hg">Bottleneck identification</span>. <span class="hg">Dependency mapping</span>. Tools: <span class="hg">OpenTelemetry</span>, Jaeger, Zipkin, Datadog APM. Sample: 100% errors, 1-5% successes.</div>
+<h2>Distributed Tracing</h2>
+<p class="su">Track a single request across services. <span class="hg">Trace ID → Spans → Parent-child relationships → Latency breakdown</span>. Essential for debugging microservices.</p>
+
+<!-- ═══ Trace/Span Hierarchy SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Trace / Span Hierarchy — Request Flow</div>
+<svg width="100%" viewBox="0 0 750 220" style="max-width:750px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob3" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+  </defs>
+  <title>Distributed Trace: Request flowing through API Gateway → Auth → User Service → DB with timing bars</title>
+
+  <!-- Header -->
+  <text x="375" y="18" text-anchor="middle" fill="var(--text)" font-size="9" font-weight="700">Trace ID: abc-123-def-456</text>
+  <text x="375" y="30" text-anchor="middle" fill="var(--muted)" font-size="7">Total Duration: 245ms</text>
+
+  <!-- Time axis -->
+  <line x1="180" y1="42" x2="720" y2="42" stroke="var(--border)" stroke-width=".5"/>
+  <text x="180" y="40" text-anchor="middle" fill="var(--muted)" font-size="6">0ms</text>
+  <text x="360" y="40" text-anchor="middle" fill="var(--muted)" font-size="6">60ms</text>
+  <text x="540" y="40" text-anchor="middle" fill="var(--muted)" font-size="6">120ms</text>
+  <text x="720" y="40" text-anchor="middle" fill="var(--muted)" font-size="6">245ms</text>
+
+  <!-- Span 1: API Gateway (root span) -->
+  <text data-dp-step="1" x="10" y="68" fill="var(--o)" font-size="8" font-weight="600">API Gateway</text>
+  <text x="10" y="78" fill="var(--muted)" font-size="6.5">span-001 (root)</text>
+  <rect data-dp-step="1" x="180" y="58" width="540" height="18" rx="3" fill="rgba(251,146,60,.15)" stroke="var(--o)" stroke-width="1"/>
+  <text x="450" y="70" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">245ms — HTTP GET /api/users/profile</text>
+
+  <!-- Span 2: Auth Service (child of root) -->
+  <text data-dp-step="2" x="30" y="108" fill="var(--a)" font-size="8" font-weight="600">Auth Service</text>
+  <text x="30" y="118" fill="var(--muted)" font-size="6.5">span-002 (child of 001)</text>
+  <rect data-dp-step="2" x="200" y="98" width="160" height="18" rx="3" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width="1"/>
+  <text x="280" y="110" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">72ms — JWT validation</text>
+
+  <!-- Span 3: User Service (child of root, after auth) -->
+  <text data-dp-step="3" x="30" y="148" fill="var(--g)" font-size="8" font-weight="600">User Service</text>
+  <text x="30" y="158" fill="var(--muted)" font-size="6.5">span-003 (child of 001)</text>
+  <rect data-dp-step="3" x="370" y="138" width="300" height="18" rx="3" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width="1"/>
+  <text x="520" y="150" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">135ms — getProfile()</text>
+
+  <!-- Span 4: Database (child of user service) -->
+  <text data-dp-step="4" x="50" y="188" fill="var(--p)" font-size="8" font-weight="600">PostgreSQL</text>
+  <text x="50" y="198" fill="var(--muted)" font-size="6.5">span-004 (child of 003)</text>
+  <rect data-dp-step="4" x="400" y="178" width="200" height="18" rx="3" fill="rgba(167,139,250,.15)" stroke="var(--p)" stroke-width="1"/>
+  <text x="500" y="190" text-anchor="middle" fill="var(--p)" font-size="7" font-weight="600">89ms — SELECT * FROM users</text>
+
+  <!-- Parent-child relationship lines -->
+  <line x1="180" y1="76" x2="200" y2="98" stroke="var(--muted)" stroke-width=".7" stroke-dasharray="3,2"/>
+  <line x1="180" y1="76" x2="370" y2="138" stroke="var(--muted)" stroke-width=".7" stroke-dasharray="3,2"/>
+  <line x1="370" y1="156" x2="400" y2="178" stroke="var(--muted)" stroke-width=".7" stroke-dasharray="3,2"/>
+
+  <!-- Bottleneck indicator -->
+  <rect x="400" y="200" width="200" height="16" rx="3" fill="rgba(239,68,68,.08)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="500" y="211" text-anchor="middle" fill="var(--r)" font-size="7">⚠️ Bottleneck: DB query = 36% of total</text>
+</svg>
+
+<div class="b bg"><span class="hi">Core Concepts:</span> <span class="hg">Trace</span> — end-to-end journey of a request. <span class="hg">Span</span> — single unit of work (one service call). <span class="hg">Root Span</span> — first span, sets trace duration. <span class="hg">Child Span</span> — nested operation within parent. <span class="hg">Span Context</span> — trace_id + span_id + flags propagated across boundaries.</div>
+
+<!-- Context Propagation Table -->
+<div class="d-title"><span class="num d-green">▸</span> Context Propagation Standards</div>
+<table>
+<tr><th>Standard</th><th>Header Format</th><th>Example</th><th>Used By</th></tr>
+<tr><td><span class="hi">W3C TraceContext</span></td><td><code>traceparent</code> / <code>tracestate</code></td><td><code>00-abc123-span456-01</code></td><td>OpenTelemetry (default), modern systems</td></tr>
+<tr><td><span class="hi">B3 (Zipkin)</span></td><td><code>X-B3-TraceId</code> / <code>X-B3-SpanId</code></td><td><code>X-B3-TraceId: abc123</code></td><td>Zipkin, Spring Cloud Sleuth</td></tr>
+<tr><td><span class="hi">B3 Single</span></td><td><code>b3</code> (single header)</td><td><code>abc123-span456-1</code></td><td>Zipkin compact format</td></tr>
+<tr><td><span class="hi">Jaeger</span></td><td><code>uber-trace-id</code></td><td><code>abc123:span456:0:1</code></td><td>Jaeger native (legacy)</td></tr>
+<tr><td><span class="hi">Baggage</span></td><td><code>baggage</code></td><td><code>user_id=123,region=us</code></td><td>W3C Baggage — custom context across services</td></tr>
+</table>
+
+<!-- Sampling Strategies -->
+<div class="d-title"><span class="num d-cyan">▸</span> Sampling Strategies: Head-Based vs Tail-Based</div>
+<table>
+<tr><th>Strategy</th><th>Decision Point</th><th>Pros</th><th>Cons</th><th>Best For</th></tr>
+<tr><td><span class="hi">Head-based</span></td><td>At trace start (first service)</td><td>Simple, low overhead, consistent</td><td><span class="hr">May miss interesting traces</span> (errors decided later)</td><td>High-volume, cost-sensitive</td></tr>
+<tr><td><span class="hi">Tail-based</span></td><td>After trace completes (collector)</td><td>Keep all errors/slow traces, smarter</td><td><span class="hr">Higher memory</span> (buffer full traces), complex</td><td>Debug-focused, error analysis</td></tr>
+<tr><td><span class="hi">Priority-based</span></td><td>Based on attributes (user tier, endpoint)</td><td>VIP users always traced</td><td>Configuration complexity</td><td>Multi-tenant systems</td></tr>
+<tr><td><span class="hi">Rate-limiting</span></td><td>N traces per second per service</td><td>Predictable cost</td><td>May miss bursts</td><td>Budget-constrained</td></tr>
+</table>
+
+<!-- Async Propagation -->
+<div class="b by"><span class="hi">Async Boundary Propagation:</span> For <span class="hg">Kafka</span> — inject trace context into message headers (<code>traceparent</code> header). For <span class="hg">SQS</span> — use message attributes. For <span class="hg">gRPC</span> — metadata headers. For <span class="hg">HTTP</span> — request headers. Key: consumer creates a <span class="hg">new span linked to producer span</span> (SpanLink, not parent-child).</div>
+
+<div class="b bg"><span class="hi">Tools:</span> <span class="hg">OpenTelemetry</span> (vendor-neutral SDK) · <span class="hg">Jaeger</span> (open-source backend) · <span class="hg">Zipkin</span> (lightweight) · <span class="hg">Datadog APM</span> · <span class="hg">AWS X-Ray</span> · <span class="hg">Tempo</span> (Grafana, uses object storage). Sample: 100% errors, 1-5% successes.</div>
+
+<div class="b bb"><span class="hi">One-liner:</span> Propagate <span class="hg">W3C TraceContext</span> headers across all boundaries. Use <span class="hg">tail-based sampling</span> to capture errors. Every span needs: service name, operation, duration, status, and <span class="hg">parent span ID</span>.</div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 4: MONITORING & ALERTING
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="monitoring">
-<h2>Monitoring &amp; Alerting</h2><p class="su">Collect → Alert → Respond → Root Cause Analysis</p>
-<div class="b bg"><span class="hi">Alert Rules:</span> Only page if <span class="hg">human action needed</span>. Good: "error rate >1% for 2min". Bad: "any single error". <span class="hi">Error Budget:</span> 100% - SLO = budget for experimentation/risk. Tools: PagerDuty, Opsgenie, Grafana OnCall.</div>
-<div class="b bp"><span class="hv">Advanced:</span> <span class="hi">OpenTelemetry</span> — vendor-neutral SDK for metrics + traces + logs. App → OTel SDK → Collector → export to Jaeger/Datadog/Prometheus. Single instrumentation, multiple backends. <span class="hi">Log Aggregation Pipeline</span> — App → Fluentd/Filebeat → Kafka (buffer) → Elasticsearch → Kibana. <span class="hi">Burn Rate Alerts</span> — alert when error budget is being consumed too fast (e.g., "at this rate, SLO breached in 6 hours"). Better than static thresholds.</div>
+<h2>Monitoring &amp; Alerting</h2>
+<p class="su">Collect → Evaluate → Alert → Route → Respond → Root Cause Analysis. Only page if <span class="hg">human action is needed</span>.</p>
+
+<!-- ═══ Alerting Pipeline SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Alerting Pipeline Architecture</div>
+<svg width="100%" viewBox="0 0 750 140" style="max-width:750px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob4" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ob4r" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--r)"/></marker>
+  </defs>
+  <title>Alerting Pipeline: Metric → Rule Evaluation → Alert Manager → Routing → Notification Channels</title>
+
+  <!-- Metric Source -->
+  <rect data-dp-step="1" x="10" y="35" width="90" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="55" y="55" text-anchor="middle" fill="var(--g)" font-size="8.5" font-weight="700">Metrics</text>
+  <text x="55" y="68" text-anchor="middle" fill="var(--muted)" font-size="6.5">Prometheus TSDB</text>
+  <text x="55" y="78" text-anchor="middle" fill="var(--muted)" font-size="6.5">Time-series data</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="2" x1="100" y1="60" x2="138" y2="60" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob4)"/>
+
+  <!-- Rule Evaluation -->
+  <rect data-dp-step="2" x="140" y="35" width="110" height="50" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="195" y="52" text-anchor="middle" fill="var(--a)" font-size="8.5" font-weight="700">Rule Engine</text>
+  <text x="195" y="65" text-anchor="middle" fill="var(--muted)" font-size="6.5">PromQL evaluation</text>
+  <text x="195" y="78" text-anchor="middle" fill="var(--muted)" font-size="6.5">every 15-60s</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="3" x1="250" y1="60" x2="288" y2="60" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob4)"/>
+  <text x="269" y="53" text-anchor="middle" fill="var(--r)" font-size="6.5">FIRING</text>
+
+  <!-- Alert Manager -->
+  <rect data-dp-step="3" x="290" y="30" width="120" height="60" rx="6" fill="rgba(239,68,68,.06)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="350" y="48" text-anchor="middle" fill="var(--r)" font-size="8.5" font-weight="700">Alert Manager</text>
+  <text x="350" y="62" text-anchor="middle" fill="var(--muted)" font-size="6.5">Deduplicate</text>
+  <text x="350" y="73" text-anchor="middle" fill="var(--muted)" font-size="6.5">Group · Silence</text>
+  <text x="350" y="84" text-anchor="middle" fill="var(--muted)" font-size="6.5">Inhibit · Route</text>
+
+  <!-- Arrow to routing -->
+  <line data-dp-step="4" x1="410" y1="60" x2="448" y2="60" stroke="var(--r)" stroke-width="1" marker-end="url(#ob4r)"/>
+
+  <!-- Routing -->
+  <rect data-dp-step="4" x="450" y="35" width="100" height="50" rx="6" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="500" y="52" text-anchor="middle" fill="var(--y)" font-size="8.5" font-weight="700">Routing</text>
+  <text x="500" y="65" text-anchor="middle" fill="var(--muted)" font-size="6.5">By severity</text>
+  <text x="500" y="78" text-anchor="middle" fill="var(--muted)" font-size="6.5">By team/service</text>
+
+  <!-- Notification channels -->
+  <line data-dp-step="5" x1="550" y1="45" x2="598" y2="30" stroke="var(--r)" stroke-width=".8" marker-end="url(#ob4r)"/>
+  <line x1="550" y1="55" x2="598" y2="55" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ob4)"/>
+  <line x1="550" y1="65" x2="598" y2="80" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ob4)"/>
+  <line x1="550" y1="75" x2="598" y2="105" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ob4)"/>
+
+  <!-- Channel boxes -->
+  <rect data-dp-step="5" x="600" y="20" width="120" height="20" rx="4" fill="rgba(239,68,68,.08)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="660" y="34" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="600">🚨 PagerDuty (SEV1)</text>
+
+  <rect x="600" y="45" width="120" height="20" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="660" y="59" text-anchor="middle" fill="var(--a)" font-size="7.5">💬 Slack #alerts</text>
+
+  <rect x="600" y="70" width="120" height="20" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="660" y="84" text-anchor="middle" fill="var(--g)" font-size="7.5">📧 Email (SEV3-4)</text>
+
+  <rect x="600" y="95" width="120" height="20" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="660" y="109" text-anchor="middle" fill="var(--p)" font-size="7.5">📋 Jira Ticket</text>
+
+  <!-- Bottom label -->
+  <text x="375" y="130" text-anchor="middle" fill="var(--muted)" font-size="7.5">Alert fatigue killer: deduplicate → group → route by severity → escalate on timeout</text>
+</svg>
+
+<!-- Alert Quality Table -->
+<div class="d-title"><span class="num d-green">▸</span> Alert Quality: Good vs Bad</div>
+<table>
+<tr><th>Quality</th><th>Alert Example</th><th>Why</th><th>Action</th></tr>
+<tr><td><span class="hg">✅ Good</span></td><td>Error rate &gt; 1% for 5 min on payment-svc</td><td>Sustained, actionable, specific service</td><td>Investigate payment gateway</td></tr>
+<tr><td><span class="hg">✅ Good</span></td><td>p99 latency &gt; 2s for 3 min</td><td>User-impacting, time-windowed</td><td>Check DB queries, scale pods</td></tr>
+<tr><td><span class="hg">✅ Good</span></td><td>Error budget burn rate &gt; 14.4x for 1h</td><td>SLO-based, predictive</td><td>Will breach SLO in 6h if unchecked</td></tr>
+<tr><td><span class="hr">❌ Bad</span></td><td>Any single 500 error</td><td><span class="hr">Too noisy</span> — single errors are normal</td><td>Alert fatigue, ignored</td></tr>
+<tr><td><span class="hr">❌ Bad</span></td><td>CPU &gt; 50%</td><td><span class="hr">Not actionable</span> — 50% is healthy</td><td>Wastes on-call time</td></tr>
+<tr><td><span class="hr">❌ Bad</span></td><td>Disk usage &gt; 80% (no duration)</td><td><span class="hr">No time window</span> — transient spikes trigger</td><td>False positives</td></tr>
+</table>
+
+<!-- On-Call Best Practices -->
+<div class="d-title"><span class="num d-cyan">▸</span> On-Call Best Practices</div>
+<div class="b bg"><span class="hi">On-Call Rules:</span> <span class="hg">Every alert must have a runbook</span> — link in alert annotation. <span class="hg">Escalation policy</span> — if no ack in 5 min, escalate. <span class="hg">Rotation</span> — weekly, with handoff notes. <span class="hg">Blameless culture</span> — focus on systems, not people. <span class="hg">Toil budget</span> — if &gt;50% time on toil, fix the system.</div>
+
+<!-- Burn Rate Alerting -->
+<div class="d-title"><span class="num d-green">▸</span> Burn Rate Alerting (Multi-Window)</div>
+<div class="b bp"><span class="hi">Burn Rate Concept:</span> If SLO = 99.9% over 30 days → error budget = 0.1% = 43.2 min of downtime/month.
+<br><br><span class="hg">Burn rate 1x</span> = consuming budget at exactly the allowed rate (will exhaust in 30 days).
+<br><span class="ho">Burn rate 14.4x</span> = will exhaust entire budget in ~2 days → <span class="hr">page immediately</span>.
+<br><span class="hg">Burn rate 6x</span> = will exhaust in ~5 days → ticket, investigate.
+<br><span class="hg">Burn rate 1x</span> = normal → no action.
+<br><br><span class="hi">Multi-window:</span> Use <span class="hg">short window</span> (5 min) to detect fast burns + <span class="hg">long window</span> (1h) to confirm sustained. Prevents false positives from brief spikes.</span></div>
+
+<div class="b by"><span class="hi">Tools:</span> <span class="hg">PagerDuty</span> · <span class="hg">Opsgenie</span> · <span class="hg">Grafana OnCall</span> · <span class="hg">Prometheus Alertmanager</span>. Key features: deduplication, grouping, silencing, inhibition, escalation chains.</div>
+
+<div class="b bb"><span class="hi">One-liner:</span> Only page if <span class="hg">human action needed</span>. Use <span class="hg">burn rate alerts</span> over static thresholds. Every alert needs a <span class="hg">runbook</span>. Group + deduplicate to prevent <span class="hr">alert fatigue</span>.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 5: OPENTELEMETRY
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="opentelemetry">
+<h2>OpenTelemetry</h2>
+<p class="su">Vendor-neutral observability framework — <span class="hg">one SDK for Traces + Metrics + Logs</span>. Instrument once, export to any backend. CNCF project, industry standard.</p>
+
+<!-- ═══ OTel Architecture SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> OpenTelemetry Architecture</div>
+<svg width="100%" viewBox="0 0 750 200" style="max-width:750px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob5" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ob5a" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker>
+  </defs>
+  <title>OpenTelemetry Architecture: SDK → Processor → Exporter → Collector → Multiple Backends</title>
+
+  <!-- Application with SDK -->
+  <rect data-dp-step="1" x="10" y="20" width="160" height="160" rx="8" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="90" y="38" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">Application + OTel SDK</text>
+
+  <!-- Three signals -->
+  <rect data-dp-step="1" x="22" y="48" width="136" height="24" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="90" y="64" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="600">📍 Traces (SpanProcessor)</text>
+
+  <rect data-dp-step="1" x="22" y="78" width="136" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="90" y="94" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="600">📊 Metrics (MeterProvider)</text>
+
+  <rect data-dp-step="1" x="22" y="108" width="136" height="24" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="90" y="124" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="600">📝 Logs (LoggerProvider)</text>
+
+  <!-- Instrumentation label -->
+  <rect x="22" y="140" width="136" height="18" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width=".6"/>
+  <text x="90" y="152" text-anchor="middle" fill="var(--p)" font-size="6.5">Auto + Manual Instrumentation</text>
+  <text x="90" y="172" text-anchor="middle" fill="var(--muted)" font-size="6.5">Context Propagation (W3C)</text>
+
+  <!-- Arrow: SDK → Collector -->
+  <line data-dp-step="2" x1="170" y1="80" x2="228" y2="80" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ob5a)"/>
+  <text x="199" y="72" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">OTLP</text>
+  <text x="199" y="92" text-anchor="middle" fill="var(--muted)" font-size="6">(gRPC/HTTP)</text>
+
+  <!-- OTel Collector -->
+  <rect data-dp-step="3" x="230" y="15" width="200" height="170" rx="8" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="330" y="34" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">OTel Collector</text>
+
+  <!-- Receiver -->
+  <rect data-dp-step="3" x="245" y="42" width="170" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="330" y="55" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="600">Receivers</text>
+  <text x="330" y="65" text-anchor="middle" fill="var(--muted)" font-size="6.5">OTLP · Prometheus · Jaeger · Zipkin</text>
+
+  <!-- Processor -->
+  <rect data-dp-step="4" x="245" y="76" width="170" height="28" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="330" y="89" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="600">Processors</text>
+  <text x="330" y="99" text-anchor="middle" fill="var(--muted)" font-size="6.5">Batch · Filter · Transform · Sampling</text>
+
+  <!-- Exporter -->
+  <rect data-dp-step="5" x="245" y="110" width="170" height="28" rx="4" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="330" y="123" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="600">Exporters</text>
+  <text x="330" y="133" text-anchor="middle" fill="var(--muted)" font-size="6.5">OTLP · Prometheus · Jaeger · Datadog</text>
+
+  <!-- Connector -->
+  <rect x="245" y="144" width="170" height="22" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width=".6"/>
+  <text x="330" y="158" text-anchor="middle" fill="var(--p)" font-size="6.5">Connectors (route between pipelines)</text>
+
+  <!-- Arrows to backends -->
+  <line data-dp-step="6" x1="430" y1="50" x2="488" y2="35" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob5)"/>
+  <line x1="430" y1="80" x2="488" y2="75" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob5)"/>
+  <line x1="430" y1="110" x2="488" y2="115" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob5)"/>
+  <line x1="430" y1="140" x2="488" y2="155" stroke="var(--muted)" stroke-width="1" marker-end="url(#ob5)"/>
+
+  <!-- Backends -->
+  <rect data-dp-step="6" x="490" y="22" width="130" height="24" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="555" y="38" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="600">Jaeger / Tempo (Traces)</text>
+
+  <rect data-dp-step="7" x="490" y="62" width="130" height="24" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="555" y="78" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="600">Prometheus (Metrics)</text>
+
+  <rect data-dp-step="7" x="490" y="102" width="130" height="24" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="555" y="118" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="600">Loki / ES (Logs)</text>
+
+  <rect data-dp-step="8" x="490" y="142" width="130" height="24" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="555" y="158" text-anchor="middle" fill="var(--p)" font-size="7.5" font-weight="600">Datadog / New Relic</text>
+
+  <!-- Grafana -->
+  <line x1="620" y1="38" x2="658" y2="80" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ob5)"/>
+  <line x1="620" y1="78" x2="658" y2="80" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ob5)"/>
+  <line x1="620" y1="118" x2="658" y2="80" stroke="var(--muted)" stroke-width=".7" marker-end="url(#ob5)"/>
+  <rect data-dp-step="9" x="660" y="60" width="80" height="40" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1"/>
+  <text x="700" y="78" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Grafana</text>
+  <text x="700" y="92" text-anchor="middle" fill="var(--muted)" font-size="6.5">Unified View</text>
+
+  <text x="375" y="196" text-anchor="middle" fill="var(--muted)" font-size="7.5">Instrument once → export everywhere. Vendor-neutral, CNCF graduated project.</text>
+</svg>
+
+<!-- Three Signals -->
+<div class="d-title"><span class="num d-green">▸</span> Three Signals Unified</div>
+<table>
+<tr><th>Signal</th><th>What It Captures</th><th>OTel API</th><th>Data Model</th><th>Best Backend</th></tr>
+<tr><td><span class="hi">Traces</span></td><td>Request flow across services</td><td>TracerProvider → Tracer → Span</td><td>Spans with parent-child, attributes, events</td><td>Jaeger, Tempo, Zipkin</td></tr>
+<tr><td><span class="hi">Metrics</span></td><td>Numeric measurements over time</td><td>MeterProvider → Meter → Instrument</td><td>Counter, Histogram, Gauge, UpDownCounter</td><td>Prometheus, Datadog</td></tr>
+<tr><td><span class="hi">Logs</span></td><td>Discrete events with context</td><td>LoggerProvider → Logger → LogRecord</td><td>Timestamp, severity, body, attributes, trace_id</td><td>Loki, Elasticsearch</td></tr>
+</table>
+
+<!-- Instrumentation Patterns -->
+<div class="d-title"><span class="num d-cyan">▸</span> Instrumentation Patterns</div>
+<table>
+<tr><th>Type</th><th>How</th><th>Effort</th><th>Coverage</th><th>Example</th></tr>
+<tr><td><span class="hg">Auto-instrumentation</span></td><td>Agent/SDK hooks into frameworks automatically</td><td>Zero code changes</td><td>HTTP, DB, gRPC, messaging</td><td>Java agent, Python auto-instr, Node.js require hook</td></tr>
+<tr><td><span class="hi">Manual instrumentation</span></td><td>Developer adds spans/metrics in code</td><td>Code changes required</td><td>Business logic, custom operations</td><td><code>tracer.startSpan("processPayment")</code></td></tr>
+<tr><td><span class="hi">Semantic Conventions</span></td><td>Standardized attribute names</td><td>Follow naming guide</td><td>Cross-service consistency</td><td><code>http.method</code>, <code>db.system</code>, <code>rpc.service</code></td></tr>
+</table>
+
+<!-- Collector Deployment Patterns -->
+<div class="d-title"><span class="num d-green">▸</span> Collector Deployment Patterns</div>
+<table>
+<tr><th>Pattern</th><th>Architecture</th><th>Pros</th><th>Cons</th><th>Best For</th></tr>
+<tr><td><span class="hi">Sidecar</span></td><td>Collector per pod (DaemonSet or sidecar container)</td><td>Isolation, per-service config, low latency</td><td>More resource usage, many instances</td><td>Kubernetes, per-service sampling</td></tr>
+<tr><td><span class="hi">Gateway</span></td><td>Centralized collector cluster (Deployment)</td><td>Fewer instances, centralized config, easier to manage</td><td>Single point of failure, network hop</td><td>Simple setups, centralized processing</td></tr>
+<tr><td><span class="hi">Agent + Gateway</span></td><td>Local agent → central gateway (two-tier)</td><td>Best of both: local buffering + central processing</td><td>More complex, two configs</td><td>Large-scale production</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Key Benefits:</span> <span class="hg">Vendor-neutral</span> — switch backends without re-instrumenting. <span class="hg">Correlation</span> — trace_id links logs ↔ traces ↔ metrics. <span class="hg">Semantic conventions</span> — standardized attribute names across languages. <span class="hg">Collector</span> — offloads processing from app (batching, retry, sampling).</div>
+
+<div class="b bb"><span class="hi">One-liner:</span> Use <span class="hg">OTel auto-instrumentation</span> for 80% coverage, add <span class="hg">manual spans</span> for business logic. Deploy collector as <span class="hg">agent + gateway</span> in production. Correlate all three signals via <span class="hg">trace_id</span>.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 6: DASHBOARDS & VISUALIZATION
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="dashboards">
+<h2>Dashboards &amp; Visualization</h2>
+<p class="su">Dashboards are the <span class="hg">first thing you look at during an incident</span>. Design for clarity: USE for infra, RED for services, business KPIs for stakeholders.</p>
+
+<!-- Dashboard Design Principles -->
+<div class="d-title"><span class="num d-cyan">▸</span> Dashboard Design Principles</div>
+<table>
+<tr><th>Principle</th><th>Description</th><th>Example</th></tr>
+<tr><td><span class="hi">Audience-first</span></td><td>Different dashboards for different roles</td><td>SRE: latency/errors. PM: conversion rate. Exec: uptime %</td></tr>
+<tr><td><span class="hi">Top-down drill</span></td><td>Start high-level, click to detail</td><td>Service overview → endpoint breakdown → individual trace</td></tr>
+<tr><td><span class="hi">Time alignment</span></td><td>All panels share same time range</td><td>Correlate CPU spike with latency increase at same moment</td></tr>
+<tr><td><span class="hi">Annotations</span></td><td>Mark deployments, incidents on timeline</td><td>Vertical line: "v2.4.1 deployed" — correlate with metric change</td></tr>
+<tr><td><span class="hi">Thresholds visible</span></td><td>Show SLO/SLA lines on graphs</td><td>Red line at p99 = 500ms (SLO boundary)</td></tr>
+<tr><td><span class="hi">≤ 8 panels</span></td><td>Cognitive load limit per dashboard</td><td>More panels = slower load + harder to scan during incident</td></tr>
+</table>
+
+<!-- The 4 Golden Dashboards -->
+<div class="d-title"><span class="num d-green">▸</span> The 4 Golden Dashboards Every Service Needs</div>
+<div class="d-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:6px 0">
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">1. Service Health (RED)</h4>
+<ul style="margin:4px 0;padding-left:14px;font-size:0.82em">
+<li>Request rate (RPS)</li>
+<li>Error rate (%)</li>
+<li>p50 / p95 / p99 latency</li>
+<li>Active connections</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">2. Infrastructure (USE)</h4>
+<ul style="margin:4px 0;padding-left:14px;font-size:0.82em">
+<li>CPU utilization %</li>
+<li>Memory usage / limits</li>
+<li>Disk I/O + space</li>
+<li>Network in/out</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--o)">3. Dependencies</h4>
+<ul style="margin:4px 0;padding-left:14px;font-size:0.82em">
+<li>DB query latency</li>
+<li>Cache hit ratio</li>
+<li>External API latency</li>
+<li>Queue depth / lag</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--p)">4. Business KPIs</h4>
+<ul style="margin:4px 0;padding-left:14px;font-size:0.82em">
+<li>Orders/min</li>
+<li>Signup conversion</li>
+<li>Revenue per minute</li>
+<li>Active users</li>
+</ul>
 </div>
 </div>
+
+<!-- Dashboard Anti-Patterns -->
+<div class="d-title"><span class="num d-cyan">▸</span> Dashboard Anti-Patterns</div>
+<table>
+<tr><th>Anti-Pattern</th><th>Problem</th><th>Fix</th></tr>
+<tr><td><span class="hr">Too many panels</span></td><td>Cognitive overload, slow rendering, can't find signal in noise</td><td>Max 6-8 panels per dashboard. Split into sub-dashboards.</td></tr>
+<tr><td><span class="hr">Vanity metrics</span></td><td>"Total requests ever" — not actionable, always goes up</td><td>Show <span class="hg">rate of change</span> (RPS), not cumulative totals</td></tr>
+<tr><td><span class="hr">No context</span></td><td>Graph shows spike but no reference for "normal"</td><td>Add <span class="hg">SLO threshold lines</span> + deployment annotations</td></tr>
+<tr><td><span class="hr">Average-only</span></td><td>Hides tail latency — 1% of users suffering</td><td>Always show <span class="hg">p50 + p95 + p99</span> together</td></tr>
+<tr><td><span class="hr">Stale dashboards</span></td><td>Panels for decommissioned services, broken queries</td><td>Quarterly dashboard review. Delete unused panels.</td></tr>
+<tr><td><span class="hr">No drill-down</span></td><td>See problem but can't investigate further</td><td>Link panels to detailed dashboards, traces, logs</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Grafana Tips:</span> Use <span class="hg">variables</span> for service/environment selectors. <span class="hg">Annotations</span> for deploys. <span class="hg">Alert rules</span> directly on panels. <span class="hg">Exemplars</span> — click a metric data point to jump to the exact trace. <span class="hg">Explore</span> mode for ad-hoc investigation.</div>
+
+<div class="b bb"><span class="hi">One-liner:</span> Build <span class="hg">4 dashboards per service</span> (RED, USE, Dependencies, Business). Max <span class="hg">8 panels each</span>. Show percentiles not averages. Add <span class="hg">SLO lines + deploy annotations</span>. Link to traces for drill-down.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 7: INCIDENT RESPONSE
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="incident-response">
+<h2>Incident Response</h2>
+<p class="su">Structured process: <span class="hg">Detect → Triage → Mitigate → Resolve → Postmortem</span>. Goal: minimize user impact, learn from failures, prevent recurrence.</p>
+
+<!-- ═══ Incident Lifecycle SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Incident Lifecycle</div>
+<svg width="100%" viewBox="0 0 750 150" style="max-width:750px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ob6" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ob6g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>Incident Lifecycle: Detect → Triage → Mitigate → Resolve → Postmortem</title>
+
+  <!-- Phase 1: Detect -->
+  <rect data-dp-step="1" x="20" y="30" width="120" height="70" rx="8" fill="rgba(239,68,68,.06)" stroke="var(--r)" stroke-width="1.3"/>
+  <text x="80" y="50" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">🚨 Detect</text>
+  <text x="80" y="65" text-anchor="middle" fill="var(--muted)" font-size="7">Alert fires</text>
+  <text x="80" y="77" text-anchor="middle" fill="var(--muted)" font-size="7">User reports</text>
+  <text x="80" y="89" text-anchor="middle" fill="var(--muted)" font-size="7">Anomaly detection</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="2" x1="140" y1="65" x2="168" y2="65" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#ob6)"/>
+
+  <!-- Phase 2: Triage -->
+  <rect data-dp-step="2" x="170" y="30" width="120" height="70" rx="8" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.3"/>
+  <text x="230" y="50" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">🔍 Triage</text>
+  <text x="230" y="65" text-anchor="middle" fill="var(--muted)" font-size="7">Assess severity</text>
+  <text x="230" y="77" text-anchor="middle" fill="var(--muted)" font-size="7">Assign IC</text>
+  <text x="230" y="89" text-anchor="middle" fill="var(--muted)" font-size="7">Open war room</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="3" x1="290" y1="65" x2="318" y2="65" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#ob6)"/>
+
+  <!-- Phase 3: Mitigate -->
+  <rect data-dp-step="3" x="320" y="30" width="120" height="70" rx="8" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.3"/>
+  <text x="380" y="50" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">🛡️ Mitigate</text>
+  <text x="380" y="65" text-anchor="middle" fill="var(--muted)" font-size="7">Stop the bleeding</text>
+  <text x="380" y="77" text-anchor="middle" fill="var(--muted)" font-size="7">Rollback / scale</text>
+  <text x="380" y="89" text-anchor="middle" fill="var(--muted)" font-size="7">Feature flag off</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="4" x1="440" y1="65" x2="468" y2="65" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#ob6)"/>
+
+  <!-- Phase 4: Resolve -->
+  <rect data-dp-step="4" x="470" y="30" width="120" height="70" rx="8" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.3"/>
+  <text x="530" y="50" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">✅ Resolve</text>
+  <text x="530" y="65" text-anchor="middle" fill="var(--muted)" font-size="7">Root cause fix</text>
+  <text x="530" y="77" text-anchor="middle" fill="var(--muted)" font-size="7">Verify recovery</text>
+  <text x="530" y="89" text-anchor="middle" fill="var(--muted)" font-size="7">Close incident</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="5" x1="590" y1="65" x2="618" y2="65" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ob6g)"/>
+
+  <!-- Phase 5: Postmortem -->
+  <rect data-dp-step="5" x="620" y="30" width="120" height="70" rx="8" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.3"/>
+  <text x="680" y="50" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">📝 Postmortem</text>
+  <text x="680" y="65" text-anchor="middle" fill="var(--muted)" font-size="7">Blameless review</text>
+  <text x="680" y="77" text-anchor="middle" fill="var(--muted)" font-size="7">Action items</text>
+  <text x="680" y="89" text-anchor="middle" fill="var(--muted)" font-size="7">Prevent recurrence</text>
+
+  <!-- Timeline labels -->
+  <text x="80" y="115" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">MTTD</text>
+  <text x="80" y="126" text-anchor="middle" fill="var(--muted)" font-size="6">Time to Detect</text>
+  <line x1="20" y1="108" x2="140" y2="108" stroke="var(--r)" stroke-width=".8"/>
+
+  <text x="380" y="115" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">MTTR</text>
+  <text x="380" y="126" text-anchor="middle" fill="var(--muted)" font-size="6">Time to Resolve</text>
+  <line x1="170" y1="108" x2="590" y2="108" stroke="var(--o)" stroke-width=".8"/>
+
+  <text x="680" y="115" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Learn</text>
+  <text x="680" y="126" text-anchor="middle" fill="var(--muted)" font-size="6">Prevent next</text>
+
+  <text x="375" y="145" text-anchor="middle" fill="var(--muted)" font-size="7.5">Goal: Minimize MTTD + MTTR. Maximize learning from every incident.</text>
+</svg>
+
+<!-- Severity Levels Table -->
+<div class="d-title"><span class="num d-green">▸</span> Severity Levels</div>
+<table>
+<tr><th>Severity</th><th>Impact</th><th>Response Time</th><th>Who's Paged</th><th>Example</th></tr>
+<tr><td><span class="hr">SEV1 — Critical</span></td><td>Complete outage, data loss, security breach</td><td>&lt; 5 min</td><td>On-call + manager + exec</td><td>Payment system down, data breach</td></tr>
+<tr><td><span class="ho">SEV2 — Major</span></td><td>Significant degradation, partial outage</td><td>&lt; 15 min</td><td>On-call + team lead</td><td>50% of requests failing, one region down</td></tr>
+<tr><td><span class="hi">SEV3 — Minor</span></td><td>Limited impact, workaround available</td><td>&lt; 4 hours</td><td>On-call (next business day OK)</td><td>Non-critical feature broken, slow queries</td></tr>
+<tr><td><span class="hg">SEV4 — Low</span></td><td>Cosmetic, no user impact</td><td>Next sprint</td><td>Ticket only</td><td>Typo in error message, minor UI glitch</td></tr>
+</table>
+
+<!-- MTTR/MTTD/MTBF -->
+<div class="d-title"><span class="num d-cyan">▸</span> Key Reliability Metrics</div>
+<table>
+<tr><th>Metric</th><th>Full Name</th><th>Formula</th><th>Target</th><th>How to Improve</th></tr>
+<tr><td><span class="hi">MTTD</span></td><td>Mean Time to Detect</td><td>Time from failure start → alert fires</td><td>&lt; 5 min</td><td>Better monitoring, anomaly detection, synthetic probes</td></tr>
+<tr><td><span class="hi">MTTR</span></td><td>Mean Time to Resolve</td><td>Time from detection → service restored</td><td>&lt; 30 min (SEV1)</td><td>Runbooks, automation, rollback capability, feature flags</td></tr>
+<tr><td><span class="hi">MTBF</span></td><td>Mean Time Between Failures</td><td>Total uptime ÷ number of failures</td><td>Maximize</td><td>Chaos engineering, testing, redundancy, code quality</td></tr>
+<tr><td><span class="hi">MTTA</span></td><td>Mean Time to Acknowledge</td><td>Time from alert → human acknowledges</td><td>&lt; 5 min</td><td>Clear escalation policy, on-call rotation</td></tr>
+</table>
+
+<!-- Postmortem Template -->
+<div class="d-title"><span class="num d-green">▸</span> Postmortem Template Outline</div>
+<div class="b bg"><span class="hi">Blameless Postmortem Structure:</span>
+<br><br><span class="hg">1. Summary</span> — What happened, impact, duration, severity
+<br><span class="hg">2. Timeline</span> — Minute-by-minute: detection, actions taken, resolution
+<br><span class="hg">3. Root Cause</span> — The "5 Whys" analysis. What actually broke and why
+<br><span class="hg">4. Impact</span> — Users affected, revenue lost, SLO budget consumed
+<br><span class="hg">5. What Went Well</span> — Detection speed, team response, tools that helped
+<br><span class="hg">6. What Went Wrong</span> — Gaps in monitoring, slow detection, missing runbooks
+<br><span class="hg">7. Action Items</span> — Specific, assigned, time-bound fixes (with owners + deadlines)
+<br><span class="hg">8. Lessons Learned</span> — Systemic improvements, process changes
+</div>
+
+<div class="b by"><span class="hi">Incident Response Tools:</span> <span class="hg">PagerDuty</span> (alerting + escalation) · <span class="hg">Statuspage</span> (external communication) · <span class="hg">Slack/Teams</span> (war room) · <span class="hg">Jira/Linear</span> (action items) · <span class="hg">Rootly/incident.io</span> (incident management) · <span class="hg">Blameless</span> (postmortem tracking)</div>
+
+<div class="b bp"><span class="hi">Chaos Engineering:</span> Proactively inject failures to find weaknesses <em>before</em> production incidents. Tools: <span class="hg">Chaos Monkey</span> (random instance kill) · <span class="hg">Litmus</span> (Kubernetes chaos) · <span class="hg">Gremlin</span> (managed platform). Start with <span class="hg">Game Days</span> — scheduled, controlled experiments with rollback plan.</div>
+
+<div class="b bb"><span class="hi">One-liner:</span> <span class="hg">Detect fast</span> (MTTD &lt; 5 min), <span class="hg">mitigate first</span> (rollback &gt; debug), <span class="hg">resolve properly</span>, then <span class="hg">blameless postmortem</span> with action items. Every SEV1 gets a postmortem within 48h.</div>
+</div>
+
+</div><!-- /.ct -->
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
-<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<div class="progress-bar" id="progressBar"></div>
+<script>
+const b=document.getElementById('topBtn');
+const p=document.getElementById('progressBar');
+window.addEventListener('scroll',()=>{
+  b.style.display=window.scrollY>400?'flex':'none';
+  const h=document.documentElement;
+  const pct=h.scrollTop/(h.scrollHeight-h.clientHeight)*100;
+  if(p)p.style.width=pct+'%';
+});
+</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script>
+<script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

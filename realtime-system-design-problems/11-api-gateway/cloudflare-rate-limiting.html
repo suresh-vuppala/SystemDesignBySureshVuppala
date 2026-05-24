@@ -1,0 +1,264 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Cloudflare rate-limit 45M+ req/sec without adding latency? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Cloudflare rate-limit 45M+ requests/sec without adding latency?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🛡️</span> Design a distributed rate limiter: 45M req/sec, 300+ PoPs, fail-open, &lt;1ms overhead</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does an edge network rate-limit 45M+ requests/sec without adding latency, distributing rate counters across hundreds of PoPs while using fail-open policies to avoid blocking legitimate traffic during sync delays?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Rate limiting at the edge means <span class="hr">no central counter</span> — each of 300+ PoPs must make local decisions. But a distributed attacker can spread requests across PoPs to bypass per-PoP limits. How do you coordinate without adding latency?</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">45M+</div>
+<div style="font-size:.72rem;color:var(--muted)">requests / second</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">across all PoPs</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">300+</div>
+<div style="font-size:.72rem;color:var(--muted)">edge PoPs</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">globally distributed</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;1ms</div>
+<div style="font-size:.72rem;color:var(--muted)">added latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">rate check overhead</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Fail-Open</div>
+<div style="font-size:.72rem;color:var(--muted)">policy on sync failure</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">never block legit traffic</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture — Sliding Window at the Edge</h2>
+<p class="su">Local counters + async gossip for global coordination</p>
+
+<!-- ═══ Rate Limiting Architecture SVG ═══ -->
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cloudflare Rate Limiting — End-to-End Architecture">
+  <defs><marker id="rl-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Cloudflare Distributed Rate Limiting — End-to-End Architecture</text>
+
+  <!-- LAYER 1: CLIENT LAYER -->
+  <rect x="10" y="25" width="760" height="90" rx="8" fill="rgba(248,113,113,.02)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">CLIENT LAYER — 45M req/sec Global Traffic</text>
+
+  <!-- Client groups -->
+  <rect x="25" y="50" width="140" height="35" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="95" y="64" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Americas</text>
+  <text x="95" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">~15M req/sec</text>
+
+  <rect x="180" y="50" width="140" height="35" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="250" y="64" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Europe</text>
+  <text x="250" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">~12M req/sec</text>
+
+  <rect x="335" y="50" width="140" height="35" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="405" y="64" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Asia-Pacific</text>
+  <text x="405" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">~13M req/sec</text>
+
+  <rect x="490" y="50" width="140" height="35" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="560" y="64" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Other Regions</text>
+  <text x="560" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">~5M req/sec</text>
+
+  <!-- Key info -->
+  <rect x="645" y="50" width="112" height="35" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="701" y="64" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Rate Limit Key</text>
+  <text x="701" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">IP + API key + path</text>
+
+  <text x="390" y="100" text-anchor="middle" fill="var(--muted)" font-size="5">Anycast routing: each request hits nearest PoP automatically | Distributed attackers spread across PoPs</text>
+
+  <!-- Arrows down -->
+  <line x1="95" y1="108" x2="95" y2="125" stroke="var(--r)" stroke-width=".8" marker-end="url(#rl-arr)"/>
+  <line x1="250" y1="108" x2="250" y2="125" stroke="var(--r)" stroke-width=".8" marker-end="url(#rl-arr)"/>
+  <line x1="405" y1="108" x2="405" y2="125" stroke="var(--r)" stroke-width=".8" marker-end="url(#rl-arr)"/>
+  <line x1="560" y1="108" x2="560" y2="125" stroke="var(--r)" stroke-width=".8" marker-end="url(#rl-arr)"/>
+
+  <!-- LAYER 2: EDGE LAYER -->
+  <rect x="10" y="120" width="560" height="140" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="290" y="135" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">EDGE LAYER — 300+ PoPs, In-Memory Counters</text>
+
+  <!-- PoP US-East -->
+  <rect x="25" y="145" width="165" height="55" rx="5" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width="1"/>
+  <text x="107" y="160" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">PoP — US-East (IAD)</text>
+  <text x="107" y="173" text-anchor="middle" fill="var(--muted)" font-size="5">in-memory sliding window</text>
+  <text x="107" y="185" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">allow/deny in &lt;1ms</text>
+  <text x="107" y="196" text-anchor="middle" fill="var(--muted)" font-size="4.5">no DB, no Redis, L1 cache</text>
+
+  <!-- PoP EU-West -->
+  <rect x="200" y="145" width="165" height="55" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="282" y="160" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">PoP — EU-West (CDG)</text>
+  <text x="282" y="173" text-anchor="middle" fill="var(--muted)" font-size="5">in-memory sliding window</text>
+  <text x="282" y="185" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">independent local decision</text>
+  <text x="282" y="196" text-anchor="middle" fill="var(--muted)" font-size="4.5">per-key evaluation &lt;1ms</text>
+
+  <!-- PoP AP-South -->
+  <rect x="375" y="145" width="180" height="55" rx="5" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1"/>
+  <text x="465" y="160" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">PoP — AP-South (SIN)</text>
+  <text x="465" y="173" text-anchor="middle" fill="var(--muted)" font-size="5">in-memory sliding window</text>
+  <text x="465" y="185" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">fail-open if gossip stale</text>
+  <text x="465" y="196" text-anchor="middle" fill="var(--muted)" font-size="4.5">availability &gt; precision</text>
+
+  <!-- Edge layer outputs -->
+  <text x="290" y="218" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Each PoP: weighted = curr_bucket + prev_bucket × overlap% | If weighted ≥ limit → DENY | else → ALLOW</text>
+  <text x="290" y="232" text-anchor="middle" fill="var(--muted)" font-size="4.5">300+ PoPs × per-worker counters | Zero network I/O on hot path | Counter lives in CPU L1 cache</text>
+
+  <!-- Allow output -->
+  <line x1="200" y1="245" x2="200" y2="295" stroke="var(--g)" stroke-width="1" marker-end="url(#rl-arr)"/>
+  <text x="185" y="270" fill="var(--g)" font-size="5" font-weight="600">ALLOW</text>
+
+  <!-- Deny output -->
+  <line x1="420" y1="245" x2="420" y2="295" stroke="var(--r)" stroke-width="1" marker-end="url(#rl-arr)"/>
+  <text x="435" y="270" fill="var(--r)" font-size="5" font-weight="600">DENY</text>
+
+  <!-- Sliding Window + Fail-open side panel -->
+  <rect x="580" y="120" width="190" height="80" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="675" y="135" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Sliding Window Formula</text>
+  <text x="675" y="150" text-anchor="middle" fill="var(--muted)" font-size="5">weighted = curr_count</text>
+  <text x="675" y="163" text-anchor="middle" fill="var(--muted)" font-size="5">+ prev_count × (1 - elapsed/window)</text>
+  <text x="675" y="178" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">e.g. 40 + 80×0.5 = 80</text>
+  <text x="675" y="191" text-anchor="middle" fill="var(--muted)" font-size="4.5">No boundary burst problem</text>
+
+  <!-- Fail-open box -->
+  <rect x="580" y="205" width="190" height="50" rx="4" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="675" y="220" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Fail-Open Policy</text>
+  <text x="675" y="234" text-anchor="middle" fill="var(--muted)" font-size="5">If gossip stale → ALLOW</text>
+  <text x="675" y="247" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Never block legit traffic</text>
+
+  <!-- LAYER 3: COORDINATION + OUTPUT LAYER -->
+  <rect x="10" y="260" width="560" height="120" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="290" y="275" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">COORDINATION &amp; OUTPUT LAYER</text>
+
+  <!-- Allow → Origin -->
+  <rect x="25" y="290" width="200" height="55" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="125" y="306" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">ALLOW → Origin Server</text>
+  <text x="125" y="320" text-anchor="middle" fill="var(--muted)" font-size="5.5">200 OK — clean traffic forwarded</text>
+  <text x="125" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">RateLimit-Remaining: 20</text>
+  <text x="125" y="343" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Origin sees only good traffic</text>
+
+  <!-- Deny → 429 -->
+  <rect x="245" y="290" width="200" height="55" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
+  <text x="345" y="306" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">DENY → 429 Too Many</text>
+  <text x="345" y="320" text-anchor="middle" fill="var(--muted)" font-size="5.5">Retry-After: 30s</text>
+  <text x="345" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">RateLimit-Remaining: 0</text>
+  <text x="345" y="343" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">Client backs off intelligently</text>
+
+  <!-- Gossip Coordination -->
+  <rect x="25" y="350" width="530" height="22" rx="3" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="290" y="365" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gossip Protocol: PoPs share local counts every 1-5s → aggregate global rate → tighten/loosen local limits</text>
+
+  <!-- Gossip arrows between PoPs (visual) -->
+  <line x1="107" y1="200" x2="282" y2="200" stroke="var(--y)" stroke-width=".6" stroke-dasharray="2,2"/>
+  <line x1="282" y1="200" x2="465" y2="200" stroke="var(--y)" stroke-width=".6" stroke-dasharray="2,2"/>
+  <text x="195" y="210" text-anchor="middle" fill="var(--y)" font-size="4">gossip 1-5s</text>
+  <text x="375" y="210" text-anchor="middle" fill="var(--y)" font-size="4">gossip 1-5s</text>
+
+  <!-- Coordination side panel -->
+  <rect x="580" y="260" width="190" height="120" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="675" y="275" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Global Coordination</text>
+  <text x="675" y="290" text-anchor="middle" fill="var(--muted)" font-size="5">Aggregate counts every 1-5s</text>
+  <text x="675" y="305" text-anchor="middle" fill="var(--muted)" font-size="5">Global rate = Σ all PoP counts</text>
+  <text x="675" y="320" text-anchor="middle" fill="var(--muted)" font-size="5">If global &gt; threshold:</text>
+  <text x="675" y="333" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">tighten all local limits</text>
+  <text x="675" y="348" text-anchor="middle" fill="var(--muted)" font-size="4.5">Eventually consistent</text>
+  <text x="675" y="361" text-anchor="middle" fill="var(--muted)" font-size="4.5">No central Redis needed</text>
+  <text x="675" y="374" text-anchor="middle" fill="var(--r)" font-size="4.5">Tradeoff: 1-5s window for</text>
+  <text x="675" y="384" text-anchor="middle" fill="var(--r)" font-size="4.5">distributed attack bypass</text>
+
+  <!-- BOTTOM: Sliding Window Calculation Example -->
+  <rect x="10" y="390" width="760" height="103" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="406" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Sliding Window Calculation — Concrete Example</text>
+
+  <!-- Window visualization -->
+  <rect x="40" y="416" width="180" height="20" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="130" y="430" text-anchor="middle" fill="var(--a2)" font-size="5.5">Previous Window (60s): 80 requests</text>
+
+  <rect x="220" y="416" width="180" height="20" rx="3" fill="rgba(34,211,238,.08)" stroke="var(--c)" stroke-width=".6"/>
+  <text x="310" y="430" text-anchor="middle" fill="var(--c)" font-size="5.5">Current Window (30s elapsed): 40 req</text>
+
+  <!-- Overlap -->
+  <rect x="190" y="416" width="30" height="20" rx="0" fill="rgba(251,191,36,.15)" stroke="var(--y)" stroke-width=".4"/>
+  <text x="205" y="430" text-anchor="middle" fill="var(--y)" font-size="4.5">50%</text>
+
+  <!-- Formula -->
+  <text x="560" y="424" text-anchor="middle" fill="var(--muted)" font-size="5.5">overlap = 1 - (30s elapsed / 60s window) = 0.5</text>
+  <text x="560" y="438" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">weighted = 40 + (80 × 0.5) = 80</text>
+
+  <!-- Result -->
+  <text x="200" y="456" text-anchor="middle" fill="var(--muted)" font-size="5.5">Limit: 100 req/min per key</text>
+  <text x="200" y="470" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">80 &lt; 100 → ALLOW ✓</text>
+
+  <text x="500" y="456" text-anchor="middle" fill="var(--muted)" font-size="5.5">If current had 70 requests instead:</text>
+  <text x="500" y="470" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">70 + (80 × 0.5) = 110 &gt; 100 → DENY ✗ (429)</text>
+
+  <text x="390" y="488" text-anchor="middle" fill="var(--muted)" font-size="5">Key = IP + API key + endpoint path | No boundary burst (unlike fixed window) | Memory: 2 counters per key per PoP</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Sliding window log (per-PoP) + approximate global sync</td><td>Precise locally, eventually consistent globally</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>In-memory counters per worker (no DB)</td><td>Zero I/O latency — counter lives in L1 cache</td></tr>
+<tr><td><span class="hi">Coordination</span></td><td>Async gossip every 1-5s between PoPs</td><td>Share counts without blocking request path</td></tr>
+<tr><td><span class="hi">Fail mode</span></td><td>Fail-open (allow) when sync is stale</td><td>Availability &gt; precision — never block legit users</td></tr>
+<tr><td><span class="hi">Key space</span></td><td>IP + API key + path (configurable)</td><td>Flexible: per-IP, per-key, per-endpoint rules</td></tr>
+<tr><td><span class="hi">Response</span></td><td>429 + Retry-After + RateLimit-* headers</td><td>Standard, client can back off intelligently</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Sliding window:</span> Each PoP maintains a <span class="hg">sliding window counter</span> per (key, rule). Window = weighted sum of current + previous bucket. Example: 100 req/min limit, current bucket (30s) has 40 req, previous bucket had 80 req → weighted = 40 + 80×0.5 = 80 → allow (under 100).</div>
+<div class="b by"><span class="hi">Global coordination:</span> Every 1-5s, PoPs gossip their local counts to a coordination layer. Global rate = sum of all PoP counts. If global exceeds threshold, all PoPs tighten local limits. <span class="hg">Tradeoff:</span> 1-5s window where distributed attacks can slightly exceed limits.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Central Redis counter</span> — adds 10-50ms RTT per request (unacceptable at edge). <span class="hr">Fail-closed on sync failure</span> — blocks all traffic during network issues. <span class="hr">Fixed window</span> — burst at window boundary (2× limit in 1s).</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Cloudflare</strong> — sliding window at 300+ PoPs. <strong>Stripe</strong> — token bucket per API key (100 req/sec). <strong>GitHub</strong> — 5000 req/hour sliding window. <strong>AWS API Gateway</strong> — token bucket with burst capacity.</div>
+</div>
+
+<!-- ═══ RESILIENCE ═══ -->
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Gossip network down</span></td><td>PoPs can't share counts — distributed attacker bypasses global limit</td><td>Fail-open: allow traffic. Tighten local limits as fallback (per-PoP limit = global/N).</td></tr>
+<tr><td><span class="hr">PoP overloaded</span></td><td>Counter updates delayed</td><td>Shed load at L4 before rate limiter. Pre-filter known-bad IPs via blocklist.</td></tr>
+<tr><td><span class="hr">Clock skew between PoPs</span></td><td>Window boundaries misaligned</td><td>Use NTP sync. Sliding window is tolerant of small skew (weighted average smooths it).</td></tr>
+<tr><td><span class="hr">Hot key (one API key = 90% traffic)</span></td><td>Counter for that key dominates memory</td><td>Separate hot-key path with dedicated counter. Alert on anomalous single-key volume.</td></tr>
+<tr><td><span class="hr">Legitimate burst (viral event)</span></td><td>Good traffic rate-limited</td><td>Burst allowance (token bucket hybrid). Whitelist known-good keys. Dynamic limit adjustment.</td></tr>
+</table>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 6 things to say for distributed rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Sliding window</strong> — weighted current + previous bucket (no boundary burst)<br>
+<span class="hg">2.</span> <strong>In-memory counters</strong> — zero I/O, counter in L1 cache, &lt;1ms overhead<br>
+<span class="hg">3.</span> <strong>Async gossip between PoPs</strong> — share counts every 1-5s without blocking requests<br>
+<span class="hg">4.</span> <strong>Fail-open policy</strong> — if sync is stale, allow traffic (availability &gt; precision)<br>
+<span class="hg">5.</span> <strong>429 + Retry-After + RateLimit headers</strong> — standard response, client backs off<br>
+<span class="hg">6.</span> <strong>No central Redis</strong> — adds 10-50ms RTT (unacceptable at edge). Local decision + eventual global sync.
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

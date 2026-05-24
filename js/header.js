@@ -1,21 +1,29 @@
-/* ═══ Shared Site Header — Modern Minimal ═══ */
+﻿/* ═══ Shared Site Header — HelloSDE.com ═══ */
 (function(){
   var path = location.pathname;
   var page = path.split('/').pop() || 'index.html';
-  var dir = path.split('/').slice(-2, -1)[0] || '';
+  var parts = path.split('/').filter(function(p){ return p !== ''; });
+  var dir = parts.length > 1 ? parts[parts.length - 2] : '';
 
+  // Detect which section we're in (handles subfolders)
   var activeSection = 'home';
-  if(dir === 'system-design-cheatsheet' || page.match(/^(0[1-9]|1[0-5])-/)) activeSection = 'cheatsheet';
-  if(dir === 'realtime-system-design-problems') activeSection = 'realtime';
+  var inCheatsheet = path.indexOf('system-design-cheatsheet') !== -1;
+  var inRealtime = path.indexOf('realtime-system-design-problems') !== -1;
+  if(inCheatsheet) activeSection = 'concepts';
+  if(inRealtime) activeSection = 'realtime';
   if(page === 'engineering-blogs.html') activeSection = 'blogs';
 
+  // Calculate prefix to reach the project root
   var prefix = '';
-  if(dir === 'system-design-cheatsheet' || dir === 'realtime-system-design-problems') prefix = '../';
+  if(dir === 'system-design-cheatsheet') prefix = '../';
+  else if(dir === 'realtime-system-design-problems') prefix = '../';
+  else if(inRealtime) prefix = '../../';
+  else if(inCheatsheet) prefix = '../';
 
   var links = [
-    {href: prefix+'system-design-cheatsheet/index.html', label:'System Design', id:'cheatsheet'},
-    {href: prefix+'realtime-system-design-problems/index.html', label:'Real-Time Design', id:'realtime'},
-    {href: prefix+'system-design-cheatsheet/engineering-blogs.html', label:'Engg Blogs', id:'blogs'}
+    {href: prefix+'system-design-cheatsheet/index.html', label:'Concepts', id:'concepts'},
+    {href: prefix+'realtime-system-design-problems/index.html', label:'Problems', id:'realtime'},
+    {href: prefix+'system-design-cheatsheet/engineering-blogs.html', label:'Blogs', id:'blogs'}
   ];
 
   var navItems = links.map(function(l){
@@ -23,9 +31,11 @@
   }).join('');
 
   var html = '<header class="sh">'
-    + '<a class="sh-brand" href="'+prefix+'index.html">System Design</a>'
-    + '<button class="sh-toggle" aria-label="Menu" aria-expanded="false">☰</button>'
+    + '<a class="sh-brand" href="'+prefix+'index.html">'
+    + '<svg class="sh-logo" width="22" height="22" viewBox="0 0 24 24" style="animation:shLogoSpin 8s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="var(--a)" stroke-width="2" stroke-dasharray="14 6" opacity=".7"/><circle cx="12" cy="12" r="5" fill="var(--a)" opacity=".9"/><circle cx="12" cy="12" r="2" fill="#fff"/></svg>'
+    + '<span>HelloSDE<span style="font-size:.65em;color:#fff;font-weight:500">.</span><span style="font-size:.65em;opacity:.5;font-weight:500">com</span></span></a>'
     + '<nav class="sh-nav">'+navItems+'</nav>'
+    + '<button class="sh-toggle" aria-label="Menu" aria-expanded="false">☰</button>'
     + '</header>';
 
   document.body.insertAdjacentHTML('afterbegin', html);

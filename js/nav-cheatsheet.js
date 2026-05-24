@@ -1,4 +1,4 @@
-/* ═══ Cheatsheet Section Nav ═══
+﻿/* ═══ Concepts Section Nav ═══
    Injects the topic navigation grid and search on cheatsheet pages.
 */
 (function(){
@@ -25,7 +25,7 @@ const navHTML = `
   <div class="nc"><h3 style="color:var(--t)">5. Infrastructure</h3>
     <div class="sg"><a href="05-infrastructure.html#load-balancer">Load Balancer</a><a href="05-infrastructure.html#api-gateway">API Gateway</a><a href="05-infrastructure.html#proxy">Proxy</a></div>
     <div class="sg"><a href="05-infrastructure.html#nginx">NGINX</a><a href="05-infrastructure.html#docker-k8s">Docker/K8s</a><a href="05-infrastructure.html#service-mesh">Mesh</a></div>
-    <div class="sg"><a href="05-infrastructure.html#multi-region">Multi-Region</a><a href="05-infrastructure.html#service-discovery">Service Discovery</a><a href="05-infrastructure.html#cicd">CI/CD</a><a href="05-infrastructure.html#serverless">Serverless</a></div>
+    <div class="sg"><a href="05-infrastructure.html#multi-region">Multi-Region</a><a href="05-infrastructure.html#service-discovery">Service Discovery</a><a href="05-infrastructure.html#cicd">CI/CD</a><a href="05-infrastructure.html#serverless">Serverless</a><a href="05-infrastructure.html#iac">IaC</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--g)">6. Storage Systems</h3>
     <div class="sg"><a href="06-storage.html#db-choice">DB Choice</a><a href="06-storage.html#db-internals">Internals</a><a href="06-storage.html#db-indexing">Indexing</a></div>
@@ -34,20 +34,21 @@ const navHTML = `
   </div>
   <div class="nc"><h3 style="color:var(--y)">7. Caching</h3>
     <div class="sg"><a href="07-caching.html#caching">Strategies</a><a href="07-caching.html#cdn">CDN</a></div>
-    <div class="sg"><a href="07-caching.html#redis">Redis</a><a href="07-caching.html#redis-fast">Why Redis Fast</a></div>
+    <div class="sg"><a href="07-caching.html#redis">Redis</a><a href="07-caching.html#redis-fast">Why Redis Fast</a><a href="07-caching.html#redis-cache">Redis Cache</a></div>
+    <div class="sg"><a href="07-caching.html#redis-pubsub">Pub/Sub &amp; Streams</a><a href="07-caching.html#redis-ha">Persistence/HA</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--o)">8. Messaging</h3>
     <div class="sg"><a href="08-messaging.html#message-queues">Queues</a><a href="08-messaging.html#kafka">Kafka</a><a href="08-messaging.html#pubsub">Pub/Sub</a></div>
-    <div class="sg"><a href="08-messaging.html#dlq">DLQ</a><a href="08-messaging.html#event-sourcing">Event Sourcing</a><a href="08-messaging.html#cqrs">CQRS</a><a href="08-messaging.html#ordering">Ordering</a></div>
+    <div class="sg"><a href="08-messaging.html#dlq">DLQ</a><a href="08-messaging.html#event-sourcing">Event Sourcing</a><a href="08-messaging.html#cqrs">CQRS</a><a href="08-messaging.html#ordering">Ordering</a><a href="08-messaging.html#schema-registry">Schema Registry</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--a)">9. Consistency</h3>
     <div class="sg"><a href="09-consistency.html#cap">CAP/PACELC</a><a href="09-consistency.html#consistency-models">Models</a><a href="09-consistency.html#consensus">Consensus</a></div>
-    <div class="sg"><a href="09-consistency.html#transactions">Transactions</a><a href="09-consistency.html#saga-orchestration">Saga</a><a href="09-consistency.html#conflict-resolution">Conflict Res.</a></div>
+    <div class="sg"><a href="09-consistency.html#transactions">Transactions</a><a href="09-consistency.html#saga-orchestration">Saga</a><a href="09-consistency.html#conflict-resolution">Conflict Res.</a><a href="09-consistency.html#clock-sync">Clock Sync</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--g)">10. Scalability</h3>
     <div class="sg"><a href="10-scalability.html#partitioning">Partitioning</a><a href="10-scalability.html#sharding">Sharding</a><a href="10-scalability.html#replication">Replication</a></div>
     <div class="sg"><a href="10-scalability.html#consistent-hashing">Consistent Hash</a><a href="10-scalability.html#bloom-filters">Bloom Filters</a><a href="10-scalability.html#rate-limiting">Rate Limiting</a></div>
-    <div class="sg"><a href="10-scalability.html#backpressure">Backpressure</a><a href="10-scalability.html#auto-scaling">Auto-Scaling</a></div>
+    <div class="sg"><a href="10-scalability.html#backpressure">Backpressure</a><a href="10-scalability.html#auto-scaling">Auto-Scaling</a><a href="10-scalability.html#graceful-degradation">Degradation</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--o)">11. Data Pipelines</h3>
     <div class="sg"><a href="11-data-pipelines.html#cdc">CDC</a><a href="11-data-pipelines.html#etl">ETL/ELT</a></div>

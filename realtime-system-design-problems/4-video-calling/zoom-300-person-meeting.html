@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Zoom handle 300-person meetings with adaptive video quality? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Zoom handle 300-person meetings with screen sharing and adaptive video quality?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">📹</span> Zoom · 300 participants · &lt;200ms latency · adaptive quality per participant</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<p class="su">How does Zoom handle 300-person meetings with screen sharing, adapting per-participant video quality in real-time based on available bandwidth while keeping total meeting latency under 200ms?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time media routing — SFU architecture, simulcast, bandwidth estimation, speaker detection. Not scheduling, recording, or chat. The hard question: <span class="hr">how do you route 300 video streams selectively to each participant based on their individual bandwidth and viewport, all under 200ms?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">300</div>
+<div style="font-size:.72rem;color:var(--muted)">participants</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">per meeting</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;200ms</div>
+<div style="font-size:.72rem;color:var(--muted)">end-to-end latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">glass-to-glass</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">2-5 Mbps</div>
+<div style="font-size:.72rem;color:var(--muted)">per participant</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">upload + download</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">48kHz</div>
+<div style="font-size:.72rem;color:var(--muted)">audio sample rate</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">Opus codec</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<table>
+<tr><th>Feature</th><th>Description</th></tr>
+<tr><td><span class="hi">Simulcast</span></td><td>Each client sends multiple quality layers (e.g., 180p, 360p, 720p) — SFU picks which to forward</td></tr>
+<tr><td><span class="hi">Speaker Detection</span></td><td>Audio energy analysis identifies active speaker; SFU prioritizes their high-quality stream</td></tr>
+<tr><td><span class="hi">Screen Share</span></td><td>Separate stream with higher resolution (1080p) and lower framerate (5-15fps), prioritized over video</td></tr>
+<tr><td><span class="hi">Bandwidth Estimation</span></td><td>Per-participant REMB/TWCC feedback; SFU adapts forwarded quality every 1-2 seconds</td></tr>
+<tr><td><span class="hi">Gallery View</span></td><td>Show up to 25-49 thumbnails; SFU sends low-res for non-speakers, high-res for active speaker</td></tr>
+<tr><td><span class="hi">SRTP Encryption</span></td><td>All media encrypted end-to-hop (SRTP); optional E2EE for sensitive meetings</td></tr>
+</table>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<table>
+<tr><th>Property</th><th>Target</th><th>Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;200ms</span> glass-to-glass</td><td>SFU (no transcoding) over MCU. UDP transport. Geo-distributed media servers.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td><span class="hg">300 participants</span> per room</td><td>SFU selective forwarding — O(N) not O(N²). Only forward what each client needs.</td></tr>
+<tr><td><span class="hi">Adaptability</span></td><td><span class="hg">Per-participant quality</span></td><td>Simulcast layers + bandwidth estimation. Each receiver gets optimal quality for their link.</td></tr>
+<tr><td><span class="hi">Reliability</span></td><td><span class="hg">99.9% uptime</span></td><td>Redundant SFU clusters. Seamless failover. FEC + NACK for packet loss recovery.</td></tr>
+<tr><td><span class="hi">Audio Priority</span></td><td><span class="hg">Audio never drops</span></td><td>Audio packets prioritized over video. Separate DSCP marking. Opus FEC built-in.</td></tr>
+<tr><td><span class="hi">Security</span></td><td><span class="hg">SRTP + DTLS</span></td><td>All streams encrypted. Key exchange via DTLS-SRTP. Optional E2EE layer.</td></tr>
+</table>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>High-Level Architecture</h2>
+<p class="su">SFU-based selective forwarding — each participant sends once, SFU decides what to forward to whom</p>
+
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zoom SFU end-to-end architecture diagram">
+  <defs><marker id="zm-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ LAYER 1: SENDER ═══ -->
+  <rect x="10" y="8" width="760" height="135" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: SENDER — Each participant encodes 3 simulcast layers + audio (Opus with FEC)</text>
+
+  <rect x="25" y="35" width="220" height="95" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="135" y="52" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Participant (Sender)</text>
+  <text x="135" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">encodes video at 3 quality layers:</text>
+  <rect x="35" y="73" width="200" height="14" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="135" y="83" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Layer 3: 1080p @30fps (~2.5 Mbps)</text>
+  <rect x="35" y="89" width="200" height="14" rx="2" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".5"/>
+  <text x="135" y="99" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Layer 2: 720p @30fps (~1.0 Mbps)</text>
+  <rect x="35" y="105" width="200" height="14" rx="2" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".5"/>
+  <text x="135" y="115" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Layer 1: 180p @15fps (~0.15 Mbps)</text>
+
+  <rect x="260" y="35" width="200" height="95" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="360" y="52" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Audio Encoding</text>
+  <text x="360" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">Opus codec @ 48kHz</text>
+  <text x="360" y="80" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">FEC (Forward Error Correction)</text>
+  <text x="360" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">handles 10% packet loss gracefully</text>
+  <text x="360" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">always prioritized over video</text>
+  <text x="360" y="119" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">never dropped (even at 500kbps)</text>
+
+  <rect x="475" y="35" width="290" height="95" rx="6" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="620" y="52" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="700">Transport: UDP/SRTP</text>
+  <text x="620" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">UDP for low latency (no head-of-line blocking)</text>
+  <text x="620" y="80" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">SRTP encryption (DTLS key exchange)</text>
+  <text x="620" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">tolerate packet loss vs TCP retransmit delay</text>
+  <text x="620" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">NACK for selective retransmit (critical frames)</text>
+  <text x="620" y="119" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">all 3 layers sent to SFU simultaneously</text>
+
+  <!-- ═══ LAYER 2: SFU ═══ -->
+  <rect x="10" y="150" width="760" height="165" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="165" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: SFU — Selective Forwarding Unit (per-participant bandwidth estimation, layer selection)</text>
+
+  <rect x="25" y="175" width="450" height="125" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="2"/>
+  <text x="250" y="192" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="800">SFU (Selective Forwarding Unit)</text>
+  <text x="250" y="206" text-anchor="middle" fill="var(--muted)" font-size="5.5">receives all 300 streams — forwards SUBSET to each client (no transcoding)</text>
+
+  <rect x="35" y="212" width="210" height="16" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="140" y="223" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bandwidth Estimator (TWCC per receiver)</text>
+  <rect x="35" y="231" width="210" height="16" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="140" y="242" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Active Speaker Detector (audio energy)</text>
+  <rect x="35" y="250" width="210" height="16" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".5"/>
+  <text x="140" y="261" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Layer Selector (pick quality per receiver)</text>
+  <rect x="35" y="269" width="210" height="16" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="140" y="280" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Packet Router (O(1) per packet, no decode)</text>
+
+  <text x="370" y="225" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Decision Logic:</text>
+  <text x="370" y="240" text-anchor="middle" fill="var(--muted)" font-size="5">speaker → forward 1080p/720p</text>
+  <text x="370" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">gallery → forward 180p thumbnails</text>
+  <text x="370" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">off-screen → forward nothing</text>
+  <text x="370" y="279" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">adapt every 1-2s per receiver BW</text>
+
+  <!-- Cascaded SFUs -->
+  <rect x="500" y="175" width="260" height="125" rx="6" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="630" y="192" text-anchor="middle" fill="var(--c)" font-size="7.5" font-weight="700">Cascaded SFUs (Geo)</text>
+  <text x="630" y="207" text-anchor="middle" fill="var(--muted)" font-size="5.5">multi-region meetings: SFU per region</text>
+  <text x="630" y="220" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">inter-SFU relay (1 stream per region)</text>
+  <text x="630" y="233" text-anchor="middle" fill="var(--muted)" font-size="5.5">minimize cross-region hops</text>
+  <text x="630" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">US-East ↔ EU-West ↔ AP-South</text>
+  <text x="630" y="259" text-anchor="middle" fill="var(--muted)" font-size="5">users connect to nearest SFU</text>
+  <text x="630" y="272" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">300 users ≠ 300 cross-region streams</text>
+  <text x="630" y="285" text-anchor="middle" fill="var(--muted)" font-size="5">only unique streams relayed between SFUs</text>
+
+  <line x1="475" y1="240" x2="498" y2="240" stroke="var(--c)" stroke-width="1" marker-end="url(#zm-arr)"/>
+
+  <!-- ═══ LAYER 3: RECEIVER ═══ -->
+  <rect x="10" y="322" width="760" height="130" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="337" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: RECEIVER — Each gets 1 high-quality speaker + N thumbnails → gallery/speaker view</text>
+
+  <rect x="25" y="347" width="230" height="90" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="140" y="364" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Client B (5 Mbps)</text>
+  <text x="140" y="379" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Receives: speaker @720p</text>
+  <text x="140" y="392" text-anchor="middle" fill="var(--muted)" font-size="5.5">+ 24 gallery thumbnails @180p</text>
+  <text x="140" y="405" text-anchor="middle" fill="var(--muted)" font-size="5.5">+ screen share @1080p (if active)</text>
+  <text x="140" y="418" text-anchor="middle" fill="var(--muted)" font-size="5">+ audio for all active speakers</text>
+  <text x="140" y="431" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">total: ~5 Mbps download</text>
+
+  <rect x="275" y="347" width="230" height="90" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="390" y="364" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Client C (1 Mbps)</text>
+  <text x="390" y="379" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Receives: speaker @360p</text>
+  <text x="390" y="392" text-anchor="middle" fill="var(--muted)" font-size="5.5">+ 4 thumbnails @180p only</text>
+  <text x="390" y="405" text-anchor="middle" fill="var(--muted)" font-size="5.5">+ screen share @720p (downgraded)</text>
+  <text x="390" y="418" text-anchor="middle" fill="var(--muted)" font-size="5">+ audio (always full quality)</text>
+  <text x="390" y="431" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">total: ~1 Mbps download</text>
+
+  <rect x="525" y="347" width="235" height="90" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="642" y="364" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Client D (Mobile/Cellular)</text>
+  <text x="642" y="379" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Receives: speaker @360p only</text>
+  <text x="642" y="392" text-anchor="middle" fill="var(--muted)" font-size="5.5">+ audio for active speakers</text>
+  <text x="642" y="405" text-anchor="middle" fill="var(--muted)" font-size="5.5">no gallery thumbnails (save data)</text>
+  <text x="642" y="418" text-anchor="middle" fill="var(--muted)" font-size="5">speaker view only on small screen</text>
+  <text x="642" y="431" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">total: ~0.5 Mbps download</text>
+
+  <!-- Arrows from SFU to receivers -->
+  <line x1="250" y1="300" x2="140" y2="345" stroke="var(--g)" stroke-width="1" marker-end="url(#zm-arr)"/>
+  <line x1="300" y1="300" x2="390" y2="345" stroke="var(--r)" stroke-width="1" marker-end="url(#zm-arr)"/>
+  <line x1="400" y1="300" x2="642" y2="345" stroke="var(--y)" stroke-width="1" marker-end="url(#zm-arr)"/>
+
+  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <rect x="10" y="458" width="760" height="35" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">SFU not MCU (no server-side mixing) | Simulcast: sender encodes 3 layers, SFU picks per receiver | UDP: tolerate loss vs TCP delay</text>
+  <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="5.5">&lt;200ms glass-to-glass | 300 uploads + ~25 downloads each = 7,800 streams (vs 89,700 for P2P) | Audio never dropped</text>
+</svg>
+</div>
+
+<!-- ═══ KEY DECISIONS ═══ -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Topology</span></td><td>SFU (Selective Forwarding Unit)</td><td>No transcoding = &lt;200ms latency. MCU adds 300-500ms for mixing.</td></tr>
+<tr><td><span class="hi">Encoding</span></td><td>Simulcast (3 quality layers per sender)</td><td>SFU picks layer per receiver without re-encoding. Adapts instantly.</td></tr>
+<tr><td><span class="hi">Transport</span></td><td>UDP + SRTP + DTLS</td><td>UDP for low latency. SRTP for encryption. DTLS for key exchange.</td></tr>
+<tr><td><span class="hi">Bandwidth</span></td><td>TWCC (Transport-Wide Congestion Control)</td><td>Per-receiver feedback every 100ms. SFU adjusts forwarded layer.</td></tr>
+<tr><td><span class="hi">Audio</span></td><td>Opus codec, always prioritized over video</td><td>Audio is critical for meetings. Never dropped even at 500kbps.</td></tr>
+<tr><td><span class="hi">Screen Share</span></td><td>Separate stream, higher priority than video</td><td>Content sharing is primary use case. Gets bandwidth allocation first.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">SFU vs MCU:</span> An MCU (Multipoint Control Unit) decodes all streams, composites them into one video, and re-encodes — adding <span class="hr">300-500ms latency</span>. An SFU just forwards packets selectively — <span class="hg">&lt;50ms added latency</span>. At 300 participants, SFU is the only viable choice for real-time interaction.</div>
+<div class="b by"><span class="hi">Simulcast trade-off:</span> Each sender uploads 3 layers (~2.5 Mbps total) instead of 1 (~1 Mbps). The extra upload cost enables the SFU to <span class="hg">instantly switch quality per receiver</span> without requesting a new encode from the sender — critical for real-time adaptation.</div>
+<div class="b br"><span class="hi">Failure handling:</span> If a participant's bandwidth drops → SFU switches to lower simulcast layer within 1-2 seconds. If SFU node fails → clients reconnect to backup SFU (ICE restart). Audio is never sacrificed — video drops first.</div>
+</div>
+
+<!-- ═══ INTERVIEW TIPS ═══ -->
+<div class="T" id="interview">
+<h2>Interview Tips</h2>
+<div class="b bg"><span class="hi">Must mention:</span> <span class="hg">SFU architecture</span> (not MCU for large meetings). <span class="hg">Simulcast</span> (multiple quality layers). <span class="hg">Per-participant bandwidth estimation</span>. <span class="hg">Speaker detection</span> for priority routing. <span class="hg">UDP transport</span> for low latency.</div>
+<div class="b by"><span class="hi">Bonus points:</span> <span class="hg">TWCC feedback</span> mechanism. <span class="hg">Opus FEC</span> for audio resilience. <span class="hg">Cascaded SFUs</span> for geo-distribution. <span class="hg">SRTP/DTLS</span> security model. Explain why screen share is a separate stream with different encoding parameters.</div>
+<div class="b br"><span class="hi">Common mistakes:</span> <span class="hr">Suggesting MCU</span> — doesn't scale to 300 with &lt;200ms. <span class="hr">Peer-to-peer mesh</span> — O(N²) connections impossible at 300. <span class="hr">TCP transport</span> — head-of-line blocking kills real-time. <span class="hr">Single quality stream</span> — can't adapt per receiver.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 8 things to say for video calling design</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>SFU (Selective Forwarding Unit)</strong> — server receives all streams, selectively forwards (not MCU mixing)<br>
+<span class="hg">2.</span> <strong>Simulcast</strong> — sender encodes 3 quality layers (high/med/low), SFU picks per receiver<br>
+<span class="hg">3.</span> <strong>Per-participant bandwidth estimation</strong> — TWCC feedback, adapt forwarded quality individually<br>
+<span class="hg">4.</span> <strong>Active speaker detection</strong> — only forward video of top 4-9 speakers (not all 300)<br>
+<span class="hg">5.</span> <strong>UDP + SRTP</strong> — low latency transport, encrypted, tolerates packet loss (vs TCP retransmit)<br>
+<span class="hg">6.</span> <strong>Cascaded SFUs</strong> — geo-distributed servers, each region has local SFU, inter-SFU relay<br>
+<span class="hg">7.</span> <strong>Opus codec for audio</strong> — FEC (forward error correction) handles 10% packet loss gracefully<br>
+<span class="hg">8.</span> <strong>Separate screen share stream</strong> — different encoding params (high res, low fps, text-optimized)
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

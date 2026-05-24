@@ -1,62 +1,939 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>14. Key Numbers — System Design Cheatsheet</title>
+<title>14. Key Numbers — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-13"><span class="e">🔢</span> 14 · KEY NUMBERS</div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 1: LATENCY NUMBERS
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="latency-numbers">
-<h2>Latency Reference</h2><p class="su">Approximate latencies every engineer should know</p>
+<h2>Latency Numbers Every Programmer Should Know</h2>
+<p class="su">Jeff Dean's famous latency numbers — updated for 2024 hardware. These form the foundation of every back-of-envelope calculation.</p>
+
 <table>
-<tr><th>Operation</th><th>Latency</th><th>Notes</th></tr>
-<tr><td>L1 cache</td><td>~1 ns</td><td></td></tr>
-<tr><td>RAM</td><td>~100 ns</td><td></td></tr>
-<tr><td>SSD random read</td><td>~100 µs</td><td>1000x slower than RAM</td></tr>
-<tr><td>HDD seek</td><td>~10 ms</td><td>100x slower than SSD</td></tr>
-<tr><td>Redis GET</td><td>~0.1-0.5 ms</td><td>In-memory</td></tr>
-<tr><td>DB query (indexed)</td><td>~1-5 ms</td><td></td></tr>
-<tr><td>Same datacenter RTT</td><td>~0.5 ms</td><td></td></tr>
-<tr><td>Cross-region RTT</td><td>~100-150 ms</td><td>US↔EU</td></tr>
+<tr><th>Operation</th><th>Latency</th><th>Relative Scale</th><th>Notes</th></tr>
+<tr><td>L1 cache reference</td><td class="b bb">~1 ns</td><td>1×</td><td>CPU register-adjacent</td></tr>
+<tr><td>Branch mispredict</td><td>~3 ns</td><td>3×</td><td>Pipeline flush penalty</td></tr>
+<tr><td>L2 cache reference</td><td class="b bg">~4 ns</td><td>4×</td><td>4× L1</td></tr>
+<tr><td>L3 cache reference</td><td>~12 ns</td><td>12×</td><td>Shared across cores</td></tr>
+<tr><td>Mutex lock/unlock</td><td>~17 ns</td><td>17×</td><td>Uncontended</td></tr>
+<tr><td>Main memory (RAM)</td><td class="b by">~100 ns</td><td>100×</td><td>DRAM access</td></tr>
+<tr><td>Compress 1KB (Snappy)</td><td>~3 µs</td><td>3,000×</td><td>Fast compression</td></tr>
+<tr><td>Send 2KB over 1Gbps NIC</td><td>~20 µs</td><td>20,000×</td><td>Network card latency</td></tr>
+<tr><td>SSD random read</td><td class="b bo">~100 µs</td><td>100,000×</td><td>NVMe: ~20 µs</td></tr>
+<tr><td>Read 1MB sequentially (RAM)</td><td>~250 µs</td><td>250,000×</td><td>Memory bandwidth</td></tr>
+<tr><td>Same datacenter RTT</td><td>~500 µs</td><td>500,000×</td><td>Within AZ</td></tr>
+<tr><td>Read 1MB sequentially (SSD)</td><td>~1 ms</td><td>1,000,000×</td><td>Sequential is fast</td></tr>
+<tr><td>HDD seek</td><td class="b br">~10 ms</td><td>10,000,000×</td><td>Mechanical movement</td></tr>
+<tr><td>Read 1MB sequentially (HDD)</td><td>~20 ms</td><td>20,000,000×</td><td>After seek</td></tr>
+<tr><td>Send packet CA→NL→CA</td><td class="b bp">~150 ms</td><td>150,000,000×</td><td>Speed of light limit</td></tr>
+</table>
+
+<div class="b bb" data-dp-step="1"><span class="hi">Key Insight:</span> Memory is 100× faster than SSD, SSD is 100× faster than HDD, and local is 1000× faster than cross-continent. Design your hot path to stay in memory.</div>
+
+<h3>Visual Latency Scale (Logarithmic)</h3>
+<svg viewBox="0 0 740 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logarithmic latency scale showing relative speeds from L1 cache to cross-region network">
+  <defs>
+    <marker id="kn1" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><circle cx="3" cy="3" r="2" fill="var(--a)"/></marker>
+    <linearGradient id="kn1-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:var(--g)"/>
+      <stop offset="50%" style="stop-color:var(--y)"/>
+      <stop offset="100%" style="stop-color:var(--r)"/>
+    </linearGradient>
+  </defs>
+  <!-- Title -->
+  <text x="370" y="24" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">Latency Scale — Orders of Magnitude (log₁₀)</text>
+  <!-- Axis -->
+  <line x1="60" y1="280" x2="700" y2="280" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- Scale labels -->
+  <text x="60" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">1ns</text>
+  <text x="167" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">10ns</text>
+  <text x="274" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">100ns</text>
+  <text x="381" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">1µs</text>
+  <text x="488" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">100µs</text>
+  <text x="595" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">10ms</text>
+  <text x="700" y="298" text-anchor="middle" font-size="10" fill="var(--muted)">150ms</text>
+  <!-- Tick marks -->
+  <line x1="60" y1="276" x2="60" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <line x1="167" y1="276" x2="167" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <line x1="274" y1="276" x2="274" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <line x1="381" y1="276" x2="381" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <line x1="488" y1="276" x2="488" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <line x1="595" y1="276" x2="595" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <line x1="700" y1="276" x2="700" y2="284" stroke="var(--border)" stroke-width="1"/>
+  <!-- Bars -->
+  <rect x="60" y="44" width="18" height="22" rx="3" fill="var(--g)" data-dp-step="2"/>
+  <text x="82" y="59" font-size="11" fill="var(--text)" data-dp-step="2">L1 Cache — 1 ns</text>
+  <rect x="60" y="74" width="65" height="22" rx="3" fill="var(--g)" data-dp-step="3"/>
+  <text x="130" y="89" font-size="11" fill="var(--text)" data-dp-step="3">L2 Cache — 4 ns</text>
+  <rect x="60" y="104" width="214" height="22" rx="3" fill="var(--a)" data-dp-step="4"/>
+  <text x="280" y="119" font-size="11" fill="var(--text)" data-dp-step="4">RAM — 100 ns</text>
+  <rect x="60" y="134" width="321" height="22" rx="3" fill="var(--y)" data-dp-step="5"/>
+  <text x="386" y="149" font-size="11" fill="var(--text)" data-dp-step="5">Compress 1KB — 3 µs</text>
+  <rect x="60" y="164" width="428" height="22" rx="3" fill="var(--o)" data-dp-step="6"/>
+  <text x="493" y="179" font-size="11" fill="var(--text)" data-dp-step="6">SSD Random Read — 100 µs</text>
+  <rect x="60" y="194" width="535" height="22" rx="3" fill="var(--o)" data-dp-step="7"/>
+  <text x="600" y="209" font-size="11" fill="var(--text)" data-dp-step="7">Datacenter RTT — 500 µs</text>
+  <rect x="60" y="224" width="595" height="22" rx="3" fill="var(--r)" data-dp-step="8"/>
+  <text x="400" y="239" font-size="11" fill="white" font-weight="bold" data-dp-step="8">HDD Seek — 10 ms</text>
+  <rect x="60" y="254" width="640" height="22" rx="3" fill="var(--p)" data-dp-step="9"/>
+  <text x="400" y="269" font-size="11" fill="white" font-weight="bold" data-dp-step="9">Cross-Region RTT — 150 ms</text>
+</svg>
+
+<h3>Network Latency Breakdown</h3>
+<p class="su">What happens during a typical HTTPS request — each phase adds latency</p>
+<svg viewBox="0 0 740 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Network request latency breakdown showing DNS, TCP, TLS, HTTP phases">
+  <defs>
+    <marker id="kn2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--a)"/></marker>
+  </defs>
+  <!-- Timeline arrow -->
+  <line x1="30" y1="90" x2="710" y2="90" stroke="var(--border)" stroke-width="2" marker-end="url(#kn2)"/>
+  <!-- DNS -->
+  <rect x="40" y="50" width="100" height="30" rx="6" fill="var(--a)" opacity="0.85" data-dp-step="1"/>
+  <text x="90" y="70" text-anchor="middle" font-size="11" fill="white" font-weight="bold">DNS Lookup</text>
+  <text x="90" y="120" text-anchor="middle" font-size="10" fill="var(--muted)">20-120 ms</text>
+  <text x="90" y="135" text-anchor="middle" font-size="9" fill="var(--muted)">(cached: 0 ms)</text>
+  <!-- TCP -->
+  <rect x="160" y="50" width="110" height="30" rx="6" fill="var(--g)" opacity="0.85" data-dp-step="2"/>
+  <text x="215" y="70" text-anchor="middle" font-size="11" fill="white" font-weight="bold">TCP Handshake</text>
+  <text x="215" y="120" text-anchor="middle" font-size="10" fill="var(--muted)">1 RTT</text>
+  <text x="215" y="135" text-anchor="middle" font-size="9" fill="var(--muted)">~14-100 ms</text>
+  <!-- TLS -->
+  <rect x="290" y="50" width="120" height="30" rx="6" fill="var(--y)" opacity="0.85" data-dp-step="3"/>
+  <text x="350" y="70" text-anchor="middle" font-size="11" fill="var(--text)" font-weight="bold">TLS Handshake</text>
+  <text x="350" y="120" text-anchor="middle" font-size="10" fill="var(--muted)">1-2 RTT</text>
+  <text x="350" y="135" text-anchor="middle" font-size="9" fill="var(--muted)">~28-200 ms</text>
+  <!-- HTTP Request -->
+  <rect x="430" y="50" width="110" height="30" rx="6" fill="var(--o)" opacity="0.85" data-dp-step="4"/>
+  <text x="485" y="70" text-anchor="middle" font-size="11" fill="white" font-weight="bold">HTTP Request</text>
+  <text x="485" y="120" text-anchor="middle" font-size="10" fill="var(--muted)">1 RTT</text>
+  <text x="485" y="135" text-anchor="middle" font-size="9" fill="var(--muted)">~14-100 ms</text>
+  <!-- Server Processing -->
+  <rect x="560" y="50" width="100" height="30" rx="6" fill="var(--r)" opacity="0.85" data-dp-step="5"/>
+  <text x="610" y="70" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Server Work</text>
+  <text x="610" y="120" text-anchor="middle" font-size="10" fill="var(--muted)">5-500 ms</text>
+  <text x="610" y="135" text-anchor="middle" font-size="9" fill="var(--muted)">(app dependent)</text>
+  <!-- Total -->
+  <rect x="40" y="150" width="620" height="22" rx="4" fill="none" stroke="var(--a)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="350" y="165" text-anchor="middle" font-size="11" fill="var(--a)" font-weight="bold">Total cold start: 80-1000+ ms | With keep-alive: 20-600 ms</text>
+</svg>
+
+<div class="d-grid" style="grid-template-columns: 1fr 1fr;">
+<div class="d-panel" data-dp-step="10">
+<h4>Jeff Dean's Numbers (2024 Updated)</h4>
+<table>
+<tr><th>Operation</th><th>2012</th><th>2024</th></tr>
+<tr><td>L1 cache</td><td>0.5 ns</td><td>~1 ns</td></tr>
+<tr><td>L2 cache</td><td>7 ns</td><td>~4 ns</td></tr>
+<tr><td>RAM</td><td>100 ns</td><td>~80-100 ns</td></tr>
+<tr><td>SSD random read</td><td>150 µs</td><td>~16-100 µs (NVMe)</td></tr>
+<tr><td>HDD seek</td><td>10 ms</td><td>~4-10 ms</td></tr>
+<tr><td>1 Gbps send 1MB</td><td>10 ms</td><td>~1 ms (10Gbps+)</td></tr>
+<tr><td>Datacenter RTT</td><td>500 µs</td><td>~200-500 µs</td></tr>
 </table>
 </div>
+<div class="d-panel" data-dp-step="11">
+<h4>Latency Rules of Thumb</h4>
+<div class="b bg"><span class="hi">🟢 Fast (&lt;1ms):</span> In-memory ops, cache hits, local IPC</div>
+<div class="b by"><span class="hi">🟡 Medium (1-10ms):</span> DB queries, SSD reads, same-region calls</div>
+<div class="b bo"><span class="hi">🟠 Slow (10-100ms):</span> HDD, cross-AZ, external API calls</div>
+<div class="b br"><span class="hi">🔴 Very Slow (&gt;100ms):</span> Cross-region, cold starts, DNS lookups</div>
+<br>
+<div class="b bb"><span class="hi">Optimization Priority:</span> Cache hot data → reduce network hops → batch I/O → move compute closer to data</div>
+</div>
+</div>
+</div>
 
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 2: THROUGHPUT NUMBERS
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="throughput-numbers">
-<h2>Throughput Reference</h2><p class="su">Capacity for back-of-envelope calculations</p>
+<h2>Throughput Numbers</h2>
+<p class="su">Capacity benchmarks for common systems — use these for back-of-envelope sizing. Numbers assume modern hardware (2024) with proper tuning.</p>
+
 <table>
-<tr><th>System</th><th>Throughput</th></tr>
-<tr><td>Postgres</td><td>~10K reads, ~1-3K writes/sec</td></tr>
-<tr><td>Redis</td><td>~100K-1M ops/sec</td></tr>
-<tr><td>Kafka</td><td>~1M+ msg/sec (cluster)</td></tr>
-<tr><td>Cassandra</td><td>~50-100K writes/sec (per node)</td></tr>
-<tr><td>Elasticsearch</td><td>~10-50K docs/sec indexing</td></tr>
-<tr><td>S3</td><td>~3,500 PUT, ~5,500 GET/sec (per prefix)</td></tr>
-<tr><td>NGINX</td><td>~100K+ concurrent connections</td></tr>
+<tr><th>System</th><th>Read Throughput</th><th>Write Throughput</th><th>Notes</th></tr>
+<tr><td class="b bg">PostgreSQL</td><td>~10-30K reads/sec</td><td>~1-5K writes/sec</td><td>Single node, indexed queries</td></tr>
+<tr><td class="b bg">MySQL (InnoDB)</td><td>~10-25K reads/sec</td><td>~1-5K writes/sec</td><td>Similar to Postgres</td></tr>
+<tr><td class="b bb">Redis</td><td>~100K-1M ops/sec</td><td>~100K-500K ops/sec</td><td>In-memory, single-threaded per shard</td></tr>
+<tr><td class="b bb">Memcached</td><td>~200K-1M ops/sec</td><td>~200K-1M ops/sec</td><td>Multi-threaded, simple K/V</td></tr>
+<tr><td class="b by">Cassandra</td><td>~20-50K reads/sec/node</td><td>~50-100K writes/sec/node</td><td>Write-optimized LSM tree</td></tr>
+<tr><td class="b by">DynamoDB</td><td>Unlimited (auto-scale)</td><td>Unlimited (auto-scale)</td><td>Per-partition: 3K RCU, 1K WCU</td></tr>
+<tr><td class="b by">MongoDB</td><td>~20-50K reads/sec</td><td>~10-30K writes/sec</td><td>Single node, WiredTiger</td></tr>
+<tr><td class="b bo">Kafka</td><td>~1M+ msg/sec (consume)</td><td>~1M+ msg/sec (produce)</td><td>Per cluster, partitioned</td></tr>
+<tr><td class="b bo">RabbitMQ</td><td>~20-50K msg/sec</td><td>~20-50K msg/sec</td><td>Per node, persistent</td></tr>
+<tr><td class="b bp">Elasticsearch</td><td>~10-50K queries/sec</td><td>~10-50K docs/sec indexing</td><td>Depends on query complexity</td></tr>
+<tr><td class="b br">S3</td><td>~5,500 GET/sec/prefix</td><td>~3,500 PUT/sec/prefix</td><td>Partition prefixes for more</td></tr>
+<tr><td>NGINX / HAProxy</td><td colspan="2">~100K-500K concurrent connections</td><td>Event-driven, non-blocking</td></tr>
+<tr><td>gRPC</td><td colspan="2">~50-100K RPC/sec per server</td><td>HTTP/2 multiplexing</td></tr>
+</table>
+
+<h3>Throughput Comparison (Relative Scale)</h3>
+<svg viewBox="0 0 740 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Horizontal bar chart comparing throughput of various systems">
+  <defs>
+    <marker id="kn3" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><circle cx="3" cy="3" r="2" fill="var(--g)"/></marker>
+  </defs>
+  <text x="370" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">System Throughput — Operations per Second (log scale)</text>
+  <!-- Y-axis labels -->
+  <text x="95" y="58" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="1">Redis</text>
+  <text x="95" y="88" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="2">Memcached</text>
+  <text x="95" y="118" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="3">Kafka</text>
+  <text x="95" y="148" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="4">NGINX</text>
+  <text x="95" y="178" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="5">Cassandra</text>
+  <text x="95" y="208" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="6">gRPC Server</text>
+  <text x="95" y="238" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="7">Elasticsearch</text>
+  <text x="95" y="268" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="8">MongoDB</text>
+  <text x="95" y="298" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="9">PostgreSQL</text>
+  <text x="95" y="328" text-anchor="end" font-size="11" fill="var(--text)" data-dp-step="10">S3 (per prefix)</text>
+  <!-- Bars (scaled logarithmically: max ~1M = full width 580px) -->
+  <rect x="100" y="44" width="580" height="20" rx="4" fill="var(--a)" data-dp-step="1"/>
+  <text x="685" y="58" font-size="10" fill="var(--muted)">1M ops/s</text>
+  <rect x="100" y="74" width="580" height="20" rx="4" fill="var(--a2)" data-dp-step="2"/>
+  <text x="685" y="88" font-size="10" fill="var(--muted)">1M ops/s</text>
+  <rect x="100" y="104" width="580" height="20" rx="4" fill="var(--o)" data-dp-step="3"/>
+  <text x="685" y="118" font-size="10" fill="var(--muted)">1M msg/s</text>
+  <rect x="100" y="134" width="480" height="20" rx="4" fill="var(--g)" data-dp-step="4"/>
+  <text x="585" y="148" font-size="10" fill="var(--muted)">500K conn</text>
+  <rect x="100" y="164" width="390" height="20" rx="4" fill="var(--y)" data-dp-step="5"/>
+  <text x="495" y="178" font-size="10" fill="var(--muted)">100K w/s</text>
+  <rect x="100" y="194" width="390" height="20" rx="4" fill="var(--p)" data-dp-step="6"/>
+  <text x="495" y="208" font-size="10" fill="var(--muted)">100K rpc/s</text>
+  <rect x="100" y="224" width="290" height="20" rx="4" fill="var(--c)" data-dp-step="7"/>
+  <text x="395" y="238" font-size="10" fill="var(--muted)">50K q/s</text>
+  <rect x="100" y="254" width="290" height="20" rx="4" fill="var(--y)" data-dp-step="8"/>
+  <text x="395" y="268" font-size="10" fill="var(--muted)">50K r/s</text>
+  <rect x="100" y="284" width="193" height="20" rx="4" fill="var(--g)" data-dp-step="9"/>
+  <text x="298" y="298" font-size="10" fill="var(--muted)">10-30K r/s</text>
+  <rect x="100" y="314" width="145" height="20" rx="4" fill="var(--r)" data-dp-step="10"/>
+  <text x="250" y="328" font-size="10" fill="var(--muted)">5.5K GET/s</text>
+  <!-- Scale reference -->
+  <line x1="100" y1="348" x2="680" y2="348" stroke="var(--border)" stroke-width="1"/>
+  <text x="100" y="365" font-size="9" fill="var(--muted)">1K</text>
+  <text x="245" y="365" font-size="9" fill="var(--muted)">10K</text>
+  <text x="390" y="365" font-size="9" fill="var(--muted)">100K</text>
+  <text x="535" y="365" font-size="9" fill="var(--muted)">500K</text>
+  <text x="665" y="365" font-size="9" fill="var(--muted)">1M+</text>
+</svg>
+
+<h3>Connections per Server</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+<div class="d-panel" data-dp-step="11">
+<h4>🟢 Event-Driven (epoll/kqueue)</h4>
+<table>
+<tr><th>Runtime</th><th>Connections</th></tr>
+<tr><td>NGINX</td><td>500K-1M</td></tr>
+<tr><td>Node.js (libuv)</td><td>100K-500K</td></tr>
+<tr><td>Netty (Java)</td><td>100K-500K</td></tr>
+<tr><td>WebSocket server</td><td>500K-1M</td></tr>
 </table>
 </div>
+<div class="d-panel" data-dp-step="12">
+<h4>🟡 Lightweight Threads</h4>
+<table>
+<tr><th>Runtime</th><th>Concurrency</th></tr>
+<tr><td>Go goroutines</td><td>100K-1M</td></tr>
+<tr><td>Erlang processes</td><td>1M+</td></tr>
+<tr><td>Java virtual threads</td><td>100K-1M</td></tr>
+<tr><td>Rust async (tokio)</td><td>500K-1M</td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="13">
+<h4>🔴 OS Threads</h4>
+<table>
+<tr><th>Runtime</th><th>Threads</th></tr>
+<tr><td>Java (platform)</td><td>5K-10K</td></tr>
+<tr><td>Python (GIL)</td><td>~1K effective</td></tr>
+<tr><td>C++ threads</td><td>10K-50K</td></tr>
+<tr><td>Linux max</td><td>~32K default</td></tr>
+</table>
+</div>
+</div>
 
+<div class="b bb" data-dp-step="14"><span class="hi">Scaling Rule:</span> For WebSocket-heavy apps (chat, gaming, live updates), budget <span class="hg">500K connections per server</span> with epoll. For request/response APIs, budget <span class="hg">10-50K RPS per server</span> depending on processing complexity. Horizontal scaling = more servers, not bigger servers.</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 3: STORAGE & SIZE ESTIMATION
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="storage-numbers">
+<h2>Storage &amp; Size Estimation</h2>
+<p class="su">Know the size of common data objects and storage tiers to quickly estimate capacity requirements.</p>
+
+<h3>Common Data Sizes</h3>
+<table>
+<tr><th>Data Type</th><th>Typical Size</th><th>1M Records</th><th>1B Records</th></tr>
+<tr><td>Tweet / Short message</td><td>~140 B (text only)</td><td>~140 MB</td><td>~140 GB</td></tr>
+<tr><td>Chat message (with metadata)</td><td>~500 B</td><td>~500 MB</td><td>~500 GB</td></tr>
+<tr><td>User profile (basic)</td><td>~1 KB</td><td>~1 GB</td><td>~1 TB</td></tr>
+<tr><td>User profile (rich, with prefs)</td><td>~5-10 KB</td><td>~5-10 GB</td><td>~5-10 TB</td></tr>
+<tr><td>Email (avg with headers)</td><td>~50 KB</td><td>~50 GB</td><td>~50 TB</td></tr>
+<tr><td>Web page (HTML + assets)</td><td>~2-5 MB</td><td>~2-5 TB</td><td>~2-5 PB</td></tr>
+<tr><td>Photo (compressed JPEG)</td><td>~200 KB - 5 MB</td><td>~200 GB - 5 TB</td><td>~200 TB - 5 PB</td></tr>
+<tr><td>Photo (multiple resolutions)</td><td>~1-10 MB total</td><td>~1-10 TB</td><td>~1-10 PB</td></tr>
+<tr><td>Video (1 min, 720p)</td><td>~50 MB</td><td>~50 TB</td><td>~50 PB</td></tr>
+<tr><td>Video (1 min, 1080p)</td><td>~130 MB</td><td>~130 TB</td><td>~130 PB</td></tr>
+<tr><td>Log entry</td><td>~200-500 B</td><td>~200-500 MB</td><td>~200-500 GB</td></tr>
+<tr><td>Search index entry</td><td>~500 B - 2 KB</td><td>~500 MB - 2 GB</td><td>~500 GB - 2 TB</td></tr>
+</table>
+
+<h3>Storage Hierarchy — Capacity, Speed &amp; Cost</h3>
+<svg viewBox="0 0 740 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Storage hierarchy pyramid showing capacity, speed, and cost per GB from L1 cache to Glacier">
+  <defs>
+    <marker id="kn4" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--a)"/></marker>
+  </defs>
+  <text x="370" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">Storage Hierarchy — Speed vs Capacity vs Cost</text>
+  <!-- Pyramid layers (top = fastest/smallest/most expensive) -->
+  <!-- L1 Cache -->
+  <polygon points="370,42 340,72 400,72" fill="var(--r)" opacity="0.9" data-dp-step="1"/>
+  <text x="370" y="65" text-anchor="middle" font-size="9" fill="white" font-weight="bold">L1</text>
+  <text x="420" y="62" font-size="9" fill="var(--text)" data-dp-step="1">64 KB | 1 ns | ~$$$$$</text>
+  <!-- L2 Cache -->
+  <polygon points="340,72 320,102 420,102 400,72" fill="var(--o)" opacity="0.9" data-dp-step="2"/>
+  <text x="370" y="92" text-anchor="middle" font-size="9" fill="white" font-weight="bold">L2</text>
+  <text x="440" y="92" font-size="9" fill="var(--text)" data-dp-step="2">256 KB-1 MB | 4 ns</text>
+  <!-- L3 Cache -->
+  <polygon points="320,102 295,132 445,132 420,102" fill="var(--y)" opacity="0.9" data-dp-step="3"/>
+  <text x="370" y="122" text-anchor="middle" font-size="9" fill="var(--text)" font-weight="bold">L3</text>
+  <text x="465" y="122" font-size="9" fill="var(--text)" data-dp-step="3">8-64 MB | 12 ns</text>
+  <!-- RAM -->
+  <polygon points="295,132 265,162 475,162 445,132" fill="var(--g)" opacity="0.85" data-dp-step="4"/>
+  <text x="370" y="152" text-anchor="middle" font-size="10" fill="white" font-weight="bold">RAM</text>
+  <text x="495" y="152" font-size="9" fill="var(--text)" data-dp-step="4">16-512 GB | 100 ns | ~$5/GB</text>
+  <!-- SSD -->
+  <polygon points="265,162 230,192 510,192 475,162" fill="var(--a)" opacity="0.85" data-dp-step="5"/>
+  <text x="370" y="182" text-anchor="middle" font-size="10" fill="white" font-weight="bold">SSD (NVMe)</text>
+  <text x="530" y="182" font-size="9" fill="var(--text)" data-dp-step="5">1-30 TB | 100 µs | ~$0.10/GB</text>
+  <!-- HDD -->
+  <polygon points="230,192 195,222 545,222 510,192" fill="var(--a2)" opacity="0.85" data-dp-step="6"/>
+  <text x="370" y="212" text-anchor="middle" font-size="10" fill="white" font-weight="bold">HDD</text>
+  <text x="565" y="212" font-size="9" fill="var(--text)" data-dp-step="6">4-20 TB | 10 ms | ~$0.02/GB</text>
+  <!-- S3 / Object Storage -->
+  <polygon points="195,222 155,252 585,252 545,222" fill="var(--p)" opacity="0.8" data-dp-step="7"/>
+  <text x="370" y="242" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Object Storage (S3)</text>
+  <text x="605" y="242" font-size="9" fill="var(--text)" data-dp-step="7">Unlimited | 50-100 ms | ~$0.023/GB/mo</text>
+  <!-- Glacier / Archive -->
+  <polygon points="155,252 115,282 625,282 585,252" fill="var(--c)" opacity="0.8" data-dp-step="8"/>
+  <text x="370" y="272" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Archive (Glacier / Cold)</text>
+  <text x="645" y="272" font-size="9" fill="var(--text)" data-dp-step="8">Unlimited | hours | ~$0.004/GB/mo</text>
+  <!-- Arrows on sides -->
+  <text x="100" y="160" text-anchor="middle" font-size="10" fill="var(--r)" font-weight="bold" transform="rotate(-90,100,160)">← FASTER / COSTLIER</text>
+  <text x="680" y="160" text-anchor="middle" font-size="10" fill="var(--g)" font-weight="bold" transform="rotate(90,680,160)">← LARGER / CHEAPER</text>
+  <!-- Legend -->
+  <text x="370" y="310" text-anchor="middle" font-size="11" fill="var(--muted)">Rule: Each tier is ~10-100× slower but ~10-100× cheaper and larger than the one above</text>
+  <text x="370" y="330" text-anchor="middle" font-size="11" fill="var(--a)" font-weight="bold">Design principle: Keep hot data in upper tiers, cold data in lower tiers</text>
+</svg>
+
+<h3>Growth Estimation Template</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr;">
+<div class="d-panel" data-dp-step="9">
+<h4>📊 Daily → Monthly → Yearly</h4>
+<pre><code>Given:
+  Users = 10M DAU
+  Actions/user/day = 5 posts
+  Size per action = 1 KB (text) + 200 KB (image)
+
+Daily:
+  Posts = 10M × 5 = 50M posts/day
+  Storage = 50M × 201 KB = ~10 TB/day
+
+Monthly:
+  Storage = 10 TB × 30 = ~300 TB/month
+
+Yearly:
+  Storage = 300 TB × 12 = ~3.6 PB/year
+
+With replication (3×):
+  Total = 3.6 PB × 3 = ~10.8 PB/year</code></pre>
+</div>
+<div class="d-panel" data-dp-step="10">
+<h4>📐 Quick Multipliers</h4>
+<table>
+<tr><th>Period</th><th>Seconds</th><th>Approx</th></tr>
+<tr><td>1 minute</td><td>60</td><td>~60</td></tr>
+<tr><td>1 hour</td><td>3,600</td><td>~4K</td></tr>
+<tr><td>1 day</td><td>86,400</td><td>~100K</td></tr>
+<tr><td>1 month</td><td>2,592,000</td><td>~2.5M</td></tr>
+<tr><td>1 year</td><td>31,536,000</td><td>~30M</td></tr>
+</table>
+<br>
+<div class="b bg"><span class="hi">Memory Rule:</span> 1 day ≈ 10⁵ sec, 1 year ≈ 3×10⁷ sec</div>
+<div class="b by"><span class="hi">Storage Rule:</span> 2³⁰ = 1 GB, 2⁴⁰ = 1 TB, 2⁵⁰ = 1 PB</div>
+</div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 4: BACK-OF-ENVELOPE ESTIMATION
+     ═══════════════════════════════════════════════════════════════════ -->
 <div class="T" id="estimation">
-<h2>Back-of-Envelope Estimation</h2><p class="su">Quick math for interviews</p>
-<pre><code>Storage: 1M users × 1KB = 1GB · 1B users × 1KB = 1TB
-Time: 1 day ≈ 100K sec · 1 year ≈ 30M sec
-Traffic: 1M DAU × 10 req/day = 10M/day ÷ 100K sec = ~100 RPS avg · Peak = 3-5x
-Powers of 2: 2^10=1KB · 2^20=1MB · 2^30=1GB · 2^40=1TB · 2^50=1PB
-80/20 Rule: 20% of data = 80% of traffic (cache hot data)
-Rule of 72: Doubling time = 72 / growth% (10%/month → doubles in ~7 months)</code></pre>
-<div class="b bb"><span class="hi">Cost Estimation:</span> <span class="hg">Compute</span> — EC2 m5.xlarge ~$140/mo, Lambda ~$0.20/1M invocations. <span class="hg">Storage</span> — S3 ~$23/TB/mo, EBS ~$80/TB/mo, RDS ~$200-800/mo. <span class="hg">Bandwidth</span> — $0.09/GB egress (first 10TB). <span class="hg">Redis</span> — ElastiCache r6g.large ~$200/mo. Rule: compute > storage > bandwidth for most apps.</div>
-<div class="b bg"><span class="hi">SLA Math:</span> <span class="hg">99.9%</span> = 8.76h downtime/yr = 43.8min/mo. <span class="hg">99.99%</span> = 52.6min/yr = 4.38min/mo. <span class="hg">Serial</span>: A_total = A1 × A2 (0.999 × 0.999 = 0.998). <span class="hg">Parallel</span>: A_total = 1 - (1-A1)(1-A2) (two 99.9% = 99.9999%). Always set SLO stricter than SLA — buffer before breach.</div>
+<h2>Back-of-Envelope Estimation</h2>
+<p class="su">The most critical skill in system design interviews. Master these formulas and you can size any system in 5 minutes.</p>
+
+<h3>Core Estimation Formulas</h3>
+<pre><code>═══ TRAFFIC ═══
+Total Users → DAU = Total × DAU% (typically 10-30%)
+Requests/day = DAU × actions_per_user
+RPS (avg) = Requests/day ÷ 86,400 (seconds in a day)
+RPS (peak) = RPS_avg × peak_multiplier (typically 3-5×)
+
+═══ STORAGE ═══
+Storage/day = Requests/day × avg_object_size
+Storage/year = Storage/day × 365
+With replication = Storage × replication_factor (typically 3×)
+With overhead = Storage × 1.3 (indexes, metadata, fragmentation)
+
+═══ BANDWIDTH ═══
+Bandwidth (avg) = RPS × avg_response_size
+Bandwidth (peak) = Peak_RPS × avg_response_size
+Egress/month = Bandwidth_avg × seconds_in_month
+
+═══ SERVERS ═══
+Servers needed = Peak_RPS ÷ RPS_per_server
+With headroom = Servers × 1.5 (for failover + growth)
+Cache servers = Hot_data_size ÷ RAM_per_server
+
+═══ CACHE ═══
+Cache size = Working_set × hit_rate_target
+Working set ≈ 20% of total data (80/20 rule)
+Cache hit rate target: 95-99% for read-heavy systems</code></pre>
+
+<h3>Estimation Framework Flowchart</h3>
+<svg viewBox="0 0 740 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Estimation framework flowchart showing the step-by-step process from users to server count">
+  <defs>
+    <marker id="kn5" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--a)"/></marker>
+    <marker id="kn6" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--g)"/></marker>
+  </defs>
+  <text x="370" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">Back-of-Envelope Estimation Framework</text>
+  
+  <!-- Row 1: Users → DAU → RPS -->
+  <rect x="30" y="45" width="120" height="45" rx="8" fill="var(--a)" opacity="0.9" data-dp-step="1"/>
+  <text x="90" y="64" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Total Users</text>
+  <text x="90" y="80" text-anchor="middle" font-size="9" fill="white">e.g., 100M</text>
+  
+  <line x1="150" y1="67" x2="185" y2="67" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  <text x="167" y="60" text-anchor="middle" font-size="8" fill="var(--muted)">×20%</text>
+  
+  <rect x="190" y="45" width="120" height="45" rx="8" fill="var(--g)" opacity="0.9" data-dp-step="2"/>
+  <text x="250" y="64" text-anchor="middle" font-size="10" fill="white" font-weight="bold">DAU</text>
+  <text x="250" y="80" text-anchor="middle" font-size="9" fill="white">20M active/day</text>
+  
+  <line x1="310" y1="67" x2="345" y2="67" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  <text x="327" y="60" text-anchor="middle" font-size="8" fill="var(--muted)">×10 req</text>
+  
+  <rect x="350" y="45" width="120" height="45" rx="8" fill="var(--y)" opacity="0.9" data-dp-step="3"/>
+  <text x="410" y="64" text-anchor="middle" font-size="10" fill="var(--text)" font-weight="bold">Requests/Day</text>
+  <text x="410" y="80" text-anchor="middle" font-size="9" fill="var(--text)">200M req/day</text>
+  
+  <line x1="470" y1="67" x2="505" y2="67" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  <text x="487" y="60" text-anchor="middle" font-size="8" fill="var(--muted)">÷100K</text>
+  
+  <rect x="510" y="45" width="120" height="45" rx="8" fill="var(--o)" opacity="0.9" data-dp-step="4"/>
+  <text x="570" y="64" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Avg RPS</text>
+  <text x="570" y="80" text-anchor="middle" font-size="9" fill="white">~2,300 RPS</text>
+  
+  <!-- Arrow down from RPS -->
+  <line x1="570" y1="90" x2="570" y2="120" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  <text x="590" y="110" font-size="8" fill="var(--muted)">×5</text>
+  
+  <!-- Row 2: Peak RPS -->
+  <rect x="510" y="125" width="120" height="45" rx="8" fill="var(--r)" opacity="0.9" data-dp-step="5"/>
+  <text x="570" y="144" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Peak RPS</text>
+  <text x="570" y="160" text-anchor="middle" font-size="9" fill="white">~11,500 RPS</text>
+  
+  <!-- Branch down to 3 outputs -->
+  <line x1="570" y1="170" x2="570" y2="195" stroke="var(--a)" stroke-width="2"/>
+  <line x1="200" y1="195" x2="570" y2="195" stroke="var(--a)" stroke-width="1.5"/>
+  <line x1="200" y1="195" x2="200" y2="215" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  <line x1="390" y1="195" x2="390" y2="215" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  <line x1="570" y1="195" x2="570" y2="215" stroke="var(--a)" stroke-width="2" marker-end="url(#kn5)"/>
+  
+  <!-- Row 3: Storage, Bandwidth, Servers -->
+  <rect x="130" y="220" width="140" height="55" rx="8" fill="var(--p)" opacity="0.85" data-dp-step="6"/>
+  <text x="200" y="240" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Storage</text>
+  <text x="200" y="255" text-anchor="middle" font-size="9" fill="white">200M × 1KB = 200GB/day</text>
+  <text x="200" y="268" text-anchor="middle" font-size="9" fill="white">= 73 TB/year</text>
+  
+  <rect x="320" y="220" width="140" height="55" rx="8" fill="var(--c)" opacity="0.85" data-dp-step="7"/>
+  <text x="390" y="240" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Bandwidth</text>
+  <text x="390" y="255" text-anchor="middle" font-size="9" fill="white">11.5K × 10KB = 115 MB/s</text>
+  <text x="390" y="268" text-anchor="middle" font-size="9" fill="white">= ~1 Gbps peak</text>
+  
+  <rect x="510" y="220" width="140" height="55" rx="8" fill="var(--a2)" opacity="0.85" data-dp-step="8"/>
+  <text x="580" y="240" text-anchor="middle" font-size="10" fill="white" font-weight="bold">Servers</text>
+  <text x="580" y="255" text-anchor="middle" font-size="9" fill="white">11.5K ÷ 1K RPS/srv</text>
+  <text x="580" y="268" text-anchor="middle" font-size="9" fill="white">= ~12 servers (+50%)</text>
+  
+  <!-- Final summary box -->
+  <rect x="130" y="295" width="520" height="50" rx="8" fill="none" stroke="var(--g)" stroke-width="2" data-dp-step="9"/>
+  <text x="390" y="315" text-anchor="middle" font-size="11" fill="var(--g)" font-weight="bold">✓ Final Answer: 18 app servers, 73 TB storage/yr, 1 Gbps peak bandwidth</text>
+  <text x="390" y="335" text-anchor="middle" font-size="10" fill="var(--muted)">Add: 3× replication, cache layer (Redis), CDN for static assets, DB read replicas</text>
+</svg>
+
+<h3>Common Estimation Patterns</h3>
+<table>
+<tr><th>System</th><th>DAU</th><th>Actions/User/Day</th><th>Object Size</th><th>Daily Storage</th><th>Peak RPS</th></tr>
+<tr><td class="b bg">Social Media Post</td><td>500M</td><td>2 posts + 50 reads</td><td>1 KB text + 500 KB media</td><td>~500 TB</td><td>~300K</td></tr>
+<tr><td class="b bb">Chat Message</td><td>100M</td><td>50 messages</td><td>500 B</td><td>~2.5 TB</td><td>~250K</td></tr>
+<tr><td class="b by">Video Upload</td><td>50M</td><td>0.01 uploads + 5 views</td><td>500 MB (upload)</td><td>~250 TB</td><td>~15K uploads</td></tr>
+<tr><td class="b bo">Search Query</td><td>1B</td><td>5 searches</td><td>~100 B query, 10 KB result</td><td>~50 TB results</td><td>~250K</td></tr>
+<tr><td class="b bp">E-commerce Order</td><td>10M</td><td>0.1 orders + 20 browses</td><td>5 KB order, 50 KB page</td><td>~10 TB</td><td>~12K orders</td></tr>
+<tr><td class="b br">Ride-sharing</td><td>20M</td><td>2 rides + 100 location pings</td><td>200 B per ping</td><td>~400 GB pings</td><td>~50K</td></tr>
+</table>
+
+<h3>Powers of 10 — Quick Reference</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr;">
+<div class="d-panel" data-dp-step="10">
+<h4>Powers of 2 (Storage)</h4>
+<table>
+<tr><th>Power</th><th>Value</th><th>Name</th><th>Real-World</th></tr>
+<tr><td>2¹⁰</td><td>1,024</td><td>1 KB</td><td>A short paragraph</td></tr>
+<tr><td>2²⁰</td><td>~1M</td><td>1 MB</td><td>A book, a photo</td></tr>
+<tr><td>2³⁰</td><td>~1B</td><td>1 GB</td><td>A movie, 1K photos</td></tr>
+<tr><td>2⁴⁰</td><td>~1T</td><td>1 TB</td><td>1M photos, 500h video</td></tr>
+<tr><td>2⁵⁰</td><td>~1P</td><td>1 PB</td><td>Netflix library (3×)</td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="11">
+<h4>Powers of 10 (Traffic)</h4>
+<table>
+<tr><th>Scale</th><th>RPS</th><th>Real-World Analogy</th></tr>
+<tr><td>10¹</td><td>10 RPS</td><td>Personal blog</td></tr>
+<tr><td>10²</td><td>100 RPS</td><td>Small SaaS app</td></tr>
+<tr><td>10³</td><td>1K RPS</td><td>Medium startup</td></tr>
+<tr><td>10⁴</td><td>10K RPS</td><td>Large app (Slack)</td></tr>
+<tr><td>10⁵</td><td>100K RPS</td><td>Twitter, Netflix</td></tr>
+<tr><td>10⁶</td><td>1M RPS</td><td>Google Search</td></tr>
+</table>
 </div>
 </div>
+
+<div class="b bg" data-dp-step="12"><span class="hi">Interview Tip:</span> Always state your assumptions clearly. "I'll assume 100M total users, 20% DAU, 10 actions per user per day." Interviewers care more about your <em>process</em> than exact numbers. Round aggressively — 86,400 ≈ 100K is perfectly fine.</div>
+<div class="b by" data-dp-step="13"><span class="hi">80/20 Rule:</span> 20% of data generates 80% of traffic. Cache the hot 20% in Redis/Memcached. For a 1TB dataset, you need ~200GB of cache to serve 80% of reads from memory.</div>
+<div class="b bb" data-dp-step="14"><span class="hi">Rule of 72:</span> Doubling time = 72 ÷ growth%. At 10% monthly growth, data doubles in ~7 months. At 5% monthly growth, doubles in ~14 months. Plan capacity for 2× current load minimum.</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 5: COST ESTIMATION
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="cost-numbers">
+<h2>Cost Estimation</h2>
+<p class="su">Cloud cost awareness separates senior engineers from juniors. Know these numbers to make architecture decisions that balance performance with budget.</p>
+
+<h3>AWS / GCP Cost Reference (2024 Pricing)</h3>
+<table>
+<tr><th>Category</th><th>Service</th><th>Spec</th><th>Monthly Cost</th><th>Notes</th></tr>
+<tr><td rowspan="4" class="b bb">Compute</td><td>EC2 m5.xlarge</td><td>4 vCPU, 16 GB</td><td>~$140/mo</td><td>On-demand, general purpose</td></tr>
+<tr><td>EC2 m5.4xlarge</td><td>16 vCPU, 64 GB</td><td>~$560/mo</td><td>Typical app server</td></tr>
+<tr><td>Lambda</td><td>1M invocations</td><td>~$0.20</td><td>+ $0.0000167/GB-sec</td></tr>
+<tr><td>Fargate</td><td>1 vCPU, 2 GB</td><td>~$30/mo</td><td>Serverless containers</td></tr>
+<tr><td rowspan="4" class="b bg">Storage</td><td>S3 Standard</td><td>Per TB</td><td>~$23/TB/mo</td><td>+ request costs</td></tr>
+<tr><td>S3 Glacier</td><td>Per TB</td><td>~$4/TB/mo</td><td>Retrieval: hours</td></tr>
+<tr><td>EBS (gp3)</td><td>Per TB</td><td>~$80/TB/mo</td><td>Block storage for EC2</td></tr>
+<tr><td>EFS</td><td>Per TB</td><td>~$300/TB/mo</td><td>Shared file system</td></tr>
+<tr><td rowspan="3" class="b by">Database</td><td>RDS (db.r5.xlarge)</td><td>4 vCPU, 32 GB</td><td>~$350/mo</td><td>Multi-AZ: 2×</td></tr>
+<tr><td>DynamoDB</td><td>On-demand</td><td>$1.25/M writes, $0.25/M reads</td><td>Pay per request</td></tr>
+<tr><td>ElastiCache (r6g.large)</td><td>2 vCPU, 13 GB</td><td>~$200/mo</td><td>Redis managed</td></tr>
+<tr><td rowspan="2" class="b bo">Network</td><td>Data Transfer (egress)</td><td>First 10 TB</td><td>$0.09/GB</td><td>Ingress is free</td></tr>
+<tr><td>CloudFront CDN</td><td>First 10 TB</td><td>$0.085/GB</td><td>Cheaper than direct</td></tr>
+<tr><td rowspan="2" class="b bp">Messaging</td><td>SQS</td><td>Per 1M requests</td><td>~$0.40</td><td>Standard queue</td></tr>
+<tr><td>MSK (Kafka)</td><td>3 brokers (m5.large)</td><td>~$500/mo</td><td>Managed Kafka</td></tr>
+</table>
+
+<h3>Monthly Cost for Common Architectures</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+<div class="d-panel" data-dp-step="1">
+<h4>💬 Chat App (10M DAU)</h4>
+<table>
+<tr><th>Component</th><th>Cost/mo</th></tr>
+<tr><td>20 app servers (m5.xl)</td><td>$2,800</td></tr>
+<tr><td>WebSocket servers (10×)</td><td>$1,400</td></tr>
+<tr><td>Redis cluster (5 nodes)</td><td>$1,000</td></tr>
+<tr><td>RDS Multi-AZ</td><td>$700</td></tr>
+<tr><td>S3 (media, 50TB)</td><td>$1,150</td></tr>
+<tr><td>Bandwidth (100TB)</td><td>$9,000</td></tr>
+<tr><td><strong>Total</strong></td><td><strong>~$16K/mo</strong></td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="2">
+<h4>🎬 Video Platform (5M DAU)</h4>
+<table>
+<tr><th>Component</th><th>Cost/mo</th></tr>
+<tr><td>Transcoding (GPU)</td><td>$5,000</td></tr>
+<tr><td>S3 storage (500TB)</td><td>$11,500</td></tr>
+<tr><td>CloudFront CDN (1PB)</td><td>$40,000</td></tr>
+<tr><td>App servers (10×)</td><td>$1,400</td></tr>
+<tr><td>Search (ES cluster)</td><td>$2,000</td></tr>
+<tr><td>Database (RDS)</td><td>$1,500</td></tr>
+<tr><td><strong>Total</strong></td><td><strong>~$61K/mo</strong></td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="3">
+<h4>🛒 E-commerce (2M DAU)</h4>
+<table>
+<tr><th>Component</th><th>Cost/mo</th></tr>
+<tr><td>App servers (8×)</td><td>$1,120</td></tr>
+<tr><td>RDS Multi-AZ (large)</td><td>$1,400</td></tr>
+<tr><td>ElastiCache (3 nodes)</td><td>$600</td></tr>
+<tr><td>Elasticsearch</td><td>$1,500</td></tr>
+<tr><td>S3 + CloudFront</td><td>$3,000</td></tr>
+<tr><td>SQS + Lambda</td><td>$200</td></tr>
+<tr><td><strong>Total</strong></td><td><strong>~$8K/mo</strong></td></tr>
+</table>
+</div>
+</div>
+
+<h3>Cost Optimization Strategies</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+<div class="d-panel" data-dp-step="4">
+<h4>💰 Reserved Instances</h4>
+<div class="b bg"><span class="hi">Savings:</span> 30-60% vs on-demand</div>
+<ul>
+<li>1-year RI: ~30% savings</li>
+<li>3-year RI: ~60% savings</li>
+<li>Best for: steady-state workloads</li>
+<li>Commit: predictable base load</li>
+</ul>
+</div>
+<div class="d-panel" data-dp-step="5">
+<h4>⚡ Spot Instances</h4>
+<div class="b by"><span class="hi">Savings:</span> 60-90% vs on-demand</div>
+<ul>
+<li>Can be interrupted with 2-min notice</li>
+<li>Best for: batch jobs, CI/CD, stateless workers</li>
+<li>Not for: databases, user-facing servers</li>
+<li>Use spot fleets for availability</li>
+</ul>
+</div>
+<div class="d-panel" data-dp-step="6">
+<h4>📏 Right-Sizing</h4>
+<div class="b bb"><span class="hi">Savings:</span> 20-40% typical</div>
+<ul>
+<li>Monitor CPU/memory utilization</li>
+<li>Target: 60-70% avg utilization</li>
+<li>Downsize over-provisioned instances</li>
+<li>Use auto-scaling for variable load</li>
+</ul>
+</div>
+</div>
+
+<div class="b br" data-dp-step="7"><span class="hi">Cost Rule of Thumb:</span> For most applications: <span class="hg">Bandwidth &gt; Compute &gt; Storage</span>. Video/media platforms spend 60-70% on CDN/bandwidth. CRUD apps spend 50-60% on compute. Data platforms spend 40-50% on storage. Always check: "Am I paying for idle resources?"</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 6: SLA MATH
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="sla-math">
+<h2>SLA Math &amp; Availability</h2>
+<p class="su">Availability is measured in "nines." Each additional nine is 10× harder to achieve and 10× more expensive. Know how to calculate composite SLAs.</p>
+
+<h3>Availability Levels</h3>
+<table>
+<tr><th>SLA Level</th><th>Uptime %</th><th>Downtime/Year</th><th>Downtime/Month</th><th>Downtime/Week</th><th>Typical Systems</th></tr>
+<tr><td class="b br">One Nine</td><td>90%</td><td>36.5 days</td><td>72 hours</td><td>16.8 hours</td><td>Batch jobs, internal tools</td></tr>
+<tr><td class="b bo">Two Nines</td><td>99%</td><td>3.65 days</td><td>7.2 hours</td><td>1.68 hours</td><td>Personal projects</td></tr>
+<tr><td class="b by">Three Nines</td><td>99.9%</td><td>8.76 hours</td><td>43.8 min</td><td>10.1 min</td><td>Business SaaS apps</td></tr>
+<tr><td class="b bg">Four Nines</td><td>99.99%</td><td>52.6 min</td><td>4.38 min</td><td>1.01 min</td><td>E-commerce, fintech</td></tr>
+<tr><td class="b bb">Five Nines</td><td>99.999%</td><td>5.26 min</td><td>26.3 sec</td><td>6.05 sec</td><td>Payment systems, DNS</td></tr>
+<tr><td class="b bp">Six Nines</td><td>99.9999%</td><td>31.5 sec</td><td>2.63 sec</td><td>0.6 sec</td><td>Pacemakers, aviation</td></tr>
+</table>
+
+<h3>Serial vs Parallel Availability</h3>
+<svg viewBox="0 0 740 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Visual showing serial vs parallel availability calculations">
+  <defs>
+    <marker id="kn7" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--text)"/></marker>
+    <marker id="kn8" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--g)"/></marker>
+  </defs>
+  <text x="370" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">Availability: Serial (worse) vs Parallel (better)</text>
+  
+  <!-- SERIAL Section -->
+  <text x="185" y="52" text-anchor="middle" font-size="12" font-weight="bold" fill="var(--r)">Serial (all must work)</text>
+  <text x="185" y="68" text-anchor="middle" font-size="10" fill="var(--muted)">A_total = A₁ × A₂ × A₃</text>
+  
+  <!-- Serial chain -->
+  <line x1="30" y1="100" x2="60" y2="100" stroke="var(--text)" stroke-width="2" marker-end="url(#kn7)"/>
+  <rect x="65" y="82" width="80" height="36" rx="6" fill="var(--o)" opacity="0.85" data-dp-step="1"/>
+  <text x="105" y="100" text-anchor="middle" font-size="9" fill="white" font-weight="bold">Web Server</text>
+  <text x="105" y="112" text-anchor="middle" font-size="8" fill="white">99.9%</text>
+  <line x1="145" y1="100" x2="175" y2="100" stroke="var(--text)" stroke-width="2" marker-end="url(#kn7)"/>
+  <rect x="180" y="82" width="80" height="36" rx="6" fill="var(--y)" opacity="0.85" data-dp-step="2"/>
+  <text x="220" y="100" text-anchor="middle" font-size="9" fill="var(--text)" font-weight="bold">App Server</text>
+  <text x="220" y="112" text-anchor="middle" font-size="8" fill="var(--text)">99.9%</text>
+  <line x1="260" y1="100" x2="290" y2="100" stroke="var(--text)" stroke-width="2" marker-end="url(#kn7)"/>
+  <rect x="295" y="82" width="80" height="36" rx="6" fill="var(--p)" opacity="0.85" data-dp-step="3"/>
+  <text x="335" y="100" text-anchor="middle" font-size="9" fill="white" font-weight="bold">Database</text>
+  <text x="335" y="112" text-anchor="middle" font-size="8" fill="white">99.9%</text>
+  
+  <!-- Serial result -->
+  <rect x="65" y="130" width="310" height="28" rx="5" fill="none" stroke="var(--r)" stroke-width="1.5" data-dp-step="4"/>
+  <text x="220" y="148" text-anchor="middle" font-size="10" fill="var(--r)" font-weight="bold">Result: 0.999 × 0.999 × 0.999 = 99.7% (26.3 hrs/yr downtime)</text>
+  
+  <!-- PARALLEL Section -->
+  <text x="555" y="52" text-anchor="middle" font-size="12" font-weight="bold" fill="var(--g)">Parallel (any one works)</text>
+  <text x="555" y="68" text-anchor="middle" font-size="10" fill="var(--muted)">A_total = 1 - (1-A₁)(1-A₂)</text>
+  
+  <!-- Parallel paths -->
+  <line x1="430" y1="100" x2="460" y2="100" stroke="var(--text)" stroke-width="2"/>
+  <!-- Fork -->
+  <line x1="460" y1="100" x2="480" y2="82" stroke="var(--text)" stroke-width="1.5"/>
+  <line x1="460" y1="100" x2="480" y2="118" stroke="var(--text)" stroke-width="1.5"/>
+  <!-- Top path -->
+  <rect x="485" y="68" width="100" height="30" rx="6" fill="var(--g)" opacity="0.85" data-dp-step="5"/>
+  <text x="535" y="84" text-anchor="middle" font-size="9" fill="white" font-weight="bold">Server A</text>
+  <text x="535" y="95" text-anchor="middle" font-size="8" fill="white">99.9%</text>
+  <!-- Bottom path -->
+  <rect x="485" y="104" width="100" height="30" rx="6" fill="var(--g)" opacity="0.85" data-dp-step="6"/>
+  <text x="535" y="120" text-anchor="middle" font-size="9" fill="white" font-weight="bold">Server B</text>
+  <text x="535" y="131" text-anchor="middle" font-size="8" fill="white">99.9%</text>
+  <!-- Join -->
+  <line x1="585" y1="82" x2="605" y2="100" stroke="var(--text)" stroke-width="1.5"/>
+  <line x1="585" y1="118" x2="605" y2="100" stroke="var(--text)" stroke-width="1.5"/>
+  <line x1="605" y1="100" x2="640" y2="100" stroke="var(--text)" stroke-width="2" marker-end="url(#kn7)"/>
+  
+  <!-- Parallel result -->
+  <rect x="435" y="140" width="280" height="28" rx="5" fill="none" stroke="var(--g)" stroke-width="1.5" data-dp-step="7"/>
+  <text x="575" y="158" text-anchor="middle" font-size="10" fill="var(--g)" font-weight="bold">Result: 1-(0.001)² = 99.9999% (31.5 sec/yr)</text>
+  
+  <!-- Composite SLA Example -->
+  <text x="370" y="195" text-anchor="middle" font-size="12" font-weight="bold" fill="var(--a)">Composite SLA Example: Typical 3-Tier Architecture</text>
+  
+  <rect x="50" y="210" width="640" height="80" rx="8" fill="none" stroke="var(--border)" stroke-width="1" data-dp-step="8"/>
+  <!-- LB -->
+  <rect x="70" y="225" width="90" height="35" rx="5" fill="var(--g)" opacity="0.8"/>
+  <text x="115" y="243" text-anchor="middle" font-size="9" fill="white" font-weight="bold">Load Balancer</text>
+  <text x="115" y="256" text-anchor="middle" font-size="8" fill="white">99.99% (HA)</text>
+  <!-- × -->
+  <text x="175" y="248" text-anchor="middle" font-size="14" fill="var(--text)">×</text>
+  <!-- App (parallel) -->
+  <rect x="195" y="225" width="130" height="35" rx="5" fill="var(--a)" opacity="0.8"/>
+  <text x="260" y="243" text-anchor="middle" font-size="9" fill="white" font-weight="bold">App Servers (3×)</text>
+  <text x="260" y="256" text-anchor="middle" font-size="8" fill="white">1-(1-0.999)³ = 99.9999%</text>
+  <!-- × -->
+  <text x="340" y="248" text-anchor="middle" font-size="14" fill="var(--text)">×</text>
+  <!-- DB -->
+  <rect x="360" y="225" width="130" height="35" rx="5" fill="var(--p)" opacity="0.8"/>
+  <text x="425" y="243" text-anchor="middle" font-size="9" fill="white" font-weight="bold">DB Primary+Replica</text>
+  <text x="425" y="256" text-anchor="middle" font-size="8" fill="white">1-(1-0.999)² = 99.9999%</text>
+  <!-- × -->
+  <text x="505" y="248" text-anchor="middle" font-size="14" fill="var(--text)">×</text>
+  <!-- Cache -->
+  <rect x="525" y="225" width="90" height="35" rx="5" fill="var(--o)" opacity="0.8"/>
+  <text x="570" y="243" text-anchor="middle" font-size="9" fill="white" font-weight="bold">Redis (HA)</text>
+  <text x="570" y="256" text-anchor="middle" font-size="8" fill="white">99.99%</text>
+  <!-- Result -->
+  <text x="370" y="278" text-anchor="middle" font-size="10" fill="var(--a)" font-weight="bold">Composite: 99.99% × 99.9999% × 99.9999% × 99.99% ≈ 99.98% (1.75 hrs/yr)</text>
+</svg>
+
+<h3>Error Budget Concept</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr;">
+<div class="d-panel" data-dp-step="9">
+<h4>📊 What is an Error Budget?</h4>
+<p>Error budget = allowed downtime based on SLO. It's the "budget" you can "spend" on deployments, experiments, and incidents.</p>
+<table>
+<tr><th>SLO</th><th>Error Budget/Month</th><th>Meaning</th></tr>
+<tr><td>99.9%</td><td>43.8 minutes</td><td>~1 incident allowed</td></tr>
+<tr><td>99.95%</td><td>21.9 minutes</td><td>Very tight</td></tr>
+<tr><td>99.99%</td><td>4.38 minutes</td><td>Almost zero tolerance</td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="10">
+<h4>🎯 SLO vs SLA vs SLI</h4>
+<div class="b bg"><span class="hi">SLI</span> (Indicator): The metric you measure (e.g., latency p99 &lt; 200ms)</div>
+<div class="b by"><span class="hi">SLO</span> (Objective): Internal target (e.g., 99.95% requests &lt; 200ms)</div>
+<div class="b br"><span class="hi">SLA</span> (Agreement): External contract with penalties (e.g., 99.9% or credits)</div>
+<br>
+<div class="b bb"><span class="hi">Rule:</span> SLO should be stricter than SLA. If SLA = 99.9%, set SLO = 99.95%. The gap is your safety buffer before you breach the contract.</div>
+</div>
+</div>
+
+<div class="b bo" data-dp-step="11"><span class="hi">Key Insight:</span> Adding more serial components <em>always</em> reduces availability. A system with 5 serial components at 99.9% each = 99.5% overall (43.8 hrs/yr downtime). Solution: add redundancy (parallel) at each layer, especially the weakest link.</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 7: INTERVIEW QUICK REFERENCE
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="interview-reference">
+<h2>Interview Quick Reference — The 20 Numbers You Must Know</h2>
+<p class="su">Your "cheat card" for system design interviews. Memorize these anchors and you can derive everything else.</p>
+
+<div class="d-grid" style="grid-template-columns: 1fr 1fr;">
+<div class="d-panel" data-dp-step="1">
+<h4>⚡ Latency Anchors</h4>
+<table>
+<tr><th>#</th><th>Fact</th><th>Anchor</th></tr>
+<tr><td>1</td><td>RAM access</td><td class="b bg"><strong>100 ns</strong></td></tr>
+<tr><td>2</td><td>SSD random read</td><td class="b by"><strong>100 µs</strong></td></tr>
+<tr><td>3</td><td>HDD seek</td><td class="b bo"><strong>10 ms</strong></td></tr>
+<tr><td>4</td><td>Same datacenter RTT</td><td class="b bg"><strong>0.5 ms</strong></td></tr>
+<tr><td>5</td><td>Cross-region RTT</td><td class="b br"><strong>150 ms</strong></td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="2">
+<h4>🚀 Throughput Anchors</h4>
+<table>
+<tr><th>#</th><th>Fact</th><th>Anchor</th></tr>
+<tr><td>6</td><td>Redis ops/sec</td><td class="b bg"><strong>100K ops/s</strong></td></tr>
+<tr><td>7</td><td>Kafka messages/sec</td><td class="b bg"><strong>1M msg/s</strong></td></tr>
+<tr><td>8</td><td>PostgreSQL reads/sec</td><td class="b by"><strong>10K reads/s</strong></td></tr>
+<tr><td>9</td><td>WebSocket connections/server</td><td class="b bg"><strong>500K conn</strong></td></tr>
+<tr><td>10</td><td>S3 GET per prefix</td><td class="b by"><strong>5,500/s</strong></td></tr>
+</table>
+</div>
+</div>
+
+<div class="d-grid" style="grid-template-columns: 1fr 1fr;">
+<div class="d-panel" data-dp-step="3">
+<h4>💾 Storage Anchors</h4>
+<table>
+<tr><th>#</th><th>Fact</th><th>Anchor</th></tr>
+<tr><td>11</td><td>Tweet / short msg</td><td class="b bg"><strong>~140 B</strong></td></tr>
+<tr><td>12</td><td>User profile</td><td class="b bg"><strong>~1 KB</strong></td></tr>
+<tr><td>13</td><td>Photo (JPEG)</td><td class="b by"><strong>~200 KB - 5 MB</strong></td></tr>
+<tr><td>14</td><td>Video (1 min, 720p)</td><td class="b bo"><strong>~50 MB</strong></td></tr>
+<tr><td>15</td><td>1 day in seconds</td><td class="b bg"><strong>~100K sec</strong></td></tr>
+</table>
+</div>
+<div class="d-panel" data-dp-step="4">
+<h4>💰 Cost &amp; SLA Anchors</h4>
+<table>
+<tr><th>#</th><th>Fact</th><th>Anchor</th></tr>
+<tr><td>16</td><td>S3 cost per TB/mo</td><td class="b bg"><strong>$23/TB</strong></td></tr>
+<tr><td>17</td><td>EC2 m5.xlarge/mo</td><td class="b by"><strong>~$140</strong></td></tr>
+<tr><td>18</td><td>Bandwidth egress/GB</td><td class="b by"><strong>$0.09/GB</strong></td></tr>
+<tr><td>19</td><td>99.9% downtime/yr</td><td class="b bo"><strong>8.76 hours</strong></td></tr>
+<tr><td>20</td><td>99.99% downtime/yr</td><td class="b bg"><strong>52.6 minutes</strong></td></tr>
+</table>
+</div>
+</div>
+
+<h3>Quick Derivation Patterns</h3>
+<svg viewBox="0 0 740 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Quick derivation patterns showing how to use anchor numbers in interviews">
+  <defs>
+    <marker id="kn9" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--a)"/></marker>
+    <marker id="kn10" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="var(--g)"/></marker>
+  </defs>
+  <text x="370" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="var(--text)">Interview Derivation: From Requirements to Architecture</text>
+  
+  <!-- Pattern 1: RPS Calculation -->
+  <rect x="20" y="40" width="220" height="90" rx="8" fill="none" stroke="var(--a)" stroke-width="1.5" data-dp-step="5"/>
+  <text x="130" y="58" text-anchor="middle" font-size="10" fill="var(--a)" font-weight="bold">Pattern: RPS Calculation</text>
+  <text x="30" y="76" font-size="9" fill="var(--text)">100M users × 20% DAU = 20M</text>
+  <text x="30" y="92" font-size="9" fill="var(--text)">20M × 10 req/day = 200M/day</text>
+  <text x="30" y="108" font-size="9" fill="var(--text)">200M ÷ 100K sec = 2,000 RPS avg</text>
+  <text x="30" y="124" font-size="9" fill="var(--g)" font-weight="bold">Peak = 2,000 × 5 = 10,000 RPS</text>
+  
+  <!-- Pattern 2: Storage -->
+  <rect x="260" y="40" width="220" height="90" rx="8" fill="none" stroke="var(--g)" stroke-width="1.5" data-dp-step="6"/>
+  <text x="370" y="58" text-anchor="middle" font-size="10" fill="var(--g)" font-weight="bold">Pattern: Storage Sizing</text>
+  <text x="270" y="76" font-size="9" fill="var(--text)">50M posts/day × 1KB = 50 GB/day</text>
+  <text x="270" y="92" font-size="9" fill="var(--text)">50 GB × 365 = 18.25 TB/year</text>
+  <text x="270" y="108" font-size="9" fill="var(--text)">With 3× replication = 55 TB/year</text>
+  <text x="270" y="124" font-size="9" fill="var(--g)" font-weight="bold">5-year plan: ~275 TB total</text>
+  
+  <!-- Pattern 3: Server Count -->
+  <rect x="500" y="40" width="220" height="90" rx="8" fill="none" stroke="var(--p)" stroke-width="1.5" data-dp-step="7"/>
+  <text x="610" y="58" text-anchor="middle" font-size="10" fill="var(--p)" font-weight="bold">Pattern: Server Count</text>
+  <text x="510" y="76" font-size="9" fill="var(--text)">Peak RPS = 10,000</text>
+  <text x="510" y="92" font-size="9" fill="var(--text)">Each server handles ~1K RPS</text>
+  <text x="510" y="108" font-size="9" fill="var(--text)">Need: 10 servers minimum</text>
+  <text x="510" y="124" font-size="9" fill="var(--g)" font-weight="bold">With 50% headroom: 15 servers</text>
+  
+  <!-- Pattern 4: Cache Sizing -->
+  <rect x="20" y="150" width="220" height="90" rx="8" fill="none" stroke="var(--o)" stroke-width="1.5" data-dp-step="8"/>
+  <text x="130" y="168" text-anchor="middle" font-size="10" fill="var(--o)" font-weight="bold">Pattern: Cache Sizing</text>
+  <text x="30" y="186" font-size="9" fill="var(--text)">Total data: 18 TB</text>
+  <text x="30" y="202" font-size="9" fill="var(--text)">Hot data (20%): 3.6 TB</text>
+  <text x="30" y="218" font-size="9" fill="var(--text)">Redis node: 64 GB RAM</text>
+  <text x="30" y="234" font-size="9" fill="var(--g)" font-weight="bold">Need: 3,600 ÷ 64 = 57 Redis nodes</text>
+  
+  <!-- Pattern 5: Bandwidth -->
+  <rect x="260" y="150" width="220" height="90" rx="8" fill="none" stroke="var(--y)" stroke-width="1.5" data-dp-step="9"/>
+  <text x="370" y="168" text-anchor="middle" font-size="10" fill="var(--y)" font-weight="bold">Pattern: Bandwidth</text>
+  <text x="270" y="186" font-size="9" fill="var(--text)">Peak RPS = 10K, avg response = 50KB</text>
+  <text x="270" y="202" font-size="9" fill="var(--text)">Bandwidth = 10K × 50KB = 500 MB/s</text>
+  <text x="270" y="218" font-size="9" fill="var(--text)">= 4 Gbps peak outbound</text>
+  <text x="270" y="234" font-size="9" fill="var(--g)" font-weight="bold">Monthly: ~1.3 PB egress</text>
+  
+  <!-- Pattern 6: Cost -->
+  <rect x="500" y="150" width="220" height="90" rx="8" fill="none" stroke="var(--r)" stroke-width="1.5" data-dp-step="10"/>
+  <text x="610" y="168" text-anchor="middle" font-size="10" fill="var(--r)" font-weight="bold">Pattern: Quick Cost</text>
+  <text x="510" y="186" font-size="9" fill="var(--text)">15 servers × $140 = $2,100/mo</text>
+  <text x="510" y="202" font-size="9" fill="var(--text)">55 TB S3 × $23 = $1,265/mo</text>
+  <text x="510" y="218" font-size="9" fill="var(--text)">1.3 PB egress × $90/TB = $117K/mo</text>
+  <text x="510" y="234" font-size="9" fill="var(--r)" font-weight="bold">→ CDN needed! ($40K vs $117K)</text>
+</svg>
+
+<h3>Interview Mnemonics</h3>
+<div class="d-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+<div class="d-panel" data-dp-step="11">
+<h4>🧠 "The 100× Rule"</h4>
+<p>Each storage tier is ~100× slower:</p>
+<div class="b bg">L1 → RAM: 100×</div>
+<div class="b by">RAM → SSD: 1000×</div>
+<div class="b bo">SSD → HDD: 100×</div>
+<div class="b br">HDD → Network: 15×</div>
+</div>
+<div class="d-panel" data-dp-step="12">
+<h4>🧠 "The 1000× Rule"</h4>
+<p>Scaling units of data:</p>
+<div class="b bg">1 KB × 1M = 1 GB</div>
+<div class="b by">1 KB × 1B = 1 TB</div>
+<div class="b bo">1 MB × 1M = 1 TB</div>
+<div class="b br">1 MB × 1B = 1 PB</div>
+</div>
+<div class="d-panel" data-dp-step="13">
+<h4>🧠 "The Time Rule"</h4>
+<p>Seconds in common periods:</p>
+<div class="b bg">1 day ≈ 10⁵ seconds</div>
+<div class="b by">1 month ≈ 2.5 × 10⁶ sec</div>
+<div class="b bo">1 year ≈ 3 × 10⁷ sec</div>
+<div class="b br">Peak = avg × 3-5</div>
+</div>
+</div>
+
+<div class="b bb" data-dp-step="14"><span class="hi">Final Interview Tip:</span> When asked "Design X for Y million users," immediately write down: <span class="hg">(1)</span> DAU estimate, <span class="hg">(2)</span> RPS calculation, <span class="hg">(3)</span> Storage per year, <span class="hg">(4)</span> Bandwidth peak. This shows structured thinking and buys you time to think about the actual architecture. Round aggressively — interviewers want to see your process, not calculator precision.</div>
+
+<div class="b bg" data-dp-step="15"><span class="hi">Sanity Checks:</span> After your estimation, verify: Is RPS reasonable for the system type? (Social media: 100K+, SaaS: 1-10K). Is storage growing faster than you can afford? (If &gt;1PB/year, you need tiered storage). Is bandwidth cost dominant? (If yes, add CDN). Are you over-provisioning? (Target 60-70% utilization).</div>
+</div>
+
+
+</div><!-- /.ct -->
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
-<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<div class="progress-bar" id="progressBar"></div>
+<script>
+const b=document.getElementById('topBtn');
+const p=document.getElementById('progressBar');
+window.addEventListener('scroll',()=>{
+  b.style.display=window.scrollY>400?'flex':'none';
+  const h=document.documentElement;
+  const pct=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100;
+  if(p)p.style.width=pct+'%';
+});
+</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script>
+<script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

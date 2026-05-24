@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>6. Storage Systems — System Design Cheatsheet</title>
+<title>6. Storage Systems — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-3"><span class="e">💾</span> 6 · STORAGE SYSTEMS</div>
 
@@ -727,8 +728,80 @@ Lucene doesn't update the inverted index in-place. Instead: new docs are written
 </div>
 
 <div class="T" id="blob">
-<h2>Blob Storage (S3)</h2><p class="su"><span class="hg">99.999999999% durability</span> (11 nines). Cheap, infinite scale. Pre-signed URLs for direct access.</p>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Strong read-after-write consistency</span> (S3, since Dec 2020). <span class="hg">Versioning</span> protects against accidental deletes. Lifecycle policies auto-tier: Standard → IA → Glacier.</div>
+<h2>Blob Storage (S3)</h2><p class="su"><span class="hg">99.999999999% durability</span> (11 nines). Cheap, infinite scale. The default for any unstructured data — images, videos, backups, logs.</p>
+
+<svg width="100%" viewBox="0 0 520 140" style="max-width:520px;display:block;margin:4px auto">
+<defs><marker id="bs1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Upload flow -->
+<rect x="4" y="10" width="80" height="30" rx="5" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+<text x="44" y="22" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+<text x="44" y="32" text-anchor="middle" fill="var(--muted)" font-size="5.5">upload image</text>
+
+<line x1="84" y1="25" x2="108" y2="25" stroke="var(--a)" stroke-width="1" marker-end="url(#bs1)"/>
+
+<rect x="110" y="10" width="90" height="30" rx="5" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+<text x="155" y="22" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">App Server</text>
+<text x="155" y="32" text-anchor="middle" fill="var(--muted)" font-size="5.5">generate pre-signed URL</text>
+
+<line x1="200" y1="25" x2="224" y2="25" stroke="var(--g)" stroke-width="1" marker-end="url(#bs1)"/>
+
+<rect x="226" y="6" width="120" height="38" rx="5" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width="1.2"/>
+<text x="286" y="20" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">S3 / Blob Store</text>
+<text x="286" y="32" text-anchor="middle" fill="var(--muted)" font-size="5.5">PUT via pre-signed URL</text>
+<text x="286" y="40" text-anchor="middle" fill="var(--muted)" font-size="5.5">11 nines durability</text>
+
+<line x1="346" y1="25" x2="370" y2="25" stroke="var(--o)" stroke-width="1" marker-end="url(#bs1)"/>
+
+<rect x="372" y="10" width="80" height="30" rx="5" fill="rgba(34,211,238,.1)" stroke="var(--c)" stroke-width="1"/>
+<text x="412" y="22" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">CDN Edge</text>
+<text x="412" y="32" text-anchor="middle" fill="var(--muted)" font-size="5.5">serve to users</text>
+
+<!-- Tiering -->
+<rect x="4" y="56" width="508" height="76" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
+<text x="260" y="70" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Storage Tiers — Automatic Lifecycle Policies</text>
+
+<rect x="16" y="80" width="100" height="40" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+<text x="66" y="94" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Standard</text>
+<text x="66" y="106" text-anchor="middle" fill="var(--muted)" font-size="5.5">$0.023/GB/mo</text>
+<text x="66" y="116" text-anchor="middle" fill="var(--muted)" font-size="5.5">frequent access</text>
+
+<line x1="116" y1="100" x2="136" y2="100" stroke="var(--muted)" stroke-width="1" marker-end="url(#bs1)"/>
+<text x="126" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">30d</text>
+
+<rect x="138" y="80" width="100" height="40" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+<text x="188" y="94" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Infrequent (IA)</text>
+<text x="188" y="106" text-anchor="middle" fill="var(--muted)" font-size="5.5">$0.0125/GB/mo</text>
+<text x="188" y="116" text-anchor="middle" fill="var(--muted)" font-size="5.5">~1×/month access</text>
+
+<line x1="238" y1="100" x2="258" y2="100" stroke="var(--muted)" stroke-width="1" marker-end="url(#bs1)"/>
+<text x="248" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">90d</text>
+
+<rect x="260" y="80" width="100" height="40" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+<text x="310" y="94" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Glacier</text>
+<text x="310" y="106" text-anchor="middle" fill="var(--muted)" font-size="5.5">$0.004/GB/mo</text>
+<text x="310" y="116" text-anchor="middle" fill="var(--muted)" font-size="5.5">retrieval: minutes</text>
+
+<line x1="360" y1="100" x2="380" y2="100" stroke="var(--muted)" stroke-width="1" marker-end="url(#bs1)"/>
+<text x="370" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">1yr</text>
+
+<rect x="382" y="80" width="118" height="40" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+<text x="441" y="94" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Deep Archive</text>
+<text x="441" y="106" text-anchor="middle" fill="var(--muted)" font-size="5.5">$0.00099/GB/mo</text>
+<text x="441" y="116" text-anchor="middle" fill="var(--muted)" font-size="5.5">retrieval: 12-48 hrs</text>
+</svg>
+
+<table>
+<tr><th>Feature</th><th>How It Works</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Pre-signed URLs</span></td><td>Server generates time-limited signed URL → client uploads/downloads directly to S3 (no proxy)</td><td>Large file uploads without loading app server</td></tr>
+<tr><td><span class="hi">Versioning</span></td><td>Every overwrite creates a new version. Old versions retained until explicitly deleted.</td><td>Accidental delete protection, audit trail</td></tr>
+<tr><td><span class="hi">Multipart Upload</span></td><td>Split large files into chunks (5MB-5GB each), upload in parallel, assemble on S3</td><td>Files >100MB, resumable uploads over flaky networks</td></tr>
+<tr><td><span class="hi">Event Notifications</span></td><td>S3 triggers Lambda/SQS/SNS on PUT/DELETE events</td><td>Auto-generate thumbnails, trigger transcoding pipeline</td></tr>
+<tr><td><span class="hi">Cross-Region Replication</span></td><td>Async replicate objects to another region bucket</td><td>Disaster recovery, compliance (data residency)</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Strong read-after-write consistency</span> (S3, since Dec 2020). <span class="hg">11 nines durability</span> = lose 1 object per 100 billion stored per year. <span class="hg">Infinite scale</span> — no capacity planning needed. Partition prefixes for >5,500 GET/sec or >3,500 PUT/sec per prefix.</div>
+<div class="b by"><span class="hi">Design patterns:</span> <span class="hg">Media uploads</span> — pre-signed URL → S3 → CDN. <span class="hg">Data lake</span> — Parquet/ORC files on S3 → query with Athena/Spark. <span class="hg">Backups</span> — DB snapshots → S3 → lifecycle to Glacier. <span class="hg">Static hosting</span> — HTML/CSS/JS on S3 + CloudFront.</div>
 </div>
 
 <!-- ═══ Storage: separate compact lessons ═══ -->
@@ -814,6 +887,16 @@ CREATE UNIQUE INDEX users_email_uq
 <tr><td>OpenSearch / Elastic</td><td>Hybrid lexical + vector</td></tr>
 </table>
 <div class="b bg"><b>Use cases:</b> semantic search, RAG, dedup, recommendations, image / audio similarity.</div>
+<div class="d-title"><span class="num d-purple">▸</span> ANN Index Algorithms Compared</div>
+<table>
+<tr><th>Algorithm</th><th>How It Works</th><th>Speed</th><th>Accuracy</th><th>Memory</th><th>Best For</th></tr>
+<tr><td><span class="hi">HNSW</span></td><td>Hierarchical graph — navigate layers from coarse to fine</td><td><span class="hg">Very fast</span></td><td><span class="hg">High (95%+)</span></td><td>High (in-memory graph)</td><td>Low-latency serving, <1M vectors</td></tr>
+<tr><td><span class="hi">IVF-PQ</span></td><td>Cluster vectors (IVF) + compress with Product Quantization</td><td>Fast</td><td>Good (90%+)</td><td><span class="hg">Low (compressed)</span></td><td>Billions of vectors, cost-sensitive</td></tr>
+<tr><td><span class="hi">Flat (brute force)</span></td><td>Compare query against every vector</td><td><span class="hr">Slow (O(n))</span></td><td><span class="hg">Perfect (100%)</span></td><td>Full vectors in RAM</td><td>Small datasets (<100K), ground truth</td></tr>
+<tr><td><span class="hi">ScaNN</span></td><td>Google's anisotropic quantization + tree partitioning</td><td><span class="hg">Very fast</span></td><td>High</td><td>Medium</td><td>Google-scale, TensorFlow ecosystem</td></tr>
+</table>
+<div class="b by"><span class="hi">Embedding dimensions:</span> OpenAI text-embedding-3-small = <span class="hg">1536 dims</span>. Cohere = 1024. BGE/E5 = 768. Image (CLIP) = 512. Each vector = dims × 4 bytes (float32). 1M vectors × 1536 dims = <span class="hg">~6GB RAM</span>. Use PQ compression for 10-50× reduction.</div>
+<div class="b bb"><span class="hi">RAG pattern:</span> User query → embed → ANN search top-K docs → feed docs + query to LLM → grounded answer. Vector DB is the retrieval layer that makes LLMs factual.</div>
 </div>
 
 <div class="T" id="graph-db-deep">
@@ -845,12 +928,55 @@ RETURN DISTINCT f.name;</code></pre>
 <tr><td>Pathfinding, shortest-path</td><td>Simple CRUD apps (overkill)</td></tr>
 </table>
 <div class="b bg"><b>Engines:</b> Neo4j, Amazon Neptune, JanusGraph, ArangoDB (multi-model), TigerGraph (analytics-heavy).</div>
+<div class="d-title"><span class="num d-green">▸</span> Graph DB Internals — Why O(1) Traversal?</div>
+<svg width="100%" viewBox="0 0 520 100" style="max-width:520px;display:block;margin:4px auto">
+<defs><marker id="gd1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Node storage -->
+<rect x="4" y="10" width="160" height="80" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+<text x="84" y="26" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Node Record (fixed size)</text>
+<text x="14" y="42" fill="var(--muted)" font-size="6">id: 42</text>
+<text x="14" y="54" fill="var(--muted)" font-size="6">labels: [:User]</text>
+<text x="14" y="66" fill="var(--muted)" font-size="6">first_rel_ptr: → rel#7</text>
+<text x="14" y="78" fill="var(--muted)" font-size="6">first_prop_ptr: → prop#3</text>
+<text x="14" y="88" fill="var(--g)" font-size="5.5" font-weight="600">Direct pointer — no index lookup!</text>
+
+<line x1="164" y1="50" x2="188" y2="50" stroke="var(--a)" stroke-width="1" marker-end="url(#gd1)"/>
+
+<!-- Relationship storage -->
+<rect x="190" y="10" width="160" height="80" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+<text x="270" y="26" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Relationship Record</text>
+<text x="200" y="42" fill="var(--muted)" font-size="6">id: 7 (FOLLOWS)</text>
+<text x="200" y="54" fill="var(--muted)" font-size="6">start_node: → node#42</text>
+<text x="200" y="66" fill="var(--muted)" font-size="6">end_node: → node#99</text>
+<text x="200" y="78" fill="var(--muted)" font-size="6">next_rel_ptr: → rel#12</text>
+<text x="200" y="88" fill="var(--g)" font-size="5.5" font-weight="600">Linked list of relationships</text>
+
+<line x1="350" y1="50" x2="374" y2="50" stroke="var(--g)" stroke-width="1" marker-end="url(#gd1)"/>
+
+<!-- Traversal explanation -->
+<rect x="376" y="10" width="138" height="80" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
+<text x="445" y="26" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Index-Free Adjacency</text>
+<text x="386" y="42" fill="var(--muted)" font-size="6">Each node stores direct</text>
+<text x="386" y="54" fill="var(--muted)" font-size="6">pointers to its neighbors.</text>
+<text x="386" y="68" fill="var(--g)" font-size="6" font-weight="600">Traversal = follow pointers</text>
+<text x="386" y="80" fill="var(--g)" font-size="6" font-weight="600">O(1) per hop regardless</text>
+<text x="386" y="90" fill="var(--g)" font-size="6" font-weight="600">of total graph size!</text>
+</svg>
+
+<div class="b by"><span class="hi">Graph vs Relational for relationships:</span> SQL JOIN on 5-hop social query = <span class="hr">5 table scans, exponential cost</span>. Graph DB = <span class="hg">5 pointer follows, constant cost per hop</span>. At 1M nodes with avg 50 edges: SQL "friends of friends of friends" = seconds. Graph = milliseconds.</div>
+<div class="b bb"><span class="hi">When NOT to use Graph DB:</span> Simple CRUD with no relationships. High-volume writes (>100K/sec). Aggregations/analytics over all data (use columnar DB). Storing blobs/documents. If your queries don't traverse relationships, a graph DB adds complexity for no benefit.</div>
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

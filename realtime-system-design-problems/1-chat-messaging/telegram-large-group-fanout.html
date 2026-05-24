@@ -1,0 +1,636 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram Large Group Fan-out — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a group chat with 1M+ members deliver a single message without causing a fan-out explosion?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">📢</span> Design a large-group messaging system that delivers messages to 1M+ members with &lt;2s latency — without write-time fan-out</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a group chat with 1M+ members deliver a single message without causing a fan-out explosion, keeping delivery latency under 2 seconds for all participants regardless of group size?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Large channel/group delivery path — not 1:1 DMs, not media upload, not E2E encryption. The hard question: <span class="hr">how do you avoid O(N) write amplification when N = 1,000,000?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">1M+</div>
+<div style="font-size:.72rem;color:var(--muted)">members per channel</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">some channels exceed 5M</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">200K+</div>
+<div style="font-size:.72rem;color:var(--muted)">channels at this scale</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">public broadcast channels</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;2s</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery target</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">all members, any region</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">700M+</div>
+<div style="font-size:.72rem;color:var(--muted)">monthly active users</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">global distribution</div>
+</div>
+</div>
+
+<div class="b by" style="margin:6px 0"><span class="hi">Cross-reference:</span> <a href="slack-real-time-messaging.html#fanout">Slack's Fan-out Strategy</a> covers hybrid fan-out up to 50K members — this problem goes <span class="hr">20× further</span>. At 1M+ members, even Slack's "push to online only" model breaks because 10% online = 100K simultaneous pushes per message.</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — core behaviours for 1M+ member channels</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Admin/allowed user can <strong>post a message</strong> to a channel with 1M+ members<br>
+  <span class="hg">2.</span> All <strong>online members</strong> receive the message within <strong>2 seconds</strong><br>
+  <span class="hg">3.</span> <strong>Offline members</strong> see the message on next app open (pull-based catch-up)<br>
+  <span class="hg">4.</span> Messages are <strong>ordered</strong> — all members see the same sequence<br>
+  <span class="hg">5.</span> <strong>Notification tiering</strong> — @mentions push immediately, regular messages update badge only<br>
+  <span class="hg">6.</span> System handles <strong>member join/leave storms</strong> without disrupting delivery
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> End-to-end encryption (not applicable to large public channels)<br>
+  <span class="hr">✗</span> Media/file delivery (separate CDN pipeline)<br>
+  <span class="hr">✗</span> Message editing/deletion propagation<br>
+  <span class="hr">✗</span> Bot API and webhook integrations<br>
+  <span class="hr">✗</span> User authentication and session management<br>
+  <span class="hr">✗</span> Small group chat (&lt;1K members — standard fan-out works fine)
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints that shape the architecture for extreme fan-out</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;2s delivery</span> for all online members</td><td>Users expect near-instant delivery. Read-time pull with long-polling achieves this without write amplification.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">100M+ deliveries/day</span> per large channel</td><td>A single channel with 1M members and 100 msgs/day = 100M delivery events. Must not scale linearly with writes.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span> (&lt;52 min/year)</td><td>Channels are broadcast infrastructure for governments and media. Downtime = public trust loss.</td></tr>
+<tr><td><span class="hi">Durability</span></td><td><span class="hg">Zero message loss</span> after server ACK</td><td>Append-only log with replication. Messages never deleted from server (unlike E2E chats).</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td>Linear with <span class="hg">readers, not writers</span></td><td>Write cost = O(1) per message. Read cost distributed across millions of clients pulling independently.</td></tr>
+<tr><td><span class="hi">Fan-out ratio</span></td><td><span class="hg">1 write : 0 server-side copies</span></td><td>No per-user inbox. Single log entry serves all members. Eliminates write amplification entirely.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Per-channel total order</span></td><td>All members see messages in identical sequence. Monotonic message IDs enable gap detection.</td></tr>
+<tr><td><span class="hi">Fault tolerance</span></td><td>Survive <span class="hg">datacenter failures</span></td><td>Multi-DC replication of channel log. Clients reconnect to any DC and resume from cursor.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key insight:</span> At 1M+ members, the system <span class="hg">cannot afford O(N) work per message</span>. The architecture must make message posting O(1) and shift the cost to readers — each reader does O(1) work to fetch their unread messages.</div>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive why write-time fan-out is impossible at 1M+ members — and what replaces it</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>1M members per channel</strong> · <strong>100 messages/day per channel</strong> · <strong>&lt;2s delivery</strong> · <strong>700M+ MAU</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Deliveries per channel/day</td>
+  <td>1M members × 100 msgs/day</td>
+  <td><span class="hg">100M deliveries/day</span></td>
+  <td>Per-channel delivery volume — impossible to write-amplify</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Write-time fan-out cost</td>
+  <td>1M inbox writes × 100 msgs/day</td>
+  <td><span class="hr">100M writes/day/channel ✗</span></td>
+  <td>With 200K channels: 20 trillion writes/day. Completely infeasible.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Read-time cost (log model)</td>
+  <td>1 append per message (O(1) write)</td>
+  <td><span class="hg">100 writes/day/channel ✓</span></td>
+  <td>Single append-only log. Readers pull. Write cost independent of member count.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Online members at any time</td>
+  <td>1M × 5% online rate</td>
+  <td><span class="hg">~50K concurrent readers</span></td>
+  <td>50K long-poll connections per large channel — manageable with connection pooling</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Notification fan-out (push)</td>
+  <td>Only @mentions trigger push: ~1% of msgs</td>
+  <td><span class="hg">~1 push/day per user</span></td>
+  <td>Push notifications are rare — most msgs only increment badge counter</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Storage per channel/day</td>
+  <td>100 msgs × 2KB avg (text + metadata)</td>
+  <td><span class="hg">~200KB/day/channel</span></td>
+  <td>Trivial storage. 200K channels × 200KB = 40GB/day total for all large channels</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Cursor storage</td>
+  <td>700M users × 8 bytes (last_read_msg_id)</td>
+  <td><span class="hg">~5.6GB</span></td>
+  <td>Per-user cursor per channel. Fits in distributed cache. No per-user message copies.</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Latency budget</td>
+  <td>Long-poll wakeup (~50ms) + log read (~5ms) + network (~100ms)</td>
+  <td><span class="hg">~155ms actual</span></td>
+  <td>Well within 2s budget. Long-poll gives near-real-time without persistent connections.</td>
+</tr>
+</table>
+
+<div class="b br"><span class="hi">The impossibility proof:</span> Write-time fan-out at 1M members means writing 1M inbox entries per message. At 100 msgs/day that's <span class="hr">100M writes/day for ONE channel</span>. Multiply by 200K large channels = 20 trillion writes/day. No storage system can sustain this. <span class="hg">Read-time pull from a shared log is the only viable architecture.</span></div>
+</div>
+
+<!-- ═══ ARCHITECTURE OVERVIEW ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Single append-only channel log eliminates write amplification — clients pull from shared log independently</p>
+
+<svg width="100%" viewBox="0 0 720 100" style="max-width:720px;display:block;margin:6px auto">
+<defs><marker id="tga1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+<rect x="10" y="35" width="120" height="30" rx="6" fill="#1a1c2e" stroke="#f5a623"/>
+<text x="70" y="55" text-anchor="middle" fill="#f5a623" font-size="11">Admin posts</text>
+<line x1="130" y1="50" x2="175" y2="50" stroke="#8b8fa3" marker-end="url(#tga1)"/>
+<rect x="180" y="35" width="160" height="30" rx="6" fill="#1a1c2e" stroke="#4ecdc4"/>
+<text x="260" y="55" text-anchor="middle" fill="#4ecdc4" font-size="11">Server appends to log</text>
+<line x1="340" y1="50" x2="385" y2="50" stroke="#8b8fa3" marker-end="url(#tga1)"/>
+<rect x="390" y="20" width="160" height="30" rx="6" fill="#1a1c2e" stroke="#a78bfa"/>
+<text x="470" y="40" text-anchor="middle" fill="#a78bfa" font-size="10">Online clients pull (long-poll)</text>
+<rect x="390" y="55" width="160" height="30" rx="6" fill="#1a1c2e" stroke="#f97066"/>
+<text x="470" y="75" text-anchor="middle" fill="#f97066" font-size="10">Offline clients pull on reconnect</text>
+<line x1="550" y1="35" x2="595" y2="35" stroke="#8b8fa3" marker-end="url(#tga1)"/>
+<line x1="550" y1="70" x2="595" y2="70" stroke="#8b8fa3" marker-end="url(#tga1)"/>
+<rect x="600" y="20" width="100" height="30" rx="6" fill="#1a1c2e" stroke="#a78bfa"/>
+<text x="650" y="40" text-anchor="middle" fill="#a78bfa" font-size="10">Real-time UI</text>
+<rect x="600" y="55" width="100" height="30" rx="6" fill="#1a1c2e" stroke="#f97066"/>
+<text x="650" y="75" text-anchor="middle" fill="#f97066" font-size="10">Catch-up sync</text>
+</svg>
+
+<div class="b by"><span class="hi">Key insight:</span> The architecture is <span class="hg">read-time pull from a shared channel log</span>. One write serves all members. Online clients long-poll for new entries; offline clients fetch from their last-seen cursor on reconnect. See detailed strategies below.</div>
+</div>
+
+<!-- ═══ FAN-OUT STRATEGIES AT SCALE ═══ -->
+<div class="T" id="fanout-strategies">
+<h2>Fan-out Strategies at Scale</h2>
+<p class="su">Comparing three approaches — and why <span class="hg">read-time pull</span> wins at 1M+ members</p>
+
+<svg width="100%" viewBox="0 0 760 280" style="max-width:760px;display:block;margin:6px auto">
+<defs><marker id="tg1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Title -->
+<text x="380" y="14" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="800">Fan-out Strategy Comparison at 1M+ Members</text>
+
+<!-- Strategy 1: Write-time (FAILS) -->
+<rect x="4" y="26" width="240" height="110" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2"/>
+<text x="124" y="42" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">❌ Write-time Fan-out (Push to All)</text>
+<text x="124" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">1 message → 1M inbox writes</text>
+
+<rect x="14" y="64" width="50" height="18" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="39" y="76" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Message</text>
+<line x1="64" y1="73" x2="78" y2="73" stroke="var(--r)" stroke-width=".8" marker-end="url(#tg1)"/>
+
+<rect x="80" y="62" width="60" height="22" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".6"/>
+<text x="110" y="72" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Fan-out Writer</text>
+<text x="110" y="80" text-anchor="middle" fill="var(--muted)" font-size="4.5">1M copies</text>
+
+<line x1="140" y1="68" x2="154" y2="62" stroke="var(--r)" stroke-width=".6" marker-end="url(#tg1)"/>
+<line x1="140" y1="73" x2="154" y2="73" stroke="var(--r)" stroke-width=".6" marker-end="url(#tg1)"/>
+<line x1="140" y1="78" x2="154" y2="84" stroke="var(--r)" stroke-width=".6" marker-end="url(#tg1)"/>
+
+<rect x="156" y="56" width="40" height="12" rx="2" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".4"/>
+<text x="176" y="65" text-anchor="middle" fill="var(--r)" font-size="4.5">Inbox 1</text>
+<rect x="156" y="70" width="40" height="12" rx="2" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".4"/>
+<text x="176" y="79" text-anchor="middle" fill="var(--r)" font-size="4.5">Inbox 2</text>
+<rect x="156" y="84" width="40" height="12" rx="2" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".4"/>
+<text x="176" y="93" text-anchor="middle" fill="var(--r)" font-size="4.5">Inbox 1M</text>
+<text x="200" y="79" fill="var(--muted)" font-size="5">...</text>
+
+<rect x="14" y="100" width="220" height="28" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text x="124" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Cost: 100M writes/day/channel</text>
+<text x="124" y="122" text-anchor="middle" fill="var(--r)" font-size="5">Storage explodes. Latency unbounded. IMPOSSIBLE.</text>
+
+<!-- Strategy 2: Read-time (WINS) -->
+<rect x="260" y="26" width="240" height="110" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+<text x="380" y="42" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">✅ Read-time Pull (Log-based)</text>
+<text x="380" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">1 message → 1 log append. Clients pull.</text>
+
+<rect x="270" y="64" width="50" height="18" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="295" y="76" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Message</text>
+<line x1="320" y1="73" x2="334" y2="73" stroke="var(--g)" stroke-width=".8" marker-end="url(#tg1)"/>
+
+<rect x="336" y="62" width="70" height="22" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text x="371" y="72" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Channel Log</text>
+<text x="371" y="80" text-anchor="middle" fill="var(--muted)" font-size="4.5">append-only</text>
+
+<line x1="406" y1="68" x2="420" y2="62" stroke="var(--a)" stroke-width=".6" stroke-dasharray="3,2" marker-end="url(#tg1)"/>
+<line x1="406" y1="73" x2="420" y2="73" stroke="var(--a)" stroke-width=".6" stroke-dasharray="3,2" marker-end="url(#tg1)"/>
+<line x1="406" y1="78" x2="420" y2="84" stroke="var(--a)" stroke-width=".6" stroke-dasharray="3,2" marker-end="url(#tg1)"/>
+
+<rect x="422" y="56" width="50" height="12" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".4"/>
+<text x="447" y="65" text-anchor="middle" fill="var(--a)" font-size="4.5">Client 1 pull</text>
+<rect x="422" y="70" width="50" height="12" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".4"/>
+<text x="447" y="79" text-anchor="middle" fill="var(--a)" font-size="4.5">Client 2 pull</text>
+<rect x="422" y="84" width="50" height="12" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".4"/>
+<text x="447" y="93" text-anchor="middle" fill="var(--a)" font-size="4.5">Client N pull</text>
+
+<rect x="270" y="100" width="220" height="28" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+<text x="380" y="112" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Cost: 100 writes/day (O(1) per msg)</text>
+<text x="380" y="122" text-anchor="middle" fill="var(--g)" font-size="5">Reads distributed. Scales to any N. WINNER at 1M+.</text>
+
+<!-- Strategy 3: Hybrid (breaks at 1M+) -->
+<rect x="516" y="26" width="240" height="110" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
+<text x="636" y="42" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">⚠️ Hybrid (Push Online + Pull Offline)</text>
+<text x="636" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Push to 50K online + offline pull later</text>
+
+<rect x="526" y="64" width="50" height="18" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="551" y="76" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Message</text>
+<line x1="576" y1="73" x2="590" y2="73" stroke="var(--y)" stroke-width=".8" marker-end="url(#tg1)"/>
+
+<rect x="592" y="62" width="60" height="22" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text x="622" y="72" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Fan-out (online)</text>
+<text x="622" y="80" text-anchor="middle" fill="var(--muted)" font-size="4.5">50K pushes</text>
+
+<line x1="652" y1="68" x2="666" y2="62" stroke="var(--y)" stroke-width=".6" marker-end="url(#tg1)"/>
+<line x1="652" y1="73" x2="666" y2="73" stroke="var(--y)" stroke-width=".6" marker-end="url(#tg1)"/>
+<line x1="652" y1="78" x2="666" y2="84" stroke="var(--y)" stroke-width=".6" marker-end="url(#tg1)"/>
+
+<rect x="668" y="56" width="50" height="12" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".4"/>
+<text x="693" y="65" text-anchor="middle" fill="var(--y)" font-size="4.5">Online 1</text>
+<rect x="668" y="70" width="50" height="12" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".4"/>
+<text x="693" y="79" text-anchor="middle" fill="var(--y)" font-size="4.5">Online 2</text>
+<rect x="668" y="84" width="50" height="12" rx="2" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".4"/>
+<text x="693" y="93" text-anchor="middle" fill="var(--o)" font-size="4.5">Offline pull</text>
+
+<rect x="526" y="100" width="220" height="28" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+<text x="636" y="112" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Cost: 50K pushes/msg (still O(N))</text>
+<text x="636" y="122" text-anchor="middle" fill="var(--y)" font-size="5">Works for Slack (50K). Breaks at 1M+ (100K online pushes).</text>
+
+<!-- Comparison summary -->
+<rect x="4" y="148" width="752" height="50" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width=".8"/>
+<text x="380" y="164" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Why Read-time Wins at 1M+</text>
+<text x="30" y="178" fill="var(--muted)" font-size="5.5">• Write cost: O(1) — single log append regardless of member count</text>
+<text x="30" y="190" fill="var(--muted)" font-size="5.5">• Read cost: distributed across clients — each does O(1) cursor-based fetch</text>
+<text x="380" y="178" fill="var(--muted)" font-size="5.5">• No per-user state on server — cursor lives on client</text>
+<text x="380" y="190" fill="var(--muted)" font-size="5.5">• Notification push is separate (only @mentions, not content)</text>
+
+<!-- Scale threshold diagram -->
+<rect x="4" y="206" width="752" height="68" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width=".6"/>
+<text x="380" y="220" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Scale Thresholds — When Each Strategy Breaks</text>
+<line x1="60" y1="240" x2="720" y2="240" stroke="var(--border)" stroke-width="1"/>
+<circle cx="120" cy="240" r="4" fill="var(--g)"/>
+<text x="120" y="254" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&lt;100</text>
+<text x="120" y="264" text-anchor="middle" fill="var(--muted)" font-size="4.5">Write-time OK</text>
+<circle cx="300" cy="240" r="4" fill="var(--y)"/>
+<text x="300" y="254" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">100–50K</text>
+<text x="300" y="264" text-anchor="middle" fill="var(--muted)" font-size="4.5">Hybrid (Slack)</text>
+<circle cx="500" cy="240" r="4" fill="var(--r)"/>
+<text x="500" y="254" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">50K–1M</text>
+<text x="500" y="264" text-anchor="middle" fill="var(--muted)" font-size="4.5">Hybrid breaks</text>
+<circle cx="650" cy="240" r="4" fill="var(--a)"/>
+<text x="650" y="254" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">1M+</text>
+<text x="650" y="264" text-anchor="middle" fill="var(--muted)" font-size="4.5">Read-time only</text>
+</svg>
+
+<div class="b by"><span class="hi">Cross-reference:</span> <a href="slack-real-time-messaging.html#fanout">Slack uses hybrid fan-out</a> for channels up to 50K members — push to online, offline users catch up on reconnect. At 1M+ even the "push to online" part becomes 50K–100K pushes per message, creating unacceptable latency spikes. Telegram's solution: <span class="hg">don't push message content at all</span> — push only a lightweight "new message available" signal and let clients pull.</div>
+</div>
+
+<!-- ═══ CHANNEL LOG ARCHITECTURE ═══ -->
+<div class="T" id="channel-log">
+<h2>Channel Log Architecture</h2>
+<p class="su">Single append-only log per channel — clients maintain their own cursor. Server tracks <span class="hg">zero per-user delivery state</span>.</p>
+
+<svg width="100%" viewBox="0 0 760 260" style="max-width:760px;display:block;margin:6px auto">
+<defs><marker id="tg2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Channel Log -->
+<rect x="4" y="4" width="752" height="60" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text x="380" y="18" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">CHANNEL LOG — Single Append-Only Sequence</text>
+
+<rect x="40" y="28" width="60" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text x="70" y="40" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">msg_id: 1</text>
+<text x="70" y="50" text-anchor="middle" fill="var(--muted)" font-size="4.5">Hello world</text>
+
+<rect x="110" y="28" width="60" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text x="140" y="40" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">msg_id: 2</text>
+<text x="140" y="50" text-anchor="middle" fill="var(--muted)" font-size="4.5">Breaking news</text>
+
+<rect x="180" y="28" width="60" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text x="210" y="40" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">msg_id: 3</text>
+<text x="210" y="50" text-anchor="middle" fill="var(--muted)" font-size="4.5">Update v2.0</text>
+
+<rect x="250" y="28" width="60" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text x="280" y="40" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">msg_id: 4</text>
+<text x="280" y="50" text-anchor="middle" fill="var(--muted)" font-size="4.5">New feature</text>
+
+<rect x="320" y="28" width="60" height="28" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+<text x="350" y="40" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">msg_id: 5</text>
+<text x="350" y="50" text-anchor="middle" fill="var(--y)" font-size="4.5">Latest msg</text>
+
+<text x="420" y="42" fill="var(--muted)" font-size="6">← append direction</text>
+<line x1="390" y1="42" x2="410" y2="42" stroke="var(--y)" stroke-width="1" marker-end="url(#tg2)"/>
+
+<!-- Client cursors -->
+<rect x="4" y="72" width="752" height="90" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1"/>
+<text x="380" y="86" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">CLIENT CURSORS — Each Client Tracks Its Own Position</text>
+
+<rect x="30" y="96" width="160" height="56" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+<text x="110" y="110" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Client A (online)</text>
+<text x="110" y="122" text-anchor="middle" fill="var(--muted)" font-size="5.5">cursor = msg_id: 5 (caught up)</text>
+<text x="110" y="134" text-anchor="middle" fill="var(--g)" font-size="5">Long-poll: waiting for msg_id &gt; 5</text>
+<text x="110" y="146" text-anchor="middle" fill="var(--muted)" font-size="4.5">Server holds connection until new msg arrives</text>
+
+<rect x="220" y="96" width="160" height="56" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+<text x="300" y="110" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Client B (behind)</text>
+<text x="300" y="122" text-anchor="middle" fill="var(--muted)" font-size="5.5">cursor = msg_id: 3 (2 msgs behind)</text>
+<text x="300" y="134" text-anchor="middle" fill="var(--y)" font-size="5">Fetches: GET msgs after id:3 → [4, 5]</text>
+<text x="300" y="146" text-anchor="middle" fill="var(--muted)" font-size="4.5">Advances cursor to 5, then long-polls</text>
+
+<rect x="410" y="96" width="160" height="56" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
+<text x="490" y="110" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client C (offline 2 days)</text>
+<text x="490" y="122" text-anchor="middle" fill="var(--muted)" font-size="5.5">cursor = msg_id: 1 (far behind)</text>
+<text x="490" y="134" text-anchor="middle" fill="var(--o)" font-size="5">On open: paginated fetch from id:1</text>
+<text x="490" y="146" text-anchor="middle" fill="var(--muted)" font-size="4.5">Catches up in batches of 100</text>
+
+<rect x="600" y="96" width="140" height="56" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+<text x="670" y="110" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">New Member D</text>
+<text x="670" y="122" text-anchor="middle" fill="var(--muted)" font-size="5.5">cursor = msg_id: 5 (join point)</text>
+<text x="670" y="134" text-anchor="middle" fill="var(--r)" font-size="5">Starts from latest — no backfill</text>
+<text x="670" y="146" text-anchor="middle" fill="var(--muted)" font-size="4.5">Can scroll up to load history on demand</text>
+
+<!-- Key properties -->
+<rect x="4" y="170" width="752" height="84" rx="6" fill="rgba(244,114,182,.02)" stroke="var(--p)" stroke-width=".8"/>
+<text x="380" y="184" text-anchor="middle" fill="var(--p)" font-size="7" font-weight="700">Key Properties of the Log Model</text>
+
+<rect x="20" y="194" width="170" height="50" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".5"/>
+<text x="105" y="208" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">O(1) Write</text>
+<text x="105" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">Single append per message</text>
+<text x="105" y="232" text-anchor="middle" fill="var(--muted)" font-size="5">Independent of member count</text>
+<text x="105" y="242" text-anchor="middle" fill="var(--g)" font-size="5">1M members = same cost as 10</text>
+
+<rect x="200" y="194" width="170" height="50" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".5"/>
+<text x="285" y="208" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Client-side Cursor</text>
+<text x="285" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">Server stores NO per-user read state</text>
+<text x="285" y="232" text-anchor="middle" fill="var(--muted)" font-size="5">Client persists last_read_msg_id locally</text>
+<text x="285" y="242" text-anchor="middle" fill="var(--a)" font-size="5">Eliminates 1M cursor updates/msg</text>
+
+<rect x="380" y="194" width="170" height="50" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".5"/>
+<text x="465" y="208" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Long-poll for Real-time</text>
+<text x="465" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">Client: "give me msgs after cursor"</text>
+<text x="465" y="232" text-anchor="middle" fill="var(--muted)" font-size="5">Server holds request until new msg</text>
+<text x="465" y="242" text-anchor="middle" fill="var(--y)" font-size="5">~50ms wakeup latency</text>
+
+<rect x="560" y="194" width="180" height="50" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".5"/>
+<text x="650" y="208" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Replicated Log</text>
+<text x="650" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">Multi-DC replication for durability</text>
+<text x="650" y="232" text-anchor="middle" fill="var(--muted)" font-size="5">Any DC can serve reads</text>
+<text x="650" y="242" text-anchor="middle" fill="var(--r)" font-size="5">Survives datacenter failure</text>
+</svg>
+
+<div class="b bg"><span class="hi">Why this works:</span> The server does <span class="hg">zero per-user bookkeeping</span>. It doesn't know who has read what — that's the client's job. When a client opens the app, it says "give me everything after msg_id X" and the server does a simple range scan on the log. This makes the system scale with <em>readers</em> (distributed) rather than <em>writers</em> (centralized).</div>
+</div>
+
+<!-- ═══ NOTIFICATION TIERING ═══ -->
+<div class="T" id="notifications">
+<h2>Notification Tiering</h2>
+<p class="su">Only <span class="hg">push notifications</span> fan-out — not message content. Tiered by priority to minimize push volume.</p>
+
+<svg width="100%" viewBox="0 0 760 220" style="max-width:760px;display:block;margin:6px auto">
+<defs><marker id="tg3" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Title -->
+<text x="380" y="14" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="800">Notification Priority Tiers</text>
+
+<!-- Tier 1: @mention -->
+<rect x="4" y="26" width="240" height="80" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2"/>
+<text x="124" y="42" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">🔴 Tier 1: @mention / Reply</text>
+<text x="124" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Push notification immediately via APNs/FCM</text>
+
+<rect x="14" y="62" width="220" height="36" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".5"/>
+<text x="124" y="74" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Fan-out: YES — but only to mentioned users</text>
+<text x="124" y="84" text-anchor="middle" fill="var(--muted)" font-size="5">Typical: 1–10 users per @mention</text>
+<text x="124" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">Payload: "User X mentioned you in Channel Y"</text>
+
+<!-- Tier 2: Regular message -->
+<rect x="260" y="26" width="240" height="80" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
+<text x="380" y="42" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">🟡 Tier 2: Regular Message</text>
+<text x="380" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Badge count increment only (silent push)</text>
+
+<rect x="270" y="62" width="220" height="36" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".5"/>
+<text x="380" y="74" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Fan-out: MINIMAL — counter update via APNs</text>
+<text x="380" y="84" text-anchor="middle" fill="var(--muted)" font-size="5">Batched: aggregate unread count, send every 30s</text>
+<text x="380" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">Payload: { badge: 42 } — no message content</text>
+
+<!-- Tier 3: Muted channel -->
+<rect x="516" y="26" width="240" height="80" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.2"/>
+<text x="636" y="42" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">🔵 Tier 3: Muted Channel</text>
+<text x="636" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Silent — no push, no badge</text>
+
+<rect x="526" y="62" width="220" height="36" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".5"/>
+<text x="636" y="74" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Fan-out: NONE — zero server work</text>
+<text x="636" y="84" text-anchor="middle" fill="var(--muted)" font-size="5">Client discovers new msgs on next pull</text>
+<text x="636" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">Most large channel members are muted (~80%)</text>
+
+<!-- Flow diagram -->
+<rect x="4" y="116" width="752" height="96" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width=".8"/>
+<text x="380" y="132" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Notification Decision Flow</text>
+
+<rect x="30" y="142" width="80" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text x="70" y="157" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">New Message</text>
+<line x1="110" y1="154" x2="140" y2="154" stroke="var(--muted)" stroke-width=".8" marker-end="url(#tg3)"/>
+
+<rect x="142" y="140" width="90" height="28" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+<text x="187" y="152" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Has @mentions?</text>
+<text x="187" y="162" text-anchor="middle" fill="var(--muted)" font-size="4.5">Parse message text</text>
+
+<line x1="232" y1="148" x2="262" y2="148" stroke="var(--r)" stroke-width=".8" marker-end="url(#tg3)"/>
+<text x="247" y="144" fill="var(--r)" font-size="4.5">yes</text>
+<line x1="187" y1="168" x2="187" y2="182" stroke="var(--y)" stroke-width=".8" marker-end="url(#tg3)"/>
+<text x="194" y="178" fill="var(--y)" font-size="4.5">no</text>
+
+<rect x="264" y="138" width="100" height="22" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".6"/>
+<text x="314" y="152" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Push to @mentioned users</text>
+
+<rect x="142" y="184" width="90" height="22" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
+<text x="187" y="198" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">User muted?</text>
+
+<line x1="232" y1="195" x2="262" y2="195" stroke="var(--a)" stroke-width=".8" marker-end="url(#tg3)"/>
+<text x="247" y="191" fill="var(--a)" font-size="4.5">yes</text>
+<line x1="142" y1="195" x2="120" y2="195" stroke="var(--y)" stroke-width=".8" marker-end="url(#tg3)"/>
+<text x="130" y="191" fill="var(--y)" font-size="4.5">no</text>
+
+<rect x="264" y="184" width="100" height="22" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".5"/>
+<text x="314" y="198" text-anchor="middle" fill="var(--a)" font-size="5.5">No push (silent)</text>
+
+<rect x="30" y="184" width="80" height="22" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".5"/>
+<text x="70" y="198" text-anchor="middle" fill="var(--y)" font-size="5.5">Badge +1 (batched)</text>
+
+<!-- Volume annotation -->
+<rect x="420" y="140" width="320" height="60" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="580" y="154" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Push Volume Reduction</text>
+<text x="580" y="168" text-anchor="middle" fill="var(--muted)" font-size="5.5">1M members × 80% muted = 800K get NO push</text>
+<text x="580" y="180" text-anchor="middle" fill="var(--muted)" font-size="5.5">200K unmuted × badge batching (30s) = ~7K pushes/msg</text>
+<text x="580" y="192" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Effective fan-out: 7K (not 1M) — 99.3% reduction</text>
+</svg>
+
+<div class="b bg"><span class="hi">Key insight:</span> Notification fan-out and message delivery are <span class="hg">completely decoupled</span>. Message content lives in the channel log (pulled by clients). Push notifications are lightweight signals ("you have N unread") that fan-out only to unmuted, offline users — and even those are batched to reduce volume by 99%+.</div>
+</div>
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">What breaks at 1M+ scale — and how the architecture handles it</p>
+<table>
+<tr><th>Edge Case</th><th>Problem</th><th>Solution</th><th>Impact if Unhandled</th></tr>
+<tr>
+  <td><span class="hi">Viral message in 1M channel</span></td>
+  <td>Sudden spike: 50K clients simultaneously pull after a popular post</td>
+  <td>CDN-like caching of recent messages at edge. Hot channel log replicated to read replicas. Rate-limit pulls to 1/sec per client.</td>
+  <td><span class="hr">Log server overload, cascading timeouts for all channels on same shard</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Member join/leave storms</span></td>
+  <td>100K users join a channel in minutes (viral invite link). Membership list update becomes bottleneck.</td>
+  <td>Membership is eventually consistent. New members start cursor at latest msg_id. Membership changes don't affect the log — only the "who can read" ACL check on pull.</td>
+  <td><span class="hr">Membership write lock blocks message delivery if coupled</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Cursor management for offline users</span></td>
+  <td>User offline for 30 days. Channel has 3000 new messages. Full catch-up is expensive.</td>
+  <td>Paginated fetch (100 msgs/page). Show latest first, load history on scroll-up. If gap &gt; 1000 msgs, show "jump to latest" with unread count only.</td>
+  <td><span class="hr">Client OOM on massive payload. Server timeout on huge range scan.</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Thundering herd on popular channel</span></td>
+  <td>Channel admin posts → 50K long-poll connections wake up simultaneously → 50K read requests hit log server at once</td>
+  <td>Staggered wakeup: add random jitter (0–200ms) to long-poll response. Coalesce reads: batch wakeup notifications, serve from cache. Connection-level rate limiting.</td>
+  <td><span class="hr">Log server CPU spike, increased latency for all channels on same partition</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Multi-device sync</span></td>
+  <td>User has phone + desktop + tablet. Each device has its own cursor. Must not show duplicate notifications.</td>
+  <td>Server-side "last notified msg_id" per user (not per device). Devices sync cursors via shared user state. Push notification sent once, all devices update badge.</td>
+  <td><span class="hr">Triple notifications per message. User disables notifications entirely.</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Log compaction / retention</span></td>
+  <td>Channel with 1M msgs over 5 years. Log grows unbounded. Old messages rarely accessed.</td>
+  <td>Tiered storage: hot (last 7 days, SSD), warm (last 90 days, HDD), cold (archive, object storage). Cursor-based access works across tiers transparently.</td>
+  <td><span class="hr">Storage costs grow linearly forever. SSD capacity exhaustion.</span></td>
+</tr>
+</table>
+<div class="b by"><span class="hi">Design principle:</span> Every edge case is handled by keeping the <span class="hg">write path simple</span> (single append) and pushing complexity to the <span class="hg">read path</span> (caching, pagination, rate limiting). The log is the source of truth — everything else is derived.</div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack</h2>
+<p class="su">Telegram's infrastructure choices optimized for large-scale message delivery</p>
+<table>
+<tr><th>Layer</th><th>Technology</th><th>Why This Choice</th></tr>
+<tr>
+  <td><span class="hi">Protocol</span></td>
+  <td><span class="hg">MTProto (custom)</span></td>
+  <td>Binary protocol over TCP. Smaller payloads than JSON/HTTP. Built-in encryption, compression, and multiplexing. Supports long-poll natively.</td>
+</tr>
+<tr>
+  <td><span class="hi">Transport</span></td>
+  <td><span class="hg">TCP + custom framing</span></td>
+  <td>Persistent TCP connections with keep-alive. No HTTP overhead. Supports multiple concurrent requests on single connection (multiplexed).</td>
+</tr>
+<tr>
+  <td><span class="hi">Message Storage</span></td>
+  <td><span class="hg">Distributed append-only log</span></td>
+  <td>Custom storage engine optimized for sequential writes and range reads. Sharded by channel_id. Replicated across 3+ DCs.</td>
+</tr>
+<tr>
+  <td><span class="hi">Metadata Store</span></td>
+  <td><span class="hg">Distributed KV store</span></td>
+  <td>User profiles, channel membership, notification preferences. Eventually consistent with strong consistency for writes.</td>
+</tr>
+<tr>
+  <td><span class="hi">Media Delivery</span></td>
+  <td><span class="hg">Global CDN + edge caching</span></td>
+  <td>Photos/videos served from nearest edge. Message log contains only media_id reference. Decouples media from text delivery.</td>
+</tr>
+<tr>
+  <td><span class="hi">Push Notifications</span></td>
+  <td><span class="hg">APNs / FCM + custom gateway</span></td>
+  <td>Custom aggregation layer batches badge updates. Direct APNs/FCM for @mentions. Reduces API calls to Apple/Google by 99%.</td>
+</tr>
+<tr>
+  <td><span class="hi">Service Mesh</span></td>
+  <td><span class="hg">Custom RPC framework</span></td>
+  <td>Internal services communicate via lightweight binary RPC. Service discovery, load balancing, and circuit breaking built-in.</td>
+</tr>
+<tr>
+  <td><span class="hi">Datacenter Strategy</span></td>
+  <td><span class="hg">Multi-DC active-active</span></td>
+  <td>5+ DCs globally. Users connect to nearest DC. Channel logs replicated synchronously within region, async across regions.</td>
+</tr>
+</table>
+<div class="b bb"><span class="hi">Why custom protocol?</span> HTTP/JSON adds ~200 bytes overhead per request. At 700M users making frequent pulls, that's <span class="hr">140GB/day of wasted bandwidth</span> just in headers. MTProto's binary framing reduces this to ~20 bytes overhead — a 10× improvement that matters at Telegram's scale.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail the Telegram large-group fan-out question</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="color:var(--g);margin-bottom:6px">🎯 5 Points That Win the Interview</h4>
+<div style="font-size:.78rem;line-height:1.9">
+  <span class="hg">1.</span> <strong>Write-time fan-out is impossible at 1M+</strong> — prove it with math: 1M members × 100 msgs/day = 100M writes/day per channel. Show the interviewer you understand <em>why</em> the naive approach fails before proposing the solution.<br>
+  <span class="hg">2.</span> <strong>Read-time pull from append-only log</strong> — single write per message, clients pull from their cursor. Write cost is O(1) regardless of channel size. This is the core architectural insight.<br>
+  <span class="hg">3.</span> <strong>Decouple notifications from content delivery</strong> — push notifications are lightweight signals (badge count), not message content. Only @mentions trigger immediate push. 80% of members are muted = zero push work.<br>
+  <span class="hg">4.</span> <strong>Client-side cursor eliminates server state</strong> — server doesn't track per-user read position for 1M users. Client stores last_read_msg_id locally. On reconnect, client tells server "give me everything after X."<br>
+  <span class="hg">5.</span> <strong>Thundering herd mitigation</strong> — when a message arrives, 50K long-poll connections wake up. Solve with: jittered wakeup, read replicas, edge caching of recent messages, and connection-level rate limiting.
+</div>
+</div>
+</div>
+
+<div class="b bo" style="margin-top:8px"><span class="hi">Interviewer follow-ups to prepare for:</span><br>
+<span style="font-size:.78rem;line-height:1.8">
+• "How do you handle ordering?" → Monotonic msg_id per channel. Client detects gaps and re-fetches.<br>
+• "What about read receipts?" → Not feasible at 1M. Show "X people saw this" as an approximate counter, not a full list.<br>
+• "How does this differ from Kafka?" → Similar concept (log + consumer offset), but Kafka tracks offsets server-side. Telegram pushes offset tracking to the client to avoid 1M offset updates per message.<br>
+• "What if the log server goes down?" → Multi-DC replication. Client reconnects to any DC and resumes from cursor. No data loss after ACK.
+</span></div>
+</div>
+
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

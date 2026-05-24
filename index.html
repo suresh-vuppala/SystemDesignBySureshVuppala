@@ -1,135 +1,188 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-
-<!-- Primary Meta Tags -->
-<title>System Design Resources — Complete Cheatsheet & Real-Time Problems for Staff/Sr Engineers</title>
-<meta name="title" content="System Design Resources — Complete Cheatsheet & Real-Time Problems for Staff/Sr Engineers">
-<meta name="description" content="Master system design with our comprehensive guide covering distributed systems, scalability, caching, databases, load balancing, and 100+ real-time problems from Google, Meta, Uber, Netflix. Perfect for Staff and Senior SWE interviews.">
-<meta name="keywords" content="system design, distributed systems, scalability, microservices, database design, caching strategies, load balancing, CDN, API design, real-time systems, staff engineer interview, senior engineer interview, system architecture, high availability, fault tolerance, CAP theorem, database sharding, message queues, event-driven architecture">
+<title>HelloSDE — System Design Mastery for Staff & Senior Engineers</title>
+<meta name="description" content="Master system design with 15 core topics, 201 real-time problems, and visual SVG diagrams. Built for FAANG/MAANG interview prep at Staff/Sr SWE level.">
+<meta name="keywords" content="system design, distributed systems, scalability, staff engineer interview, FAANG interview prep, system architecture, HelloSDE">
 <meta name="author" content="Suresh Vuppala">
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-<meta name="googlebot" content="index, follow">
-<meta name="language" content="English">
-<meta name="revisit-after" content="7 days">
-
-<!-- Canonical URL -->
-<link rel="canonical" href="https://yourdomain.com/">
-
-<!-- Open Graph / Facebook -->
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://hellosde.com/">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://yourdomain.com/">
-<meta property="og:site_name" content="System Design Resources by Suresh Vuppala">
-<meta property="og:title" content="System Design Resources — Complete Cheatsheet & Real-Time Problems">
-<meta property="og:description" content="Master system design with comprehensive guides on distributed systems, scalability, databases, and 100+ real-time problems from top tech companies.">
-<meta property="og:image" content="https://yourdomain.com/images/og-image.jpg">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="System Design Resources - Complete Learning Roadmap">
-<meta property="og:locale" content="en_US">
-
-<!-- Twitter Card -->
+<meta property="og:url" content="https://hellosde.com/">
+<meta property="og:title" content="HelloSDE — System Design Mastery">
+<meta property="og:description" content="15 core topics, 201 real-time problems, visual diagrams. Staff/Sr SWE interview prep.">
+<meta property="og:site_name" content="HelloSDE">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:url" content="https://yourdomain.com/">
-<meta name="twitter:title" content="System Design Resources — Complete Cheatsheet & Real-Time Problems">
-<meta name="twitter:description" content="Master system design with comprehensive guides on distributed systems, scalability, databases, and 100+ real-time problems from top tech companies.">
-<meta name="twitter:image" content="https://yourdomain.com/images/twitter-card.jpg">
-<meta name="twitter:image:alt" content="System Design Resources - Complete Learning Roadmap">
-<meta name="twitter:creator" content="@SureshVuppala">
-<meta name="twitter:site" content="@SureshVuppala">
-
-<!-- Favicon -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#2563eb">
-
-<!-- Preconnect for Performance -->
+<meta name="twitter:title" content="HelloSDE — System Design Mastery">
+<meta name="theme-color" content="#6c8cff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-<!-- Structured Data (JSON-LD) -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "System Design Resources by Suresh Vuppala",
-  "url": "https://yourdomain.com/",
-  "description": "Complete system design reference for Staff and Senior SWE interviews covering distributed systems, scalability, caching, databases, and real-time problems.",
-  "author": {
-    "@type": "Person",
-    "name": "Suresh Vuppala"
-  },
-  "publisher": {
-    "@type": "Person",
-    "name": "Suresh Vuppala"
-  },
-  "inLanguage": "en-US",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": "https://yourdomain.com/search?q={search_term_string}",
-    "query-input": "required name=search_term_string"
-  }
-}
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "EducationalOrganization",
-  "name": "System Design Resources",
-  "url": "https://yourdomain.com/",
-  "logo": "https://yourdomain.com/images/logo.png",
-  "description": "Comprehensive system design learning platform with cheatsheets and real-time problems for senior engineers.",
-  "educationalLevel": "Advanced",
-  "teaches": [
-    "System Design",
-    "Distributed Systems",
-    "Scalability",
-    "Database Design",
-    "Microservices Architecture",
-    "Load Balancing",
-    "Caching Strategies",
-    "API Design"
-  ]
-}
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [{
-    "@type": "ListItem",
-    "position": 1,
-    "name": "Home",
-    "item": "https://yourdomain.com/"
-  }]
-}
-</script>
-
-<!-- Stylesheet -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="css/style.css">
+<style>
+.home-hero{text-align:center;padding:60px 24px 48px;background:var(--bg)}
+.home-hero h1{font-size:2.4rem;font-weight:800;letter-spacing:-.03em;color:#fff;margin:0;line-height:1.2}
+.home-hero h1 span{background:linear-gradient(135deg,var(--a),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.home-hero .tagline{color:var(--muted);margin-top:12px;font-size:1rem;line-height:1.6}
+.home-hero .tagline strong{color:var(--text)}
+.home-stats{display:flex;justify-content:center;gap:32px;margin-top:28px;flex-wrap:wrap}
+.home-stat{text-align:center}
+.home-stat .num{font-size:1.6rem;font-weight:800;color:var(--a)}
+.home-stat .label{font-size:.75rem;color:var(--muted);margin-top:2px}
+.home-cta{display:flex;justify-content:center;gap:12px;margin-top:32px;flex-wrap:wrap}
+.home-cta a{padding:12px 28px;border-radius:8px;font-size:.9rem;font-weight:600;text-decoration:none;transition:all .2s}
+.home-cta .primary{background:var(--a);color:#fff}
+.home-cta .primary:hover{background:var(--a2);transform:translateY(-1px)}
+.home-cta .secondary{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
+.home-cta .secondary:hover{background:rgba(255,255,255,.1);border-color:var(--a)}
+
+.home-sections{max-width:900px;margin:0 auto;padding:48px 24px}
+.home-card{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px}
+@media(max-width:600px){.home-card{grid-template-columns:1fr}}
+.home-card-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;transition:border-color .2s,transform .2s}
+.home-card-item:hover{border-color:var(--a);transform:translateY(-2px)}
+.home-card-item h3{font-size:1.1rem;font-weight:700;color:#fff;margin:0 0 8px}
+.home-card-item p{font-size:.82rem;color:var(--muted);line-height:1.5;margin:0 0 14px}
+.home-card-item .meta{display:flex;gap:12px;font-size:.72rem;color:var(--muted)}
+.home-card-item .meta span{display:flex;align-items:center;gap:4px}
+.home-card-item a{display:inline-block;margin-top:12px;font-size:.8rem;color:var(--a);font-weight:600;text-decoration:none}
+.home-card-item a:hover{text-decoration:underline}
+
+.home-features{max-width:900px;margin:0 auto;padding:0 24px 48px}
+.home-features h2{text-align:center;font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:24px}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:700px){.features-grid{grid-template-columns:1fr}}
+.feature-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;text-align:center}
+.feature-item .icon{font-size:1.5rem;margin-bottom:8px}
+.feature-item h4{font-size:.88rem;font-weight:700;color:var(--text);margin:0 0 6px}
+.feature-item p{font-size:.75rem;color:var(--muted);line-height:1.4;margin:0}
+
+.home-footer{text-align:center;padding:32px 24px;border-top:1px solid var(--border);color:var(--muted);font-size:.75rem}
+.home-footer a{color:var(--a);text-decoration:none}
+</style>
 </head>
 <body>
-<!-- Skip to main content for accessibility -->
 
-<main id="main-content">
-<header class="hero" role="banner">
-<h1><span>System Design Resources</span></h1>
-<p>Cheatsheet & Real-Time Problems — Staff / Sr SWE Reference</p>
-</header>
+<div class="home-hero">
+  <h1>Master <span>System Design</span><br>for Top Tech Interviews</h1>
+  <p class="tagline">
+    <strong>15 core topics</strong> · <strong>201 real-time problems</strong> · Visual SVG diagrams<br>
+    Built for Staff & Senior SWE at Google · Meta · Uber · Netflix · Amazon
+  </p>
+  <div class="home-stats">
+    <div class="home-stat"><div class="num">15</div><div class="label">Core Topics</div></div>
+    <div class="home-stat"><div class="num" style="color:var(--g)">201</div><div class="label">Design Problems</div></div>
+    <div class="home-stat"><div class="num" style="color:var(--o)">28</div><div class="label">Modules</div></div>
+    <div class="home-stat"><div class="num" style="color:var(--a2)">100+</div><div class="label">SVG Diagrams</div></div>
+  </div>
+  <div class="home-cta">
+    <a href="system-design-cheatsheet/index.html" class="primary">Start Learning →</a>
+    <a href="realtime-system-design-problems/index.html" class="secondary">Browse Problems →</a>
+  </div>
+</div>
 
-<section class="ct" aria-label="Main content section"></section>
-</main>
+<div class="home-sections">
+  <div class="home-card">
+    <div class="home-card-item">
+      <h3>📖 System Design Concepts</h3>
+      <p>Complete reference covering Foundations, Networking, Security, APIs, Infrastructure, Storage, Caching, Messaging, Consistency, Scalability, Data Pipelines, Distributed Systems, Observability, Key Numbers, and Decision Flowcharts.</p>
+      <div class="meta">
+        <span>📄 15 topics</span>
+        <span>📊 100+ diagrams</span>
+        <span>⚡ Interview-ready</span>
+      </div>
+      <a href="system-design-cheatsheet/index.html">Explore Concepts →</a>
+    </div>
+    <div class="home-card-item">
+      <h3>🧩 Real-Time Design Problems</h3>
+      <p>201 problems across 28 modules — Chat & Messaging, Video Streaming, Payments, Geo/Rides, Queues, Social Feeds, Search, Scheduling, Observability, ML Serving, Security, and more. Each with full architecture + interview cheat sheet.</p>
+      <div class="meta">
+        <span>🏗️ 201 problems</span>
+        <span>🏢 28 modules</span>
+        <span>🎯 FAANG-level</span>
+      </div>
+      <a href="realtime-system-design-problems/index.html">Browse Problems →</a>
+    </div>
+  </div>
+</div>
+
+<div class="home-features">
+
+  <!-- Globe Section with title -->
+  <h2 style="text-align:center;margin-bottom:8px">Learners Worldwide</h2>
+  <p style="text-align:center;font-size:.82rem;color:var(--muted);margin-bottom:24px">Engineers across the globe preparing for system design interviews</p>
+
+  <div id="globe-container" style="display:flex;align-items:center;gap:32px;margin-bottom:48px;flex-wrap:wrap;justify-content:center">
+    <div style="position:relative">
+      <canvas id="globe-canvas" style="display:block;border-radius:50%"></canvas>
+      <div style="text-align:center;margin-top:10px;font-size:.78rem;color:var(--muted)">
+        🟢 <span style="color:var(--g);font-weight:700" id="globe-counter">892</span> learners online
+      </div>
+    </div>
+    <div style="min-width:220px">
+      <div style="font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">Trending Topics</div>
+      <div id="top-concepts"></div>
+    </div>
+  </div>
+
+  <style>
+  .tc-item{display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:.78rem;border-radius:6px;text-decoration:none;transition:background .15s}
+  .tc-item:hover{background:rgba(108,140,255,.08);text-decoration:none}
+  .tc-rank{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;background:rgba(255,255,255,.06);color:var(--muted)}
+  .tc-item:hover .tc-rank{background:rgba(108,140,255,.15);color:var(--a)}
+  .tc-name{color:var(--text-2)}
+  .tc-item:hover .tc-name{color:var(--a)}
+  </style>
+
+  <!-- Why HelloSDE - moved to bottom -->
+  <h2>Why HelloSDE?</h2>
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="icon">🎨</div>
+      <h4>Visual SVG Diagrams</h4>
+      <p>Every concept explained with clear, interactive architecture diagrams — not just text walls</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon">🎯</div>
+      <h4>Interview Cheat Sheets</h4>
+      <p>"5 things to say" panels for every problem — nail the key points interviewers want to hear</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon">📐</div>
+      <h4>Scale Estimation</h4>
+      <p>Back-of-envelope math for every problem — derive architecture from numbers, not the other way around</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon">🔗</div>
+      <h4>Cross-Referenced</h4>
+      <p>Problems link to related core topics. Concepts links to real-world problems. Everything connected.</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon">🏢</div>
+      <h4>Real Company Scale</h4>
+      <p>Slack 10B msg/day, WhatsApp 2B users, Discord 10M WebSockets — real numbers, real architectures</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon">⚡</div>
+      <h4>Staff/Sr SWE Level</h4>
+      <p>Not beginner tutorials — deep dives into tradeoffs, failure modes, and production-grade decisions</p>
+    </div>
+  </div>
+</div>
+
+<div class="home-footer">
+  <p>Built by <a href="https://github.com/sureshvuppala" target="_blank">Suresh Vuppala</a> · HelloSDE.com · System Design for Senior Engineers</p>
+</div>
 
 <script src="js/header.js"></script>
-<script src="js/nav-cheatsheet.js"></script>
-<script src="js/nav-realtime.js"></script>
+<script src="js/globe.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="js/auth.js"></script>
 </body>
 </html>

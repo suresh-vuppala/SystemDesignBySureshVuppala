@@ -1,0 +1,673 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Region Message Ordering — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a multi-region chat system guarantee causal message ordering when an entire cloud region goes down?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🌍</span> Design a multi-region messaging system that maintains causal ordering across 3+ regions with &lt;250ms cross-region latency while surviving full region failures</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a multi-region chat system guarantee causal message ordering within conversations when an entire cloud region goes down, while maintaining consistency and conflict resolution across geographically distributed nodes?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> In a single-region system, a monotonic sequence number trivially orders messages. But when messages originate in different regions with 60–120ms replication lag, <span class="hr">how do you guarantee that "Reply B" always appears after "Original A" — even during a region failover?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">3+</div>
+<div style="font-size:.72rem;color:var(--muted)">active regions</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">US-East, EU-West, AP-South</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;250ms</div>
+<div style="font-size:.72rem;color:var(--muted)">cross-region delivery</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">including replication</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Full Region</div>
+<div style="font-size:.72rem;color:var(--muted)">failure survival</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">zero message loss</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Causal</div>
+<div style="font-size:.72rem;color:var(--muted)">ordering guarantee</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">happens-before preserved</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — core behaviours for multi-region causal ordering</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Messages within a conversation maintain <strong>causal ordering</strong> — if User A sees message M1 before sending M2, all users see M1 before M2<br>
+  <span class="hg">2.</span> System operates in <strong>3+ active regions</strong> simultaneously (active-active)<br>
+  <span class="hg">3.</span> Survives <strong>full region failure</strong> — users failover to another region with no message loss<br>
+  <span class="hg">4.</span> <strong>Conflict detection</strong> — concurrent messages (no causal relationship) are deterministically ordered across all nodes<br>
+  <span class="hg">5.</span> <strong>Consistency reconciliation</strong> — when a failed region recovers, in-flight messages are merged without duplicates<br>
+  <span class="hg">6.</span> Clients receive <strong>ordered delivery</strong> — messages are buffered and reordered before display if they arrive out of causal order
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> Global total ordering across all conversations (only per-conversation causal order)<br>
+  <span class="hr">✗</span> End-to-end encryption key distribution across regions<br>
+  <span class="hr">✗</span> Media/file replication strategy<br>
+  <span class="hr">✗</span> User authentication and session management<br>
+  <span class="hr">✗</span> Read receipts and typing indicators<br>
+  <span class="hr">✗</span> Message search indexing across regions
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints that shape the multi-region architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">P99 &lt;250ms</span> cross-region delivery</td><td>Users in different regions must perceive near-real-time chat. Drives async replication over synchronous consensus for the hot path.</td></tr>
+<tr><td><span class="hi">Ordering</span></td><td><span class="hg">Causal consistency</span> per conversation</td><td>Happens-before relationships must be preserved. Drives HLC adoption over simple wall-clock timestamps.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span> — survive full region failure</td><td>No single region is a SPOF. Active-active with automatic failover. Clients reconnect to nearest healthy region.</td></tr>
+<tr><td><span class="hi">Durability</span></td><td><span class="hg">Zero message loss</span> after ACK</td><td>Kafka <code>acks=all</code> within region + cross-region replication with MirrorMaker. Reconciliation on recovery.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Convergent</span> — all regions agree eventually</td><td>CRDT-inspired merge for concurrent messages. Deterministic tie-breaking ensures identical final state.</td></tr>
+<tr><td><span class="hi">Partition tolerance</span></td><td>Operate during <span class="hg">network partitions</span></td><td>Each region continues accepting writes. Conflict resolution happens on reconnection. CAP: AP with causal consistency.</td></tr>
+<tr><td><span class="hi">Recovery time</span></td><td><span class="hg">&lt;30s</span> region failover</td><td>Health checks detect failure in ~10s. DNS/routing update in ~5s. Client reconnect + catch-up in ~15s.</td></tr>
+<tr><td><span class="hi">Replication lag</span></td><td><span class="hg">&lt;100ms</span> steady-state</td><td>Cross-region Kafka MirrorMaker lag. During partition, messages queue and replay on reconnection.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Latency vs. Consistency</span>. Synchronous cross-region consensus (Raft/Paxos) guarantees ordering but adds 60–120ms per write. We choose async replication with HLC-based causal ordering — accepting brief windows where concurrent messages may be reordered, but never violating causality.</div>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Cross-region latency budget and replication lag analysis</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>3 active regions</strong> · <strong>&lt;250ms cross-region P99</strong> · <strong>~80ms inter-region RTT</strong> · <strong>survive full region failure</strong> · <strong>causal ordering guarantee</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Cross-region RTT</td>
+  <td>US-East ↔ EU-West measured</td>
+  <td><span class="hg">~80ms</span></td>
+  <td>Sets floor for replication lag — cannot do synchronous consensus within latency budget</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Replication lag budget</td>
+  <td>250ms total − 80ms network − 50ms local processing</td>
+  <td><span class="hg">~120ms buffer</span></td>
+  <td>MirrorMaker must replicate within this window for steady-state ordering</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>HLC clock skew tolerance</td>
+  <td>NTP sync accuracy across regions</td>
+  <td><span class="hg">~10-50ms</span></td>
+  <td>HLC absorbs clock skew — logical component breaks ties when physical clocks are close</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Conflict window</td>
+  <td>Replication lag (80ms) = window where concurrent writes can occur</td>
+  <td><span class="hr">~80ms conflict window</span></td>
+  <td>Messages sent within 80ms across regions may arrive "simultaneously" — need deterministic ordering</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Failover detection time</td>
+  <td>Health check interval (5s) × 2 missed + propagation</td>
+  <td><span class="hg">~10-15s</span></td>
+  <td>During this window, in-flight messages to dead region must be retried to surviving regions</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Recovery reconciliation volume</td>
+  <td>Messages during outage × replication factor</td>
+  <td><span class="hg">Variable</span></td>
+  <td>Failed region may have accepted writes not yet replicated — must reconcile on recovery using HLC</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Client reorder buffer</td>
+  <td>Max out-of-order window = replication lag + processing</td>
+  <td><span class="hg">~150ms buffer</span></td>
+  <td>Client holds messages for 150ms before displaying, allowing causal predecessors to arrive</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with the cross-region RTT — it immediately rules out synchronous consensus for the hot path. Then derive the conflict window from replication lag. This is the key insight: you need a clock mechanism (HLC) that can order events even when wall clocks disagree by up to 50ms.</div>
+</div>
+
+<!-- ═══ ORDERING STRATEGIES COMPARED ═══ -->
+<div class="T" id="ordering-strategies">
+<h2>Ordering Strategies Compared</h2>
+<p class="su">Four approaches to message ordering in distributed systems — and why HLC wins for multi-region chat</p>
+
+<!-- SVG: Ordering Strategies Comparison -->
+<svg viewBox="0 0 800 320" style="width:100%;max-width:800px;margin:10px auto;display:block;font-family:system-ui,sans-serif">
+  <defs>
+    <marker id="mr1" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--a)"/></marker>
+    <marker id="mr2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--g)"/></marker>
+  </defs>
+
+  <!-- Lamport Timestamps -->
+  <rect x="20" y="20" width="170" height="130" rx="8" fill="none" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="105" y="45" text-anchor="middle" fill="var(--y)" font-size="11" font-weight="700">Lamport Timestamps</text>
+  <text x="105" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">Single counter, increment on send</text>
+  <text x="35" y="90" fill="var(--text)" font-size="9">✓ Total order</text>
+  <text x="35" y="108" fill="var(--text)" font-size="9">✗ No causal detection</text>
+  <text x="35" y="126" fill="var(--r)" font-size="9">✗ Can't tell concurrent</text>
+  <text x="35" y="144" fill="var(--r)" font-size="9">   from causally related</text>
+
+  <!-- Vector Clocks -->
+  <rect x="210" y="20" width="170" height="130" rx="8" fill="none" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="295" y="45" text-anchor="middle" fill="var(--a)" font-size="11" font-weight="700">Vector Clocks</text>
+  <text x="295" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">One counter per node</text>
+  <text x="225" y="90" fill="var(--text)" font-size="9">✓ Detects causality</text>
+  <text x="225" y="108" fill="var(--text)" font-size="9">✓ Detects concurrency</text>
+  <text x="225" y="126" fill="var(--r)" font-size="9">✗ O(n) space per message</text>
+  <text x="225" y="144" fill="var(--r)" font-size="9">✗ Grows with participants</text>
+
+  <!-- HLC -->
+  <rect x="400" y="20" width="170" height="130" rx="8" fill="none" stroke="var(--g)" stroke-width="2"/>
+  <text x="485" y="45" text-anchor="middle" fill="var(--g)" font-size="11" font-weight="700">Hybrid Logical Clocks</text>
+  <text x="485" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">Physical time + logical counter</text>
+  <text x="415" y="90" fill="var(--text)" font-size="9">✓ Causal ordering</text>
+  <text x="415" y="108" fill="var(--text)" font-size="9">✓ Bounded size (64-bit)</text>
+  <text x="415" y="126" fill="var(--text)" font-size="9">✓ Close to wall-clock</text>
+  <text x="415" y="144" fill="var(--g)" font-size="9">★ Best for multi-region</text>
+
+  <!-- Server-Assigned Seq -->
+  <rect x="590" y="20" width="180" height="130" rx="8" fill="none" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="680" y="45" text-anchor="middle" fill="var(--o)" font-size="11" font-weight="700">Server-Assigned Seq</text>
+  <text x="680" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">Monotonic per partition</text>
+  <text x="605" y="90" fill="var(--text)" font-size="9">✓ Simple, fast</text>
+  <text x="605" y="108" fill="var(--text)" font-size="9">✓ Total order (single region)</text>
+  <text x="605" y="126" fill="var(--r)" font-size="9">✗ Breaks on region failover</text>
+  <text x="605" y="144" fill="var(--r)" font-size="9">✗ Single point of assignment</text>
+
+  <!-- Winner indicator -->
+  <rect x="400" y="165" width="170" height="30" rx="6" fill="var(--g)" opacity="0.15"/>
+  <text x="485" y="185" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="700">✓ CHOSEN: HLC</text>
+
+  <!-- Comparison arrows -->
+  <line x1="190" y1="200" x2="400" y2="185" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4"/>
+  <line x1="380" y1="200" x2="400" y2="185" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4"/>
+  <line x1="590" y1="200" x2="570" y2="185" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4"/>
+
+  <!-- HLC Structure Detail -->
+  <rect x="150" y="220" width="500" height="80" rx="8" fill="none" stroke="var(--border)" stroke-width="1"/>
+  <text x="400" y="245" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600">HLC Timestamp Structure (64-bit)</text>
+  <rect x="180" y="258" width="200" height="28" rx="4" fill="var(--a)" opacity="0.2"/>
+  <text x="280" y="277" text-anchor="middle" fill="var(--a)" font-size="10">Physical Time (48 bits)</text>
+  <rect x="385" y="258" width="120" height="28" rx="4" fill="var(--g)" opacity="0.2"/>
+  <text x="445" y="277" text-anchor="middle" fill="var(--g)" font-size="10">Logical (16 bits)</text>
+  <rect x="510" y="258" width="110" height="28" rx="4" fill="var(--o)" opacity="0.2"/>
+  <text x="565" y="277" text-anchor="middle" fill="var(--o)" font-size="10">Node ID (tiebreak)</text>
+</svg>
+
+<table>
+<tr><th>Strategy</th><th>Causality Detection</th><th>Space per Message</th><th>Multi-Region</th><th>Failover Behavior</th><th>Best For</th></tr>
+<tr><td><span class="hi">Lamport Timestamps</span></td><td><span class="hr">No</span> — only total order</td><td><span class="hg">O(1)</span> — single integer</td><td><span class="hr">Poor</span> — no concurrency detection</td><td>Counter gaps on failover</td><td>Single-leader systems</td></tr>
+<tr><td><span class="hi">Vector Clocks</span></td><td><span class="hg">Yes</span> — full causal history</td><td><span class="hr">O(n)</span> — grows with nodes</td><td><span class="hg">Good</span> — detects conflicts</td><td>Works but expensive metadata</td><td>Small node counts (Dynamo)</td></tr>
+<tr><td><span class="hi">Hybrid Logical Clocks</span></td><td><span class="hg">Yes</span> — causal + physical</td><td><span class="hg">O(1)</span> — 64-bit fixed</td><td><span class="hg">Excellent</span> — bounded, sortable</td><td>Seamless — no single assigner</td><td><span class="hg">Multi-region chat ★</span></td></tr>
+<tr><td><span class="hi">Server-Assigned Seq</span></td><td><span class="hg">Yes</span> — within partition</td><td><span class="hg">O(1)</span> — integer</td><td><span class="hr">Breaks</span> — single assigner</td><td><span class="hr">Fails</span> — assigner is SPOF</td><td>Single-region (Kafka partition)</td></tr>
+</table>
+
+<div class="b bb"><span class="hi">Cross-reference:</span> <a href="slack-real-time-messaging.html#ordering">Slack uses server-assigned monotonic seq via Kafka partition</a> — works for single-region but breaks during region failover. When the partition leader moves to another region, sequence numbers can gap or conflict with in-flight messages from the old leader.</div>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture</h2>
+<p class="su">Multi-region active-active setup with HLC-based causal ordering and cross-region replication</p>
+
+<!-- SVG: Multi-Region Architecture -->
+<svg viewBox="0 0 820 480" style="width:100%;max-width:820px;margin:10px auto;display:block;font-family:system-ui,sans-serif">
+  <defs>
+    <marker id="mr3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--a)"/></marker>
+    <marker id="mr4" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--g)"/></marker>
+    <marker id="mr5" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--o)"/></marker>
+    <marker id="mr6" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--r)"/></marker>
+  </defs>
+
+  <!-- Region A: US-East -->
+  <rect x="20" y="30" width="240" height="200" rx="10" fill="none" stroke="var(--a)" stroke-width="2" stroke-dasharray="6"/>
+  <text x="140" y="55" text-anchor="middle" fill="var(--a)" font-size="12" font-weight="700">Region A — US-East</text>
+
+  <rect x="40" y="70" width="90" height="35" rx="6" fill="var(--a)" opacity="0.15" stroke="var(--a)" stroke-width="1"/>
+  <text x="85" y="92" text-anchor="middle" fill="var(--text)" font-size="9">Gateway</text>
+
+  <rect x="150" y="70" width="90" height="35" rx="6" fill="var(--a)" opacity="0.15" stroke="var(--a)" stroke-width="1"/>
+  <text x="195" y="92" text-anchor="middle" fill="var(--text)" font-size="9">HLC Service</text>
+
+  <rect x="40" y="120" width="90" height="35" rx="6" fill="var(--a)" opacity="0.15" stroke="var(--a)" stroke-width="1"/>
+  <text x="85" y="142" text-anchor="middle" fill="var(--text)" font-size="9">Kafka Cluster</text>
+
+  <rect x="150" y="120" width="90" height="35" rx="6" fill="var(--a)" opacity="0.15" stroke="var(--a)" stroke-width="1"/>
+  <text x="195" y="142" text-anchor="middle" fill="var(--text)" font-size="9">Conflict Detector</text>
+
+  <rect x="40" y="170" width="200" height="35" rx="6" fill="var(--a)" opacity="0.1" stroke="var(--a)" stroke-width="1"/>
+  <text x="140" y="192" text-anchor="middle" fill="var(--text)" font-size="9">CockroachDB / Spanner (local replica)</text>
+
+  <!-- Region B: EU-West -->
+  <rect x="290" y="30" width="240" height="200" rx="10" fill="none" stroke="var(--g)" stroke-width="2" stroke-dasharray="6"/>
+  <text x="410" y="55" text-anchor="middle" fill="var(--g)" font-size="12" font-weight="700">Region B — EU-West</text>
+
+  <rect x="310" y="70" width="90" height="35" rx="6" fill="var(--g)" opacity="0.15" stroke="var(--g)" stroke-width="1"/>
+  <text x="355" y="92" text-anchor="middle" fill="var(--text)" font-size="9">Gateway</text>
+
+  <rect x="420" y="70" width="90" height="35" rx="6" fill="var(--g)" opacity="0.15" stroke="var(--g)" stroke-width="1"/>
+  <text x="465" y="92" text-anchor="middle" fill="var(--text)" font-size="9">HLC Service</text>
+
+  <rect x="310" y="120" width="90" height="35" rx="6" fill="var(--g)" opacity="0.15" stroke="var(--g)" stroke-width="1"/>
+  <text x="355" y="142" text-anchor="middle" fill="var(--text)" font-size="9">Kafka Cluster</text>
+
+  <rect x="420" y="120" width="90" height="35" rx="6" fill="var(--g)" opacity="0.15" stroke="var(--g)" stroke-width="1"/>
+  <text x="465" y="142" text-anchor="middle" fill="var(--text)" font-size="9">Conflict Detector</text>
+
+  <rect x="310" y="170" width="200" height="35" rx="6" fill="var(--g)" opacity="0.1" stroke="var(--g)" stroke-width="1"/>
+  <text x="410" y="192" text-anchor="middle" fill="var(--text)" font-size="9">CockroachDB / Spanner (local replica)</text>
+
+  <!-- Region C: AP-South -->
+  <rect x="560" y="30" width="240" height="200" rx="10" fill="none" stroke="var(--o)" stroke-width="2" stroke-dasharray="6"/>
+  <text x="680" y="55" text-anchor="middle" fill="var(--o)" font-size="12" font-weight="700">Region C — AP-South</text>
+
+  <rect x="580" y="70" width="90" height="35" rx="6" fill="var(--o)" opacity="0.15" stroke="var(--o)" stroke-width="1"/>
+  <text x="625" y="92" text-anchor="middle" fill="var(--text)" font-size="9">Gateway</text>
+
+  <rect x="690" y="70" width="90" height="35" rx="6" fill="var(--o)" opacity="0.15" stroke="var(--o)" stroke-width="1"/>
+  <text x="735" y="92" text-anchor="middle" fill="var(--text)" font-size="9">HLC Service</text>
+
+  <rect x="580" y="120" width="90" height="35" rx="6" fill="var(--o)" opacity="0.15" stroke="var(--o)" stroke-width="1"/>
+  <text x="625" y="142" text-anchor="middle" fill="var(--text)" font-size="9">Kafka Cluster</text>
+
+  <rect x="690" y="120" width="90" height="35" rx="6" fill="var(--o)" opacity="0.15" stroke="var(--o)" stroke-width="1"/>
+  <text x="735" y="142" text-anchor="middle" fill="var(--text)" font-size="9">Conflict Detector</text>
+
+  <rect x="580" y="170" width="200" height="35" rx="6" fill="var(--o)" opacity="0.1" stroke="var(--o)" stroke-width="1"/>
+  <text x="680" y="192" text-anchor="middle" fill="var(--text)" font-size="9">CockroachDB / Spanner (local replica)</text>
+
+  <!-- Cross-Region Replication (MirrorMaker) -->
+  <rect x="150" y="260" width="520" height="60" rx="8" fill="none" stroke="var(--p)" stroke-width="1.5"/>
+  <text x="410" y="282" text-anchor="middle" fill="var(--p)" font-size="11" font-weight="700">Cross-Region Replication Layer (Kafka MirrorMaker 2)</text>
+  <text x="410" y="300" text-anchor="middle" fill="var(--muted)" font-size="9">Async replication · ~80ms lag · Topic-level mirroring · Offset translation</text>
+
+  <!-- Arrows: Regions to Replication Layer -->
+  <line x1="140" y1="230" x2="250" y2="260" stroke="var(--a)" stroke-width="1.5" marker-end="url(#mr3)"/>
+  <line x1="410" y1="230" x2="410" y2="260" stroke="var(--g)" stroke-width="1.5" marker-end="url(#mr4)"/>
+  <line x1="680" y1="230" x2="570" y2="260" stroke="var(--o)" stroke-width="1.5" marker-end="url(#mr5)"/>
+
+  <!-- Conflict Detection Layer -->
+  <rect x="200" y="340" width="420" height="50" rx="8" fill="none" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="410" y="362" text-anchor="middle" fill="var(--r)" font-size="11" font-weight="700">Conflict Detection &amp; Resolution Layer</text>
+  <text x="410" y="378" text-anchor="middle" fill="var(--muted)" font-size="9">HLC comparison · Causal graph validation · Deterministic merge</text>
+
+  <!-- Arrow: Replication to Conflict -->
+  <line x1="410" y1="320" x2="410" y2="340" stroke="var(--r)" stroke-width="1.5" marker-end="url(#mr6)"/>
+
+  <!-- HLC-Based Ordering Output -->
+  <rect x="250" y="410" width="320" height="45" rx="8" fill="var(--g)" opacity="0.1" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="410" y="432" text-anchor="middle" fill="var(--g)" font-size="11" font-weight="700">Causally Ordered Message Stream</text>
+  <text x="410" y="448" text-anchor="middle" fill="var(--muted)" font-size="9">Delivered to clients in causal order per conversation</text>
+
+  <line x1="410" y1="390" x2="410" y2="410" stroke="var(--g)" stroke-width="1.5" marker-end="url(#mr4)"/>
+</svg>
+
+<div class="b bg"><span class="hi">Cross-reference:</span> <a href="slack-real-time-messaging.html#multi-region">Slack's Multi-Region approach</a> uses async replication accepting ~80ms lag — this problem requires stronger guarantees. Slack tolerates brief ordering inconsistencies across regions; we add an HLC layer and conflict detection to guarantee causal ordering even during failover.</div>
+</div>
+
+<!-- ═══ CONFLICT RESOLUTION ═══ -->
+<div class="T" id="conflict-resolution">
+<h2>Conflict Resolution</h2>
+<p class="su">What happens when two users in different regions send messages "simultaneously" — within the replication window</p>
+
+<!-- SVG: Conflict Resolution -->
+<svg viewBox="0 0 780 380" style="width:100%;max-width:780px;margin:10px auto;display:block;font-family:system-ui,sans-serif">
+  <defs>
+    <marker id="mr7" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--a)"/></marker>
+    <marker id="mr8" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--g)"/></marker>
+    <marker id="mr9" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--r)"/></marker>
+  </defs>
+
+  <!-- Timeline -->
+  <text x="390" y="20" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">Concurrent Messages — Conflict Scenario</text>
+
+  <!-- User A in Region A -->
+  <rect x="30" y="45" width="150" height="30" rx="6" fill="var(--a)" opacity="0.15" stroke="var(--a)" stroke-width="1"/>
+  <text x="105" y="65" text-anchor="middle" fill="var(--a)" font-size="10" font-weight="600">User A (US-East)</text>
+
+  <!-- User B in Region B -->
+  <rect x="600" y="45" width="150" height="30" rx="6" fill="var(--g)" opacity="0.15" stroke="var(--g)" stroke-width="1"/>
+  <text x="675" y="65" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="600">User B (EU-West)</text>
+
+  <!-- Timeline lines -->
+  <line x1="105" y1="80" x2="105" y2="340" stroke="var(--a)" stroke-width="1.5" stroke-dasharray="4"/>
+  <line x1="675" y1="80" x2="675" y2="340" stroke="var(--g)" stroke-width="1.5" stroke-dasharray="4"/>
+
+  <!-- T=0: Both send simultaneously -->
+  <text x="390" y="105" text-anchor="middle" fill="var(--muted)" font-size="9">t=0ms — Both users send (no causal relationship)</text>
+
+  <rect x="40" y="115" width="130" height="25" rx="4" fill="var(--a)" opacity="0.2"/>
+  <text x="105" y="132" text-anchor="middle" fill="var(--text)" font-size="9">M1: "Let's meet"</text>
+  <text x="105" y="148" text-anchor="middle" fill="var(--muted)" font-size="8">HLC: (1000, 0, A)</text>
+
+  <rect x="610" y="115" width="130" height="25" rx="4" fill="var(--g)" opacity="0.2"/>
+  <text x="675" y="132" text-anchor="middle" fill="var(--text)" font-size="9">M2: "How about 3pm?"</text>
+  <text x="675" y="148" text-anchor="middle" fill="var(--muted)" font-size="8">HLC: (1000, 0, B)</text>
+
+  <!-- Replication arrows (crossing) -->
+  <line x1="170" y1="140" x2="610" y2="200" stroke="var(--a)" stroke-width="1" stroke-dasharray="3" marker-end="url(#mr7)"/>
+  <line x1="610" y1="140" x2="170" y2="200" stroke="var(--g)" stroke-width="1" stroke-dasharray="3" marker-end="url(#mr8)"/>
+  <text x="390" y="175" text-anchor="middle" fill="var(--muted)" font-size="8">~80ms replication lag</text>
+
+  <!-- Conflict Detection -->
+  <rect x="280" y="210" width="220" height="35" rx="6" fill="var(--r)" opacity="0.1" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="390" y="225" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="600">⚠ Conflict Detected</text>
+  <text x="390" y="240" text-anchor="middle" fill="var(--muted)" font-size="8">Same HLC physical time, no causal link</text>
+
+  <!-- Resolution Strategies -->
+  <text x="390" y="270" text-anchor="middle" fill="var(--text)" font-size="10" font-weight="600">Resolution Strategy: Deterministic Tiebreak</text>
+
+  <rect x="50" y="285" width="200" height="50" rx="6" fill="none" stroke="var(--y)" stroke-width="1"/>
+  <text x="150" y="305" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="600">Last-Writer-Wins (LWW)</text>
+  <text x="150" y="320" text-anchor="middle" fill="var(--muted)" font-size="8">Higher HLC wins. Simple but</text>
+  <text x="150" y="332" text-anchor="middle" fill="var(--muted)" font-size="8">may lose user intent.</text>
+
+  <rect x="290" y="285" width="200" height="50" rx="6" fill="none" stroke="var(--g)" stroke-width="2"/>
+  <text x="390" y="305" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="600">Causal + Node-ID Tiebreak ★</text>
+  <text x="390" y="320" text-anchor="middle" fill="var(--muted)" font-size="8">Preserve both. Order by</text>
+  <text x="390" y="332" text-anchor="middle" fill="var(--muted)" font-size="8">(HLC.physical, HLC.logical, nodeID)</text>
+
+  <rect x="530" y="285" width="200" height="50" rx="6" fill="none" stroke="var(--p)" stroke-width="1"/>
+  <text x="630" y="305" text-anchor="middle" fill="var(--p)" font-size="9" font-weight="600">CRDT-Based Merge</text>
+  <text x="630" y="320" text-anchor="middle" fill="var(--muted)" font-size="8">RGA/Logoot for text. Both</text>
+  <text x="630" y="332" text-anchor="middle" fill="var(--muted)" font-size="8">messages kept, auto-ordered.</text>
+
+  <!-- Final ordered result -->
+  <rect x="250" y="350" width="280" height="25" rx="4" fill="var(--g)" opacity="0.1"/>
+  <text x="390" y="367" text-anchor="middle" fill="var(--g)" font-size="9">Final order: M1 → M2 (nodeID "A" &lt; "B" tiebreak)</text>
+</svg>
+
+<div class="b bb"><span class="hi">Key insight:</span> Concurrent messages (no causal relationship) can be ordered arbitrarily — as long as <em>all nodes agree on the same order</em>. The deterministic tiebreak (HLC physical → logical → node ID) ensures every region converges to identical message ordering without coordination.</div>
+</div>
+
+<!-- ═══ REGION FAILOVER ═══ -->
+<div class="T" id="failover">
+<h2>Region Failover</h2>
+<p class="su">Region A dies → promote Region B → handle in-flight messages → reconcile when Region A recovers</p>
+
+<!-- SVG: Failover Sequence -->
+<svg viewBox="0 0 800 440" style="width:100%;max-width:800px;margin:10px auto;display:block;font-family:system-ui,sans-serif">
+  <defs>
+    <marker id="mr10" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--g)"/></marker>
+    <marker id="mr11" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--r)"/></marker>
+    <marker id="mr12" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--o)"/></marker>
+  </defs>
+
+  <!-- Phase labels -->
+  <text x="400" y="20" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">Region Failover &amp; Recovery Timeline</text>
+
+  <!-- Phase 1: Normal Operation -->
+  <rect x="20" y="40" width="180" height="380" rx="6" fill="var(--g)" opacity="0.03" stroke="var(--g)" stroke-width="1" stroke-dasharray="4"/>
+  <text x="110" y="60" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="600">Phase 1: Normal</text>
+
+  <!-- Phase 2: Failure Detected -->
+  <rect x="210" y="40" width="180" height="380" rx="6" fill="var(--r)" opacity="0.03" stroke="var(--r)" stroke-width="1" stroke-dasharray="4"/>
+  <text x="300" y="60" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="600">Phase 2: Failure</text>
+
+  <!-- Phase 3: Failover Active -->
+  <rect x="400" y="40" width="180" height="380" rx="6" fill="var(--o)" opacity="0.03" stroke="var(--o)" stroke-width="1" stroke-dasharray="4"/>
+  <text x="490" y="60" text-anchor="middle" fill="var(--o)" font-size="10" font-weight="600">Phase 3: Failover</text>
+
+  <!-- Phase 4: Recovery -->
+  <rect x="590" y="40" width="190" height="380" rx="6" fill="var(--a)" opacity="0.03" stroke="var(--a)" stroke-width="1" stroke-dasharray="4"/>
+  <text x="685" y="60" text-anchor="middle" fill="var(--a)" font-size="10" font-weight="600">Phase 4: Recovery</text>
+
+  <!-- Region A timeline -->
+  <text x="60" y="90" fill="var(--a)" font-size="9" font-weight="600">Region A</text>
+  <line x1="60" y1="100" x2="260" y2="100" stroke="var(--a)" stroke-width="2"/>
+  <text x="270" y="104" fill="var(--r)" font-size="14">✗</text>
+  <line x1="290" y1="100" x2="590" y2="100" stroke="var(--r)" stroke-width="1" stroke-dasharray="4"/>
+  <line x1="620" y1="100" x2="770" y2="100" stroke="var(--a)" stroke-width="2"/>
+  <text x="610" y="104" fill="var(--g)" font-size="12">↑</text>
+
+  <!-- Region B timeline -->
+  <text x="60" y="160" fill="var(--g)" font-size="9" font-weight="600">Region B</text>
+  <line x1="60" y1="170" x2="770" y2="170" stroke="var(--g)" stroke-width="2"/>
+
+  <!-- Region C timeline -->
+  <text x="60" y="230" fill="var(--o)" font-size="9" font-weight="600">Region C</text>
+  <line x1="60" y1="240" x2="770" y2="240" stroke="var(--o)" stroke-width="2"/>
+
+  <!-- Events -->
+  <!-- Normal: replication flowing -->
+  <line x1="100" y1="105" x2="100" y2="165" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2" marker-end="url(#mr10)"/>
+  <text x="115" y="135" fill="var(--muted)" font-size="7">replicate</text>
+
+  <!-- Failure: Region A dies at t=10s -->
+  <rect x="230" y="110" width="130" height="30" rx="4" fill="var(--r)" opacity="0.15"/>
+  <text x="295" y="122" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="600">t=0: Region A unreachable</text>
+  <text x="295" y="135" text-anchor="middle" fill="var(--muted)" font-size="7">Health checks fail (×2)</text>
+
+  <!-- In-flight messages -->
+  <rect x="230" y="175" width="130" height="25" rx="4" fill="var(--y)" opacity="0.15"/>
+  <text x="295" y="192" text-anchor="middle" fill="var(--y)" font-size="8">In-flight msgs queued</text>
+
+  <!-- Failover: DNS update + client reconnect -->
+  <rect x="415" y="110" width="150" height="40" rx="4" fill="var(--o)" opacity="0.15"/>
+  <text x="490" y="125" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="600">t=10s: Failover triggered</text>
+  <text x="490" y="138" text-anchor="middle" fill="var(--muted)" font-size="7">DNS routes A's users → B</text>
+  <text x="490" y="148" text-anchor="middle" fill="var(--muted)" font-size="7">Clients reconnect (~5s)</text>
+
+  <!-- Region B absorbs load -->
+  <rect x="415" y="175" width="150" height="30" rx="4" fill="var(--g)" opacity="0.15"/>
+  <text x="490" y="192" text-anchor="middle" fill="var(--g)" font-size="8">B absorbs A's traffic</text>
+  <text x="490" y="202" text-anchor="middle" fill="var(--muted)" font-size="7">HLC continues from max(A,B)</text>
+
+  <!-- Recovery: Region A comes back -->
+  <rect x="620" y="110" width="150" height="50" rx="4" fill="var(--a)" opacity="0.15"/>
+  <text x="695" y="125" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="600">Region A recovers</text>
+  <text x="695" y="138" text-anchor="middle" fill="var(--muted)" font-size="7">1. Replay missed messages</text>
+  <text x="695" y="150" text-anchor="middle" fill="var(--muted)" font-size="7">2. HLC sync (advance clock)</text>
+  <text x="695" y="162" text-anchor="middle" fill="var(--muted)" font-size="7">3. Reconcile conflicts</text>
+
+  <!-- Split-brain detection -->
+  <rect x="250" y="280" width="500" height="60" rx="8" fill="none" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="500" y="300" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="700">Split-Brain Detection &amp; Resolution</text>
+  <text x="500" y="318" text-anchor="middle" fill="var(--muted)" font-size="9">If Region A accepted writes while partitioned (before detecting failure):</text>
+  <text x="500" y="334" text-anchor="middle" fill="var(--text)" font-size="9">Compare HLC timestamps → Identify unreplicated messages → Merge using causal graph → Notify affected clients</text>
+
+  <!-- Fencing token -->
+  <rect x="250" y="360" width="500" height="45" rx="8" fill="none" stroke="var(--y)" stroke-width="1"/>
+  <text x="500" y="380" text-anchor="middle" fill="var(--y)" font-size="10" font-weight="600">Fencing: Epoch-Based Leader Election</text>
+  <text x="500" y="398" text-anchor="middle" fill="var(--muted)" font-size="9">Each region has an epoch number. On failover, epoch increments. Stale-epoch writes are rejected and re-routed.</text>
+</svg>
+
+<div class="b br"><span class="hi">Split-brain scenario:</span> Region A may accept writes for a few seconds before it realizes it's partitioned. These "orphaned" messages have valid HLC timestamps. On recovery, the reconciliation layer compares them against messages accepted by B/C during the same window. Since HLC preserves causality, any message that was <em>caused by</em> an orphaned message is also orphaned and must be re-sequenced.</div>
+</div>
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">What can go wrong in a multi-region ordering system — and how to handle it</p>
+<table>
+<tr><th>Edge Case</th><th>What Happens</th><th>Mitigation</th><th>Impact if Unhandled</th></tr>
+<tr>
+  <td><span class="hi">Clock skew &gt; 500ms</span></td>
+  <td>HLC physical component diverges significantly between regions</td>
+  <td>HLC caps drift — if physical clock jumps too far ahead, logical counter absorbs the gap. Alert on NTP drift &gt;100ms.</td>
+  <td><span class="hr">Messages appear in wrong order for extended periods</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Replication lag spike</span></td>
+  <td>MirrorMaker falls behind (network congestion, broker overload)</td>
+  <td>Client-side reorder buffer extends dynamically. Server sends "ordering_uncertain" flag. Backpressure on producers.</td>
+  <td><span class="hr">Users see messages reorder after initial display</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Split-brain writes</span></td>
+  <td>Partitioned region accepts writes that conflict with other regions</td>
+  <td>Epoch-based fencing. On recovery, compare HLC ranges and merge. Notify clients of reordered messages.</td>
+  <td><span class="hr">Duplicate or divergent conversation histories</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Client reconnects to different region</span></td>
+  <td>User's last-seen HLC is from Region A, now connected to Region B</td>
+  <td>Client sends last HLC on reconnect. Region B serves catch-up from its local replica (which has replicated data from A).</td>
+  <td><span class="hr">Missed messages or duplicate delivery</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Cascading region failures</span></td>
+  <td>Region A fails, load shifts to B, B becomes overloaded and fails</td>
+  <td>Capacity planning: each region sized to handle 50% extra load. Circuit breakers. Graceful degradation (queue messages, delay delivery).</td>
+  <td><span class="hr">Total system outage</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Message delivered before causal predecessor</span></td>
+  <td>Reply arrives before the original message due to routing differences</td>
+  <td>Client-side causal buffer: hold message if its causal dependency (parent HLC) hasn't arrived. Timeout after 500ms and display with indicator.</td>
+  <td><span class="hr">Confusing conversation flow for users</span></td>
+</tr>
+<tr>
+  <td><span class="hi">HLC overflow</span></td>
+  <td>Logical counter exhausts 16-bit space within same millisecond</td>
+  <td>Wait for physical clock to advance (max 1ms). In practice, 65K messages/ms/node is unreachable for chat.</td>
+  <td><span class="hr">Ordering violations within single millisecond</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Recovery reconciliation storm</span></td>
+  <td>Region recovers after long outage — massive backlog to reconcile</td>
+  <td>Throttled replay with priority queue (recent messages first). Background reconciliation for older messages.</td>
+  <td><span class="hr">Recovery takes hours, blocking normal operation</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack</h2>
+<p class="su">Components chosen specifically for multi-region causal ordering guarantees</p>
+<table>
+<tr><th>Layer</th><th>Technology</th><th>Why This Choice</th><th>Alternative Considered</th></tr>
+<tr>
+  <td><span class="hi">Database</span></td>
+  <td><span class="hg">CockroachDB / Google Spanner</span></td>
+  <td>Globally distributed, serializable transactions, built-in multi-region replication with TrueTime/HLC. Survives region failure natively.</td>
+  <td>Vitess (no native multi-region consensus), DynamoDB Global Tables (eventual only)</td>
+</tr>
+<tr>
+  <td><span class="hi">Event Streaming</span></td>
+  <td><span class="hg">Kafka + MirrorMaker 2</span></td>
+  <td>Regional Kafka clusters for low-latency local writes. MirrorMaker 2 for async cross-region topic replication with offset translation.</td>
+  <td>Pulsar Geo-Replication (simpler but less mature), Kafka Stretch Clusters (too much cross-region traffic)</td>
+</tr>
+<tr>
+  <td><span class="hi">Clock Mechanism</span></td>
+  <td><span class="hg">Hybrid Logical Clocks (HLC)</span></td>
+  <td>Combines physical time (sortable, human-readable) with logical counter (causal ordering). Fixed 64-bit size. No coordination needed.</td>
+  <td>Vector Clocks (O(n) space), Lamport (no causality detection), TrueTime (requires atomic clocks)</td>
+</tr>
+<tr>
+  <td><span class="hi">Consensus</span></td>
+  <td><span class="hg">Raft (via CockroachDB)</span></td>
+  <td>Used for metadata and epoch management — not on the hot message path. Elects region leaders for partition ownership.</td>
+  <td>Paxos (more complex), ZAB (Zookeeper-specific)</td>
+</tr>
+<tr>
+  <td><span class="hi">Service Mesh</span></td>
+  <td><span class="hg">Envoy + Global Load Balancer</span></td>
+  <td>GeoDNS routes users to nearest region. Health-check-based failover. Envoy handles cross-region gRPC with automatic retries.</td>
+  <td>Istio (heavier), AWS Global Accelerator (vendor lock-in)</td>
+</tr>
+<tr>
+  <td><span class="hi">Conflict Resolution</span></td>
+  <td><span class="hg">Custom CRDT-inspired merge layer</span></td>
+  <td>Deterministic ordering of concurrent messages using (HLC.physical, HLC.logical, nodeID). Idempotent merge — safe to replay.</td>
+  <td>Application-level LWW (loses messages), Operational Transform (complex for ordering)</td>
+</tr>
+<tr>
+  <td><span class="hi">Client SDK</span></td>
+  <td><span class="hg">Causal delivery buffer</span></td>
+  <td>Client holds out-of-order messages in a buffer (max 150ms) waiting for causal predecessors. Displays with reorder indicator if timeout.</td>
+  <td>Server-side buffering (adds latency for all messages, not just out-of-order ones)</td>
+</tr>
+</table>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail the multi-region ordering question</p>
+
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="color:var(--g);margin-bottom:6px">1. Why HLC over Server-Assigned Sequences</h4>
+<div style="font-size:.78rem;line-height:1.7;color:var(--text)">
+Server-assigned monotonic sequences (like Kafka partition offsets) require a <strong>single point of assignment</strong>. When that region fails, the new leader may assign conflicting sequence numbers to in-flight messages. HLC is <strong>decentralized</strong> — each region generates timestamps independently, and causality is preserved by the clock protocol itself. No coordination needed on the write path.
+</div>
+</div>
+
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="color:var(--a);margin-bottom:6px">2. Causal vs. Total Ordering</h4>
+<div style="font-size:.78rem;line-height:1.7;color:var(--text)">
+You don't need <strong>total ordering</strong> (every message globally ordered) — you need <strong>causal ordering</strong> (if A happened-before B, everyone sees A before B). Concurrent messages (no causal link) can be in any order — as long as all nodes agree. This relaxation is what makes multi-region feasible without synchronous consensus.
+</div>
+</div>
+
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="color:var(--o);margin-bottom:6px">3. The 80ms Conflict Window</h4>
+<div style="font-size:.78rem;line-height:1.7;color:var(--text)">
+Cross-region replication takes ~80ms. Any two messages sent within this window from different regions are <strong>potentially concurrent</strong>. The system must: (a) detect this via HLC comparison, (b) apply deterministic tiebreaking (physical → logical → nodeID), and (c) ensure all regions converge to the same order. This is the core distributed systems insight.
+</div>
+</div>
+
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="color:var(--r);margin-bottom:6px">4. Failover Without Message Loss</h4>
+<div style="font-size:.78rem;line-height:1.7;color:var(--text)">
+When a region dies: (1) detect via health checks (~10s), (2) DNS/routing redirects users to nearest healthy region, (3) clients reconnect with their last HLC, (4) new region serves catch-up. The hard part: messages accepted by the dead region but not yet replicated. Solution: <strong>epoch-based fencing</strong> + reconciliation on recovery.
+</div>
+</div>
+
+<div class="d-panel" style="padding:10px;text-align:left">
+<h4 style="color:var(--p);margin-bottom:6px">5. Client-Side Causal Buffer</h4>
+<div style="font-size:.78rem;line-height:1.7;color:var(--text)">
+The client is the last line of defense. It maintains a <strong>150ms reorder buffer</strong> — if a message arrives whose causal predecessor hasn't been seen yet, it's held. After timeout, display with a "reordering" indicator. This handles the rare case where cross-region routing delivers a reply before its parent. The buffer is invisible to users 99.9% of the time.
+</div>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Interview flow:</span> Start with the problem (why single-region ordering breaks). Introduce HLC as the solution. Draw the multi-region architecture. Explain the conflict window. Walk through failover. End with the client buffer as the safety net. This shows you understand the full stack from theory to implementation.</div>
+</div>
+
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

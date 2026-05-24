@@ -1,0 +1,223 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does LaunchDarkly evaluate 1M+ flag checks/sec with &lt;5ms latency? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does LaunchDarkly evaluate 1M+ flag checks/sec with &lt;5ms latency?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🚩</span> Design a feature flag system: 1M+ checks/sec, P99 &lt;5ms, 10s propagation to 100K servers</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a feature flag platform evaluate 1M+ flag checks per second with P99 &lt;5ms latency, support complex targeting rules (user segments, percentages, custom attributes), and propagate flag changes to 100K+ servers within 10 seconds?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Flag evaluation must be <span class="hg">local and fast</span> (no network call per check), but changes must propagate globally in seconds. Complex targeting rules (10% of users in segment X with attribute Y) need efficient evaluation without per-request API calls.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">1M+</div>
+<div style="font-size:.72rem;color:var(--muted)">flag checks / sec</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">P99 &lt;5ms</div>
+<div style="font-size:.72rem;color:var(--muted)">evaluation latency</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">10s</div>
+<div style="font-size:.72rem;color:var(--muted)">global propagation</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">100K+</div>
+<div style="font-size:.72rem;color:var(--muted)">connected servers</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture</h2>
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Feature flag architecture end-to-end: management, distribution, and local evaluation">
+  <defs><marker id="ff-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="var(--muted)"/></marker></defs>
+
+  <!-- LAYER 1: MANAGEMENT -->
+  <rect x="10" y="10" width="760" height="125" rx="8" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 — MANAGEMENT (Dashboard → Flag Store → Change Event)</text>
+
+  <rect x="30" y="42" width="200" height="82" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="130" y="58" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Dashboard</text>
+  <text x="130" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">Toggle flags on/off</text>
+  <text x="130" y="85" text-anchor="middle" fill="var(--muted)" font-size="5.5">Edit targeting rules</text>
+  <text x="130" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">Define user segments</text>
+  <text x="130" y="111" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">% rollout configuration</text>
+  <text x="130" y="122" text-anchor="middle" fill="var(--muted)" font-size="5">Audit log per change</text>
+
+  <line x1="230" y1="80" x2="258" y2="80" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
+
+  <rect x="260" y="42" width="230" height="82" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="375" y="58" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Flag Store DB</text>
+  <text x="375" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rules + segments + targeting conditions</text>
+  <text x="375" y="85" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Versioned configs (v1, v2, v3...)</text>
+  <text x="375" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">~500 flags × 10 rules = ~5K rules total</text>
+  <text x="375" y="111" text-anchor="middle" fill="var(--muted)" font-size="5.5">Fits in ~10MB RAM per SDK</text>
+  <text x="375" y="122" text-anchor="middle" fill="var(--muted)" font-size="5">Immutable versions for rollback</text>
+
+  <line x1="490" y1="80" x2="518" y2="80" stroke="var(--y)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
+
+  <rect x="520" y="42" width="240" height="82" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="640" y="58" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Change Event</text>
+  <text x="640" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">Trigger propagation on any edit</text>
+  <text x="640" y="85" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Delta payload (only the diff)</text>
+  <text x="640" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">Version N → N+1 (incremental)</text>
+  <text x="640" y="111" text-anchor="middle" fill="var(--muted)" font-size="5.5">No full sync per change</text>
+  <text x="640" y="122" text-anchor="middle" fill="var(--muted)" font-size="5">Minimizes bandwidth to 100K+ SDKs</text>
+
+  <!-- Arrow Layer 1 → Layer 2 -->
+  <line x1="390" y1="135" x2="390" y2="153" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
+
+  <!-- LAYER 2: DISTRIBUTION -->
+  <rect x="10" y="155" width="760" height="125" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="390" y="173" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 — DISTRIBUTION (Stream Relay → 100K+ SDK Instances)</text>
+
+  <rect x="30" y="185" width="320" height="82" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="190" y="201" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Stream Relay Cluster</text>
+  <text x="190" y="215" text-anchor="middle" fill="var(--muted)" font-size="5.5">SSE / WebSocket persistent connections</text>
+  <text x="190" y="228" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Fan-out delta updates to 100K+ SDKs</text>
+  <text x="190" y="241" text-anchor="middle" fill="var(--muted)" font-size="5.5">Horizontal scale: N relay nodes, each holds subset</text>
+  <text x="190" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">Intermediate cache: reduces load on origin DB</text>
+  <text x="190" y="265" text-anchor="middle" fill="var(--muted)" font-size="5">Fallback: polling every 30s if stream disconnects</text>
+
+  <!-- Fan-out arrows -->
+  <line x1="350" y1="210" x2="380" y2="200" stroke="var(--g)" stroke-width=".8" marker-end="url(#ff-arr)"/>
+  <line x1="350" y1="230" x2="380" y2="230" stroke="var(--g)" stroke-width=".8" marker-end="url(#ff-arr)"/>
+  <line x1="350" y1="250" x2="380" y2="260" stroke="var(--g)" stroke-width=".8" marker-end="url(#ff-arr)"/>
+
+  <rect x="382" y="185" width="130" height="38" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="447" y="200" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">SDK Instance A</text>
+  <text x="447" y="214" text-anchor="middle" fill="var(--muted)" font-size="5">in-process cache</text>
+  <text x="447" y="222" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">local eval &lt;1ms</text>
+
+  <rect x="382" y="227" width="130" height="38" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="447" y="242" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">SDK Instance B</text>
+  <text x="447" y="256" text-anchor="middle" fill="var(--muted)" font-size="5">in-process cache</text>
+  <text x="447" y="264" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">local eval &lt;1ms</text>
+
+  <rect x="530" y="200" width="230" height="65" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="645" y="216" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">100K+ SDK Instances</text>
+  <text x="645" y="230" text-anchor="middle" fill="var(--muted)" font-size="5.5">All rules cached in-process memory</text>
+  <text x="645" y="243" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">No network call per flag check</text>
+  <text x="645" y="256" text-anchor="middle" fill="var(--muted)" font-size="5.5">Graceful degradation: use last-known</text>
+  <text x="645" y="265" text-anchor="middle" fill="var(--muted)" font-size="5">if stream disconnects</text>
+
+  <!-- Arrow Layer 2 → Layer 3 -->
+  <line x1="390" y1="280" x2="390" y2="298" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
+
+  <!-- LAYER 3: EVALUATION -->
+  <rect x="10" y="300" width="760" height="145" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <text x="390" y="318" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 3 — EVALUATION (Local In-Process, &lt;1ms, Deterministic)</text>
+
+  <!-- App Code -->
+  <rect x="30" y="330" width="200" height="100" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="130" y="346" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App Code</text>
+  <text x="130" y="362" text-anchor="middle" fill="var(--muted)" font-size="6">if (flag("new-ui")) {</text>
+  <text x="130" y="376" text-anchor="middle" fill="var(--muted)" font-size="6">  showNewUI();</text>
+  <text x="130" y="390" text-anchor="middle" fill="var(--muted)" font-size="6">}</text>
+  <text x="130" y="408" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Response: &lt;1ms</text>
+  <text x="130" y="422" text-anchor="middle" fill="var(--muted)" font-size="5.5">Pure in-memory lookup</text>
+
+  <line x1="230" y1="380" x2="258" y2="380" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
+
+  <!-- Evaluation Logic -->
+  <rect x="260" y="330" width="500" height="100" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="510" y="346" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">SDK Evaluates Locally (&lt;1ms) — Rule Evaluation Order</text>
+
+  <rect x="275" y="355" width="110" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="330" y="370" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">1. Individual Targets</text>
+  <text x="330" y="382" text-anchor="middle" fill="var(--muted)" font-size="5">user_id in list?</text>
+
+  <line x1="385" y1="370" x2="400" y2="370" stroke="var(--y)" stroke-width=".8" marker-end="url(#ff-arr)"/>
+
+  <rect x="402" y="355" width="110" height="30" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="457" y="370" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">2. Segment Rules</text>
+  <text x="457" y="382" text-anchor="middle" fill="var(--muted)" font-size="5">user in segment?</text>
+
+  <line x1="512" y1="370" x2="527" y2="370" stroke="var(--y)" stroke-width=".8" marker-end="url(#ff-arr)"/>
+
+  <rect x="529" y="355" width="110" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="584" y="370" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">3. % Rollout</text>
+  <text x="584" y="382" text-anchor="middle" fill="var(--muted)" font-size="5">hash(uid+flag)%100</text>
+
+  <line x1="639" y1="370" x2="654" y2="370" stroke="var(--y)" stroke-width=".8" marker-end="url(#ff-arr)"/>
+
+  <rect x="656" y="355" width="90" height="30" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".7"/>
+  <text x="701" y="370" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">4. Default</text>
+  <text x="701" y="382" text-anchor="middle" fill="var(--muted)" font-size="5">fallback value</text>
+
+  <text x="510" y="405" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Deterministic: hash(user_id + flag_key) % 100 — same user always gets same variant</text>
+  <text x="510" y="418" text-anchor="middle" fill="var(--muted)" font-size="5.5">Consistent experience across requests | No randomness | Reproducible</text>
+
+  <!-- BOTTOM INSIGHT -->
+  <rect x="10" y="455" width="760" height="38" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">10s propagation end-to-end | deterministic: hash(user_id + flag) % 100 | graceful degradation: last-known if stream disconnects</text>
+  <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="6">1M+ evals/sec across fleet | ~10MB RAM per SDK | Polling fallback every 30s | Hardcoded defaults as last resort</text>
+</svg>
+
+<div class="b bg"><span class="hi">Local evaluation:</span> The SDK downloads all flag rules at startup and keeps them in-memory. Every flag check is a <span class="hg">local computation</span> — hash user context against targeting rules. No network call per evaluation → sub-millisecond P99.</div>
+<div class="b by"><span class="hi">Propagation via streaming:</span> Flag changes push through SSE/WebSocket relay layer. <span class="hg">Delta updates</span> (only changed flags) minimize bandwidth. Relay proxies handle fan-out to 100K+ connected SDKs. Fallback: polling every 30s if stream disconnects.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">API call per flag check</span> — adds latency, creates SPOF. <span class="hr">Polling-only updates</span> — minutes of stale flags. <span class="hr">No fallback defaults</span> — service crashes if flag service is down. <span class="hr">Unbounded rule complexity</span> — evaluation time explodes.</div>
+<div class="b bb"><span class="hi">Targeting rules:</span> Evaluated in order: individual targets → segment rules → percentage rollout → default. Percentage uses <span class="hg">deterministic hashing</span> (same user always gets same variant) — consistent experience across requests.</div>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<table>
+<tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
+<tr><td><span class="hi">1</span></td><td>Flag checks: 1M/sec across all services</td><td><span class="hg">1M evaluations/sec</span></td><td>Must be local (in-process) — no network call per check</td></tr>
+<tr><td><span class="hi">2</span></td><td>Flags per project: ~500 flags × 10 rules each</td><td><span class="hg">~5K rules in memory</span></td><td>Fits in ~10MB RAM per SDK instance — trivial</td></tr>
+<tr><td><span class="hi">3</span></td><td>Connected SDKs: 100K servers × 1 connection each</td><td><span class="hg">100K persistent connections</span></td><td>Relay proxy layer for fan-out (not direct to origin)</td></tr>
+<tr><td><span class="hi">4</span></td><td>Propagation: change → relay → all SDKs</td><td><span class="hg">&lt;10s end-to-end</span></td><td>SSE streaming with delta updates (only changed flags)</td></tr>
+<tr><td><span class="hi">5</span></td><td>Event analytics: 1M checks/sec × 100 bytes</td><td><span class="hg">~100 MB/sec telemetry</span></td><td>Sampled (1-10%) + aggregated client-side before sending</td></tr>
+</table>
+</div>
+
+<!-- ═══ RESILIENCE ═══ -->
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Stream disconnected</span></td><td>SDK can't receive flag updates</td><td>Use last-known state (in-memory cache). Fallback: poll every 30s. Hardcoded defaults as last resort.</td></tr>
+<tr><td><span class="hr">Flag service completely down</span></td><td>No updates propagate</td><td>SDK continues with cached rules indefinitely. App never crashes due to flag service outage.</td></tr>
+<tr><td><span class="hr">Bad flag rule deployed</span></td><td>Feature broken for all users</td><td>Kill switch: emergency flag override. Instant propagation via streaming. Audit log for rollback.</td></tr>
+<tr><td><span class="hr">Percentage rollout inconsistency</span></td><td>User sees different variant on different requests</td><td>Deterministic hash: hash(user_id + flag_key) % 100 — always same result for same user.</td></tr>
+<tr><td><span class="hr">Stale SDK cache after deploy</span></td><td>New service instance has no flags</td><td>SDK fetches full flag set on startup (blocking init). Ready to serve only after initial load.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>In-process evaluation</strong> — SDK holds rules locally, no network call per check (&lt;1ms)<br>
+<span class="hg">2.</span> <strong>Streaming propagation</strong> — SSE/WebSocket push, delta updates, 10s global propagation<br>
+<span class="hg">3.</span> <strong>Deterministic hashing</strong> — hash(user_id + flag) % 100 for consistent percentage rollouts<br>
+<span class="hg">4.</span> <strong>Rule evaluation order</strong> — individual → segment → percentage → default<br>
+<span class="hg">5.</span> <strong>Graceful degradation</strong> — SDK uses last-known state if stream disconnects, hardcoded defaults as last resort<br>
+<span class="hg">6.</span> <strong>Relay proxy</strong> — intermediate cache for high fan-out, reduces load on origin
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

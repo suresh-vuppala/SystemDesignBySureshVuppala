@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>10. Scalability Patterns — System Design Cheatsheet</title>
+<title>10. Scalability Patterns — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-10"><span class="e">📈</span> 10 · SCALABILITY PATTERNS</div>
 
@@ -1613,95 +1614,111 @@
 </div>
 
 <div class="T" id="bloom-filters">
-<h2>Bloom Filters</h2><p class="su"><span class="hg">Probabilistic membership test</span> — "definitely not in set" or "probably in set". <span class="hi">~100KB for 1M items</span></p>
+<h2>Bloom Filters</h2><p class="su">A probabilistic data structure that tells you: <span class="hr">"Definitely not in the set"</span> or <span class="hi">"Probably in the set"</span> (false positives possible, false negatives never). Uses <span class="hg">tiny memory</span> for ultra-fast checks at massive scale.</p>
 
-<!-- ═══ INSERT: How it works ═══ -->
-<div class="d-title"><span class="num d-green">▸</span> Insert: "user123" into Bloom Filter</div>
-<svg width="100%" viewBox="0 0 500 120" style="max-width:500px;display:block;margin:2px auto">
+<!-- ═══ REAL-TIME EXAMPLE: Username Availability Check ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Real-Time Example: "Is this username taken?" (Instagram/Twitter signup)</div>
+<svg width="100%" viewBox="0 0 540 260" style="max-width:540px;display:block;margin:4px auto">
   <defs><marker id="bf1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-  <!-- Element -->
-  <rect x="4" y="10" width="76" height="22" rx="6" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
-  <text x="42" y="24" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">"user123"</text>
+  <!-- Title context -->
+  <rect x="4" y="4" width="532" height="24" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="270" y="18" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Scenario: User signs up → check if "@elonmusk" is already taken (500M usernames in DB)</text>
 
-  <!-- 3 Hash functions -->
-  <line x1="80" y1="16" x2="110" y2="8" stroke="var(--r)" stroke-width=".8" marker-end="url(#bf1)"/>
-  <line x1="80" y1="21" x2="110" y2="36" stroke="var(--g)" stroke-width=".8" marker-end="url(#bf1)"/>
-  <line x1="80" y1="26" x2="110" y2="64" stroke="var(--o)" stroke-width=".8" marker-end="url(#bf1)"/>
+  <!-- Step 1: User types username -->
+  <rect x="4" y="36" width="100" height="36" rx="5" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="54" y="50" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">User types:</text>
+  <text x="54" y="62" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">"@elonmusk"</text>
 
-  <circle cx="124" cy="6" r="10" fill="rgba(248,113,113,.15)" stroke="var(--r)" stroke-width="1"/>
-  <text x="124" y="10" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">H1</text>
-  <circle cx="124" cy="36" r="10" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width="1"/>
-  <text x="124" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">H2</text>
-  <circle cx="124" cy="66" r="10" fill="rgba(251,146,60,.15)" stroke="var(--o)" stroke-width="1"/>
-  <text x="124" y="70" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">H3</text>
+  <line x1="104" y1="54" x2="128" y2="54" stroke="var(--a)" stroke-width="1.2" marker-end="url(#bf1)"/>
 
-  <!-- Hash results -->
-  <text x="142" y="10" fill="var(--r)" font-size="6.5" font-weight="600">% 15 = 1</text>
-  <text x="142" y="40" fill="var(--g)" font-size="6.5" font-weight="600">% 15 = 6</text>
-  <text x="142" y="70" fill="var(--o)" font-size="6.5" font-weight="600">% 15 = 11</text>
+  <!-- Step 2: 3 Hash Functions -->
+  <rect x="130" y="32" width="130" height="80" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
+  <text x="195" y="46" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">3 Hash Functions (k=3)</text>
+
+  <!-- H1: MurmurHash -->
+  <rect x="138" y="52" width="114" height="16" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="195" y="63" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">H1: MurmurHash("@elonmusk") % 20 = 3</text>
+
+  <!-- H2: xxHash -->
+  <rect x="138" y="72" width="114" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="195" y="83" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">H2: xxHash("@elonmusk") % 20 = 11</text>
+
+  <!-- H3: FNV-1a -->
+  <rect x="138" y="92" width="114" height="16" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="195" y="103" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="600">H3: FNV1a("@elonmusk") % 20 = 17</text>
 
   <!-- Arrows to bit array -->
-  <line x1="172" y1="6" x2="200" y2="84" stroke="var(--r)" stroke-width=".8" marker-end="url(#bf1)"/>
-  <line x1="172" y1="36" x2="280" y2="84" stroke="var(--g)" stroke-width=".8" marker-end="url(#bf1)"/>
-  <line x1="172" y1="66" x2="360" y2="84" stroke="var(--o)" stroke-width=".8" marker-end="url(#bf1)"/>
+  <line x1="260" y1="60" x2="280" y2="130" stroke="var(--r)" stroke-width="1" marker-end="url(#bf1)"/>
+  <line x1="260" y1="80" x2="390" y2="130" stroke="var(--g)" stroke-width="1" marker-end="url(#bf1)"/>
+  <line x1="260" y1="100" x2="470" y2="130" stroke="var(--o)" stroke-width="1" marker-end="url(#bf1)"/>
 
-  <!-- Bit Array label -->
-  <text x="340" y="78" text-anchor="middle" fill="var(--text)" font-size="7.5" font-weight="700">Bit Array (m = 15 bits)</text>
+  <!-- Bit Array (m=20 bits) -->
+  <text x="350" y="128" text-anchor="middle" fill="var(--text)" font-size="7.5" font-weight="700">Bloom Filter Bit Array (m=20, holds 500M usernames)</text>
 
-  <!-- Bit array: indices 0-14 -->
   <!-- Index labels -->
-  <text x="196" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">0</text>
-  <text x="212" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">1</text>
-  <text x="228" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">2</text>
-  <text x="244" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">3</text>
-  <text x="260" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">4</text>
-  <text x="276" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">5</text>
-  <text x="292" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">6</text>
-  <text x="308" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">7</text>
-  <text x="324" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">8</text>
-  <text x="340" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">9</text>
-  <text x="356" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">10</text>
-  <text x="372" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">11</text>
-  <text x="388" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">12</text>
-  <text x="404" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">13</text>
-  <text x="420" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">14</text>
+  <text x="222" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">0</text>
+  <text x="236" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">1</text>
+  <text x="250" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">2</text>
+  <text x="264" y="140" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="700">3</text>
+  <text x="278" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">4</text>
+  <text x="292" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">5</text>
+  <text x="306" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">6</text>
+  <text x="320" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">7</text>
+  <text x="334" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">8</text>
+  <text x="348" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">9</text>
+  <text x="362" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">10</text>
+  <text x="376" y="140" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="700">11</text>
+  <text x="390" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">12</text>
+  <text x="404" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">13</text>
+  <text x="418" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">14</text>
+  <text x="432" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">15</text>
+  <text x="446" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">16</text>
+  <text x="460" y="140" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="700">17</text>
+  <text x="474" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">18</text>
+  <text x="488" y="140" text-anchor="middle" fill="var(--muted)" font-size="4.5">19</text>
 
   <!-- Bit cells -->
-  <rect x="188" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="195" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <!-- Bit 1 = SET (H1) -->
-  <rect x="204" y="96" width="14" height="14" rx="2" fill="rgba(248,113,113,.2)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="211" y="106" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">1</text>
-  <rect x="220" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="227" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="236" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="243" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="252" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="259" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="268" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="275" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <!-- Bit 6 = SET (H2) -->
-  <rect x="284" y="96" width="14" height="14" rx="2" fill="rgba(52,211,153,.2)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="291" y="106" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">1</text>
-  <rect x="300" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="307" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="316" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="323" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="332" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="339" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="348" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="355" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <!-- Bit 11 = SET (H3) -->
-  <rect x="364" y="96" width="14" height="14" rx="2" fill="rgba(251,146,60,.2)" stroke="var(--o)" stroke-width="1.2"/>
-  <text x="371" y="106" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">1</text>
-  <rect x="380" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="387" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="396" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="403" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
-  <rect x="412" y="96" width="14" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="419" y="106" text-anchor="middle" fill="var(--muted)" font-size="7">0</text>
+  <rect x="216" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="222" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <rect x="230" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="236" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="244" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="250" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <!-- pos 3: SET by H1 -->
+  <rect x="258" y="144" width="12" height="14" rx="2" fill="rgba(248,113,113,.25)" stroke="var(--r)" stroke-width="1.5"/><text x="264" y="154" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="800">1</text>
+  <rect x="272" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="278" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="286" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="292" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <rect x="300" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="306" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="314" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="320" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <rect x="328" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="334" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="342" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="348" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <rect x="356" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="362" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <!-- pos 11: SET by H2 -->
+  <rect x="370" y="144" width="12" height="14" rx="2" fill="rgba(52,211,153,.25)" stroke="var(--g)" stroke-width="1.5"/><text x="376" y="154" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">1</text>
+  <rect x="384" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="390" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="398" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="404" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <rect x="412" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="418" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="426" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="432" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+  <rect x="440" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="446" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <!-- pos 17: SET by H3 -->
+  <rect x="454" y="144" width="12" height="14" rx="2" fill="rgba(251,146,60,.25)" stroke="var(--o)" stroke-width="1.5"/><text x="460" y="154" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="800">1</text>
+  <rect x="468" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="474" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">0</text>
+  <rect x="482" y="144" width="12" height="14" rx="2" fill="rgba(255,255,255,.04)" stroke="var(--border)" stroke-width=".5"/><text x="488" y="154" text-anchor="middle" fill="var(--muted)" font-size="6">1</text>
+
+  <!-- Result: All 3 bits are 1 -->
+  <rect x="130" y="170" width="280" height="22" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="270" y="184" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">All 3 bits (pos 3, 11, 17) = 1 → ⚠️ PROBABLY TAKEN</text>
+
+  <!-- Decision: check DB to confirm -->
+  <line x1="270" y1="192" x2="270" y2="206" stroke="var(--muted)" stroke-width="1" marker-end="url(#bf1)"/>
+  <rect x="170" y="208" width="200" height="20" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="270" y="221" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="600">Confirm with DB query (only for "maybe" results)</text>
+
+  <!-- Now show a username that's available -->
+  <rect x="4" y="236" width="532" height="20" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="270" y="249" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Compare: "@suresh_dev_2024" → H1→pos 7=0 → ❌ DEFINITELY AVAILABLE (no DB query needed! saved ~5ms)</text>
 </svg>
+
+<div class="b bg" style="margin-top:4px"><span class="hi">Why this matters at scale:</span> Instagram has <span class="hg">500M+ usernames</span>. Without Bloom filter: every signup checks DB (5ms × millions of signups/day = massive DB load). With Bloom filter: <span class="hg">99% of "is this taken?" checks answered in ~0.01ms from memory</span> — only the 1% "maybe taken" results hit the DB. Filter size: 500M × 10 bits = <span class="hg">~600MB RAM</span> (fits on one server).</div>
+
 
 <!-- ═══ LOOKUP: Two scenarios ═══ -->
 <div class="d-title"><span class="num d-blue">▸</span> Lookup Process</div>
@@ -1778,6 +1795,140 @@
 <div style="font-size:.72rem;color:var(--muted);line-height:1.35">"Is content cached at this edge?" Check filter → <span class="hg">skip origin fetch if definitely not cached</span>. Reduces origin load.</div>
 </div>
 </div>
+
+
+<!-- ═══ Real-Time Example: Cassandra Read Path ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Real-Time Example: Cassandra Read Path with Bloom Filter</div>
+<svg width="100%" viewBox="0 0 560 200" style="max-width:560px;display:block;margin:4px auto">
+<defs><marker id="bf2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Client request -->
+<rect x="4" y="10" width="80" height="30" rx="5" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+<text x="44" y="22" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+<text x="44" y="32" text-anchor="middle" fill="var(--muted)" font-size="6">GET user:789</text>
+
+<line x1="84" y1="25" x2="108" y2="25" stroke="var(--a)" stroke-width="1" marker-end="url(#bf2)"/>
+
+<!-- Memtable check -->
+<rect x="110" y="10" width="80" height="30" rx="5" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
+<text x="150" y="22" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Memtable</text>
+<text x="150" y="32" text-anchor="middle" fill="var(--muted)" font-size="5.5">(in-memory)</text>
+<text x="150" y="48" text-anchor="middle" fill="var(--r)" font-size="6">miss ✗</text>
+
+<line x1="150" y1="40" x2="150" y2="58" stroke="var(--muted)" stroke-width="1" marker-end="url(#bf2)"/>
+
+<!-- Bloom Filter checks for 3 SSTables -->
+<rect x="20" y="62" width="520" height="80" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text x="280" y="76" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Bloom Filter Check — Which SSTable has this key?</text>
+
+<!-- SSTable 1: Bloom says NO -->
+<rect x="36" y="86" width="140" height="46" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".8"/>
+<text x="106" y="98" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">SSTable-1 Bloom Filter</text>
+<text x="106" y="110" text-anchor="middle" fill="var(--muted)" font-size="6">H1(user:789)→pos 3 = <tspan fill="var(--r)" font-weight="700">0</tspan></text>
+<text x="106" y="120" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">❌ SKIP (no disk read)</text>
+<text x="106" y="130" text-anchor="middle" fill="var(--g)" font-size="5.5">Saved ~10ms I/O!</text>
+
+<!-- SSTable 2: Bloom says NO -->
+<rect x="190" y="86" width="140" height="46" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".8"/>
+<text x="260" y="98" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">SSTable-2 Bloom Filter</text>
+<text x="260" y="110" text-anchor="middle" fill="var(--muted)" font-size="6">H2(user:789)→pos 9 = <tspan fill="var(--r)" font-weight="700">0</tspan></text>
+<text x="260" y="120" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">❌ SKIP (no disk read)</text>
+<text x="260" y="130" text-anchor="middle" fill="var(--g)" font-size="5.5">Saved ~10ms I/O!</text>
+
+<!-- SSTable 3: Bloom says MAYBE -->
+<rect x="344" y="86" width="140" height="46" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+<text x="414" y="98" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">SSTable-3 Bloom Filter</text>
+<text x="414" y="110" text-anchor="middle" fill="var(--muted)" font-size="6">All bits = <tspan fill="var(--g)" font-weight="700">1,1,1</tspan></text>
+<text x="414" y="120" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">✅ MAYBE → read disk</text>
+<text x="414" y="130" text-anchor="middle" fill="var(--muted)" font-size="5.5">Only 1 disk read needed</text>
+
+<!-- Arrow to disk -->
+<line x1="414" y1="142" x2="414" y2="158" stroke="var(--g)" stroke-width="1.2" marker-end="url(#bf2)"/>
+
+<!-- Disk read result -->
+<rect x="354" y="160" width="120" height="28" rx="5" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
+<text x="414" y="174" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">✓ Found on disk!</text>
+<text x="414" y="184" text-anchor="middle" fill="var(--muted)" font-size="6">Return to client</text>
+
+<!-- Summary -->
+<rect x="20" y="160" width="200" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+<text x="120" y="174" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Result: 1 disk read instead of 3</text>
+<text x="120" y="184" text-anchor="middle" fill="var(--muted)" font-size="6">Bloom filter saved 67% of I/O</text>
+</svg>
+
+<!-- ═══ Multiple Hash Functions Detail ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Multiple Hash Functions — Why K=3 or K=7?</div>
+<table>
+<tr><th>Parameter</th><th>Symbol</th><th>Meaning</th><th>Typical Value</th><th>Impact</th></tr>
+<tr><td><span class="hi">Bit array size</span></td><td><code>m</code></td><td>Total bits in the filter</td><td>~10 bits per item</td><td>More bits → fewer false positives, more memory</td></tr>
+<tr><td><span class="hi">Number of items</span></td><td><code>n</code></td><td>Expected items to insert</td><td>Application-specific</td><td>More items → higher false positive rate</td></tr>
+<tr><td><span class="hi">Hash functions</span></td><td><code>k</code></td><td>Number of independent hashes</td><td><span class="hg">k = (m/n) × ln(2) ≈ 7</span></td><td>Optimal k minimizes false positive rate</td></tr>
+<tr><td><span class="hi">False positive rate</span></td><td><code>p</code></td><td>P(says "yes" when item absent)</td><td><span class="hg">~1% at m/n=10</span></td><td>Lower p → need more bits per item</td></tr>
+</table>
+
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Common Hash Functions Used</h4>
+<div style="font-size:.76rem;line-height:1.6">
+<span class="hi">MurmurHash3:</span> Fast, good distribution. Used by Cassandra, Guava.<br>
+<span class="hi">xxHash:</span> Extremely fast (>10 GB/s). Used by Redis, LZ4.<br>
+<span class="hi">FNV-1a:</span> Simple, decent distribution. Good for small filters.<br>
+<span class="hi">Double hashing trick:</span> Use only 2 hash functions → derive K hashes as:<br>
+<code style="font-size:.7rem">  h_i(x) = h1(x) + i × h2(x)  (for i = 0..k-1)</code><br>
+<span class="hg">This gives K independent hashes from just 2 computations!</span>
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">False Positive Rate by Configuration</h4>
+<div style="font-size:.76rem;line-height:1.6">
+<span class="hi">m/n = 5, k=3:</span> FP rate ≈ <span class="hr">10%</span> (too high for most uses)<br>
+<span class="hi">m/n = 10, k=7:</span> FP rate ≈ <span class="hg">0.82%</span> (good default)<br>
+<span class="hi">m/n = 15, k=10:</span> FP rate ≈ <span class="hg">0.03%</span> (very accurate)<br>
+<span class="hi">m/n = 20, k=14:</span> FP rate ≈ <span class="hg">0.001%</span> (near-perfect)<br><br>
+<span class="hi">Formula:</span> <code style="font-size:.7rem">p ≈ (1 - e^(-kn/m))^k</code><br>
+<span class="hi">Memory:</span> 1M items × 10 bits = <span class="hg">~1.2 MB</span>. Tiny!
+</div>
+</div>
+</div>
+
+<!-- ═══ Limitations & Variants ═══ -->
+<!-- ═══ Scaling: What happens when data grows? ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Scaling Problem: What happens when data grows beyond initial m?</div>
+<div class="b br" style="margin-bottom:4px"><span class="hi">The problem:</span> A standard Bloom filter has <span class="hr">fixed size m</span> (set at creation). You can't resize it — adding more bits would invalidate all existing hash positions. As n (items) grows beyond what m was designed for, the false positive rate <span class="hr">degrades rapidly</span>. Designed for 1M items but now have 10M? FP rate jumps from 1% to ~40%.</div>
+
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Solution 1: Scalable Bloom Filter</h4>
+<div style="font-size:.76rem;line-height:1.6">
+<span class="hi">How:</span> Chain multiple filters. When filter #1 fills up (FP rate exceeds threshold), create filter #2 with <span class="hg">tighter FP rate</span> (e.g., p/2). New inserts go to latest filter. Lookup checks ALL filters.<br>
+<span class="hi">Tradeoff:</span> Lookup is O(K × number_of_filters) — slightly slower as it grows.<br>
+<span class="hg">Used by:</span> Redis BF.RESERVE with expansion option.
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Solution 2: Rebuild with larger m</h4>
+<div style="font-size:.76rem;line-height:1.6">
+<span class="hi">How:</span> When FP rate exceeds threshold, create a new filter with 2× the bits. Re-insert all items from the source of truth (DB). Swap atomically.<br>
+<span class="hi">Tradeoff:</span> Requires access to original data. Downtime or dual-read during rebuild.<br>
+<span class="hg">Used by:</span> Cassandra (rebuilds on compaction), periodic maintenance jobs.
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Solution 3: Partitioned / Sharded Filters</h4>
+<div style="font-size:.76rem;line-height:1.6">
+<span class="hi">How:</span> Shard data by key range or hash. Each shard has its own Bloom filter sized for its subset. Add shards as data grows — each filter stays within its designed capacity.<br>
+<span class="hi">Tradeoff:</span> Lookup must route to correct shard first.<br>
+<span class="hg">Used by:</span> Cassandra (per-SSTable filter), HBase (per-region filter).
+</div>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Practical rule:</span> Size your initial filter for <span class="hg">2-3× expected items</span> (headroom for growth). Monitor FP rate. When it crosses your threshold (e.g., >5%), trigger rebuild or chain a new filter. In Cassandra, this happens automatically during compaction — old SSTables merge → new Bloom filter built for the merged data.</div>
+
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Cannot delete items</span> (setting bit to 0 might affect other items). <span class="hr">Cannot count</span> (only membership). <span class="hr">Cannot resize</span> (must rebuild with larger m). <span class="hr">No enumeration</span> (can't list what's in the filter).</div>
+<div class="b by"><span class="hi">Variants:</span> <span class="hg">Counting Bloom Filter</span> — uses counters instead of bits → supports delete (at 4× memory). <span class="hg">Cuckoo Filter</span> — supports delete + slightly better space efficiency. <span class="hg">Scalable Bloom Filter</span> — grows dynamically by chaining multiple filters. <span class="hg">Quotient Filter</span> — cache-friendly, supports merge + resize.</div>
+<div class="b bb"><span class="hi">One-liner:</span> Bloom filter = <span class="hg">K hash functions</span> mapping items to <span class="hg">M bits</span>. Insert: set K bits. Lookup: check K bits. Any 0 → <span class="hr">definitely absent</span>. All 1 → <span class="hi">probably present</span>. Use <span class="hg">m/n=10, k=7</span> for ~1% FP rate. Real-world: Cassandra skips disk reads, Chrome blocks malware URLs, CDNs avoid origin fetches.</div>
+
 </div>
 
 <div class="T" id="rate-limiting">
@@ -1957,79 +2108,383 @@
 <div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Stripe</strong> — 100 req/sec per API key (token bucket). <strong>GitHub</strong> — 5000 req/hour (sliding window). Apply at: <span class="hg">API Gateway</span> (preferred), reverse proxy, or Redis (<code>INCR</code>+<code>EXPIRE</code>).</div>
 </div><!-- ═══ Scalability: separate compact lessons ═══ -->
 <div class="T" id="backpressure">
-<h2>Backpressure</h2><p class="su">When the consumer can’t keep up with the producer</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Backpressure strategies">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="60" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="70" y="86" fill="#fff">Producer</text>
-    <rect x="170" y="60" width="100" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="220" y="80" fill="#fff">Buffer</text>
-    <text x="220" y="94" fill="#8b93ac">queue / channel</text>
-    <rect x="320" y="60" width="100" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="370" y="86" fill="#fff">Consumer</text>
-    <rect x="450" y="30" width="90" height="30" fill="#1e2230" stroke="#f87171" rx="4"/>
-    <text x="495" y="50" fill="#f87171">drop / shed</text>
-    <rect x="450" y="70" width="90" height="30" fill="#1e2230" stroke="#fbbf24" rx="4"/>
-    <text x="495" y="90" fill="#fbbf24">slow producer</text>
-    <rect x="450" y="110" width="90" height="30" fill="#1e2230" stroke="#34d399" rx="4"/>
-    <text x="495" y="130" fill="#34d399">batch / yield</text>
-  </g>
-  <path d="M120 80 L170 80" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#bp1)"/>
-  <path d="M270 80 L320 80" stroke="#34d399" stroke-width="1.5" marker-end="url(#bp1)"/>
-  <path d="M220 100 L495 30" stroke="#f87171" stroke-width="1" stroke-dasharray="3 2"/>
-  <path d="M220 100 L495 85" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 2"/>
-  <path d="M220 100 L495 125" stroke="#34d399" stroke-width="1" stroke-dasharray="3 2"/>
-  <defs><marker id="bp1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+<h2>Backpressure</h2><p class="su">When the <span class="hr">consumer can't keep up</span> with the producer — the system must decide: <span class="hg">slow down</span>, <span class="hg">buffer</span>, or <span class="hg">shed load</span></p>
+
+<!-- ═══ Backpressure Flow Diagram ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> Backpressure — Detection &amp; Response Strategies</div>
+<svg width="100%" viewBox="0 0 720 260" style="max-width:720px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Backpressure strategies showing producer, buffer, consumer, and response mechanisms">
+  <defs>
+    <marker id="bp-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+    <marker id="bp-arr-r" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#f87171"/></marker>
+  </defs>
+
+  <!-- Producer (fast) -->
+  <rect x="10" y="50" width="110" height="55" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="65" y="67" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Producer</text>
+  <text x="65" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">10,000 msg/sec</text>
+  <text x="65" y="92" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">⚡ TOO FAST</text>
+
+  <!-- Arrow: Producer → Buffer -->
+  <line x1="120" y1="77" x2="155" y2="77" stroke="var(--a)" stroke-width="1.5" marker-end="url(#bp-arr)"/>
+  <text x="137" y="70" text-anchor="middle" fill="var(--a)" font-size="5">flood</text>
+
+  <!-- Buffer (filling up) -->
+  <rect x="157" y="40" width="140" height="75" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="227" y="56" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Buffer / Queue</text>
+  <!-- Fill level visualization -->
+  <rect x="167" y="62" width="120" height="20" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".5"/>
+  <rect x="167" y="62" width="100" height="20" rx="3" fill="rgba(248,113,113,.2)" stroke="var(--r)" stroke-width=".5"/>
+  <text x="227" y="76" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">83% FULL ⚠</text>
+  <text x="227" y="92" text-anchor="middle" fill="var(--muted)" font-size="5.5">bounded: 10K messages</text>
+  <text x="227" y="103" text-anchor="middle" fill="var(--r)" font-size="5">alarm: depth &gt; 80%</text>
+
+  <!-- Arrow: Buffer → Consumer -->
+  <line x1="297" y1="77" x2="332" y2="77" stroke="var(--g)" stroke-width="1.2" marker-end="url(#bp-arr)"/>
+
+  <!-- Consumer (slow) -->
+  <rect x="334" y="50" width="110" height="55" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="389" y="67" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Consumer</text>
+  <text x="389" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">2,000 msg/sec</text>
+  <text x="389" y="92" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">🐢 TOO SLOW</text>
+
+  <!-- Response Strategies -->
+  <text x="580" y="22" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Response Strategies</text>
+
+  <!-- Strategy 1: Drop/Shed -->
+  <line x1="297" y1="55" x2="490" y2="40" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <rect x="492" y="28" width="200" height="38" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="592" y="42" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">① Drop / Load Shed (503)</text>
+  <text x="592" y="53" text-anchor="middle" fill="var(--muted)" font-size="5.5">discard oldest or lowest-priority</text>
+  <text x="592" y="62" text-anchor="middle" fill="var(--muted)" font-size="5">Use: real-time metrics, ad bids, live video</text>
+
+  <!-- Strategy 2: Slow Producer -->
+  <line x1="297" y1="77" x2="490" y2="82" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <rect x="492" y="70" width="200" height="38" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="592" y="84" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">② Slow Producer (flow control)</text>
+  <text x="592" y="95" text-anchor="middle" fill="var(--muted)" font-size="5.5">TCP window, HTTP 429, Kafka quota</text>
+  <text x="592" y="104" text-anchor="middle" fill="var(--muted)" font-size="5">Use: lossless pipelines, API rate limiting</text>
+
+  <!-- Strategy 3: Buffer + Block -->
+  <line x1="297" y1="95" x2="490" y2="124" stroke="var(--a)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <rect x="492" y="112" width="200" height="38" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="592" y="126" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">③ Bounded Buffer + Block</text>
+  <text x="592" y="137" text-anchor="middle" fill="var(--muted)" font-size="5.5">producer blocks when buffer full</text>
+  <text x="592" y="146" text-anchor="middle" fill="var(--muted)" font-size="5">Use: Reactive Streams, Go channels, Akka</text>
+
+  <!-- Strategy 4: Scale Consumer -->
+  <line x1="389" y1="105" x2="490" y2="166" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <rect x="492" y="154" width="200" height="38" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="592" y="168" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">④ Scale Consumers (auto-scale)</text>
+  <text x="592" y="179" text-anchor="middle" fill="var(--muted)" font-size="5.5">add more consumers / partitions</text>
+  <text x="592" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Use: Kafka consumer groups, KEDA, SQS+Lambda</text>
+
+  <!-- Strategy 5: Sample/Aggregate -->
+  <rect x="492" y="196" width="200" height="38" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="592" y="210" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">⑤ Sample / Aggregate</text>
+  <text x="592" y="221" text-anchor="middle" fill="var(--muted)" font-size="5.5">process 1-in-N, batch + flush</text>
+  <text x="592" y="230" text-anchor="middle" fill="var(--muted)" font-size="5">Use: telemetry, logging, analytics</text>
+
+  <!-- Feedback loop arrow -->
+  <path d="M65 105 C65 140, 227 140, 227 115" fill="none" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#bp-arr-r)"/>
+  <text x="145" y="135" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">backpressure signal propagates upstream</text>
 </svg>
+
+<!-- ═══ Backpressure Strategies Table ═══ -->
 <table>
-<tr><th>Strategy</th><th>When</th><th>Example</th></tr>
-<tr><td>Drop / 503</td><td>Real-time, freshness &gt; completeness</td><td>Live metrics, ad bids</td></tr>
-<tr><td>Bounded buffer + block</td><td>Want lossless, can wait</td><td>Reactive Streams, Akka</td></tr>
-<tr><td>Slow producer (TCP / lag)</td><td>End-to-end flow control</td><td>Kafka consumer lag, HTTP/2</td></tr>
+<tr><th>Strategy</th><th>Data Loss?</th><th>Latency Impact</th><th>When to Use</th><th>Example</th></tr>
+<tr><td><span class="hi">Drop / Load Shed</span></td><td><span class="hr">Yes</span></td><td>None (fast)</td><td>Real-time, freshness &gt; completeness</td><td>Live metrics, ad bids, video frames</td></tr>
+<tr><td><span class="hi">Bounded Buffer + Block</span></td><td>No</td><td><span class="hr">Increases</span> (producer waits)</td><td>Lossless, can tolerate delay</td><td>Reactive Streams, Go channels, Akka</td></tr>
+<tr><td><span class="hi">Slow Producer (flow control)</span></td><td>No</td><td>Propagates upstream</td><td>End-to-end flow control</td><td>TCP window, Kafka quotas, HTTP/2</td></tr>
+<tr><td><span class="hi">Scale Consumers</span></td><td>No</td><td>Temporary lag during scale-up</td><td>Elastic workloads</td><td>Kafka consumer groups, KEDA, Lambda</td></tr>
+<tr><td><span class="hi">Sample / Aggregate</span></td><td>Partial</td><td>None</td><td>High-volume telemetry</td><td>StatsD (1-in-10), log sampling</td></tr>
+<tr><td><span class="hi">Priority Queue</span></td><td>Low-priority dropped</td><td>None for high-priority</td><td>Mixed criticality traffic</td><td>Payment &gt; analytics, VIP &gt; free tier</td></tr>
 </table>
-<div class="b br"><b>Always alarm on queue depth.</b> Unbounded buffers are how outages turn into OOMs.</div>
+
+<!-- ═══ Backpressure by System ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Backpressure Implementation by System</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Network / Transport</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>TCP:</strong> sliding window shrinks when receiver is slow</li>
+<li><strong>HTTP/2:</strong> WINDOW_UPDATE frames control flow</li>
+<li><strong>gRPC:</strong> flow control per stream</li>
+<li><strong>WebSocket:</strong> application-level ACKs</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Message Brokers</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Kafka:</strong> consumer lag metric, fetch.max.bytes</li>
+<li><strong>RabbitMQ:</strong> prefetch count, credit-based flow</li>
+<li><strong>SQS:</strong> visibility timeout + DLQ</li>
+<li><strong>NATS:</strong> slow consumer detection, disconnect</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a2)">Application Frameworks</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Reactive Streams:</strong> request(N) protocol</li>
+<li><strong>Go channels:</strong> bounded channel blocks sender</li>
+<li><strong>Node.js streams:</strong> highWaterMark + drain event</li>
+<li><strong>Akka Streams:</strong> async boundaries with buffers</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Key Insight:</span> <span class="hg">Always use bounded buffers.</span> Unbounded queues are how outages turn into OOMs. Set buffer size based on: acceptable latency × throughput rate. <span class="hg">Alarm on queue depth</span> — growing depth means consumer is falling behind.</div>
+<div class="b by"><span class="hi">Monitoring:</span> Track <span class="hg">consumer lag</span> (Kafka), <span class="hg">queue depth</span> (SQS/RabbitMQ), <span class="hg">buffer utilization %</span>, and <span class="hg">drop rate</span>. Set alerts at 60% capacity (warning) and 80% (critical). Use these signals to trigger auto-scaling.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Unbounded buffers</span> — OOM guaranteed under sustained load. <span class="hr">No backpressure signal</span> — producer keeps flooding. <span class="hr">Dropping without metrics</span> — silent data loss. <span class="hr">Blocking in async code</span> — deadlocks the event loop.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Netflix</strong> — RxJava backpressure for streaming pipeline. <strong>Uber</strong> — QALM (queue-based adaptive load management). <strong>Twitter</strong> — Finagle admission control rejects when overloaded. <strong>Kafka</strong> — consumer lag triggers auto-scaling via KEDA.</div>
 </div>
 
 <div class="T" id="auto-scaling">
-<h2>Auto-Scaling</h2><p class="su">Match capacity to load — reactively or predictively</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto scaling signals">
-  <g font-family="Inter" font-size="10" fill="#c8cee0">
-    <rect x="20" y="30" width="160" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="100" y="50" text-anchor="middle" fill="#fff">CPU &gt; 70%</text>
-    <text x="100" y="64" text-anchor="middle" fill="#8b93ac">simple, laggy</text>
-    <rect x="200" y="30" width="160" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="280" y="50" text-anchor="middle" fill="#fff">Queue depth</text>
-    <text x="280" y="64" text-anchor="middle" fill="#8b93ac">SQS+Lambda, KEDA</text>
-    <rect x="380" y="30" width="160" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
-    <text x="460" y="50" text-anchor="middle" fill="#fff">RPS / latency</text>
-    <text x="460" y="64" text-anchor="middle" fill="#8b93ac">closest to UX</text>
-    <rect x="110" y="100" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="190" y="120" text-anchor="middle" fill="#fff">Predictive (ML)</text>
-    <text x="190" y="134" text-anchor="middle" fill="#8b93ac">pre-warm peaks</text>
-    <rect x="290" y="100" width="160" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
-    <text x="370" y="120" text-anchor="middle" fill="#fff">Schedule</text>
-    <text x="370" y="134" text-anchor="middle" fill="#8b93ac">9am traffic, batch jobs</text>
-  </g>
+<h2>Auto-Scaling</h2><p class="su">Match capacity to load — <span class="hg">reactively</span> (metrics-driven) or <span class="hg">predictively</span> (ML/schedule-based). Scale up fast, scale down slow.</p>
+
+<!-- ═══ Auto-Scaling Architecture ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Auto-Scaling — Signals, Decisions &amp; Actions</div>
+<svg width="100%" viewBox="0 0 720 280" style="max-width:720px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto-scaling architecture showing metrics collection, scaling decisions, and instance management">
+  <defs><marker id="as-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- SIGNALS (left) -->
+  <rect x="10" y="10" width="180" height="180" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="100" y="26" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Scaling Signals</text>
+
+  <rect x="20" y="34" width="160" height="24" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="100" y="44" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">CPU Utilization &gt; 70%</text>
+  <text x="100" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">simple, universal, laggy</text>
+
+  <rect x="20" y="62" width="160" height="24" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="100" y="72" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Queue Depth / Consumer Lag</text>
+  <text x="100" y="82" text-anchor="middle" fill="var(--muted)" font-size="4.5">SQS, Kafka lag → KEDA</text>
+
+  <rect x="20" y="90" width="160" height="24" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="100" y="100" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="600">Request Rate / Latency p99</text>
+  <text x="100" y="110" text-anchor="middle" fill="var(--muted)" font-size="4.5">closest to user experience</text>
+
+  <rect x="20" y="118" width="160" height="24" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="100" y="128" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Memory / Disk / Network I/O</text>
+  <text x="100" y="138" text-anchor="middle" fill="var(--muted)" font-size="4.5">resource-specific bottlenecks</text>
+
+  <rect x="20" y="146" width="160" height="24" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="100" y="156" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">Custom Metrics (business)</text>
+  <text x="100" y="166" text-anchor="middle" fill="var(--muted)" font-size="4.5">active users, orders/min</text>
+
+  <rect x="20" y="174" width="160" height="14" rx="3" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".6"/>
+  <text x="100" y="184" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Schedule / Predictive (ML)</text>
+
+  <!-- Arrow: Signals → Decision -->
+  <line x1="190" y1="100" x2="225" y2="100" stroke="var(--a)" stroke-width="1.2" marker-end="url(#as-arr)"/>
+
+  <!-- DECISION ENGINE (center) -->
+  <rect x="227" y="40" width="160" height="120" rx="7" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.8"/>
+  <text x="307" y="58" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Scaling Policy</text>
+
+  <rect x="237" y="64" width="140" height="20" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="307" y="77" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Target Tracking (maintain 70% CPU)</text>
+
+  <rect x="237" y="88" width="140" height="20" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="307" y="101" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Step Scaling (thresholds)</text>
+
+  <rect x="237" y="112" width="140" height="20" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="307" y="125" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Predictive (ML forecast)</text>
+
+  <rect x="237" y="136" width="140" height="20" rx="3" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="307" y="149" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Scheduled (cron-based)</text>
+
+  <!-- Arrow: Decision → Actions -->
+  <line x1="387" y1="100" x2="420" y2="100" stroke="var(--y)" stroke-width="1.2" marker-end="url(#as-arr)"/>
+
+  <!-- ACTIONS (right) -->
+  <rect x="422" y="20" width="280" height="170" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="562" y="36" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Scaling Actions</text>
+
+  <!-- Scale Up -->
+  <rect x="432" y="44" width="125" height="60" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="494" y="58" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">⬆ Scale Up</text>
+  <text x="494" y="70" text-anchor="middle" fill="var(--muted)" font-size="5">add instances</text>
+  <text x="494" y="80" text-anchor="middle" fill="var(--muted)" font-size="5">fast (30-60s)</text>
+  <text x="494" y="90" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">aggressive threshold</text>
+  <text x="494" y="100" text-anchor="middle" fill="var(--muted)" font-size="4.5">cooldown: 60s</text>
+
+  <!-- Scale Down -->
+  <rect x="567" y="44" width="125" height="60" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
+  <text x="629" y="58" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">⬇ Scale Down</text>
+  <text x="629" y="70" text-anchor="middle" fill="var(--muted)" font-size="5">remove instances</text>
+  <text x="629" y="80" text-anchor="middle" fill="var(--muted)" font-size="5">slow (drain first)</text>
+  <text x="629" y="90" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">conservative threshold</text>
+  <text x="629" y="100" text-anchor="middle" fill="var(--muted)" font-size="4.5">cooldown: 300s</text>
+
+  <!-- Cluster Autoscaler -->
+  <rect x="432" y="112" width="260" height="35" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="562" y="127" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Cluster Autoscaler (nodes)</text>
+  <text x="562" y="139" text-anchor="middle" fill="var(--muted)" font-size="5.5">add/remove nodes when pods can't be scheduled</text>
+
+  <!-- Pre-warming -->
+  <rect x="432" y="152" width="260" height="30" rx="4" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="562" y="167" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Pre-warming (predictive)</text>
+  <text x="562" y="177" text-anchor="middle" fill="var(--muted)" font-size="5.5">scale before traffic arrives (ML / schedule)</text>
+
+  <!-- Best Practices (bottom) -->
+  <rect x="10" y="200" width="690" height="70" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="355" y="215" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Scaling Best Practices</text>
+  <text x="130" y="232" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Scale up fast (1 min)</text>
+  <text x="130" y="244" text-anchor="middle" fill="var(--r)" font-size="5.5">✓ Scale down slow (5 min)</text>
+  <text x="310" y="232" text-anchor="middle" fill="var(--a)" font-size="5.5">✓ Combine multiple signals</text>
+  <text x="310" y="244" text-anchor="middle" fill="var(--a)" font-size="5.5">✓ Set min/max instance bounds</text>
+  <text x="500" y="232" text-anchor="middle" fill="var(--y)" font-size="5.5">✓ Use cooldown periods</text>
+  <text x="500" y="244" text-anchor="middle" fill="var(--y)" font-size="5.5">✓ Test with load before prod</text>
+  <text x="355" y="260" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Golden rule: scale up on leading indicators (queue depth), scale down on trailing (CPU)</text>
 </svg>
-<div class="b bp"><b>Combine signals:</b> base on CPU, but shrink scale-down cooldown using predictive models so you scale up early and shed slowly.</div>
-<div class="b by"><b>Tools:</b> K8s HPA + KEDA, AWS ASG + Target Tracking, GCP autoscaler. Pair with cluster autoscaler for nodes.</div>
+
+<!-- ═══ Auto-Scaling Tools Table ═══ -->
+<table>
+<tr><th>Platform</th><th>Tool</th><th>Signals</th><th>Key Feature</th></tr>
+<tr><td><span class="hi">Kubernetes</span></td><td>HPA (Horizontal Pod Autoscaler)</td><td>CPU, memory, custom metrics</td><td>Native, works with any metric via Prometheus adapter</td></tr>
+<tr><td><span class="hi">Kubernetes</span></td><td>KEDA</td><td>Queue depth, Kafka lag, cron, HTTP</td><td><span class="hg">Scale to zero</span>, 50+ scalers, event-driven</td></tr>
+<tr><td><span class="hi">AWS</span></td><td>ASG + Target Tracking</td><td>CPU, ALB request count, custom CW</td><td>Predictive scaling, warm pools, mixed instances</td></tr>
+<tr><td><span class="hi">AWS</span></td><td>Lambda (implicit)</td><td>Concurrent invocations</td><td>Instant scale, per-request billing, 1000 concurrent default</td></tr>
+<tr><td><span class="hi">GCP</span></td><td>Managed Instance Groups</td><td>CPU, HTTP LB, Pub/Sub backlog</td><td>Predictive autoscaling, per-instance metrics</td></tr>
+<tr><td><span class="hi">Azure</span></td><td>VMSS Autoscale</td><td>CPU, queue, custom metrics</td><td>Scale-in policy (newest/oldest first), overprovisioning</td></tr>
+</table>
+
+<!-- ═══ Scaling Patterns ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Scaling Patterns &amp; Considerations</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Horizontal vs Vertical</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Horizontal:</strong> add more instances (preferred, no ceiling)</li>
+<li><strong>Vertical:</strong> bigger instance (simpler, has ceiling)</li>
+<li>Stateless services → horizontal easy</li>
+<li>Stateful (DB) → vertical first, then shard</li>
+<li>Combine: vertical for DB, horizontal for app tier</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Cold Start &amp; Warm Pools</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Cold start:</strong> new instance needs boot + warm cache</li>
+<li><strong>Warm pools:</strong> pre-initialized instances ready to serve</li>
+<li><strong>Predictive:</strong> ML forecasts traffic, pre-scales</li>
+<li><strong>Scheduled:</strong> scale before known peaks (9am, sales)</li>
+<li>Lambda cold start: 100ms-10s depending on runtime</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Combine signals:</span> Base on <span class="hg">CPU for steady state</span>, but use <span class="hg">queue depth for burst detection</span> (leading indicator). Add <span class="hg">predictive scaling</span> to pre-warm before known peaks. Set <span class="hg">min instances</span> to handle baseline + sudden spikes during scale-up lag.</div>
+<div class="b by"><span class="hi">Scale-down safety:</span> Use <span class="hg">connection draining</span> (deregister from LB, finish in-flight requests). Set <span class="hg">termination grace period</span> (K8s: preStop hook). <span class="hg">Scale down 1 at a time</span> to avoid cascading failures. Never scale below <span class="hg">N+1 capacity</span> (survive 1 instance failure).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Scaling on a single metric</span> — CPU high but memory is the bottleneck. <span class="hr">No cooldown</span> — thrashing (scale up/down/up/down). <span class="hr">No max limit</span> — runaway scaling = runaway cost. <span class="hr">Scaling stateful services without draining</span> — data loss.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Netflix</strong> — Titus auto-scaling with predictive models (pre-warm for evening peak). <strong>Uber</strong> — Peloton scheduler scales 4M+ containers. <strong>Shopify</strong> — scales to 80K+ RPS during flash sales using predictive + reactive. <strong>Slack</strong> — KEDA scales workers based on job queue depth.</div>
 </div>
 
 <div class="T" id="graceful-degradation">
-<h2>Graceful Degradation</h2><p class="su">Stay partially up instead of fully down</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceful degradation tiers">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="30" width="520" height="30" fill="#34d399" opacity=".25" stroke="#34d399" rx="6"/>
-    <text x="280" y="50" fill="#fff">Healthy: full features</text>
-    <rect x="60" y="68" width="440" height="30" fill="#fbbf24" opacity=".25" stroke="#fbbf24" rx="6"/>
-    <text x="280" y="88" fill="#fff">Stressed: serve stale cache, disable recs/analytics</text>
-    <rect x="110" y="106" width="340" height="30" fill="#fb923c" opacity=".25" stroke="#fb923c" rx="6"/>
-    <text x="280" y="126" fill="#fff">Overloaded: read-only, simplified UI</text>
-    <rect x="160" y="144" width="240" height="22" fill="#f87171" opacity=".25" stroke="#f87171" rx="6"/>
-    <text x="280" y="159" fill="#fff">Critical-only: login + checkout</text>
-  </g>
+<h2>Graceful Degradation</h2><p class="su">Stay <span class="hg">partially up</span> instead of fully down — shed non-critical features to protect <span class="hi">core user journeys</span></p>
+
+<!-- ═══ Degradation Tiers Diagram ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Degradation Tiers — Progressive Feature Shedding</div>
+<svg width="100%" viewBox="0 0 700 240" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceful degradation tiers showing progressive feature shedding from healthy to critical">
+  <defs><marker id="gd-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Load indicator (left) -->
+  <rect x="10" y="20" width="30" height="200" rx="4" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <rect x="10" y="170" width="30" height="50" rx="4" fill="rgba(52,211,153,.3)"/>
+  <rect x="10" y="120" width="30" height="50" fill="rgba(251,191,36,.3)"/>
+  <rect x="10" y="70" width="30" height="50" fill="rgba(251,146,60,.3)"/>
+  <rect x="10" y="20" width="30" height="50" rx="4" fill="rgba(248,113,113,.3)"/>
+  <text x="25" y="14" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-weight="600">LOAD</text>
+  <text x="25" y="35" text-anchor="middle" fill="var(--r)" font-size="5">100%</text>
+  <text x="25" y="205" text-anchor="middle" fill="var(--g)" font-size="5">0%</text>
+
+  <!-- Tier 1: Healthy -->
+  <rect x="55" y="170" width="620" height="48" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="80" y="188" fill="var(--g)" font-size="8" font-weight="800">HEALTHY</text>
+  <text x="80" y="202" fill="var(--muted)" font-size="5.5">All features active</text>
+  <text x="250" y="192" fill="var(--g)" font-size="5.5">✓ Recommendations</text>
+  <text x="370" y="192" fill="var(--g)" font-size="5.5">✓ Analytics</text>
+  <text x="470" y="192" fill="var(--g)" font-size="5.5">✓ Search suggestions</text>
+  <text x="600" y="192" fill="var(--g)" font-size="5.5">✓ Real-time updates</text>
+  <text x="250" y="206" fill="var(--g)" font-size="5.5">✓ Personalization</text>
+  <text x="370" y="206" fill="var(--g)" font-size="5.5">✓ A/B tests</text>
+  <text x="470" y="206" fill="var(--g)" font-size="5.5">✓ Chat support</text>
+  <text x="600" y="206" fill="var(--g)" font-size="5.5">✓ Full API</text>
+
+  <!-- Tier 2: Stressed -->
+  <rect x="75" y="120" width="580" height="44" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="100" y="138" fill="var(--y)" font-size="8" font-weight="800">STRESSED</text>
+  <text x="100" y="152" fill="var(--muted)" font-size="5.5">Disable non-essential</text>
+  <text x="280" y="142" fill="var(--y)" font-size="5.5">✓ Core features</text>
+  <text x="400" y="142" fill="var(--y)" font-size="5.5">✓ Serve stale cache</text>
+  <text x="540" y="142" fill="var(--y)" font-size="5.5">✗ Recommendations OFF</text>
+  <text x="280" y="156" fill="var(--y)" font-size="5.5">✗ Analytics delayed</text>
+  <text x="400" y="156" fill="var(--y)" font-size="5.5">✗ A/B tests paused</text>
+  <text x="540" y="156" fill="var(--y)" font-size="5.5">✗ Non-critical APIs throttled</text>
+
+  <!-- Tier 3: Overloaded -->
+  <rect x="95" y="70" width="540" height="44" rx="6" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="120" y="88" fill="var(--o)" font-size="8" font-weight="800">OVERLOADED</text>
+  <text x="120" y="102" fill="var(--muted)" font-size="5.5">Read-only mode</text>
+  <text x="300" y="92" fill="var(--o)" font-size="5.5">✓ Browse catalog</text>
+  <text x="430" y="92" fill="var(--o)" font-size="5.5">✓ View orders</text>
+  <text x="550" y="92" fill="var(--o)" font-size="5.5">✗ New orders queued</text>
+  <text x="300" y="106" fill="var(--o)" font-size="5.5">✗ Search simplified</text>
+  <text x="430" y="106" fill="var(--o)" font-size="5.5">✗ Images low-res</text>
+  <text x="550" y="106" fill="var(--o)" font-size="5.5">✗ Free tier blocked</text>
+
+  <!-- Tier 4: Critical -->
+  <rect x="115" y="20" width="500" height="44" rx="6" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="140" y="38" fill="var(--r)" font-size="8" font-weight="800">CRITICAL</text>
+  <text x="140" y="52" fill="var(--muted)" font-size="5.5">Core only</text>
+  <text x="310" y="42" fill="var(--r)" font-size="5.5">✓ Login</text>
+  <text x="380" y="42" fill="var(--r)" font-size="5.5">✓ Checkout</text>
+  <text x="460" y="42" fill="var(--r)" font-size="5.5">✓ Payment processing</text>
+  <text x="310" y="56" fill="var(--r)" font-size="5.5">✗ Everything else OFF</text>
+  <text x="460" y="56" fill="var(--r)" font-size="5.5">Static error page for non-critical paths</text>
 </svg>
-<div class="b bg"><b>Tactics:</b> feature flags (LaunchDarkly), tier traffic by importance (paid &gt; free), cached fallbacks, circuit breakers, request hedging.</div>
+
+<!-- ═══ Degradation Tactics Table ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Degradation Tactics &amp; Implementation</div>
+<table>
+<tr><th>Tactic</th><th>How It Works</th><th>Implementation</th><th>Example</th></tr>
+<tr><td><span class="hi">Feature Flags</span></td><td>Toggle features on/off without deploy</td><td>LaunchDarkly, Unleash, Flagsmith</td><td>Disable recommendations when DB is slow</td></tr>
+<tr><td><span class="hi">Circuit Breaker</span></td><td>Stop calling failing dependency</td><td>Hystrix, Resilience4j, Polly</td><td>Payment service down → queue orders</td></tr>
+<tr><td><span class="hi">Cached Fallback</span></td><td>Serve stale data when source unavailable</td><td>Redis/CDN with TTL override</td><td>Product catalog from cache when DB is down</td></tr>
+<tr><td><span class="hi">Request Hedging</span></td><td>Send to multiple backends, use first response</td><td>gRPC hedging policy</td><td>Tail latency reduction (p99 → p50)</td></tr>
+<tr><td><span class="hi">Traffic Tiering</span></td><td>Prioritize paid/VIP over free tier</td><td>Priority queues, weighted routing</td><td>Paid users get full features, free get basic</td></tr>
+<tr><td><span class="hi">Static Fallback</span></td><td>Serve pre-rendered static page</td><td>CDN origin failover, S3 static site</td><td>Homepage from CDN when app servers are down</td></tr>
+<tr><td><span class="hi">Bulkhead Isolation</span></td><td>Isolate failures to one component</td><td>Separate thread pools, pods, clusters</td><td>Search failure doesn't affect checkout</td></tr>
+</table>
+
+<!-- ═══ Degradation Patterns ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Implementation Patterns</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Circuit Breaker States</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Closed:</strong> normal operation, counting failures</li>
+<li><strong>Open:</strong> fast-fail all requests (serve fallback)</li>
+<li><strong>Half-Open:</strong> allow 1 request to test recovery</li>
+<li>Thresholds: 5 failures in 10s → open for 30s</li>
+<li>Per-dependency circuit breakers (not global)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Degradation Decision Matrix</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>CPU &gt; 80%:</strong> disable recommendations, analytics</li>
+<li><strong>DB latency &gt; 500ms:</strong> serve from cache only</li>
+<li><strong>Error rate &gt; 5%:</strong> circuit break failing service</li>
+<li><strong>Queue depth &gt; 10K:</strong> reject new non-critical work</li>
+<li><strong>Memory &gt; 90%:</strong> drop sessions, reduce cache</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Tactics:</span> <span class="hg">Feature flags</span> (LaunchDarkly) for instant toggle. <span class="hg">Traffic tiering</span> by importance (paid &gt; free). <span class="hg">Cached fallbacks</span> with extended TTL. <span class="hg">Circuit breakers</span> per dependency. <span class="hg">Request hedging</span> for tail latency. <span class="hg">Bulkhead isolation</span> — failure in one component doesn't cascade.</div>
+<div class="b by"><span class="hi">Testing degradation:</span> <span class="hg">Chaos engineering</span> — inject failures in prod (Netflix Chaos Monkey). <span class="hg">Game days</span> — simulate outages with the team. <span class="hg">Load testing</span> — push past capacity to verify degradation tiers activate correctly. <span class="hg">Dependency kill switch</span> — test each circuit breaker independently.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">All-or-nothing</span> — either fully up or fully down (no middle ground). <span class="hr">No fallback tested</span> — fallback path has its own bugs. <span class="hr">Cascading failures</span> — one service down takes everything down. <span class="hr">Manual intervention required</span> — degradation should be automatic.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Netflix</strong> — Hystrix circuit breakers + fallback to cached recommendations. <strong>Amazon</strong> — static product pages from S3 when app tier is overloaded. <strong>Twitter</strong> — fail whale → degraded timeline (no trends, no who-to-follow). <strong>Shopify</strong> — checkout always works, even if storefront is degraded during flash sales.</div>
 </div>
 
 </div>
@@ -2038,6 +2493,11 @@
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

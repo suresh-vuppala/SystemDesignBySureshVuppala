@@ -1,0 +1,416 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Twitter deliver posts to 400M+ timelines in real-time? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Twitter deliver posts to 400M+ users' timelines in real-time?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🐦</span> Design a timeline delivery system: 400M users, celebrity fan-out, &lt;5s delivery</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a social platform deliver posts to 400M+ users' timelines in real-time, handling the asymmetry between users with few followers and celebrities with millions, while keeping timeline delivery under 5 seconds?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A celebrity with 100M followers posts a tweet. You <span class="hr">cannot write to 100M timelines simultaneously</span> — that's a fan-out explosion. But followers expect to see it within seconds. How do you balance write amplification vs read latency?</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">400M+</div>
+<div style="font-size:.72rem;color:var(--muted)">active users</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">timelines to serve</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">100M</div>
+<div style="font-size:.72rem;color:var(--muted)">max followers</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">celebrity problem</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;5s</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery target</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">post → visible in feed</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">500K+</div>
+<div style="font-size:.72rem;color:var(--muted)">tweets / sec peak</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">during major events</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> User posts a tweet → appears in all followers' timelines<br>
+  <span class="hg">2.</span> Timeline is <strong>ranked</strong> (not purely chronological) — relevance + recency<br>
+  <span class="hg">3.</span> <strong>Real-time updates</strong> — new tweets appear without manual refresh<br>
+  <span class="hg">4.</span> Handle <strong>celebrity asymmetry</strong> — users with 100M followers<br>
+  <span class="hg">5.</span> Support <strong>infinite scroll</strong> with pagination<br>
+  <span class="hg">6.</span> <strong>Engagement signals</strong> update in real-time (likes, retweets, replies count)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> Tweet composition and media upload<br>
+  <span class="hr">✗</span> Search and trending topics<br>
+  <span class="hr">✗</span> Direct messages<br>
+  <span class="hr">✗</span> Notifications<br>
+  <span class="hr">✗</span> Content moderation
+</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> User posts a tweet → appears in all followers' timelines<br>
+  <span class="hg">2.</span> Timeline is <strong>ranked</strong> (not purely chronological) — relevance + recency<br>
+  <span class="hg">3.</span> <strong>Real-time updates</strong> — new tweets appear without manual refresh<br>
+  <span class="hg">4.</span> Handle <strong>celebrity asymmetry</strong> — users with 100M followers<br>
+  <span class="hg">5.</span> Support <strong>infinite scroll</strong> with pagination<br>
+  <span class="hg">6.</span> <strong>Engagement signals</strong> update in real-time (likes, retweets, replies count)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> Tweet composition and media upload<br>
+  <span class="hr">✗</span> Search and trending topics<br>
+  <span class="hr">✗</span> Direct messages<br>
+  <span class="hr">✗</span> Notifications<br>
+  <span class="hr">✗</span> Content moderation
+</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<table>
+<tr><th>Property</th><th>Target</th><th>Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;5s</span> tweet → visible in follower timeline</td><td>Fan-out workers must process within seconds, not minutes</td></tr>
+<tr><td><span class="hi">Read Latency</span></td><td><span class="hg">&lt;100ms</span> timeline load</td><td>Pre-computed timeline in Redis (no DB query on read)</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">500K tweets/sec</span> peak (major events)</td><td>Kafka + parallel fan-out workers, auto-scale on lag</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span></td><td>Redis replicas, multi-AZ, graceful degradation (serve stale)</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Eventual</span> — tweets may appear 1-5s late</td><td>Fan-out is async. Acceptable: not a banking system.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td><span class="hg">400M users</span>, linear scale with user count</td><td>Shard timeline cache by user_id. Add Redis nodes as users grow.</td></tr>
+</table>
+</div>
+
+<div class="T" id="architecture">
+<h2>High-Level Architecture</h2>
+<p class="su">Hybrid fan-out: write for normal users, read for celebrities</p>
+
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Twitter Timeline Fan-out — End-to-End Architecture">
+  <defs><marker id="tw-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Twitter Timeline Fan-out — End-to-End Architecture</text>
+
+  <!-- LAYER 1: WRITE LAYER -->
+  <rect x="10" y="25" width="760" height="110" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">WRITE LAYER — Tweet Ingestion &amp; Fan-out Decision</text>
+
+  <!-- Tweet API -->
+  <rect x="25" y="50" width="120" height="40" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
+  <text x="85" y="66" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Tweet API</text>
+  <text x="85" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">500K tweets/sec peak</text>
+  <text x="85" y="87" text-anchor="middle" fill="var(--muted)" font-size="4.5">persist to Tweet DB</text>
+
+  <!-- Arrow to Kafka -->
+  <line x1="145" y1="70" x2="175" y2="70" stroke="var(--a)" stroke-width="1" marker-end="url(#tw-arr)"/>
+
+  <!-- Kafka -->
+  <rect x="178" y="50" width="110" height="40" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="233" y="66" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Kafka</text>
+  <text x="233" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">tweet-events topic</text>
+  <text x="233" y="87" text-anchor="middle" fill="var(--muted)" font-size="4.5">durable, replayable</text>
+
+  <!-- Arrow to Fan-out Decision -->
+  <line x1="288" y1="70" x2="318" y2="70" stroke="var(--g)" stroke-width="1" marker-end="url(#tw-arr)"/>
+
+  <!-- Fan-out Decision -->
+  <rect x="320" y="46" width="200" height="48" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="420" y="60" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Fan-out Decision</text>
+  <text x="420" y="73" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">followers &lt; 10K → WRITE path (99%)</text>
+  <text x="420" y="85" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">followers &gt; 10K → READ path (1%)</text>
+
+  <!-- Social Graph side box -->
+  <rect x="560" y="46" width="195" height="48" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="657" y="60" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Social Graph (FlockDB)</text>
+  <text x="657" y="73" text-anchor="middle" fill="var(--muted)" font-size="5">follower lookups per tweet</text>
+  <text x="657" y="85" text-anchor="middle" fill="var(--muted)" font-size="4.5">sharded by user_id | avg 200 followers</text>
+
+  <!-- Arrow from decision to social graph -->
+  <line x1="520" y1="70" x2="558" y2="70" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#tw-arr)"/>
+
+  <!-- Write path label -->
+  <text x="390" y="108" text-anchor="middle" fill="var(--muted)" font-size="5">Hybrid: 99% of tweets fan-out on write (fast reads) | 1% celebrities merge on read (no write explosion)</text>
+
+  <!-- Write path arrow down -->
+  <line x1="370" y1="120" x2="200" y2="148" stroke="var(--g)" stroke-width="1" marker-end="url(#tw-arr)"/>
+  <!-- Read path arrow down -->
+  <line x1="470" y1="120" x2="580" y2="148" stroke="var(--r)" stroke-width="1" marker-end="url(#tw-arr)"/>
+
+  <!-- LAYER 2: FAN-OUT LAYER -->
+  <rect x="10" y="140" width="760" height="120" rx="8" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="390" y="155" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">FAN-OUT LAYER — Write Path &amp; Celebrity Storage</text>
+
+  <!-- Fan-out Workers -->
+  <rect x="25" y="165" width="310" height="80" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="180" y="180" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Fan-out Workers (~990 instances)</text>
+  <text x="180" y="194" text-anchor="middle" fill="var(--muted)" font-size="5.5">For each follower of tweet author:</text>
+  <text x="180" y="207" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">ZADD timeline:{userId} {timestamp} {tweetId}</text>
+  <text x="180" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">99M Redis writes/sec peak | parallel across shards</text>
+  <text x="180" y="233" text-anchor="middle" fill="var(--muted)" font-size="4.5">ZREMRANGEBYRANK 0 -801 (trim to 800 entries per user)</text>
+
+  <!-- Redis Cluster -->
+  <rect x="355" y="165" width="180" height="80" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="445" y="180" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Redis Cluster</text>
+  <text x="445" y="194" text-anchor="middle" fill="var(--muted)" font-size="5.5">~2.5 TB across 100+ shards</text>
+  <text x="445" y="207" text-anchor="middle" fill="var(--muted)" font-size="5">Sorted Set per user (score=ts)</text>
+  <text x="445" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">400M user timelines cached</text>
+  <text x="445" y="233" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">cache hit rate: ~99%</text>
+
+  <!-- Celebrity Tweet Store -->
+  <rect x="555" y="165" width="200" height="80" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="655" y="180" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Celebrity Path (Read)</text>
+  <text x="655" y="194" text-anchor="middle" fill="var(--muted)" font-size="5.5">Store tweet in DB only</text>
+  <text x="655" y="207" text-anchor="middle" fill="var(--muted)" font-size="5.5">No fan-out (100M writes avoided)</text>
+  <text x="655" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">Merged at read time per user</text>
+  <text x="655" y="233" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">query: "my celebrity follows"</text>
+
+  <!-- Arrow from workers to Redis -->
+  <line x1="335" y1="205" x2="353" y2="205" stroke="var(--g)" stroke-width="1" marker-end="url(#tw-arr)"/>
+
+  <!-- Arrows down to Read Layer -->
+  <line x1="445" y1="245" x2="350" y2="275" stroke="var(--g)" stroke-width="1" marker-end="url(#tw-arr)"/>
+  <line x1="655" y1="245" x2="500" y2="275" stroke="var(--r)" stroke-width="1" marker-end="url(#tw-arr)"/>
+
+  <!-- LAYER 3: READ LAYER -->
+  <rect x="10" y="268" width="760" height="110" rx="8" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="283" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">READ LAYER — Timeline Assembly &amp; Ranking</text>
+
+  <!-- Timeline Mixer -->
+  <rect x="25" y="295" width="250" height="65" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="150" y="310" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Timeline Mixer</text>
+  <text x="150" y="324" text-anchor="middle" fill="var(--muted)" font-size="5.5">① ZREVRANGE timeline:{userId} 0 19 (pre-computed)</text>
+  <text x="150" y="337" text-anchor="middle" fill="var(--muted)" font-size="5.5">② Query celebrity tweets user follows</text>
+  <text x="150" y="350" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">③ Merge + deduplicate + sort by score</text>
+
+  <!-- ML Ranking -->
+  <rect x="295" y="295" width="200" height="65" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
+  <text x="395" y="310" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">ML Ranking Service</text>
+  <text x="395" y="324" text-anchor="middle" fill="var(--muted)" font-size="5.5">Personalized relevance scoring</text>
+  <text x="395" y="337" text-anchor="middle" fill="var(--muted)" font-size="5.5">Features: engagement, recency, affinity</text>
+  <text x="395" y="350" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">TensorFlow Serving | &lt;50ms p99</text>
+
+  <!-- Client -->
+  <rect x="515" y="295" width="120" height="65" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="575" y="310" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client App</text>
+  <text x="575" y="324" text-anchor="middle" fill="var(--muted)" font-size="5.5">Ranked timeline feed</text>
+  <text x="575" y="337" text-anchor="middle" fill="var(--muted)" font-size="5.5">Infinite scroll pagination</text>
+  <text x="575" y="350" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">WebSocket for real-time</text>
+
+  <!-- Real-time push -->
+  <rect x="655" y="295" width="100" height="65" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="705" y="310" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Real-time</text>
+  <text x="705" y="324" text-anchor="middle" fill="var(--muted)" font-size="5">SSE / WebSocket</text>
+  <text x="705" y="337" text-anchor="middle" fill="var(--muted)" font-size="5">new tweets push</text>
+  <text x="705" y="350" text-anchor="middle" fill="var(--muted)" font-size="4.5">no manual refresh</text>
+
+  <!-- Arrows between read components -->
+  <line x1="275" y1="327" x2="293" y2="327" stroke="var(--a2)" stroke-width="1" marker-end="url(#tw-arr)"/>
+  <line x1="495" y1="327" x2="513" y2="327" stroke="var(--y)" stroke-width="1" marker-end="url(#tw-arr)"/>
+  <line x1="635" y1="327" x2="653" y2="327" stroke="var(--a)" stroke-width=".8" marker-end="url(#tw-arr)"/>
+
+  <!-- BOTTOM: Hybrid Strategy Explanation -->
+  <rect x="10" y="388" width="760" height="105" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="404" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Hybrid Fan-out Strategy — By the Numbers</text>
+
+  <text x="200" y="422" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Fan-out on WRITE (followers &lt; 10K)</text>
+  <text x="200" y="436" text-anchor="middle" fill="var(--muted)" font-size="5.5">1 tweet → ZADD to each follower's Redis sorted set</text>
+  <text x="200" y="449" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Read latency: &lt;5ms (O(1) from cache)</text>
+  <text x="200" y="462" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Write amplification: 1 tweet → 200 avg writes</text>
+  <text x="200" y="475" text-anchor="middle" fill="var(--muted)" font-size="5">Covers 99% of users (avg ~200 followers)</text>
+  <text x="200" y="487" text-anchor="middle" fill="var(--muted)" font-size="4.5">Peak: 500K × 200 × 0.99 = 99M writes/sec</text>
+
+  <text x="580" y="422" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">Fan-out on READ (followers &gt; 10K)</text>
+  <text x="580" y="436" text-anchor="middle" fill="var(--muted)" font-size="5.5">Store tweet once in DB, merge at read time</text>
+  <text x="580" y="449" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ No write amplification for celebrities</text>
+  <text x="580" y="462" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Read adds ~20ms (query + merge + rank)</text>
+  <text x="580" y="475" text-anchor="middle" fill="var(--muted)" font-size="5">Only top ~1% of users (celebrities, brands)</text>
+  <text x="580" y="487" text-anchor="middle" fill="var(--muted)" font-size="4.5">Avoids: 100M follower × 1 tweet = 100M writes</text>
+</svg>
+
+<div class="b bg"><span class="hi">Why hybrid?</span> Pure fan-out-on-write: a celebrity tweet triggers 100M Redis writes = <span class="hr">minutes of lag</span>. Pure fan-out-on-read: every timeline load queries all followed users = <span class="hr">slow reads</span>. Hybrid: 99% of tweets fan-out on write (fast reads), celebrities merge on read (no write explosion).</div>
+<div class="b by"><span class="hi">Timeline cache:</span> Redis sorted set per user. Score = timestamp. ZREVRANGE for latest N tweets. Trim to 800 entries (older tweets fetched from DB). <span class="hg">Cache hit rate: ~99%</span> for active users.</div>
+<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Fan-out worker lag</span> → tweets delayed for some followers (acceptable: eventual). <span class="hr">Redis node failure</span> → rebuild from DB (cold start ~30s). <span class="hr">Celebrity tweet during event</span> → read path handles gracefully (no write storm).</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Twitter</strong> uses this exact hybrid approach. Threshold is ~10K followers. <strong>Instagram</strong> uses similar fan-out-on-write for feed. <strong>Facebook</strong> uses primarily fan-out-on-read with aggressive caching (TAO).</div>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Back-of-envelope math for timeline delivery</p>
+<div class="b bb" style="margin-bottom:10px"><span class="hi">Given:</span> <strong>400M active users</strong> · <strong>500K tweets/sec peak</strong> · <strong>avg 200 followers</strong> · <strong>top 1% have &gt;10K followers</strong></div>
+<table>
+<tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
+<tr><td><span class="hi">1</span></td><td>Fan-out writes (normal): 500K tweets × 200 followers × 99%</td><td><span class="hg">~99M Redis writes/sec</span></td><td>Redis Cluster with 100+ shards for timeline cache</td></tr>
+<tr><td><span class="hi">2</span></td><td>Celebrity tweets skipped: 500K × 1%</td><td><span class="hg">~5K tweets/sec (read path)</span></td><td>Merged at read time — no write amplification</td></tr>
+<tr><td><span class="hi">3</span></td><td>Timeline reads: 400M users × 10 opens/day ÷ 86400</td><td><span class="hg">~46K timeline reads/sec</span></td><td>Redis cache hit rate ~99% — most reads served from cache</td></tr>
+<tr><td><span class="hi">4</span></td><td>Timeline cache size: 400M users × 800 tweet_ids × 8 bytes</td><td><span class="hg">~2.5 TB Redis</span></td><td>Sorted sets, trim to 800 entries per user</td></tr>
+<tr><td><span class="hi">5</span></td><td>Fan-out worker count: 99M writes/sec ÷ 100K writes/worker</td><td><span class="hg">~990 fan-out workers</span></td><td>Stateless, horizontally scalable, Kafka-driven</td></tr>
+<tr><td><span class="hi">6</span></td><td>Tweet storage: 500K/sec × 1KB × 86400</td><td><span class="hg">~43 TB/day</span></td><td>Sharded by tweet_id, replicated 3×</td></tr>
+</table>
+</div>
+
+<!-- ═══ DATA MODEL ═══ -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Timeline cache (Redis) + Tweet store (MySQL/Manhattan) + Social graph (who follows whom)</p>
+
+<!-- ═══ Timeline Cache SVG ═══ -->
+<svg width="100%" viewBox="0 0 680 130" style="max-width:680px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Twitter timeline cache showing Redis sorted set per user">
+  <defs><marker id="tc-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- User timeline in Redis -->
+  <rect x="10" y="10" width="660" height="70" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="340" y="25" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Redis Sorted Set: timeline:{user_id}</text>
+  <text x="340" y="37" text-anchor="middle" fill="var(--muted)" font-size="5.5">score = timestamp | member = tweet_id | ZREVRANGE 0 19 → latest 20 tweets</text>
+
+  <!-- Tweet entries -->
+  <rect x="30" y="44" width="80" height="26" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="70" y="55" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">tweet_901</text>
+  <text x="70" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">score: 1704067200</text>
+
+  <rect x="120" y="44" width="80" height="26" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="160" y="55" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">tweet_899</text>
+  <text x="160" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">score: 1704067180</text>
+
+  <rect x="210" y="44" width="80" height="26" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="250" y="55" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">tweet_895</text>
+  <text x="250" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">score: 1704067100</text>
+
+  <text x="310" y="58" fill="var(--muted)" font-size="6">...</text>
+
+  <rect x="340" y="44" width="80" height="26" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="380" y="55" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">tweet_102</text>
+  <text x="380" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">score: 1704000000</text>
+
+  <text x="450" y="58" fill="var(--muted)" font-size="5">← oldest (trimmed at 800)</text>
+
+  <!-- Fan-out write -->
+  <rect x="530" y="44" width="120" height="26" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="590" y="55" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">ZADD timeline:user123</text>
+  <text x="590" y="66" text-anchor="middle" fill="var(--o)" font-size="4.5">1704067200 tweet_901</text>
+
+  <!-- Operations -->
+  <rect x="10" y="88" width="660" height="32" rx="4" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="120" y="103" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Write: ZADD (fan-out)</text>
+  <text x="300" y="103" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Read: ZREVRANGE 0 19</text>
+  <text x="470" y="103" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Trim: ZREMRANGEBYRANK 0 -801</text>
+  <text x="620" y="103" text-anchor="middle" fill="var(--muted)" font-size="5.5">Cache hit: 99%</text>
+  <text x="340" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">Memory: 400M users × 800 tweet_ids × 8 bytes = ~2.5 TB Redis (sharded across 100+ nodes)</text>
+</svg>
+<pre><code>// ═══ Timeline Cache (Redis Sorted Set) ═══
+Key:   timeline:{user_id}
+Value: Sorted Set — score=timestamp, member=tweet_id
+Ops:   ZADD timeline:user123 1704067200 tweet_abc    // fan-out write
+       ZREVRANGE timeline:user123 0 19               // get latest 20
+       ZREMRANGEBYRANK timeline:user123 0 -801       // trim to 800
+
+// ═══ Tweet Store (Sharded MySQL / Manhattan) ═══
+tweets {
+  tweet_id:    BIGINT (Snowflake ID)    -- partition key
+  user_id:     BIGINT
+  text:        VARCHAR(280)
+  media_urls:  JSON
+  created_at:  TIMESTAMP
+  reply_to:    BIGINT NULL
+  retweet_of:  BIGINT NULL
+  like_count:  INT (eventually consistent counter)
+  rt_count:    INT
+}
+
+// ═══ Social Graph (who follows whom) ═══
+follows {
+  follower_id:  BIGINT
+  followee_id:  BIGINT
+  created_at:   TIMESTAMP
+}
+-- Index: (followee_id) → get all followers (for fan-out)
+-- Index: (follower_id) → get all following (for timeline merge)
+
+// ═══ Celebrity List (cached) ═══
+celebrities: SET of user_ids with followers > 10K
+-- Updated hourly, cached in memory on fan-out workers</code></pre>
+</div>
+
+<!-- ═══ RESILIENCE ═══ -->
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Fan-out worker lag</span></td><td>Tweets delayed for some followers</td><td>Acceptable: eventual delivery. Auto-scale workers on Kafka lag.</td></tr>
+<tr><td><span class="hr">Redis node failure</span></td><td>Timeline cache lost for shard</td><td>Rebuild from DB: query follows → fetch recent tweets → populate cache (~30s cold start)</td></tr>
+<tr><td><span class="hr">Celebrity tweets during event</span></td><td>Could overwhelm read path</td><td>Pre-compute celebrity timelines, cache aggressively, CDN for trending tweets</td></tr>
+<tr><td><span class="hr">New follower of celebrity</span></td><td>Missing old tweets in timeline</td><td>On follow: backfill last N tweets from celebrity into follower's timeline</td></tr>
+<tr><td><span class="hr">User unfollows</span></td><td>Stale tweets in timeline</td><td>Lazy removal: filter at read time. Async cleanup in background.</td></tr>
+</table>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack &amp; Tradeoffs</h2>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Why</th><th>Rejected</th></tr>
+<tr><td><span class="hi">Timeline Cache</span></td><td>Redis Cluster (sorted sets)</td><td>Sub-ms reads, atomic ZADD, TTL, sharding</td><td>Memcached (no sorted sets), DynamoDB (higher latency)</td></tr>
+<tr><td><span class="hi">Tweet Store</span></td><td>Manhattan (Twitter's KV) / MySQL</td><td>Sharded by tweet_id, high write throughput</td><td>Cassandra (less familiar), PostgreSQL (single-node limits)</td></tr>
+<tr><td><span class="hi">Fan-out Queue</span></td><td>Kafka</td><td>Durable, replayable, handles 500K tweets/sec</td><td>RabbitMQ (no replay), SQS (no ordering)</td></tr>
+<tr><td><span class="hi">Social Graph</span></td><td>FlockDB (Twitter's graph DB)</td><td>Optimized for follower lookups, sharded</td><td>Neo4j (doesn't scale), MySQL (slow for graph traversal)</td></tr>
+<tr><td><span class="hi">Ranking</span></td><td>ML model (TensorFlow Serving)</td><td>Personalized relevance scoring per user</td><td>Chronological only (lower engagement)</td></tr>
+<tr><td><span class="hi">Real-time Push</span></td><td>WebSocket / Server-Sent Events</td><td>New tweets appear without refresh</td><td>Polling (wasteful, laggy)</td></tr>
+</table>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 8 things to say for timeline/feed design</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Hybrid fan-out</strong> — write for normal users (&lt;10K followers), read for celebrities (&gt;10K)<br>
+<span class="hg">2.</span> <strong>Redis sorted set per user</strong> — score=timestamp, ZREVRANGE for latest, trim to 800<br>
+<span class="hg">3.</span> <strong>Fan-out workers consume from Kafka</strong> — tweet event → lookup followers → ZADD to each timeline<br>
+<span class="hg">4.</span> <strong>Celebrity merge at read time</strong> — query "my celebrity follows" → fetch their recent tweets → merge + rank<br>
+<span class="hg">5.</span> <strong>ML ranking</strong> — not purely chronological. Score by relevance, engagement prediction, recency<br>
+<span class="hg">6.</span> <strong>Cache hit rate ~99%</strong> — active users' timelines always warm. Cold start on first login after long absence.<br>
+<span class="hg">7.</span> <strong>Social graph sharded by user_id</strong> — follower lookup is the hot path during fan-out<br>
+<span class="hg">8.</span> <strong>Engagement counters eventually consistent</strong> — likes/RTs updated async, not blocking delivery
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,229 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Twitter generate 100K+ unique time-sorted IDs/sec without coordination? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Twitter generate 100K+ unique time-sorted IDs/sec without coordination?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">❄️</span> Design a distributed ID generator: 100K+ IDs/sec, 64-bit, time-sortable, 1000+ nodes, zero collisions</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a distributed ID generation system produce 100K+ unique, time-sortable 64-bit IDs per second across 1000+ nodes with zero coordination between them and guaranteed zero collisions?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Need IDs that are <span class="hg">globally unique</span> (no central coordinator), <span class="hg">time-sortable</span> (newer IDs > older IDs for timeline ordering), <span class="hg">compact</span> (64-bit, fits in a long), and generated at <span class="hg">100K+/sec</span> per node without any cross-node communication.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">100K+</div>
+<div style="font-size:.72rem;color:var(--muted)">IDs generated / sec</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">64-bit</div>
+<div style="font-size:.72rem;color:var(--muted)">compact, fits in long</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">1000+</div>
+<div style="font-size:.72rem;color:var(--muted)">nodes, no coordination</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">Zero</div>
+<div style="font-size:.72rem;color:var(--muted)">collisions guaranteed</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture</h2>
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Snowflake ID generation end-to-end architecture">
+  <defs><marker id="sf-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ LAYER 1: ID STRUCTURE — 64-bit layout ═══ -->
+  <rect x="10" y="8" width="760" height="120" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: ID STRUCTURE — 64-bit Snowflake Layout</text>
+
+  <!-- Bit-width colored bars -->
+  <rect x="30" y="32" width="720" height="70" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+
+  <!-- Sign bit bar -->
+  <rect x="45" y="42" width="14" height="30" rx="3" fill="rgba(108,140,255,.2)" stroke="var(--a)" stroke-width="1"/>
+  <text x="52" y="60" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">0</text>
+  <text x="52" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">1 bit</text>
+  <text x="52" y="92" text-anchor="middle" fill="var(--a)" font-size="5">sign</text>
+
+  <!-- Timestamp bar (41 bits — widest) -->
+  <rect x="68" y="42" width="340" height="30" rx="3" fill="rgba(52,211,153,.18)" stroke="var(--g)" stroke-width="1"/>
+  <text x="238" y="60" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">41 bits — timestamp (ms since custom epoch)</text>
+  <text x="238" y="80" text-anchor="middle" fill="var(--g)" font-size="5.5">2^41 ms ≈ 69.7 years before overflow</text>
+  <text x="238" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">MSB position → IDs naturally sort by creation time</text>
+
+  <!-- Node ID bar (10 bits) -->
+  <rect x="418" y="42" width="140" height="30" rx="3" fill="rgba(248,113,113,.18)" stroke="var(--r)" stroke-width="1"/>
+  <text x="488" y="60" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">10 bits — node_id</text>
+  <text x="488" y="80" text-anchor="middle" fill="var(--r)" font-size="5.5">2^10 = 1024 unique nodes</text>
+  <text x="488" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">assigned at deploy via ZooKeeper</text>
+
+  <!-- Sequence bar (12 bits) -->
+  <rect x="568" y="42" width="160" height="30" rx="3" fill="rgba(251,191,36,.18)" stroke="var(--y)" stroke-width="1"/>
+  <text x="648" y="60" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">12 bits — sequence</text>
+  <text x="648" y="80" text-anchor="middle" fill="var(--y)" font-size="5.5">2^12 = 4096 IDs/ms/node</text>
+  <text x="648" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">resets to 0 each millisecond</text>
+
+  <!-- Width labels -->
+  <text x="52" y="104" text-anchor="middle" fill="var(--muted)" font-size="4.5">1/64</text>
+  <text x="238" y="104" text-anchor="middle" fill="var(--muted)" font-size="4.5">41/64 (64%)</text>
+  <text x="488" y="104" text-anchor="middle" fill="var(--muted)" font-size="4.5">10/64 (16%)</text>
+  <text x="648" y="104" text-anchor="middle" fill="var(--muted)" font-size="4.5">12/64 (19%)</text>
+
+  <!-- ═══ LAYER 2: GENERATION — Independent Nodes ═══ -->
+  <rect x="10" y="135" width="760" height="155" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="150" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: GENERATION — Independent Nodes (No Cross-Node Communication)</text>
+
+  <!-- Node 1 -->
+  <rect x="30" y="160" width="180" height="80" rx="6" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="120" y="177" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Node 1 (ID=001)</text>
+  <text x="120" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">generates IDs locally</text>
+  <text x="120" y="205" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">seq: 0, 1, 2 ... 4095</text>
+  <text x="120" y="218" text-anchor="middle" fill="var(--muted)" font-size="5">local clock + atomic counter</text>
+  <text x="120" y="232" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">4096 IDs/ms capacity</text>
+
+  <!-- Node 2 -->
+  <rect x="230" y="160" width="180" height="80" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="320" y="177" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Node 2 (ID=002)</text>
+  <text x="320" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">generates IDs locally</text>
+  <text x="320" y="205" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">seq: 0, 1, 2 ... 4095</text>
+  <text x="320" y="218" text-anchor="middle" fill="var(--muted)" font-size="5">local clock + atomic counter</text>
+  <text x="320" y="232" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">4096 IDs/ms capacity</text>
+
+  <!-- Node N -->
+  <rect x="430" y="160" width="180" height="80" rx="6" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="520" y="177" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Node N (ID=999)</text>
+  <text x="520" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">generates IDs locally</text>
+  <text x="520" y="205" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">seq: 0, 1, 2 ... 4095</text>
+  <text x="520" y="218" text-anchor="middle" fill="var(--muted)" font-size="5">local clock + atomic counter</text>
+  <text x="520" y="232" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">4096 IDs/ms capacity</text>
+
+  <!-- ZooKeeper -->
+  <rect x="640" y="160" width="115" height="80" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="697" y="177" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">ZooKeeper</text>
+  <text x="697" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">assigns node_ids</text>
+  <text x="697" y="205" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">at deploy time only</text>
+  <text x="697" y="218" text-anchor="middle" fill="var(--muted)" font-size="5">one-time coordination</text>
+  <text x="697" y="232" text-anchor="middle" fill="var(--muted)" font-size="5">no runtime calls</text>
+
+  <!-- Arrows from ZK to nodes -->
+  <line x1="640" y1="180" x2="610" y2="180" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#sf-arr)"/>
+  <line x1="640" y1="200" x2="410" y2="200" stroke="var(--y)" stroke-width=".5" stroke-dasharray="3,2" marker-end="url(#sf-arr)"/>
+  <line x1="640" y1="220" x2="210" y2="220" stroke="var(--y)" stroke-width=".5" stroke-dasharray="3,2" marker-end="url(#sf-arr)"/>
+
+  <!-- "No network" labels -->
+  <text x="320" y="260" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">← zero network calls during ID generation →</text>
+  <text x="697" y="260" text-anchor="middle" fill="var(--y)" font-size="5">deploy-time only</text>
+
+  <!-- ═══ LAYER 3: GUARANTEES ═══ -->
+  <rect x="10" y="295" width="760" height="155" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="310" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: GUARANTEES — Uniqueness + Clock Skew + Comparison</text>
+
+  <!-- Uniqueness boxes -->
+  <rect x="30" y="320" width="220" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="140" y="336" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Same ms + Same node</text>
+  <text x="140" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ sequence # differs (0,1,2...4095)</text>
+  <text x="140" y="363" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">unique by local seq counter</text>
+
+  <rect x="265" y="320" width="220" height="55" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="375" y="336" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Same ms + Diff node</text>
+  <text x="375" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ node_id bits differ (001 vs 002)</text>
+  <text x="375" y="363" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">unique by node assignment</text>
+
+  <rect x="500" y="320" width="220" height="55" rx="5" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="610" y="336" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Diff ms (any node)</text>
+  <text x="610" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ timestamp bits differ</text>
+  <text x="610" y="363" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">unique by time (MSB)</text>
+
+  <!-- Clock Skew Handling -->
+  <rect x="30" y="385" width="300" height="55" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
+  <text x="180" y="401" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Clock Skew Handling</text>
+  <text x="180" y="415" text-anchor="middle" fill="var(--muted)" font-size="5.5">NTP backward jump detected → REFUSE generation</text>
+  <text x="180" y="428" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">wait until clock catches up to last seen ms</text>
+  <text x="180" y="440" text-anchor="middle" fill="var(--muted)" font-size="5">prevents duplicate timestamps across restarts</text>
+
+  <!-- Comparison table -->
+  <rect x="345" y="385" width="410" height="55" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="550" y="401" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Comparison: Snowflake vs UUID vs Auto-Inc vs ULID</text>
+  <text x="550" y="415" text-anchor="middle" fill="var(--g)" font-size="5.5">Snowflake: 64-bit, sortable, no coord, needs node_id mgmt</text>
+  <text x="550" y="428" text-anchor="middle" fill="var(--r)" font-size="5.5">UUID v4: 128-bit, NOT sortable, no coord, poor index locality</text>
+  <text x="550" y="440" text-anchor="middle" fill="var(--muted)" font-size="5.5">Auto-Inc: sortable, SPOF | ULID: 128-bit, sortable, no coord</text>
+
+  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <rect x="10" y="458" width="760" height="35" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">4096 IDs/ms/node = 4M/sec | 69 years before overflow | time-sortable (timestamp in MSB) | no coordination during generation</text>
+  <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="5.5">1024 nodes × 4M IDs/sec = 4B IDs/sec total cluster capacity | Custom epoch extends usable lifetime | Compact 8-byte fits in DB BIGINT</text>
+</svg>
+
+<div class="b bg"><span class="hi">Bit layout:</span> 1 bit sign + 41 bits timestamp (ms since custom epoch, ~69 years) + 10 bits node ID (1024 machines) + 12 bits sequence (4096 IDs/ms/node). <span class="hg">Total capacity: 4M IDs/sec/node</span>. Time-sortable because timestamp is the most significant bits.</div>
+<div class="b by"><span class="hi">Zero coordination:</span> Each node has a unique node_id (assigned at deploy via ZooKeeper/config). Within the same millisecond, sequence counter increments locally. <span class="hg">Different nodes can never collide</span> because their node_id bits differ. No network calls needed during ID generation.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">UUID v4 (128-bit random)</span> — not sortable, wastes space, poor index locality. <span class="hr">Auto-increment DB</span> — single point of failure, not distributed. <span class="hr">Timestamp-only</span> — collisions within same ms. <span class="hr">No clock monotonicity check</span> — NTP jumps cause duplicate timestamps.</div>
+<div class="b bb"><span class="hi">Clock skew handling:</span> If system clock moves backward (NTP adjustment), the generator <span class="hg">refuses to generate IDs</span> until clock catches up — prevents duplicate timestamps. Some implementations use logical clocks or wait. Critical for correctness guarantee.</div>
+
+<!-- ═══ ID Comparison SVG ═══ -->
+<svg width="100%" viewBox="0 0 680 90" style="max-width:680px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Comparison of ID generation strategies">
+  <text x="340" y="12" text-anchor="middle" fill="var(--muted)" font-size="6.5" font-weight="700">ID Strategy Comparison</text>
+  <rect x="10" y="20" width="160" height="55" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="90" y="34" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Snowflake (64-bit)</text>
+  <text x="90" y="46" text-anchor="middle" fill="var(--g)" font-size="5">✓ Time-sortable</text>
+  <text x="90" y="56" text-anchor="middle" fill="var(--g)" font-size="5">✓ Compact (8 bytes)</text>
+  <text x="90" y="66" text-anchor="middle" fill="var(--g)" font-size="5">✓ No coordination</text>
+  <text x="90" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">✗ Needs node_id mgmt</text>
+
+  <rect x="180" y="20" width="160" height="55" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="260" y="34" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">UUID v4 (128-bit)</text>
+  <text x="260" y="46" text-anchor="middle" fill="var(--r)" font-size="5">✗ Not sortable</text>
+  <text x="260" y="56" text-anchor="middle" fill="var(--r)" font-size="5">✗ 16 bytes (2× larger)</text>
+  <text x="260" y="66" text-anchor="middle" fill="var(--g)" font-size="5">✓ No coordination</text>
+  <text x="260" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">✗ Poor index locality</text>
+
+  <rect x="350" y="20" width="160" height="55" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
+  <text x="430" y="34" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Auto-Increment DB</text>
+  <text x="430" y="46" text-anchor="middle" fill="var(--g)" font-size="5">✓ Sortable, sequential</text>
+  <text x="430" y="56" text-anchor="middle" fill="var(--g)" font-size="5">✓ Compact</text>
+  <text x="430" y="66" text-anchor="middle" fill="var(--r)" font-size="5">✗ Single point of failure</text>
+  <text x="430" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">✗ Not distributed</text>
+
+  <rect x="520" y="20" width="150" height="55" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="595" y="34" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">ULID (128-bit)</text>
+  <text x="595" y="46" text-anchor="middle" fill="var(--g)" font-size="5">✓ Time-sortable</text>
+  <text x="595" y="56" text-anchor="middle" fill="var(--r)" font-size="5">✗ 16 bytes</text>
+  <text x="595" y="66" text-anchor="middle" fill="var(--g)" font-size="5">✓ No coordination</text>
+  <text x="595" y="76" text-anchor="middle" fill="var(--a2)" font-size="4.5">Lexicographically sortable</text>
+</svg>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>64-bit layout</strong> — 41 timestamp + 10 node_id + 12 sequence = time-sortable, unique, compact<br>
+<span class="hg">2.</span> <strong>No coordination</strong> — node_id assigned once, all generation is local (no network calls)<br>
+<span class="hg">3.</span> <strong>Time-sortable</strong> — timestamp in MSB means IDs naturally sort by creation time<br>
+<span class="hg">4.</span> <strong>Capacity</strong> — 4096 IDs/ms/node = 4M/sec/node, 1024 nodes = 4B IDs/sec total<br>
+<span class="hg">5.</span> <strong>Clock skew</strong> — refuse generation on backward clock jump, wait for catch-up<br>
+<span class="hg">6.</span> <strong>Trade-offs vs UUID</strong> — smaller (64 vs 128 bit), sortable, but requires node_id management
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

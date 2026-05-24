@@ -1,4 +1,4 @@
-/* Unified Blog Theme - Vivid Slate */
+﻿/* Unified Blog Theme - Vivid Slate */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root{
@@ -49,47 +49,57 @@ b,strong{color:#fff;font-weight:600}
 /* ── Site Header / Navigation ─────────────────────────────────── */
 .sh{
   position:sticky;top:0;z-index:200;
-  background:rgba(15,17,23,.92);
-  backdrop-filter:blur(12px);
-  border-bottom:1px solid rgba(255,255,255,.06);
-  padding:0 28px;
+  background:rgba(15,17,23,.95);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(47,53,72,.4);
   display:flex;align-items:center;justify-content:space-between;
-  height:52px;
+  padding:0 24px;
+  height:54px;
 }
 .sh-brand{
-  font-size:.95rem;font-weight:700;color:var(--text);
-  text-decoration:none;letter-spacing:-.02em;
+  font-size:1.05rem;font-weight:800;color:var(--text);
+  text-decoration:none;letter-spacing:-.03em;
+  
 }
 .sh-brand:hover{color:var(--a);text-decoration:none}
-.sh-nav{display:flex;align-items:center;gap:4px}
+.sh-brand{display:flex;align-items:center;gap:8px}
+.sh-logo{flex-shrink:0}
+@keyframes shLogoSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+.sh-nav{display:flex;align-items:center;gap:2px}
 .sh-link{
-  padding:6px 14px;border-radius:6px;
-  color:var(--muted);text-decoration:none;font-weight:500;font-size:.82rem;
+  padding:7px 14px;border-radius:8px;
+  color:var(--muted);text-decoration:none;font-weight:500;font-size:.8rem;
   transition:color .15s,background .15s;
+  
 }
-.sh-link:hover{color:var(--text);background:rgba(255,255,255,.05);text-decoration:none}
-.sh-active{color:var(--text);background:rgba(255,255,255,.07)}
-.sh-active:hover{background:rgba(255,255,255,.1)}
+.sh-link:hover{color:var(--text);background:rgba(255,255,255,.06);text-decoration:none}
+
+.sh-active{color:#fff;background:rgba(108,140,255,.12);font-weight:600}
+.sh-active:hover{background:rgba(108,140,255,.18)}
 
 /* Mobile */
 .sh-toggle{display:none;background:none;border:none;color:var(--text);font-size:1.3rem;cursor:pointer;padding:6px}
 @media(max-width:700px){
   .sh{padding:0 16px;flex-wrap:wrap;height:auto;padding-top:10px;padding-bottom:10px}
   .sh-toggle{display:block}
-  .sh-nav{display:none;width:100%;padding-top:8px;flex-direction:column;align-items:stretch;gap:2px}
+  .sh-nav{display:none;width:100%;padding-top:8px;flex-direction:column;align-items:stretch;gap:2px;order:3}
   .sh-nav.sh-open{display:flex}
-  .sh-link{text-align:center;padding:10px 14px}
+  .sh-link{text-align:center;padding:10px 14px;justify-content:center}
+}
 }
 
 /* ── Hero ─────────────────────────────────────────────────────── */
 .hero{
-  text-align:center;padding:48px 24px 32px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:40px 24px 28px;
   background:var(--bg-2);
   border-bottom:1px solid var(--border);
+  width:100%;
 }
-.hero h1{font-size:2.1rem;font-weight:700;letter-spacing:-.015em;color:#fff}
-.hero h1 span{color:var(--a)}
-.hero p{color:var(--muted);margin-top:10px;font-size:.95rem}
+.hero h1{font-size:1.8rem;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0;width:100%;text-align:center}
+.hero h1 span{background:linear-gradient(to right,var(--a),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--muted);margin-top:8px;font-size:.88rem;line-height:1.5;width:100%;text-align:center}
 
 /* ── Module nav grid (top) ────────────────────────────────────── */
 .ng{
@@ -296,7 +306,7 @@ pre code{background:none;padding:0;border:none;color:inherit}
 #pageRail.pr-visible{display:block;transform:none;opacity:1}
 #pageRail h4{
   margin:0 0 10px;font-size:.7rem;letter-spacing:.7px;text-transform:uppercase;
-  color:var(--a);font-weight:700;display:flex;align-items:center;gap:6px;
+  color:var(--a);font-weight:700;
   padding-bottom:8px;border-bottom:1px solid var(--border);
 }
 #pageRail h4 .pr-dot{width:6px;height:6px;border-radius:50%;background:var(--a)}
@@ -424,8 +434,8 @@ pre code{background:none;padding:0;border:none;color:inherit}
 
 /* ── Responsive ───────────────────────────────────────────────── */
 @media(max-width:900px){
-  .hero{padding:36px 16px 24px}
-  .hero h1{font-size:1.6rem}
+  .hero{padding:32px 16px 20px}
+  .hero h1{font-size:1.5rem}
   .ng{column-width:220px;padding:14px 16px}
   .ct{padding:0 16px 60px}
   .sd{margin:28px 0 18px;padding:10px 14px;font-size:.95rem}

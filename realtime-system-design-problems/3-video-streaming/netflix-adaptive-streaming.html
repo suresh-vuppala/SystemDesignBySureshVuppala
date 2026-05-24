@@ -1,0 +1,206 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Netflix deliver 4K without buffering to 230M users? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Netflix deliver 4K HDR video without buffering to 230M+ subscribers globally?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🎬</span> Design adaptive bitrate streaming for 230M users with &lt;0.1% rebuffer rate</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a streaming platform deliver 4K HDR video to 230M+ subscribers globally without buffering, adapting quality in real-time to each viewer's bandwidth while minimizing rebuffer events to &lt;0.1% of sessions?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A user's bandwidth fluctuates constantly (WiFi → cellular → tunnel). The player must <span class="hr">predict bandwidth, pre-buffer segments, and switch quality seamlessly</span> — all without visible artifacts or interruption.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">230M+</div>
+<div style="font-size:.72rem;color:var(--muted)">subscribers</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">190+ countries</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;0.1%</div>
+<div style="font-size:.72rem;color:var(--muted)">rebuffer rate</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">target per session</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">15%+</div>
+<div style="font-size:.72rem;color:var(--muted)">of global internet traffic</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">peak hours</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">8+</div>
+<div style="font-size:.72rem;color:var(--muted)">quality levels</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">240p → 4K HDR</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>High-Level Architecture</h2>
+<p class="su">Content preparation → CDN distribution → adaptive client playback</p>
+
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Netflix adaptive streaming end-to-end architecture">
+  <defs><marker id="nf-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ LAYER 1: ENCODING ═══ -->
+  <rect x="10" y="8" width="760" height="140" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: ENCODING — Upload → Transcoding Pipeline (~1200 versions per title)</text>
+
+  <rect x="25" y="35" width="100" height="95" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="75" y="52" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Upload</text>
+  <text x="75" y="66" text-anchor="middle" fill="var(--muted)" font-size="5.5">mezzanine file</text>
+  <text x="75" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">(master quality)</text>
+  <text x="75" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">4K HDR source</text>
+  <text x="75" y="105" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">uncompressed</text>
+  <text x="75" y="118" text-anchor="middle" fill="var(--muted)" font-size="5">~100GB/title</text>
+
+  <line x1="125" y1="80" x2="155" y2="80" stroke="var(--a)" stroke-width="1.2" marker-end="url(#nf-arr)"/>
+
+  <rect x="160" y="35" width="310" height="95" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="315" y="52" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Transcoding Pipeline</text>
+  <text x="315" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">8+ resolutions (240p → 4K) × 3 codecs (H.264, H.265, AV1)</text>
+  <text x="315" y="80" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">× HDR variants (SDR, HDR10, Dolby Vision)</text>
+  <text x="315" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">= ~1200 encoded versions per title</text>
+  <text x="315" y="106" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">per-shot encoding (VMAF optimized per scene)</text>
+  <text x="315" y="119" text-anchor="middle" fill="var(--muted)" font-size="5">priority: live events > new releases > VOD catalog</text>
+
+  <line x1="470" y1="80" x2="500" y2="80" stroke="var(--r)" stroke-width="1.2" marker-end="url(#nf-arr)"/>
+
+  <rect x="505" y="35" width="250" height="95" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="630" y="52" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Output Artifacts</text>
+  <text x="630" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">2-4 second segments (chunked)</text>
+  <text x="630" y="80" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">HLS/DASH manifest (quality ladder)</text>
+  <text x="630" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">DRM encrypted (Widevine/FairPlay/PlayReady)</text>
+  <text x="630" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">per-title bitrate ladder (custom per content)</text>
+  <text x="630" y="119" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">animation: less bitrate than action</text>
+
+  <!-- ═══ LAYER 2: DELIVERY ═══ -->
+  <rect x="10" y="155" width="760" height="140" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="170" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: DELIVERY — CDN (Open Connect, 17K+ edge servers) → Adaptive Bitrate Selection</text>
+
+  <rect x="25" y="180" width="340" height="100" rx="6" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="195" y="197" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Open Connect CDN</text>
+  <text x="195" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">17,000+ edge servers in 6000+ ISP locations</text>
+  <text x="195" y="225" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">95%+ traffic served from edge (in-ISP)</text>
+  <text x="195" y="238" text-anchor="middle" fill="var(--muted)" font-size="5.5">pre-positioned during off-peak (predict popularity)</text>
+  <text x="195" y="251" text-anchor="middle" fill="var(--muted)" font-size="5">tiered: edge → regional → origin (S3)</text>
+  <text x="195" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">100+ Tbps total capacity, BGP anycast routing</text>
+  <text x="195" y="277" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">zero transit cost (embedded in ISP)</text>
+
+  <line x1="365" y1="230" x2="395" y2="230" stroke="var(--o)" stroke-width="1.2" marker-end="url(#nf-arr)"/>
+
+  <rect x="400" y="180" width="360" height="100" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="580" y="197" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Adaptive Bitrate (HLS/DASH)</text>
+  <text x="580" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">manifest lists all quality levels + segment URLs</text>
+  <text x="580" y="225" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">client picks quality based on bandwidth estimate</text>
+  <text x="580" y="238" text-anchor="middle" fill="var(--muted)" font-size="5.5">EWMA bandwidth estimation (last N segments)</text>
+  <text x="580" y="251" text-anchor="middle" fill="var(--muted)" font-size="5">buffer-based: low buffer → drop quality aggressively</text>
+  <text x="580" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">hysteresis: avoid oscillating between levels</text>
+  <text x="580" y="277" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">seamless mid-stream quality switch</text>
+
+  <!-- ═══ LAYER 3: PLAYBACK ═══ -->
+  <rect x="10" y="302" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="317" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: PLAYBACK — Client Player (buffer-based ABR) → Quality Metrics → Telemetry</text>
+
+  <rect x="25" y="327" width="340" height="105" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="195" y="344" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Client Player (ABR Engine)</text>
+  <text x="195" y="359" text-anchor="middle" fill="var(--muted)" font-size="5.5">buffer-based + throughput-based hybrid algorithm</text>
+  <text x="195" y="372" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">bandwidth estimation (EWMA of segment downloads)</text>
+  <text x="195" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">seamless quality switch mid-stream (no interruption)</text>
+  <text x="195" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">pre-buffer next episode (predictive prefetch)</text>
+  <text x="195" y="411" text-anchor="middle" fill="var(--muted)" font-size="5">start conservative (fast start) → ramp up quality</text>
+  <text x="195" y="424" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">device-aware: no 4K to phone on cellular</text>
+
+  <rect x="400" y="327" width="360" height="105" rx="6" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="580" y="344" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Quality Metrics &amp; Telemetry</text>
+  <text x="580" y="359" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">rebuffer rate &lt;0.1% (key SLA)</text>
+  <text x="580" y="372" text-anchor="middle" fill="var(--muted)" font-size="5.5">time to first frame &lt;2 seconds</text>
+  <text x="580" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">per-segment: bitrate, buffer level, VMAF score</text>
+  <text x="580" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">real-time dashboards + ML for ABR improvement</text>
+  <text x="580" y="411" text-anchor="middle" fill="var(--muted)" font-size="5">A/B test ABR algorithms per device cohort</text>
+  <text x="580" y="424" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">historical BW per user/ISP for start quality</text>
+
+  <!-- Feedback arrow -->
+  <path d="M 580 327 L 580 295 L 195 295 L 195 280" fill="none" stroke="var(--a2)" stroke-width=".7" stroke-dasharray="3,2" marker-end="url(#nf-arr)"/>
+  <text x="390" y="290" text-anchor="middle" fill="var(--a2)" font-size="5">telemetry feeds CDN steering + ABR tuning</text>
+
+  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <rect x="10" y="455" width="760" height="38" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="390" y="470" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Per-title encoding: animation needs less bitrate than action | Buffer-based: switch quality on buffer level not just bandwidth</text>
+  <text x="390" y="486" text-anchor="middle" fill="var(--muted)" font-size="5.5">15%+ of global internet traffic at peak | 17K+ edge servers | &lt;0.1% rebuffer | ~1200 encodes/title | AV1 = 30% better compression</text>
+</svg>
+</div>
+
+<!-- ═══ ABR ALGORITHM ═══ -->
+<div class="T" id="abr">
+<h2>Adaptive Bitrate (ABR) Algorithm</h2>
+<p class="su">The client-side brain that decides quality for each segment</p>
+
+<table>
+<tr><th>Signal</th><th>What It Measures</th><th>How It's Used</th></tr>
+<tr><td><span class="hi">Throughput</span></td><td>Download speed of last N segments (EWMA)</td><td>Upper bound on selectable bitrate</td></tr>
+<tr><td><span class="hi">Buffer Level</span></td><td>Seconds of video buffered ahead</td><td>Low buffer → drop quality aggressively</td></tr>
+<tr><td><span class="hi">VMAF Score</span></td><td>Perceptual quality metric per encode</td><td>Choose encode with best quality/bitrate ratio</td></tr>
+<tr><td><span class="hi">Device</span></td><td>Screen resolution, HDR capability</td><td>Don't send 4K to a phone on cellular</td></tr>
+<tr><td><span class="hi">Network type</span></td><td>WiFi vs cellular vs ethernet</td><td>More conservative on cellular (data caps)</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Netflix's approach:</span> <span class="hg">Buffer-based + throughput-based hybrid</span>. Start conservative (low quality, fast start). Ramp up as buffer fills. Drop immediately if buffer drains below threshold. <span class="hg">Per-shot encoding</span> means a dark scene at 2Mbps looks as good as a bright scene at 8Mbps — ABR picks the optimal encode per scene.</div>
+<div class="b by"><span class="hi">Key metrics:</span> <span class="hg">Time to first frame</span> &lt;2s. <span class="hg">Rebuffer rate</span> &lt;0.1%. <span class="hg">Quality switches</span> minimized (hysteresis). <span class="hg">Start bitrate</span> based on historical bandwidth for that user/device/ISP.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Throughput-only ABR</span> — oscillates wildly. <span class="hr">Fixed quality</span> — buffers on slow networks. <span class="hr">No hysteresis</span> — constant quality switching is jarring. <span class="hr">Same encode ladder for all content</span> — wastes bits on simple scenes.</div>
+</div>
+
+<!-- ═══ SCALING ═══ -->
+<div class="T" id="scaling">
+<h2>Scaling & Key Decisions</h2>
+<table>
+<tr><th>Challenge</th><th>Netflix Solution</th><th>Why</th></tr>
+<tr><td><span class="hi">Global delivery</span></td><td>Open Connect (own CDN in ISPs)</td><td>Lower latency than third-party CDN, no transit costs</td></tr>
+<tr><td><span class="hi">Encoding cost</span></td><td>Per-shot encoding + VMAF optimization</td><td>20% bandwidth savings at same quality</td></tr>
+<tr><td><span class="hi">Peak traffic</span></td><td>Proactive cache fill (predict what's popular)</td><td>Pre-position content before demand spike</td></tr>
+<tr><td><span class="hi">DRM</span></td><td>Widevine (Android/Chrome), FairPlay (Apple), PlayReady (Windows)</td><td>Studio requirements for premium content</td></tr>
+<tr><td><span class="hi">Codec evolution</span></td><td>AV1 (newest), VP9, H.265, H.264 (legacy)</td><td>AV1 = 30% better compression, rolling out per device</td></tr>
+<tr><td><span class="hi">Personalization</span></td><td>Different artwork + trailers per user</td><td>A/B tested thumbnails increase click-through 20-30%</td></tr>
+</table>
+
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Netflix</strong> serves 15%+ of global internet traffic at peak. <strong>Open Connect</strong> has 17,000+ servers. <strong>Per-shot encoding</strong> saved 20% bandwidth. <strong>AV1 codec</strong> rolling out for 30% more compression. Each title encoded into <strong>~1200 versions</strong> (resolution × bitrate × codec × HDR).</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 8 things to say for video streaming design</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Adaptive Bitrate (ABR)</strong> — client measures bandwidth, requests appropriate quality segment<br>
+<span class="hg">2.</span> <strong>HLS/DASH manifest</strong> — playlist of segment URLs at multiple quality levels, client picks<br>
+<span class="hg">3.</span> <strong>CDN (Open Connect)</strong> — 17K+ edge servers, content pre-positioned during off-peak<br>
+<span class="hg">4.</span> <strong>Per-title encoding</strong> — each title gets custom bitrate ladder (animation needs less than action)<br>
+<span class="hg">5.</span> <strong>Buffer-based algorithm</strong> — switch quality based on buffer level, not just bandwidth estimate<br>
+<span class="hg">6.</span> <strong>Rebuffer rate &lt;0.1%</strong> — the key quality metric (users leave after 2s of buffering)<br>
+<span class="hg">7.</span> <strong>Pre-positioning popular content</strong> — push to edge during off-peak, serve locally at peak<br>
+<span class="hg">8.</span> <strong>Multi-codec strategy</strong> — H.264 (compatibility) → H.265 (4K) → AV1 (next-gen, 30% savings)
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

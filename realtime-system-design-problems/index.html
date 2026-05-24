@@ -1,42 +1,44 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Real-Time System Design — 100 Problems & Solutions</title>
+<title>Real-Time System Design — 201 Problems & Solutions</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
+<style>.co-tags{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}.co-tag{font-size:.55rem;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.06);color:var(--muted);font-weight:500;border:1px solid rgba(255,255,255,.08)}</style>
 </head>
 <body>
-<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p>100 Problems & Solutions — Staff / Sr SWE Reference</p></div>
+<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p>201 Problems & Solutions — Staff / Sr SWE Reference</p></div>
 <div class="ct">
 
 <!-- ═══ MODULE 1: Chat & Messaging ═══ -->
 <div class="T" id="mod-chat">
-<h2>1. Chat &amp; Messaging</h2>
+<h2>1. Chat &amp; Messaging <span class="co-tags"><span class="co-tag">WhatsApp</span><span class="co-tag">Slack</span><span class="co-tag">Discord</span><span class="co-tag">Telegram</span></span></h2>
 <p class="su">Real-time delivery, fan-out, presence, ordering at scale — <span class="hg">11 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="slack-real-time-messaging.html">How a real-time chat system can deliver a single message to 50,000 online users within 200ms while handling 10B+ messages per day (~115K msgs/sec, peak ~200K msgs/sec) without hitting scalability bottlenecks?</a></td><td>Slack · 10B msg/day</td></tr>
-<tr><td>2</td><td><a href="01-chat-messaging.html#whatsapp-offline">How does a messaging system guarantee delivery to 2B+ users who go offline for hours/days, ensuring zero message loss, correct ordering on reconnect, and end-to-end encryption without the server ever seeing plaintext?</a></td><td>WhatsApp · 2B users</td></tr>
-<tr><td>3</td><td><a href="01-chat-messaging.html#discord-websockets">How does a chat platform maintain 10M+ concurrent WebSocket connections across thousands of gateway servers, handling heartbeats, shard assignment, graceful failover, and voice signaling without dropping connections?</a></td><td>Discord · millions WS</td></tr>
-<tr><td>4</td><td><a href="01-chat-messaging.html#multi-region-ordering">How does a multi-region chat system guarantee causal message ordering within conversations when an entire cloud region goes down, while maintaining consistency and conflict resolution across geographically distributed nodes?</a></td><td>Multi-region ordering</td></tr>
-<tr><td>5</td><td><a href="01-chat-messaging.html#large-group-fanout">How does a group chat with 1M+ members deliver a single message without causing a fan-out explosion, keeping delivery latency under 2 seconds for all participants regardless of group size?</a></td><td>Telegram · 1M members</td></tr>
-<tr><td>6</td><td><a href="01-chat-messaging.html#presence-100m">How does a presence system track online/offline status for 100M+ concurrent users in real-time, delivering status changes to relevant contacts within seconds without flooding the network with unnecessary updates?</a></td><td>WhatsApp · 100M presence</td></tr>
-<tr><td>7</td><td><a href="01-chat-messaging.html#typing-indicators">How does a chat system handle millions of ephemeral "typing..." events per second without persisting anything to disk, while ensuring sub-100ms delivery to all conversation participants?</a></td><td>Slack · ephemeral events</td></tr>
-<tr><td>8</td><td><a href="01-chat-messaging.html#chat-search">How does a search system index 10B+ messages with &lt;5s indexing latency from send to searchable, and return full-text results in &lt;100ms across the entire message corpus?</a></td><td>Slack · billions msgs search</td></tr>
-<tr><td>9</td><td><a href="01-chat-messaging.html#push-notifications">How does a notification system deliver push notifications to millions of devices without duplicates, handling device token lifecycle, retry logic, and cross-platform delivery (iOS/Android) reliably?</a></td><td>WhatsApp · dedup push</td></tr>
-<tr><td>10</td><td><a href="01-chat-messaging.html#telegram-sync">How does a multi-device messaging app keep messages, read status, and edits perfectly synced across phone/tablet/desktop, resolving conflicts when edits happen simultaneously on different devices?</a></td><td>Telegram · multi-device sync</td></tr>
-<tr><td>11</td><td><a href="01-chat-messaging.html#active-channels">Given message events across millions of channels, design a system that continuously computes the top active channels/users for the last 1 hour without scanning historical data, updating rankings within seconds of activity changes?</a></td><td>Slack · top active channels</td></tr>
+<tr><td>1</td><td><a href="1-chat-messaging/slack-real-time-messaging.html">How a real-time chat system can deliver a single message to 50,000 online users within 200ms while handling 10B+ messages per day (~115K msgs/sec, peak ~200K msgs/sec) without hitting scalability bottlenecks?</a></td><td>Slack · 10B msg/day</td></tr>
+<tr><td>2</td><td><a href="1-chat-messaging/whatsapp-offline-delivery.html">How does a messaging system guarantee delivery to 2B+ users who go offline for hours/days, ensuring zero message loss, correct ordering on reconnect, and end-to-end encryption without the server ever seeing plaintext?</a></td><td>WhatsApp · 2B users</td></tr>
+<tr><td>3</td><td><a href="1-chat-messaging/discord-websocket-infra.html">How does a chat platform maintain 10M+ concurrent WebSocket connections across thousands of gateway servers, handling heartbeats, shard assignment, graceful failover, and voice signaling without dropping connections?</a></td><td>Discord · millions WS</td></tr>
+<tr><td>4</td><td><a href="1-chat-messaging/multi-region-ordering.html">How does a multi-region chat system guarantee causal message ordering within conversations when an entire cloud region goes down, while maintaining consistency and conflict resolution across geographically distributed nodes?</a></td><td>Multi-region ordering</td></tr>
+<tr><td>5</td><td><a href="1-chat-messaging/telegram-large-group-fanout.html">How does a group chat with 1M+ members deliver a single message without causing a fan-out explosion, keeping delivery latency under 2 seconds for all participants regardless of group size?</a></td><td>Telegram · 1M members</td></tr>
+<tr><td>6</td><td><a href="1-chat-messaging/whatsapp-presence-100m.html">How does a presence system track online/offline status for 100M+ concurrent users in real-time, delivering status changes to relevant contacts within seconds without flooding the network with unnecessary updates?</a></td><td>WhatsApp · 100M presence</td></tr>
+<tr><td>7</td><td><a href="1-chat-messaging/slack-typing-indicators.html">How does a chat system handle millions of ephemeral "typing..." events per second without persisting anything to disk, while ensuring sub-100ms delivery to all conversation participants?</a></td><td>Slack · ephemeral events</td></tr>
+<tr><td>8</td><td><a href="1-chat-messaging/slack-chat-search.html">How does a search system index 10B+ messages with &lt;5s indexing latency from send to searchable, and return full-text results in &lt;100ms across the entire message corpus?</a></td><td>Slack · billions msgs search</td></tr>
+<tr><td>9</td><td><a href="1-chat-messaging/whatsapp-push-notifications.html">How does a notification system deliver push notifications to millions of devices without duplicates, handling device token lifecycle, retry logic, and cross-platform delivery (iOS/Android) reliably?</a></td><td>WhatsApp · dedup push</td></tr>
+<tr><td>10</td><td><a href="1-chat-messaging/telegram-multi-device-sync.html">How does a multi-device messaging app keep messages, read status, and edits perfectly synced across phone/tablet/desktop, resolving conflicts when edits happen simultaneously on different devices?</a></td><td>Telegram · multi-device sync</td></tr>
+<tr><td>11</td><td><a href="1-chat-messaging/slack-active-channels.html">Given message events across millions of channels, design a system that continuously computes the top active channels/users for the last 1 hour without scanning historical data, updating rankings within seconds of activity changes?</a></td><td>Slack · top active channels</td></tr>
 </table>
 </div>
 
 <!-- ═══ MODULE 2: Real-Time Collaboration ═══ -->
 <div class="T" id="mod-collab">
-<h2>2. Real-Time Collaboration</h2>
+<h2>2. Real-Time Collaboration <span class="co-tags"><span class="co-tag">Google Docs</span><span class="co-tag">Figma</span><span class="co-tag">Notion</span><span class="co-tag">Miro</span></span></h2>
 <p class="su">Concurrent editing, CRDTs, OT, multiplayer cursors — <span class="hg">7 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="02-collaboration.html">How does a collaborative editor handle 100 users editing the same paragraph simultaneously, resolving conflicting character insertions without a central lock while maintaining convergence across all clients within 50ms?</a></td><td>Google Docs · OT</td></tr>
+<tr><td>1</td><td><a href="2-collaboration/google-docs-collaborative-editing.html">How does a collaborative editor handle 100 users editing the same paragraph simultaneously, resolving conflicting character insertions without a central lock while maintaining convergence across all clients within 50ms?</a></td><td>Google Docs · OT</td></tr>
 <tr><td>2</td><td><a href="02-collaboration.html">How does a design tool render 50+ cursors moving at 60fps in real-time, achieving conflict-free state merge across all clients while keeping bandwidth under 10KB/sec per user?</a></td><td>Figma · CRDTs</td></tr>
 <tr><td>3</td><td><a href="02-collaboration.html">How does a block-based editor sync granular edits (move block, change text, nest) across devices in &lt;100ms, handling concurrent modifications to the same block structure without data loss?</a></td><td>Notion · block sync</td></tr>
 <tr><td>4</td><td><a href="02-collaboration.html">How does a collaborative whiteboard handle 1000+ objects being dragged simultaneously by 50 users, merging conflicting position updates without visual glitches or lost operations?</a></td><td>Miro · spatial CRDT</td></tr>
@@ -48,11 +50,11 @@
 
 <!-- ═══ MODULE 3: Video Streaming ═══ -->
 <div class="T" id="mod-video-stream">
-<h2>3. Video Streaming</h2>
+<h2>3. Video Streaming <span class="co-tags"><span class="co-tag">Netflix</span><span class="co-tag">YouTube</span><span class="co-tag">Twitch</span><span class="co-tag">Spotify</span></span></h2>
 <p class="su">Adaptive bitrate, CDN, transcoding, live vs VOD — <span class="hg">8 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="03-video-streaming.html">How does a streaming platform deliver 4K HDR video to 230M+ subscribers globally without buffering, adapting quality in real-time to each viewer's bandwidth while minimizing rebuffer events to &lt;0.1% of sessions?</a></td><td>Netflix · 230M users</td></tr>
+<tr><td>1</td><td><a href="3-video-streaming/netflix-adaptive-streaming.html">How does a streaming platform deliver 4K HDR video to 230M+ subscribers globally without buffering, adapting quality in real-time to each viewer's bandwidth while minimizing rebuffer events to &lt;0.1% of sessions?</a></td><td>Netflix · 230M users</td></tr>
 <tr><td>2</td><td><a href="03-video-streaming.html">How does a video platform transcode 500+ hours of video uploaded every minute into 8+ resolutions, finishing 4K transcoding in &lt;30 minutes while prioritizing live content over on-demand uploads?</a></td><td>YouTube · 500hr/min</td></tr>
 <tr><td>3</td><td><a href="03-video-streaming.html">How does a live streaming platform deliver video to 5M+ concurrent viewers with &lt;3 second glass-to-glass latency, while also supporting sub-second interactive streams for smaller audiences?</a></td><td>Twitch · live low-latency</td></tr>
 <tr><td>4</td><td><a href="03-video-streaming.html">How does a streaming platform handle 25M concurrent viewers during a single live event, gracefully degrading quality under load while maintaining stream continuity and minimizing regional failures?</a></td><td>Hotstar · 25M concurrent</td></tr>
@@ -65,11 +67,11 @@
 
 <!-- ═══ MODULE 4: Video Calling / WebRTC ═══ -->
 <div class="T" id="mod-video-call">
-<h2>4. Video Calling / WebRTC</h2>
+<h2>4. Video Calling / WebRTC <span class="co-tags"><span class="co-tag">Zoom</span><span class="co-tag">Google Meet</span><span class="co-tag">Discord</span></span></h2>
 <p class="su">P2P, SFU, MCU, signaling, NAT traversal — <span class="hg">6 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="04-video-calling.html">How does a video conferencing system handle 300-person meetings with screen sharing, adapting per-participant video quality in real-time based on available bandwidth while keeping total meeting latency under 200ms?</a></td><td>Zoom · 300 participants</td></tr>
+<tr><td>1</td><td><a href="4-video-calling/zoom-300-person-meeting.html">How does a video conferencing system handle 300-person meetings with screen sharing, adapting per-participant video quality in real-time based on available bandwidth while keeping total meeting latency under 200ms?</a></td><td>Zoom · 300 participants</td></tr>
 <tr><td>2</td><td><a href="04-video-calling.html">How does a video calling platform dynamically switch between peer-to-peer (2 users, lowest latency) and server-relayed (3+ users) topology, performing seamless mid-call migration without audio/video interruption?</a></td><td>Google Meet · adaptive</td></tr>
 <tr><td>3</td><td><a href="04-video-calling.html">How does a voice chat platform handle 100+ users in a single voice channel with &lt;50ms audio latency, selectively mixing only active speakers while maintaining clear audio for all participants?</a></td><td>Discord · voice channels</td></tr>
 <tr><td>4</td><td><a href="04-video-calling.html">How does a real-time communication system establish peer-to-peer connections through NATs and firewalls, discovering public endpoints and falling back to relay when direct connection is impossible, while minimizing connection setup time?</a></td><td>WebRTC · NAT traversal</td></tr>
@@ -80,12 +82,12 @@
 
 <!-- ═══ MODULE 5: Ticket Booking ═══ -->
 <div class="T" id="mod-tickets">
-<h2>5. Ticket Booking</h2>
+<h2>5. Ticket Booking <span class="co-tags"><span class="co-tag">Uber</span><span class="co-tag">Airbnb</span><span class="co-tag">Amazon</span><span class="co-tag">Ticketmaster</span></span></h2>
 <p class="su">Seat locking, double-booking prevention, flash sales — <span class="hg">6 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="05-ticket-booking.html">Design a ticket booking system where 5M users attempt to book 50K concert seats simultaneously, guaranteeing no double booking, fair queue ordering with position tracking, distributed seat locking with expiry, and bot detection?</a></td><td>BookMyShow · 5M users, 50K seats</td></tr>
-<tr><td>2</td><td><a href="05-ticket-booking.html">How does a ride-hailing platform match riders to the nearest available driver within 3 seconds, considering ETA, driver rating, and surge pricing while optimizing for both rider wait time and driver utilization?</a></td><td>Uber · real-time matching</td></tr>
+<tr><td>1</td><td><a href="5-ticket-booking/bookmyshow-concert-booking.html">Design a ticket booking system where 5M users attempt to book 50K concert seats simultaneously, guaranteeing no double booking, fair queue ordering with position tracking, distributed seat locking with expiry, and bot detection?</a></td><td>BookMyShow · 5M users, 50K seats</td></tr>
+<tr><td>2</td><td><a href="05-ticket-booking.html">How does a movie theater chain handle seat selection for 500+ screens simultaneously, showing real-time seat availability updates to thousands of concurrent users while preventing double-booking through optimistic locking with sub-second conflict resolution?</a></td><td>AMC · real-time seat map</td></tr>
 <tr><td>3</td><td><a href="05-ticket-booking.html">How does a rental platform prevent double-booking across time zones when two users in different continents try to book the same dates, detecting and resolving calendar conflicts with automatic resolution?</a></td><td>Airbnb · calendar sync</td></tr>
 <tr><td>4</td><td><a href="05-ticket-booking.html">How do airlines handle seat selection with distributed inventory across 100+ booking channels (website, app, agents, GDS), preventing overselling while maintaining responsive seat availability display?</a></td><td>Airlines · distributed inv</td></tr>
 <tr><td>5</td><td><a href="05-ticket-booking.html">How does a ticketing platform manage 1M+ users in a virtual queue with fair ordering, providing real-time position updates and estimated wait times while preventing bot abuse and queue jumping?</a></td><td>Ticketmaster · queue</td></tr>
@@ -95,27 +97,28 @@
 
 <!-- ═══ MODULE 6: Cache & CDN ═══ -->
 <div class="T" id="mod-cache">
-<h2>6. Cache &amp; CDN</h2>
-<p class="su">Cache invalidation, thundering herd, edge compute — <span class="hg">7 problems</span></p>
+<h2>6. Cache &amp; CDN <span class="co-tags"><span class="co-tag">Cloudflare</span><span class="co-tag">Redis</span><span class="co-tag">Akamai</span></span></h2>
+<p class="su">Cache invalidation, thundering herd, edge compute — <span class="hg">8 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="06-cache-cdn.html">How does a social platform invalidate cached objects across 1000+ servers within 1 second of a write, preventing stale reads while avoiding thundering herd on the backing store?</a></td><td>Meta · TAO cache</td></tr>
+<tr><td>1</td><td><a href="6-cache-cdn/meta-tao-cache-invalidation.html">How does a social platform invalidate cached objects across 1000+ servers within 1 second of a write, preventing stale reads while avoiding thundering herd on the backing store?</a></td><td>Meta · TAO cache</td></tr>
 <tr><td>2</td><td><a href="06-cache-cdn.html">How does a streaming platform prevent thundering herd when a hot cache key expires and 100K requests simultaneously hit the database, ensuring only one request rebuilds the cache while others wait or receive stale data?</a></td><td>Netflix · EVCache</td></tr>
 <tr><td>3</td><td><a href="06-cache-cdn.html">How does an edge network serve 45M+ requests/sec from 300+ PoPs without hitting origin, maximizing cache hit rates through tiered caching and intelligent routing for cache misses?</a></td><td>Cloudflare · edge</td></tr>
 <tr><td>4</td><td><a href="06-cache-cdn.html">How does a social platform cache the home timeline for 400M+ users, handling the asymmetry between normal users (hundreds of followers) and celebrities (100M+ followers) without overwhelming write capacity?</a></td><td>Twitter · timeline cache</td></tr>
 <tr><td>5</td><td><a href="06-cache-cdn.html">How does a distributed cache cluster handle 10M+ ops/sec with automatic failover, completing replica promotion within 2 seconds of node failure while maintaining consistent routing during topology changes?</a></td><td>Redis Cluster · 10M ops/sec</td></tr>
 <tr><td>6</td><td><a href="06-cache-cdn.html">How do CDNs purge cached content globally within 150ms for breaking news updates, invalidating stale content at all edge locations without causing origin overload from simultaneous cache misses?</a></td><td>CDN · instant purge</td></tr>
 <tr><td>7</td><td><a href="06-cache-cdn.html">How does a social platform cache ephemeral content (Stories) that expires after 24 hours, ensuring instant access for sequential viewing while automatically evicting expired content without manual cleanup?</a></td><td>Instagram · TTL cache</td></tr>
+<tr><td>8</td><td><a href="06-cache-cdn.html">How does an edge computing platform execute custom logic (authentication, A/B routing, header manipulation) at 300+ PoPs with &lt;1ms cold start, deploying code changes globally in &lt;30 seconds without origin round-trips?</a></td><td>Cloudflare Workers · edge compute</td></tr>
 </table>
 </div>
 
 <!-- ═══ MODULE 7: Queues & Events ═══ -->
 <div class="T" id="mod-queues">
-<h2>7. Queues &amp; Events</h2>
-<p class="su">Kafka, exactly-once, dead letters, event sourcing, streaming analytics — <span class="hg">11 problems</span></p>
+<h2>7. Queues &amp; Events <span class="co-tags"><span class="co-tag">Kafka</span><span class="co-tag">RabbitMQ</span><span class="co-tag">AWS SQS</span></span></h2>
+<p class="su">Kafka, exactly-once, dead letters, event sourcing, streaming analytics, notifications — <span class="hg">12 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="07-queues-events.html">How does a ride-hailing platform process 1M+ ride events per second with city-level locality, guaranteeing exactly-once processing semantics and computing real-time surge pricing from the event stream?</a></td><td>Uber · Kafka 1M/sec</td></tr>
+<tr><td>1</td><td><a href="7-queues-events/uber-kafka-ride-events.html">How does a ride-hailing platform process 1M+ ride events per second with city-level locality, guaranteeing exactly-once processing semantics and computing real-time surge pricing from the event stream?</a></td><td>Uber · Kafka 1M/sec</td></tr>
 <tr><td>2</td><td><a href="07-queues-events.html">How does a payment platform guarantee exactly-once processing when network retries can duplicate requests, ensuring no double-charges while maintaining at-least-once delivery guarantees from upstream systems?</a></td><td>Stripe · exactly-once</td></tr>
 <tr><td>3</td><td><a href="07-queues-events.html">How does a professional network handle 4 trillion events/day across 100K+ partitions, supporting schema evolution for backward compatibility while auto-scaling consumers based on lag?</a></td><td>LinkedIn · 4T events</td></tr>
 <tr><td>4</td><td><a href="07-queues-events.html">How do you design a dead letter queue that never loses messages, isolating poison messages from healthy processing while providing retry policies, monitoring with alerting, and manual replay tooling for operations?</a></td><td>DLQ · poison messages</td></tr>
@@ -126,16 +129,17 @@
 <tr><td>9</td><td><a href="07-queues-events.html">Given ad impression and click events from billions of daily ad requests, design an analytics system that computes CTR/CPC dashboards per advertiser with less than 1-minute delay from event occurrence to dashboard visibility.</a></td><td>Google Ads · CTR &lt;1min delay</td></tr>
 <tr><td>10</td><td><a href="07-queues-events.html">Given IoT telemetry from 500M smart devices sending events every few seconds, design a real-time anomaly detection system that detects outages/spikes within 10 seconds, maintaining statistical baselines per device and alerting on deviations.</a></td><td>IoT · 500M devices anomaly</td></tr>
 <tr><td>11</td><td><a href="07-queues-events.html">Given repository events (push, fork, PR, issue, star) from millions of repositories, build a "Trending Repositories" system that updates rankings globally every minute, weighting recent activity higher than older activity and segmenting by language/topic.</a></td><td>GitHub · trending repos</td></tr>
+<tr><td>12</td><td><a href="07-queues-events.html">How does a notification orchestration platform decide what to send (push/email/SMS/in-app), when to send it (optimal timing per user), and how to batch/deduplicate across channels — processing 1B+ notification decisions/day with user preference enforcement?</a></td><td>Notification orchestration</td></tr>
 </table>
 </div>
 
 <!-- ═══ MODULE 8: Social Media Feeds ═══ -->
 <div class="T" id="mod-social">
-<h2>8. Social Media Feeds &amp; Recommendations</h2>
+<h2>8. Social Media Feeds &amp; Recommendations <span class="co-tags"><span class="co-tag">X</span><span class="co-tag">Instagram</span><span class="co-tag">TikTok</span><span class="co-tag">Pinterest</span></span></h2>
 <p class="su">Fan-out on write/read, ranking, real-time updates, personalization engines, trending computation — <span class="hg">16 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="08-social-media.html">How does a social platform deliver posts to 400M+ users' timelines in real-time, handling the asymmetry between users with few followers and celebrities with millions, while keeping timeline delivery under 5 seconds?</a></td><td>Twitter · fan-out</td></tr>
+<tr><td>1</td><td><a href="8-social-media/twitter-timeline-fanout.html">How does a social platform deliver posts to 400M+ users' timelines in real-time, handling the asymmetry between users with few followers and celebrities with millions, while keeping timeline delivery under 5 seconds?</a></td><td>Twitter · fan-out</td></tr>
 <tr><td>2</td><td><a href="08-social-media.html">How does a photo-sharing platform rank your feed from millions of candidate posts, balancing relevance, recency, and popularity while maintaining exploration/exploitation balance to avoid filter bubbles?</a></td><td>Instagram · ML ranking</td></tr>
 <tr><td>3</td><td><a href="08-social-media.html">How does a short-video platform learn your preferences within 3 minutes of first use, leveraging real-time engagement signals (watch time, replays, shares) to personalize recommendations for brand-new users with no history?</a></td><td>TikTok · cold-start rec</td></tr>
 <tr><td>4</td><td><a href="08-social-media.html">How does a forum handle nested comments with millions of votes, supporting deep threading, real-time vote counts, and efficient pagination ("load more replies") without N+1 query performance degradation?</a></td><td>Reddit · comment tree</td></tr>
@@ -147,20 +151,20 @@
 <tr><td>10</td><td><a href="08-social-media.html">How does a video platform recommend the next video with 80%+ click-through rate, narrowing candidates from 1B+ videos to a ranked shortlist in &lt;50ms while incorporating real-time watch signals (watch time, skip, replay)?</a></td><td>YouTube · next video rec</td></tr>
 <tr><td>11</td><td><a href="08-social-media.html">Given an API that records every song play event (userId, songId, albumId, timestamp, country), build a system that continuously computes the top 100 songs/albums for the last 5 min / 1 hour / 1 week globally and per country, processing 5B+ listen events/day with rankings updating within seconds of activity changes.</a></td><td>Spotify · top charts 5B/day</td></tr>
 <tr><td>12</td><td><a href="08-social-media.html">Given a stream of video watch events (videoId, userId, watchDuration, region), design a system that updates the "Trending Videos" page every 30 seconds while handling 50M+ concurrent viewers, weighting scores by views, watch percentage, and velocity.</a></td><td>YouTube · Trending 50M concurrent</td></tr>
-<tr><td>13</td><td><a href="08-social-media.html">Build a trending hashtag engine where 200M tweets/day arrive continuously, computing top hashtags per city/country within rolling 5-minute windows under 2s latency with hierarchical aggregation (city → country → global).</a></td><td>Twitter · trending hashtags</td></tr>
-<tr><td>14</td><td><a href="08-social-media.html">Given playback events (userId, showId, watchTime, completionRate), build a "Top 10 in Your Country" engine that recomputes every minute across 100+ countries, weighting by completion rate and serving fresh rankings with minimal latency.</a></td><td>Netflix · Top 10 per country</td></tr>
-<tr><td>15</td><td><a href="08-social-media.html">Given engagement events (like, share, comment, watchTime), design a ranking engine that continuously recomputes trending reels/posts every few seconds, weighting recent engagement exponentially higher than older activity and atomically swapping ranked lists for readers.</a></td><td>TikTok · trending reels</td></tr>
-<tr><td>16</td><td><a href="08-social-media.html">Build a "People You May Know" system that recomputes graph recommendations for 1B+ users, scoring candidates by mutual connections, shared attributes, and interaction recency, supporting both daily batch recomputation and real-time incremental updates on new connections.</a></td><td>LinkedIn · PYMK 1B users</td></tr>
+<tr><td>13</td><td><a href="08-social-media.html">How does a social platform implement real-time content moderation at scale, classifying 500M+ posts/day for policy violations using multi-modal ML (text + image + video), routing edge cases to human reviewers within minutes, and handling appeals with audit trails?</a></td><td>Meta · content moderation</td></tr>
+<tr><td>14</td><td><a href="08-social-media.html">How does a social platform implement real-time A/B testing for feed ranking algorithms, splitting traffic across 100+ concurrent experiments, measuring engagement metrics with statistical significance within hours, and safely rolling back experiments that degrade user experience?</a></td><td>Meta · feed experimentation</td></tr>
+<tr><td>15</td><td><a href="08-social-media.html">How does a social platform serve personalized notifications to 2B+ users, deciding what to notify (likes, comments, follows), batching low-priority notifications, computing optimal send times per user based on activity patterns, and suppressing notifications during quiet hours?</a></td><td>Instagram · smart notifications</td></tr>
+<tr><td>16</td><td><a href="08-social-media.html">How does a social platform detect and suppress viral misinformation in real-time, scoring content credibility within seconds of posting using engagement velocity anomalies, cross-referencing fact-check databases, and applying distribution throttling before content reaches millions?</a></td><td>Meta · misinformation detection</td></tr>
 </table>
 </div>
 
 <!-- ═══ MODULE 9: Geo & Ride Sharing ═══ -->
 <div class="T" id="mod-geo">
-<h2>9. Geo, Ride Sharing &amp; Food Delivery</h2>
+<h2>9. Geo, Ride Sharing &amp; Food Delivery <span class="co-tags"><span class="co-tag">Uber</span><span class="co-tag">Google Maps</span><span class="co-tag">DoorDash</span><span class="co-tag">Zomato</span></span></h2>
 <p class="su">Location tracking, geofencing, matching, ETA, order lifecycle, real-time tracking — <span class="hg">13 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="09-geo-rideshare.html">How does a ride-hailing platform match riders to the nearest available driver within 3 seconds, scoring candidates by distance, ETA, and driver rating while avoiding global scans of all drivers?</a></td><td>Uber · H3 matching</td></tr>
+<tr><td>1</td><td><a href="9-geo-rideshare/uber-driver-matching.html">How does a ride-hailing platform match riders to the nearest available driver within 3 seconds, scoring candidates by distance, ETA, and driver rating while avoiding global scans of all drivers?</a></td><td>Uber · H3 matching</td></tr>
 <tr><td>2</td><td><a href="09-geo-rideshare.html">How does a maps platform calculate ETA for millions of simultaneous route requests, incorporating real-time traffic data from GPS probes and ML-based travel time prediction for accuracy within 10% of actual travel time?</a></td><td>Google Maps · ETA</td></tr>
 <tr><td>3</td><td><a href="09-geo-rideshare.html">How does a delivery platform optimize routes for 1M+ concurrent orders, batching nearby orders and dynamically re-routing when new orders arrive mid-delivery while minimizing total delivery time?</a></td><td>DoorDash · routing</td></tr>
 <tr><td>4</td><td><a href="09-geo-rideshare.html">How does a ride platform ingest and query 5M+ driver location updates every 4 seconds, supporting spatial queries ("find drivers within 2km") without scanning all drivers globally?</a></td><td>Uber · location ingestion</td></tr>
@@ -172,35 +176,35 @@
 <tr><td>10</td><td><a href="09-geo-rideshare.html">How does a food delivery platform manage the 3-party order lifecycle (customer → restaurant → driver) with state machine transitions (placed→accepted→preparing→ready→picked_up→delivered), timeout handlers per state, and compensating actions on cancellation?</a></td><td>Swiggy · order lifecycle</td></tr>
 <tr><td>11</td><td><a href="09-geo-rideshare.html">How does a food delivery platform assign orders to drivers optimizing for delivery time, driver earnings, and restaurant wait, enforcing constraints (distance &lt; 3km, capacity ≤ 2 orders) and re-assigning when a driver rejects within 30s?</a></td><td>DoorDash · driver dispatch</td></tr>
 <tr><td>12</td><td><a href="09-geo-rideshare.html">Build a traffic analytics platform where GPS pings arrive every 3 seconds from 100M vehicles, computing congestion levels per road segment and ETA updates that refresh within 5 seconds, pushing tile-based map updates to clients.</a></td><td>Google Maps · 100M vehicles traffic</td></tr>
-<tr><td>13</td><td><a href="09-geo-rideshare.html">Build a food delivery dispatch system where incoming orders must be matched to the best nearby delivery driver within 2 seconds during peak dinner traffic, scoring by distance, capacity, and acceptance rate with timeout-based re-assignment and expanding search radius.</a></td><td>Uber Eats · 2s dispatch</td></tr>
+<tr><td>13</td><td><a href="09-geo-rideshare.html">How does a geofencing platform detect when millions of devices enter/exit custom geographic boundaries in real-time, processing 10M+ location updates/sec against 100M+ geofences with sub-second trigger latency for marketing notifications and compliance alerts?</a></td><td>Radar · geofencing 10M/sec</td></tr>
 </table>
 </div>
 
 <!-- ═══ MODULE 10: Payment Systems ═══ -->
 <div class="T" id="mod-payments">
-<h2>10. Payment Systems</h2>
+<h2>10. Payment Systems <span class="co-tags"><span class="co-tag">Stripe</span><span class="co-tag">PayPal</span><span class="co-tag">Apple Pay</span><span class="co-tag">Visa</span></span></h2>
 <p class="su">Idempotency, ledgers, reconciliation, fraud, trading — <span class="hg">9 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="10-payments.html">How does a payment platform process millions of charges without double-charging, ensuring idempotent request handling, two-phase state transitions (pending→captured→settled), and at-least-once delivery with server-side deduplication?</a></td><td>Stripe · idempotency</td></tr>
+<tr><td>1</td><td><a href="10-payments/stripe-idempotent-payments.html">How does a payment platform process millions of charges without double-charging, ensuring idempotent request handling, two-phase state transitions (pending→captured→settled), and at-least-once delivery with server-side deduplication?</a></td><td>Stripe · idempotency</td></tr>
 <tr><td>2</td><td><a href="10-payments.html">How does a payment platform detect fraud in real-time across 400M accounts, scoring each transaction in sub-100ms using velocity checks, device fingerprinting, and geo-anomaly detection while routing edge cases to human review?</a></td><td>PayPal · fraud ML</td></tr>
 <tr><td>3</td><td><a href="10-payments.html">How does a cross-border payment platform handle transfers across 80+ currencies, locking FX rates within 30-second windows, managing multi-currency ledgers, and batching settlements to minimize wire fees?</a></td><td>Wise · FX ledger</td></tr>
 <tr><td>4</td><td><a href="10-payments.html">How does a trading platform handle stock orders with sub-millisecond latency, maintaining deterministic order matching, lock-free order book operations, and complete audit replay for regulatory compliance?</a></td><td>Robinhood · trading</td></tr>
 <tr><td>5</td><td><a href="10-payments.html">How does a digital wallet handle offline tap-to-pay transactions, using pre-authorized tokens with device-local transaction limits and deferred settlement that reconciles when connectivity returns?</a></td><td>Apple Pay · offline</td></tr>
 <tr><td>6</td><td><a href="10-payments.html">How do banks reconcile millions of transactions daily without losing a cent, using double-entry ledgers, end-of-day batch reconciliation, exception queues for mismatches, and cryptographic audit trails for regulatory compliance?</a></td><td>Banking · reconciliation</td></tr>
 <tr><td>7</td><td><a href="10-payments.html">How does an e-commerce platform handle checkout for 1M+ merchants during Black Friday peak, maintaining order confirmation within seconds while gracefully degrading non-critical features under extreme load?</a></td><td>Shopify · flash checkout</td></tr>
-<tr><td>8</td><td><a href="10-payments.html">Design a fraud detection pipeline for card-network-scale payment traffic where every transaction must be evaluated for fraud within 50ms before approval, computing risk features (velocity, geo-anomaly, device fingerprint) in real-time with fallback rules when ML models are unavailable.</a></td><td>Visa · 50ms fraud detection</td></tr>
+<tr><td>8</td><td><a href="10-payments.html">How does a cryptocurrency exchange handle 100K+ trades/sec with real-time order matching, maintaining a deterministic in-memory order book, supporting limit/market/stop orders, and providing guaranteed execution ordering with nanosecond timestamps for regulatory audit?</a></td><td>Binance · crypto exchange</td></tr>
 <tr><td>9</td><td><a href="10-payments.html">Design a stock market analytics system ingesting millions of trades per second that continuously updates top gainers, losers, and unusual volume spikes with millisecond latency, computing OHLC aggregations per symbol and pushing updates to trading terminals in real-time.</a></td><td>Stock exchange · ms-latency analytics</td></tr>
 </table>
 </div>
 
 <!-- ═══ MODULE 11: API Gateway & Backend ═══ -->
 <div class="T" id="mod-api">
-<h2>11. API Gateway &amp; Backend</h2>
+<h2>11. API Gateway &amp; Backend <span class="co-tags"><span class="co-tag">Cloudflare</span><span class="co-tag">Netflix</span><span class="co-tag">Kong</span></span></h2>
 <p class="su">Rate limiting, auth, circuit breaking, service mesh — <span class="hg">8 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="11-api-gateway.html">How does an edge network rate-limit 45M+ requests/sec without adding latency, distributing rate counters across hundreds of PoPs while using fail-open policies to avoid blocking legitimate traffic during sync delays?</a></td><td>Cloudflare · rate limit</td></tr>
+<tr><td>1</td><td><a href="11-api-gateway/cloudflare-rate-limiting.html">How does an edge network rate-limit 45M+ requests/sec without adding latency, distributing rate counters across hundreds of PoPs while using fail-open policies to avoid blocking legitimate traffic during sync delays?</a></td><td>Cloudflare · rate limit</td></tr>
 <tr><td>2</td><td><a href="11-api-gateway.html">How does a streaming platform's API gateway handle 100B+ API calls/day, supporting dynamic filter/routing rule updates without restart and shedding low-priority requests during overload?</a></td><td>Netflix · Zuul</td></tr>
 <tr><td>3</td><td><a href="11-api-gateway.html">How does a service mesh handle mutual TLS for 1000s of microservices, auto-rotating certificates and providing zero-code encryption between every service pair without application changes?</a></td><td>Istio · mTLS</td></tr>
 <tr><td>4</td><td><a href="11-api-gateway.html">How does a developer platform handle API versioning across millions of integrations, supporting deprecation timelines and backward-compatible schema evolution that doesn't break existing clients?</a></td><td>GitHub · API versioning</td></tr>
@@ -213,11 +217,11 @@
 
 <!-- ═══ MODULE 12: Database & Storage ═══ -->
 <div class="T" id="mod-db">
-<h2>12. Database &amp; Storage</h2>
+<h2>12. Database &amp; Storage <span class="co-tags"><span class="co-tag">Postgres</span><span class="co-tag">MongoDB</span><span class="co-tag">Redis</span><span class="co-tag">Elasticsearch</span></span></h2>
 <p class="su">Sharding, replication, consistency, migrations — <span class="hg">10 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="12-database-storage.html">How does a database sharding layer transparently shard 10B+ messages across hundreds of shards, supporting online resharding (split/merge without downtime) and connection pooling that reduces backend connections by 100×?</a></td><td>Slack · Vitess</td></tr>
+<tr><td>1</td><td><a href="12-database-storage/slack-vitess-sharding.html">How does a database sharding layer transparently shard 10B+ messages across hundreds of shards, supporting online resharding (split/merge without downtime) and connection pooling that reduces backend connections by 100×?</a></td><td>Slack · Vitess</td></tr>
 <tr><td>2</td><td><a href="12-database-storage.html">How does a globally distributed database achieve strong consistency with &lt;10ms reads, bounding clock uncertainty across regions and using consensus-based replication across 5+ regions?</a></td><td>Google Spanner · TrueTime</td></tr>
 <tr><td>3</td><td><a href="12-database-storage.html">How does a chat platform store trillions of messages in a wide-column database, partitioning by channel with time-ordered clustering, and tuning compaction strategies for time-series append patterns?</a></td><td>Discord · ScyllaDB</td></tr>
 <tr><td>4</td><td><a href="12-database-storage.html">How does a platform migrate billions of rows between database schemas with zero downtime, validating correctness through shadow reads and providing instant rollback capability during cutover?</a></td><td>Uber · online migration</td></tr>
@@ -232,14 +236,14 @@
 
 <!-- ═══ MODULE 13: Distributed Systems ═══ -->
 <div class="T" id="mod-distributed">
-<h2>13. Distributed Systems</h2>
+<h2>13. Distributed Systems <span class="co-tags"><span class="co-tag">Apache</span><span class="co-tag">Google Spanner</span><span class="co-tag">CockroachDB</span></span></h2>
 <p class="su">Consensus, leader election, clock sync, partition tolerance — <span class="hg">7 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="13-distributed-systems.html">How does a distributed key-value store achieve consensus across 5 nodes, handling leader election, log replication, and split-brain prevention requiring majority quorum (3 of 5) for all decisions?</a></td><td>etcd · Raft</td></tr>
+<tr><td>1</td><td><a href="13-distributed-systems/etcd-raft-consensus.html">How does a distributed key-value store achieve consensus across 5 nodes, handling leader election, log replication, and split-brain prevention requiring majority quorum (3 of 5) for all decisions?</a></td><td>etcd · Raft</td></tr>
 <tr><td>2</td><td><a href="13-distributed-systems.html">How does a distributed event streaming platform handle leader election when a broker dies, reassigning partitions within seconds without message loss while promoting only in-sync replicas?</a></td><td>Kafka · KRaft</td></tr>
-<tr><td>3</td><td><a href="13-distributed-systems.html">How does a globally distributed database synchronize clocks across data centers with bounded uncertainty (&lt;7ms), guaranteeing external consistency for transactions without requiring coordination between concurrent writers?</a></td><td>Spanner · TrueTime</td></tr>
-<tr><td>4</td><td><a href="13-distributed-systems.html">How does a distributed SQL database handle network partitions without losing committed data, automatically failing over leadership per data range and promoting replicas when quorum is lost in a region?</a></td><td>CockroachDB · partition</td></tr>
+<tr><td>3</td><td><a href="13-distributed-systems.html">How does a distributed system achieve causal ordering of events across data centers without synchronized clocks, using hybrid logical clocks (HLC) to bound uncertainty and provide happens-before guarantees for cross-region transactions?</a></td><td>HLC · causal ordering</td></tr>
+<tr><td>4</td><td><a href="13-distributed-systems.html">How does a distributed system implement linearizable reads without sacrificing availability, choosing between leader leases, quorum reads, and read-repair strategies based on consistency requirements and latency budgets?</a></td><td>Linearizability · read strategies</td></tr>
 <tr><td>5</td><td><a href="13-distributed-systems.html">How does a coordination service manage distributed locks, leader election, and configuration for 1000s of services, detecting liveness via ephemeral sessions and providing sequential ordering guarantees for distributed queues?</a></td><td>ZooKeeper · coordination</td></tr>
 <tr><td>6</td><td><a href="13-distributed-systems.html">How does a wide-column database maintain availability during network splits (AP in CAP), offering tunable consistency levels, hinted handoff for downed nodes, and anti-entropy repair to eventually converge divergent replicas?</a></td><td>Cassandra · AP system</td></tr>
 <tr><td>7</td><td><a href="13-distributed-systems.html">How do distributed systems detect and recover from split-brain scenarios, invalidating stale leaders with monotonic fencing tokens, epoch-based leadership with lease expiry, and ensuring only one leader can make progress at any time?</a></td><td>Split-brain · fencing</td></tr>
@@ -248,11 +252,11 @@
 
 <!-- ═══ MODULE 14: Live Sports & Real-Time Event Broadcasting ═══ -->
 <div class="T" id="mod-sports">
-<h2>14. Live Sports &amp; Real-Time Event Broadcasting</h2>
+<h2>14. Live Sports &amp; Real-Time Event Broadcasting <span class="co-tags"><span class="co-tag">ESPN</span><span class="co-tag">Cricbuzz</span><span class="co-tag">Dream11</span><span class="co-tag">Hotstar</span></span></h2>
 <p class="su">Live score push, ball-by-ball updates, millions of concurrent readers consuming the same event stream — <span class="hg">8 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="14-live-sports.html">Build a live scoring platform where every ball event (runs, wicket, over, batsman change) must reach 30M concurrent users globally within sub-second latency during World Cup finals, supporting both persistent connections and fallback polling for all client types.</a></td><td>Cricbuzz · 30M concurrent, sub-second</td></tr>
+<tr><td>1</td><td><a href="14-live-sports/cricbuzz-live-scoring.html">Build a live scoring platform where every ball event (runs, wicket, over, batsman change) must reach 30M concurrent users globally within sub-second latency during World Cup finals, supporting both persistent connections and fallback polling for all client types.</a></td><td>Cricbuzz · 30M concurrent, sub-second</td></tr>
 <tr><td>2</td><td><a href="14-live-sports.html">How does a sports platform handle 10M+ simultaneous score poll requests during a World Cup final without melting the backend, serving fresh scores (≤1s stale) from edge while protecting origin servers from traffic spikes?</a></td><td>ESPN · World Cup traffic</td></tr>
 <tr><td>3</td><td><a href="14-live-sports.html">How does a fantasy sports platform lock/unlock player selections in real-time as a match starts, performing atomic state transitions triggered by match-start events with eventual consistency for leaderboard updates?</a></td><td>Dream11 · lineup lock</td></tr>
 <tr><td>4</td><td><a href="14-live-sports.html">How does a fantasy sports platform calculate live leaderboard rankings for 10M+ users as each ball is bowled, applying pre-computed point deltas per event and updating rankings incrementally without full recomputation?</a></td><td>Dream11 · live leaderboard</td></tr>
@@ -265,11 +269,11 @@
 
 <!-- ═══ MODULE 15: File Upload & Media Processing ═══ -->
 <div class="T" id="mod-files">
-<h2>15. File Upload &amp; Media Processing</h2>
+<h2>15. File Upload &amp; Media Processing <span class="co-tags"><span class="co-tag">Dropbox</span><span class="co-tag">Google Drive</span><span class="co-tag">YouTube</span></span></h2>
 <p class="su">Chunked upload, sync engines, transcoding pipelines, deduplication — <span class="hg">7 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="15-file-upload.html">How does a cloud storage platform sync file changes across millions of devices within seconds, deduplicating content at the block level and tracking per-file block maps for efficient delta sync?</a></td><td>Dropbox · sync engine</td></tr>
+<tr><td>1</td><td><a href="15-file-upload/dropbox-sync-engine.html">How does a cloud storage platform sync file changes across millions of devices within seconds, deduplicating content at the block level and tracking per-file block maps for efficient delta sync?</a></td><td>Dropbox · sync engine</td></tr>
 <tr><td>2</td><td><a href="15-file-upload.html">How does a file platform handle resumable uploads for 5GB+ files over unreliable networks, uploading in chunks with per-chunk checksum verification and automatic retry from the last successful chunk?</a></td><td>Google Drive · resumable upload</td></tr>
 <tr><td>3</td><td><a href="15-file-upload.html">How does a video platform process 500+ hours of uploaded video per minute into multiple formats, prioritizing live content over VOD, executing DAG-based transcoding pipelines, and storing intermediate results between stages?</a></td><td>YouTube · transcoding pipeline</td></tr>
 <tr><td>4</td><td><a href="15-file-upload.html">How does a cloud storage platform deduplicate files across 700M+ users to save petabytes of storage, using content-defined chunking, block-level hashing, and reference counting to safely garbage-collect unreferenced blocks?</a></td><td>Dropbox · deduplication</td></tr>
@@ -281,11 +285,11 @@
 
 <!-- ═══ MODULE 16: Search Systems ═══ -->
 <div class="T" id="mod-search">
-<h2>16. Search Systems</h2>
+<h2>16. Search Systems <span class="co-tags"><span class="co-tag">Google</span><span class="co-tag">Elasticsearch</span><span class="co-tag">Algolia</span></span></h2>
 <p class="su">Inverted indexes, ranking, typeahead, personalization, freshness — <span class="hg">9 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="16-search-systems.html">How does a web search engine index 100B+ pages and return ranked results in &lt;200ms, combining authority scoring with relevance ranking across a tiered index serving architecture with early termination?</a></td><td>Google · web search</td></tr>
+<tr><td>1</td><td><a href="16-search-systems/google-web-search.html">How does a web search engine index 100B+ pages and return ranked results in &lt;200ms, combining authority scoring with relevance ranking across a tiered index serving architecture with early termination?</a></td><td>Google · web search</td></tr>
 <tr><td>2</td><td><a href="16-search-systems.html">How does an e-commerce platform search 500M+ products with filters (price, rating, brand) in &lt;50ms, boosting results by relevance, recency, and popularity while personalizing re-ranking based on purchase history?</a></td><td>Amazon · product search</td></tr>
 <tr><td>3</td><td><a href="16-search-systems.html">How does a professional network search 900M+ member profiles with complex filters (location, skills, company), supporting real-time index updates for profile changes within 10 seconds of modification?</a></td><td>LinkedIn · people search</td></tr>
 <tr><td>4</td><td><a href="16-search-systems.html">How does a search engine implement typeahead/autocomplete that returns suggestions in &lt;50ms as the user types, serving pre-computed top-K suggestions per prefix with personalized ranking based on recent searches?</a></td><td>Google · typeahead</td></tr>
@@ -299,11 +303,11 @@
 
 <!-- ═══ MODULE 17: Scheduling & Calendar ═══ -->
 <div class="T" id="mod-calendar">
-<h2>17. Scheduling &amp; Calendar</h2>
+<h2>17. Scheduling &amp; Calendar <span class="co-tags"><span class="co-tag">Google Calendar</span><span class="co-tag">Calendly</span><span class="co-tag">Temporal</span></span></h2>
 <p class="su">Recurring events, timezone handling, conflict detection, availability — <span class="hg">6 problems</span></p>
 <table>
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
-<tr><td>1</td><td><a href="17-calendar.html">How does a calendar platform handle recurring events (every Tuesday, except holidays) across timezones, generating occurrences on-the-fly with exception handling without storing millions of individual instances?</a></td><td>Google Calendar · recurrence</td></tr>
+<tr><td>1</td><td><a href="17-calendar/google-calendar-recurrence.html">How does a calendar platform handle recurring events (every Tuesday, except holidays) across timezones, generating occurrences on-the-fly with exception handling without storing millions of individual instances?</a></td><td>Google Calendar · recurrence</td></tr>
 <tr><td>2</td><td><a href="17-calendar.html">How does a calendar platform detect scheduling conflicts across 100M+ users in real-time, merging free/busy data across multiple calendars and handling concurrent booking attempts with optimistic locking?</a></td><td>Outlook · conflict detection</td></tr>
 <tr><td>3</td><td><a href="17-calendar.html">How does a meeting scheduler find available slots across 10 participants in different timezones, respecting working-hours constraints per timezone and scoring preferences to minimize early morning/late night for any participant?</a></td><td>Calendly · availability</td></tr>
 <tr><td>4</td><td><a href="17-calendar.html">How does a calendar platform sync events across devices and third-party integrations, supporting real-time push notifications for changes with periodic full-sync as fallback and conflict resolution for shared calendars?</a></td><td>Google Calendar · sync</td></tr>
@@ -312,11 +316,168 @@
 </table>
 </div>
 
+<!-- ═══ MODULE 18: Observability & Monitoring ═══ -->
+<div class="T" id="mod-observability">
+<h2>18. Observability &amp; Monitoring <span class="co-tags"><span class="co-tag">Datadog</span><span class="co-tag">Grafana</span><span class="co-tag">Prometheus</span></span></h2>
+<p class="su">Distributed tracing, metrics aggregation, alerting pipelines, log analytics — <span class="hg">8 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="18-observability/uber-jaeger-distributed-tracing.html">How does a distributed tracing system correlate requests across 1000+ microservices, propagating trace context through async boundaries (Kafka, queues) and sampling intelligently to keep storage under 1% of total traffic while capturing all error traces?</a></td><td>Uber · Jaeger tracing</td></tr>
+<tr><td>2</td><td><a href="18-observability.html">How does a metrics platform ingest 500M+ time-series data points per second, supporting real-time aggregation (P50/P99/max) with 10-second granularity and multi-dimensional queries across 100K+ metric names?</a></td><td>Datadog · 500M metrics/sec</td></tr>
+<tr><td>3</td><td><a href="18-observability.html">How does an alerting system evaluate 10M+ alert rules every 15 seconds without false positives, supporting complex conditions (rate-of-change, anomaly detection), alert grouping, and escalation policies with on-call rotation?</a></td><td>PagerDuty · alerting at scale</td></tr>
+<tr><td>4</td><td><a href="18-observability.html">How does a log analytics platform ingest 1PB+ of logs daily from millions of sources, indexing them for sub-second search while applying retention policies and providing real-time tail functionality for debugging?</a></td><td>Splunk · PB-scale logs</td></tr>
+<tr><td>5</td><td><a href="18-observability.html">How does a platform implement real-time error tracking that groups millions of exceptions into unique issues, detecting regressions within minutes of deployment and auto-assigning to the team that owns the failing code path?</a></td><td>Sentry · error grouping</td></tr>
+<tr><td>6</td><td><a href="18-observability.html">How does a cloud platform build real-time service dependency maps from trace data, detecting cascading failures within seconds and identifying the root-cause service in a chain of 20+ dependent services?</a></td><td>AWS X-Ray · dependency map</td></tr>
+<tr><td>7</td><td><a href="18-observability.html">How does a platform implement SLO-based monitoring that continuously computes error budgets across 10K+ services, triggering automated responses (traffic shifting, rollback) when burn rate exceeds thresholds?</a></td><td>Google · SLO monitoring</td></tr>
+<tr><td>8</td><td><a href="18-observability.html">How does a real-time dashboard system serve 100K+ concurrent viewers watching the same metrics, pushing incremental updates via WebSocket without recomputing full queries per viewer?</a></td><td>Grafana · live dashboards</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 19: ML Model Serving & Feature Stores ═══ -->
+<div class="T" id="mod-ml">
+<h2>19. ML Model Serving &amp; Feature Stores <span class="co-tags"><span class="co-tag">OpenAI</span><span class="co-tag">TensorFlow</span><span class="co-tag">PyTorch</span><span class="co-tag">Meta</span></span></h2>
+<p class="su">Real-time inference, feature computation, model deployment, A/B testing — <span class="hg">7 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="19-ml-serving/uber-michelangelo-ml-serving.html">How does a ride platform serve ML predictions (ETA, surge, fraud) at 1M+ requests/sec with P99 &lt;10ms latency, loading 100+ models into GPU memory, handling model version rollouts, and falling back to rule-based systems when models are unavailable?</a></td><td>Uber · Michelangelo</td></tr>
+<tr><td>2</td><td><a href="19-ml-serving.html">How does a feature store compute and serve real-time features (user's last 5 actions, rolling 1-hour spend) for ML models at prediction time, combining batch-computed features with streaming features while maintaining point-in-time correctness?</a></td><td>Feast · real-time features</td></tr>
+<tr><td>3</td><td><a href="19-ml-serving.html">How does a search platform deploy new ranking models to production without degrading relevance, using shadow scoring, interleaved experiments, and gradual traffic ramp with automatic rollback on metric regression?</a></td><td>Google · model deployment</td></tr>
+<tr><td>4</td><td><a href="19-ml-serving.html">How does a recommendation platform retrain models on fresh data every hour, incorporating the latest user interactions while ensuring training-serving skew stays below 1% and new models don't catastrophically forget learned patterns?</a></td><td>TikTok · online learning</td></tr>
+<tr><td>5</td><td><a href="19-ml-serving.html">How does an LLM serving platform handle 10K+ concurrent inference requests with variable-length outputs, optimizing GPU utilization through continuous batching, KV-cache management, and speculative decoding for 3x throughput improvement?</a></td><td>OpenAI · LLM serving</td></tr>
+<tr><td>6</td><td><a href="19-ml-serving.html">How does an ad platform compute click-through-rate predictions for 10B+ ad candidates daily in &lt;50ms per request, combining sparse features (user history) with dense embeddings and serving from a distributed model across 1000+ inference nodes?</a></td><td>Meta · ads prediction</td></tr>
+<tr><td>7</td><td><a href="19-ml-serving.html">How does a content platform implement real-time embedding generation for new content (images, videos, text), indexing embeddings for approximate nearest neighbor search within seconds of upload for immediate recommendation eligibility?</a></td><td>Pinterest · embedding pipeline</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 20: Security & Authentication ═══ -->
+<div class="T" id="mod-security">
+<h2>20. Security &amp; Authentication <span class="co-tags"><span class="co-tag">Cloudflare</span><span class="co-tag">Auth0</span><span class="co-tag">Okta</span></span></h2>
+<p class="su">Session management, DDoS mitigation, rate limiting, zero-trust — <span class="hg">7 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="20-security/google-session-management.html">How does a platform manage sessions for 2B+ users across multiple devices, supporting instant revocation (password change invalidates all sessions), sliding expiry, and device-specific session limits without checking a central store on every request?</a></td><td>Google · session management</td></tr>
+<tr><td>2</td><td><a href="20-security.html">How does a CDN mitigate L7 DDoS attacks at 100M+ requests/sec, distinguishing legitimate traffic from bot traffic using behavioral analysis, JavaScript challenges, and adaptive rate limiting without blocking real users during an attack?</a></td><td>Cloudflare · DDoS mitigation</td></tr>
+<tr><td>3</td><td><a href="20-security.html">How does a platform implement distributed rate limiting across 300+ edge PoPs, enforcing per-user and per-IP limits with eventual consistency between nodes while using fail-open policies to avoid blocking legitimate traffic during sync delays?</a></td><td>Stripe · distributed rate limit</td></tr>
+<tr><td>4</td><td><a href="20-security.html">How does a zero-trust architecture authenticate and authorize every service-to-service call in a 5000+ microservice mesh, issuing short-lived certificates, enforcing least-privilege policies, and detecting lateral movement without adding more than 1ms latency per hop?</a></td><td>Google BeyondCorp · zero-trust</td></tr>
+<tr><td>5</td><td><a href="20-security.html">How does an OAuth provider handle 1M+ token issuance/sec during peak login, supporting PKCE flows, token rotation, and cross-device SSO while detecting token theft through binding tokens to device fingerprints?</a></td><td>Auth0 · OAuth at scale</td></tr>
+<tr><td>6</td><td><a href="20-security.html">How does a platform implement real-time account takeover detection, scoring login attempts using device fingerprint, geo-velocity, and behavioral biometrics, triggering step-up authentication (MFA) for suspicious sessions within milliseconds?</a></td><td>Netflix · ATO detection</td></tr>
+<tr><td>7</td><td><a href="20-security.html">How does a secrets management platform handle 100K+ services fetching credentials, supporting automatic rotation every 24 hours, lease-based access with revocation, and zero-downtime rotation without service restarts?</a></td><td>HashiCorp Vault · secrets</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 21: URL Shortening & Redirection ═══ -->
+<div class="T" id="mod-url">
+<h2>21. URL Shortening &amp; Redirection <span class="co-tags"><span class="co-tag">Bitly</span><span class="co-tag">TinyURL</span><span class="co-tag">Google</span></span></h2>
+<p class="su">ID generation, redirect scaling, analytics, hot key caching — <span class="hg">4 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="21-url-shortening/bitly-url-shortener.html">How does a URL shortener generate globally unique short codes at 1000+ URLs/sec, ensuring no collisions across distributed nodes while keeping codes short (7 chars) and supporting custom aliases?</a></td><td>Bitly · ID generation</td></tr>
+<tr><td>2</td><td><a href="21-url-shortening.html">How does a URL shortener handle 100K+ redirect requests/sec with P99 &lt;10ms latency, caching hot URLs at the edge while handling expired links, geo-targeted redirects, and A/B test routing?</a></td><td>TinyURL · redirect at scale</td></tr>
+<tr><td>3</td><td><a href="21-url-shortening.html">How does a link analytics platform track clicks in real-time (referrer, geo, device, timestamp) for billions of redirects/day without adding latency to the redirect path, computing dashboards with &lt;1min freshness?</a></td><td>Bitly · click analytics</td></tr>
+<tr><td>4</td><td><a href="21-url-shortening.html">How does a URL shortener handle hot keys (viral links getting 1M+ clicks/sec) without melting the cache layer, using consistent hashing, request coalescing, and tiered caching (L1 in-process → L2 Redis → L3 DB)?</a></td><td>t.co · hot key caching</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 22: Email Systems ═══ -->
+<div class="T" id="mod-email">
+<h2>22. Email Systems <span class="co-tags"><span class="co-tag">Gmail</span><span class="co-tag">SendGrid</span><span class="co-tag">Mailchimp</span></span></h2>
+<p class="su">SMTP delivery, spam filtering, inbox indexing, threading — <span class="hg">4 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="22-email/sendgrid-email-delivery.html">How does an email platform deliver 500M+ emails/day with high deliverability, managing IP reputation, DKIM/SPF/DMARC authentication, bounce handling, and throttling per recipient domain to avoid being blacklisted?</a></td><td>SendGrid · email delivery</td></tr>
+<tr><td>2</td><td><a href="22-email.html">How does an email provider classify 1B+ incoming emails/day as spam/ham in real-time using content analysis, sender reputation, behavioral signals, and ML models — with &lt;0.1% false positive rate?</a></td><td>Gmail · spam filtering</td></tr>
+<tr><td>3</td><td><a href="22-email.html">How does an email platform index 1B+ mailboxes for instant full-text search, supporting complex queries (from:, has:attachment, date range) with &lt;200ms latency while handling 100K+ new emails/sec ingestion?</a></td><td>Gmail · inbox search</td></tr>
+<tr><td>4</td><td><a href="22-email.html">How does an email client implement conversation threading that correctly groups replies, forwards, and CC chains using In-Reply-To/References headers, handling broken threads and cross-client compatibility?</a></td><td>Gmail · threading</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 23: Content Moderation & Trust ═══ -->
+<div class="T" id="mod-moderation">
+<h2>23. Content Moderation &amp; Trust <span class="co-tags"><span class="co-tag">Meta</span><span class="co-tag">YouTube</span><span class="co-tag">Twitch</span></span></h2>
+<p class="su">Spam detection, abuse prevention, ML moderation, reporting systems — <span class="hg">4 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="23-moderation/meta-content-moderation.html">How does a social platform classify 500M+ posts/day for policy violations using multi-modal ML (text + image + video), routing borderline cases to human reviewers within minutes while maintaining &lt;1% false positive rate?</a></td><td>Meta · automated moderation</td></tr>
+<tr><td>2</td><td><a href="23-moderation.html">How does a platform detect and suppress coordinated inauthentic behavior (bot networks, brigading) in real-time, identifying clusters of accounts acting in concert using graph analysis and behavioral signals?</a></td><td>Twitter · bot detection</td></tr>
+<tr><td>3</td><td><a href="23-moderation.html">How does a platform implement a user reporting system that handles 10M+ reports/day, prioritizing by severity (child safety &gt; violence &gt; spam), deduplicating reports on the same content, and routing to specialized review queues?</a></td><td>YouTube · reporting pipeline</td></tr>
+<tr><td>4</td><td><a href="23-moderation.html">How does a platform implement real-time toxicity scoring for live chat/comments, blocking harmful messages before they're visible to other users while minimizing latency impact on the posting experience (&lt;100ms added)?</a></td><td>Twitch · live chat moderation</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 24: Configuration & Feature Flags ═══ -->
+<div class="T" id="mod-config">
+<h2>24. Configuration &amp; Feature Flags <span class="co-tags"><span class="co-tag">LaunchDarkly</span><span class="co-tag">Netflix</span><span class="co-tag">GitHub</span></span></h2>
+<p class="su">Dynamic config, experimentation, A/B testing, rollout systems — <span class="hg">3 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="24-feature-flags/launchdarkly-feature-flags.html">How does a feature flag platform evaluate 1M+ flag checks/sec with P99 &lt;5ms, supporting complex targeting rules (user segments, percentages, geo), and propagating flag changes to 100K+ servers within 10 seconds?</a></td><td>LaunchDarkly · flag evaluation</td></tr>
+<tr><td>2</td><td><a href="24-feature-flags.html">How does a platform run 1000+ concurrent A/B experiments, assigning users to variants deterministically (hash-based), computing statistical significance in real-time, and auto-stopping experiments that degrade key metrics?</a></td><td>Netflix · experimentation</td></tr>
+<tr><td>3</td><td><a href="24-feature-flags.html">How does a platform implement progressive rollouts (1% → 5% → 25% → 100%) with automatic rollback on error rate spike, supporting canary deployments and dark launches without code deploys?</a></td><td>Facebook · gradual rollout</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 25: Web Crawling & Indexing ═══ -->
+<div class="T" id="mod-crawling">
+<h2>25. Web Crawling &amp; Indexing <span class="co-tags"><span class="co-tag">Google</span><span class="co-tag">Cloudflare</span><span class="co-tag">Amazon</span></span></h2>
+<p class="su">Distributed crawlers, politeness, deduplication, indexing pipelines — <span class="hg">3 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="25-crawling/google-web-crawler.html">How does a web crawler discover and fetch 10B+ pages across the internet, respecting robots.txt, managing crawl politeness (rate limits per domain), prioritizing fresh/important pages, and deduplicating content?</a></td><td>Google · web crawler</td></tr>
+<tr><td>2</td><td><a href="25-crawling.html">How does a search engine build and maintain an inverted index over 100B+ documents, supporting incremental updates (new/modified pages) without full re-indexing, and serving queries across a distributed index in &lt;200ms?</a></td><td>Google · indexing pipeline</td></tr>
+<tr><td>3</td><td><a href="25-crawling.html">How does a price comparison platform crawl 10M+ product pages daily from 1000+ e-commerce sites, extracting structured data (price, availability, specs) using site-specific parsers, and detecting price changes within minutes?</a></td><td>PriceRunner · product crawling</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 26: ID Generation Systems ═══ -->
+<div class="T" id="mod-idgen">
+<h2>26. ID Generation Systems <span class="co-tags"><span class="co-tag">Twitter</span><span class="co-tag">Stripe</span><span class="co-tag">Snowflake</span></span></h2>
+<p class="su">Snowflake IDs, distributed unique IDs, ordering guarantees, collision avoidance — <span class="hg">3 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="26-id-generation/twitter-snowflake-ids.html">How does a distributed system generate 100K+ unique, time-sortable IDs per second across 1000+ nodes without coordination, ensuring no collisions and maintaining rough chronological ordering (Snowflake-style)?</a></td><td>Twitter Snowflake · time-sorted IDs</td></tr>
+<tr><td>2</td><td><a href="26-id-generation.html">How does a database generate monotonically increasing IDs across a sharded cluster without a single point of failure, supporting 1M+ inserts/sec while maintaining gap-free sequences within each shard?</a></td><td>Vitess · sharded sequences</td></tr>
+<tr><td>3</td><td><a href="26-id-generation.html">How does a system generate short, human-readable unique codes (invite codes, order IDs, tracking numbers) that are URL-safe, non-sequential (prevent enumeration), and globally unique across 1B+ entities?</a></td><td>Stripe · readable unique IDs</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 27: Ad Serving & Monetization ═══ -->
+<div class="T" id="mod-ads">
+<h2>27. Ad Serving &amp; Monetization <span class="co-tags"><span class="co-tag">Google Ads</span><span class="co-tag">Meta</span><span class="co-tag">Amazon</span></span></h2>
+<p class="su">Ad ranking, real-time bidding, targeting, impression tracking — <span class="hg">4 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="27-ad-serving/google-ads-ranking.html">How does an ad platform select the best ad from 10M+ candidates in &lt;100ms per page load, scoring by predicted CTR, bid amount, relevance, and advertiser budget — serving 10B+ ad requests/day?</a></td><td>Google Ads · ad ranking</td></tr>
+<tr><td>2</td><td><a href="27-ad-serving.html">How does a real-time bidding (RTB) exchange conduct auctions across 100+ demand-side platforms within 100ms, handling 1M+ bid requests/sec with timeout-based fallback and fraud detection?</a></td><td>OpenRTB · real-time bidding</td></tr>
+<tr><td>3</td><td><a href="27-ad-serving.html">How does an ad platform track impressions, clicks, and conversions across billions of events/day without double-counting, attributing conversions across devices/sessions, and computing ROI dashboards in near-real-time?</a></td><td>Meta Ads · attribution tracking</td></tr>
+<tr><td>4</td><td><a href="27-ad-serving.html">How does an ad platform enforce advertiser budgets in real-time across distributed serving nodes, preventing overspend while maximizing delivery, handling budget changes mid-campaign, and pacing spend evenly throughout the day?</a></td><td>Google Ads · budget pacing</td></tr>
+</table>
+</div>
+
+<!-- ═══ MODULE 28: Developer Platform & CI/CD ═══ -->
+<div class="T" id="mod-cicd">
+<h2>28. Developer Platform &amp; CI/CD <span class="co-tags"><span class="co-tag">GitHub Actions</span><span class="co-tag">Jenkins</span><span class="co-tag">Docker</span><span class="co-tag">Kubernetes</span></span></h2>
+<p class="su">Build systems, deployment orchestration, artifact storage, release pipelines — <span class="hg">3 problems</span></p>
+<table>
+<tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
+<tr><td>1</td><td><a href="28-cicd/github-actions-build-system.html">How does a CI platform execute 10M+ builds/day across a distributed fleet of workers, scheduling jobs by priority and resource requirements, caching build artifacts for 10× speedup, and providing real-time build logs?</a></td><td>GitHub Actions · build at scale</td></tr>
+<tr><td>2</td><td><a href="28-cicd.html">How does a deployment platform orchestrate zero-downtime rollouts across 100K+ servers, supporting canary deployments (1% → 10% → 100%), automatic rollback on health check failure, and blue-green switching?</a></td><td>Spinnaker · deployment orchestration</td></tr>
+<tr><td>3</td><td><a href="28-cicd.html">How does an artifact registry store and serve 1PB+ of build artifacts (Docker images, npm packages, Maven JARs) with global replication, content-addressable deduplication, and vulnerability scanning on upload?</a></td><td>Artifactory · artifact storage</td></tr>
+</table>
+</div>
+
+
+
+
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <script src="../js/header.js"></script>
-<script src="../js/nav-realtime.js"></script>
+<script src="../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

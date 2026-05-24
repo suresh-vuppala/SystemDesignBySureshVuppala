@@ -1,0 +1,289 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Indicators at Scale — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a chat system handle millions of ephemeral typing events per second?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">⌨️</span> Design a typing indicator system that delivers ephemeral events to conversation participants in sub-100ms without persisting anything to disk</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<p class="su">How does a chat system handle millions of ephemeral 'typing...' events per second without persisting anything to disk, while ensuring sub-100ms delivery to all conversation participants?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Ephemeral typing indicator delivery only — not message send, not presence, not read receipts. The hard question: <span class="hr">how do you fan-out millions of fire-and-forget events per second with zero disk I/O and sub-100ms latency?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">5M+</div>
+<div style="font-size:.72rem;color:var(--muted)">typing events / sec peak</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">ephemeral, never persisted</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;100ms</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery P99</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">must feel instantaneous</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">0 bytes</div>
+<div style="font-size:.72rem;color:var(--muted)">persisted to disk</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">pure in-memory routing</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">8s TTL</div>
+<div style="font-size:.72rem;color:var(--muted)">auto-expire timeout</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">no explicit "stopped" needed</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — ephemeral event delivery with aggressive throttling</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> When a user types, all <strong>online participants</strong> in the conversation see "User is typing..."<br>
+  <span class="hg">2.</span> Typing indicator <strong>auto-expires</strong> after 8 seconds of inactivity (no explicit stop event needed)<br>
+  <span class="hg">3.</span> Events are <strong>throttled</strong> — max 1 typing event per 5 seconds per user per conversation<br>
+  <span class="hg">4.</span> <strong>Zero persistence</strong> — typing events never touch disk, Kafka, or any durable store<br>
+  <span class="hg">5.</span> Delivery latency <strong>&lt;100ms P99</strong> — must feel instantaneous to recipients<br>
+  <span class="hg">6.</span> System handles <strong>5M+ events/sec</strong> at peak without degradation
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> Message <strong>delivery</strong> (separate Kafka-based pipeline — see Slack Real-Time Messaging)<br>
+  <span class="hr">✗</span> <strong>Presence</strong> (online/offline status — different protocol)<br>
+  <span class="hr">✗</span> <strong>Read receipts</strong> (persisted, different consistency model)<br>
+  <span class="hr">✗</span> <strong>Offline delivery</strong> — typing events are meaningless if recipient is offline<br>
+  <span class="hr">✗</span> <strong>Multi-device sync</strong> of typing state (only deliver to other users, not same user's devices)
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for ephemeral event delivery at massive scale</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">P99 &lt;100ms</span> delivery</td><td>Typing must feel instant — any perceptible delay breaks the illusion of real-time presence.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">5M+ events/sec</span> peak</td><td>All active users typing simultaneously during peak hours. Must handle without queuing.</td></tr>
+<tr><td><span class="hi">Durability</span></td><td><span class="hg">Zero</span> (ephemeral, never persisted to disk)</td><td>Typing indicators are transient signals — persisting them wastes I/O and adds no value.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.9%</span> (best-effort)</td><td>Brief outage is invisible — users won't notice a missed typing indicator.</td></tr>
+<tr><td><span class="hi">Delivery</span></td><td><span class="hg">At-most-once</span></td><td>Missed indicator is unnoticeable. Duplicate would cause UI flicker — worse than missing one.</td></tr>
+<tr><td><span class="hi">Bandwidth</span></td><td><span class="hg">Minimal per event</span> (~50 bytes payload)</td><td>High event rate means even small payloads add up. Keep wire format tiny.</td></tr>
+</table>
+</div>
+
+<!-- ═══ SCALE ESTIMATION ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Deriving throughput requirements from concurrent user behavior</p>
+<table>
+<tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+<tr><td>1</td><td>10M concurrent users × 20% actively typing</td><td>2M typing users</td></tr>
+<tr><td>2</td><td>2M users × 1 event/5s (throttled)</td><td>400K events/sec avg</td></tr>
+<tr><td>3</td><td>Peak factor 10×</td><td>~4-5M events/sec</td></tr>
+<tr><td>4</td><td>Avg conversation size 5 people → 400K × 4 recipients</td><td>1.6M deliveries/sec</td></tr>
+<tr><td>5</td><td>Redis Pub/Sub capacity: ~1M msgs/sec per node</td><td>Need 2-3 Redis nodes</td></tr>
+<tr><td>6</td><td>Memory for throttle state: 2M users × 32 bytes</td><td>~64MB per gateway (trivial)</td></tr>
+</table>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Direct gateway-to-gateway pub/sub — no Kafka, no database, pure in-memory routing for sub-100ms delivery</p>
+
+<svg width="100%" viewBox="0 0 740 300" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs>
+<marker id="ty1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+<marker id="ty2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+</defs>
+
+<!-- ═══ TYPING EVENT PATH ═══ -->
+<rect x="4" y="4" width="732" height="120" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">TYPING EVENT PATH — User A types in #general (no persistence)</text>
+
+<!-- User A typing -->
+<rect x="14" y="30" width="80" height="32" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text x="54" y="42" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">User A</text>
+<text x="54" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">keydown event</text>
+<text x="54" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">throttled: 1 per 5s</text>
+<line x1="94" y1="46" x2="118" y2="46" stroke="var(--a)" stroke-width="1" marker-end="url(#ty1)"/>
+
+<!-- Gateway A -->
+<rect x="120" y="30" width="100" height="32" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text x="170" y="42" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Gateway-A</text>
+<text x="170" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">server-side throttle</text>
+<text x="170" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">dedup within 5s window</text>
+<line x1="220" y1="46" x2="244" y2="46" stroke="var(--y)" stroke-width="1" marker-end="url(#ty1)"/>
+
+<!-- In-Memory Router -->
+<rect x="246" y="26" width="130" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="311" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">In-Memory Pub/Sub Router</text>
+<text x="311" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">channel → online user → gateway</text>
+<text x="311" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">Redis Pub/Sub (no persistence)</text>
+
+<!-- Fan to gateways -->
+<line x1="376" y1="40" x2="410" y2="32" stroke="var(--g)" stroke-width=".8" marker-end="url(#ty2)"/>
+<line x1="376" y1="46" x2="410" y2="46" stroke="var(--g)" stroke-width=".8" marker-end="url(#ty2)"/>
+<line x1="376" y1="52" x2="410" y2="60" stroke="var(--g)" stroke-width=".8" marker-end="url(#ty2)"/>
+
+<!-- Target Gateways -->
+<rect x="412" y="24" width="90" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text x="457" y="35" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-B → 👤👤</text>
+<rect x="412" y="42" width="90" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text x="457" y="53" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-C → 👤</text>
+<rect x="412" y="60" width="90" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text x="457" y="71" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-D → 👤👤👤</text>
+
+<!-- Latency box -->
+<rect x="530" y="26" width="196" height="50" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="628" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Latency Breakdown</text>
+<text x="540" y="50" fill="var(--muted)" font-size="5.5">Client → Gateway: ~2ms (WS frame)</text>
+<text x="540" y="60" fill="var(--muted)" font-size="5.5">Redis Pub/Sub hop: ~1ms</text>
+<text x="540" y="70" fill="var(--muted)" font-size="5.5">Gateway → Client: ~2ms (WS push)</text>
+<text x="680" y="50" fill="var(--g)" font-size="5.5" font-weight="600">Total: ~5ms</text>
+
+<!-- ═══ THROTTLE & TTL LOGIC ═══ -->
+<rect x="4" y="130" width="732" height="80" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text x="370" y="144" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">THROTTLE & TTL — Why No Kafka</text>
+
+<rect x="14" y="154" width="220" height="46" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
+<text x="124" y="166" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client-Side Throttle</text>
+<text x="124" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">Max 1 event per 5s per conversation</text>
+<text x="124" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Debounce: wait 300ms after last keystroke</text>
+<text x="124" y="198" text-anchor="middle" fill="var(--muted)" font-size="4.5">Reduces 60 keystrokes/min → 1 event/5s</text>
+
+<rect x="260" y="154" width="220" height="46" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+<text x="370" y="166" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Server-Side Throttle (Gateway)</text>
+<text x="370" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">In-memory map: {user_id+channel_id → last_ts}</text>
+<text x="370" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Drop if last event &lt; 5s ago</text>
+<text x="370" y="198" text-anchor="middle" fill="var(--muted)" font-size="4.5">Prevents misbehaving clients from flooding</text>
+
+<rect x="506" y="154" width="220" height="46" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="616" y="166" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">TTL Auto-Expire (Client-Side)</text>
+<text x="616" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">Client shows "typing..." for max 8s</text>
+<text x="616" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">No "stopped typing" event needed</text>
+<text x="616" y="198" text-anchor="middle" fill="var(--muted)" font-size="4.5">Timer reset on each new typing event received</text>
+
+<!-- ═══ WHY NOT KAFKA ═══ -->
+<rect x="4" y="218" width="732" height="74" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text x="370" y="232" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">WHY NOT KAFKA — Latency Math</text>
+
+<rect x="14" y="240" width="350" height="44" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+<text x="189" y="254" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">❌ With Kafka: ~50-80ms added latency</text>
+<text x="189" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">Produce (5ms) + Broker persist (10ms) + Consumer poll (30ms) + Fan-out (5ms)</text>
+<text x="189" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">Total: ~50-80ms — too slow for ephemeral events, wastes disk I/O</text>
+
+<rect x="380" y="240" width="346" height="44" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text x="553" y="254" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">✓ Direct Pub/Sub: ~5ms total</text>
+<text x="553" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">Gateway → Redis Pub/Sub (1ms) → Target Gateway → WS push (2ms)</text>
+<text x="553" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">No disk, no consumer lag, no partition assignment overhead</text>
+</svg>
+</div>
+
+<!-- ═══ KEY DESIGN DECISIONS ═══ -->
+<div class="T" id="design-decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Every decision optimizes for one thing: <span class="hg">minimum latency with zero durability</span></p>
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
+<tr><td><span class="hi">Transport</span></td><td><span class="hg">Redis Pub/Sub</span> (gateway-to-gateway)</td><td>Sub-ms fan-out, no persistence, fire-and-forget semantics match typing events perfectly</td><td>Kafka: adds 50ms+ latency, persists to disk (wasteful for ephemeral data)</td></tr>
+<tr><td><span class="hi">Throttling</span></td><td><span class="hg">Dual: client + server</span></td><td>Client reduces 60 keystrokes/min to 1 event/5s. Server enforces for misbehaving clients.</td><td>Server-only: wastes bandwidth sending events that will be dropped</td></tr>
+<tr><td><span class="hi">Expiry</span></td><td><span class="hg">TTL-based (8s client timer)</span></td><td>No "stopped typing" event needed — reduces event volume by 50%. Timer resets on new event.</td><td>Explicit stop event: doubles event volume, complex state machine</td></tr>
+<tr><td><span class="hi">Delivery guarantee</span></td><td><span class="hg">At-most-once (fire & forget)</span></td><td>Missed typing indicator is invisible to user — no retry needed. Simplifies entire system.</td><td>At-least-once: requires ACKs, retries, dedup — overkill for ephemeral UI hint</td></tr>
+<tr><td><span class="hi">Routing</span></td><td><span class="hg">Channel-based pub/sub topic</span></td><td>Subscribe to <code>typing:{channel_id}</code>. Only gateways with online members subscribe.</td><td>User-level routing: too many subscriptions, O(members) lookups per event</td></tr>
+</table>
+<div class="b bg"><span class="hi">Key insight:</span> Typing indicators are the <span class="hg">opposite of messages</span> — they need speed over durability, at-most-once over at-least-once, and in-memory over persistent. Using the message delivery pipeline (Kafka) for typing events is an anti-pattern that adds 10× latency for zero benefit.</div>
+</div>
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Typing indicators are lossy by design — the system optimizes for graceful degradation over correctness</p>
+<table>
+<tr><th>#</th><th>Failure / Edge Case</th><th>What Breaks</th><th>How It's Handled</th></tr>
+<tr><td><span class="hi">1</span></td><td><span class="hr">Gateway crash</span></td><td>Typing events for users on that gateway are lost</td><td>Acceptable — typing indicator disappears after 8s TTL. No recovery needed. Users reconnect to new gateway.</td></tr>
+<tr><td><span class="hi">2</span></td><td><span class="hr">Redis Pub/Sub node failure</span></td><td>Events not delivered to subscribed gateways</td><td>Redis Sentinel promotes replica in ~5s. During failover, typing indicators simply don't show — invisible to users.</td></tr>
+<tr><td><span class="hi">3</span></td><td><span class="hr">User types then closes app</span></td><td>"Typing..." shown for up to 8s after user left</td><td>8s TTL auto-expires. Presence system detects disconnect and can optionally clear early.</td></tr>
+<tr><td><span class="hi">4</span></td><td><span class="hr">50-person group chat, all typing</span></td><td>50 typing events × 49 recipients = 2,450 deliveries</td><td>Client UI caps display at "3 people are typing..." — server can further throttle to top-3 most recent.</td></tr>
+<tr><td><span class="hi">5</span></td><td><span class="hr">Misbehaving client sends 100 events/sec</span></td><td>Could flood pub/sub channel</td><td>Server-side throttle drops events within 5s window. Rate limit at Gateway: max 1 event/5s enforced.</td></tr>
+</table>
+<div class="b by"><span class="hi">Design philosophy:</span> Typing indicators are a <span class="hg">best-effort UI enhancement</span>. The system is designed so that any failure mode results in the indicator simply not showing — never in a stuck "typing..." state (thanks to TTL) and never in message loss (typing events are separate from the message pipeline).</div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack &amp; Tradeoffs</h2>
+<p class="su">Minimal stack — optimized for speed and simplicity over durability</p>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
+<tr><td><span class="hi">Event Transport</span></td><td>Redis Pub/Sub</td><td>Sub-ms delivery, fire-and-forget, no persistence overhead. Channel-based subscription model.</td><td>Kafka: persists to disk, adds 50ms+ latency. Overkill for ephemeral events.</td></tr>
+<tr><td><span class="hi">Throttle State</span></td><td>In-memory HashMap (per Gateway)</td><td>O(1) lookup, no network hop. Map: {user+channel → last_event_ts}. Evicted on disconnect.</td><td>Redis: adds 1ms per event for throttle check — unnecessary network hop.</td></tr>
+<tr><td><span class="hi">Client Timer</span></td><td>setTimeout (8s TTL)</td><td>Auto-expires indicator without server involvement. Reset on each new event.</td><td>Server-sent "stop" event: doubles traffic, complex state management.</td></tr>
+<tr><td><span class="hi">WebSocket Gateway</span></td><td>Same as message delivery (Go/Java)</td><td>Reuses existing WS connections. Typing events are just another frame type on the same socket.</td><td>Separate connection: wasteful, doubles connection count.</td></tr>
+<tr><td><span class="hi">Subscription Management</span></td><td>Redis Pub/Sub channels per conversation</td><td>Gateway subscribes to <code>typing:{channel_id}</code> when first user in that channel connects.</td><td>Per-user subscriptions: O(members) subscriptions per channel, doesn't scale.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Cross-reference:</span> The typing indicator system rides on the same WebSocket connection as the <a href="slack-real-time-messaging.html">Slack Real-Time Messaging</a> system. The Gateway terminates the WS, handles both message delivery (via Kafka) and typing events (via Redis Pub/Sub) on the same connection — different transport for different durability needs.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 5 things an interviewer wants to hear about typing indicators at scale</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a)">
+<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">① Ephemeral = No Kafka, No DB</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Typing events are fire-and-forget. They never touch disk. Use Redis Pub/Sub for gateway-to-gateway delivery — sub-ms latency, zero persistence overhead. Kafka adds 50ms+ and wastes disk I/O on data that expires in 8 seconds.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
+<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">② Dual Throttle: Client + Server</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Client debounces keystrokes (300ms) then throttles to max 1 event per 5 seconds. Server enforces the same limit in-memory to protect against misbehaving clients. This reduces 60 keystrokes/min to 12 events/min per user per channel.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
+<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">③ TTL Auto-Expire (8s) — No Stop Event</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Client shows "typing..." for 8 seconds max, then auto-hides. Each new typing event resets the timer. No explicit "stopped typing" event needed — cuts event volume in half and eliminates stuck-state bugs.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
+<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">④ At-Most-Once Delivery (Lossy by Design)</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">A missed typing indicator is invisible to the user — they just don't see "typing..." for a moment. No ACKs, no retries, no dedup. This simplifies the entire system and makes it resilient to any transient failure.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">⑤ Channel-Based Pub/Sub Subscription</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each Gateway subscribes to <code>typing:{channel_id}</code> for channels with connected users. When a typing event arrives, the Gateway pushes to all local users in that channel. Unsubscribe when last user in channel disconnects.</div>
+</div>
+</div>
+<div class="b bg" style="margin-top:8px"><span class="hi">One-liner answer:</span> <em>"Typing indicators use Redis Pub/Sub for sub-ms gateway-to-gateway delivery with zero persistence, dual client+server throttling at 1 event per 5 seconds, 8-second TTL auto-expire on the client, at-most-once fire-and-forget semantics, and channel-based subscriptions so only relevant gateways receive events."</em></div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<div id="read-progress" style="position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--a),var(--g));z-index:9998;transition:width .1s linear"></div>
+<script>
+window.addEventListener('scroll',function(){var d=document.documentElement;var pct=(d.scrollTop/(d.scrollHeight-d.clientHeight))*100;document.getElementById('read-progress').style.width=Math.min(100,pct)+'%';});
+var b=document.getElementById('topBtn');window.addEventListener('scroll',function(){b.style.display=window.scrollY>400?'flex':'none'});
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

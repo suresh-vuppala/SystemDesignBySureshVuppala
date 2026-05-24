@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>5. Infrastructure — System Design Cheatsheet</title>
+<title>5. Infrastructure — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-8"><span class="e">🏗️</span> 5 · INFRASTRUCTURE</div>
 
@@ -733,130 +734,411 @@ server {
 <div class="b bb" style="margin-top:4px"><span class="hi">Choose:</span> <span class="hg">Shared/Shared</span> for cost (Salesforce) → <span class="hg">Shared/Multi-DB</span> for data isolation (Shopify) → <span class="hg">Multi/Multi</span> for full isolation (enterprise/compliance). Most SaaS starts shared and migrates to hybrid as they scale.</div>
 </div><!-- ═══ Infrastructure: separate compact lessons ═══ -->
 <div class="T" id="service-discovery">
-<h2>Service Discovery</h2><p class="su">How services find each other in a dynamic fleet</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Service discovery">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="30" y="80" width="100" height="50" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="80" y="100" fill="#fff" font-size="11">Client</text>
-    <text x="80" y="116" fill="#8b93ac">app pod</text>
+<h2>Service Discovery</h2><p class="su">How services <span class="hg">find each other</span> in a dynamic fleet — IPs change constantly as containers scale, restart, and migrate</p>
 
-    <rect x="230" y="30" width="120" height="50" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="290" y="50" fill="#fff" font-size="11">Registry</text>
-    <text x="290" y="66" fill="#8b93ac">Consul / etcd / Eureka</text>
+<!-- ═══ Service Discovery Architecture ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Service Discovery — Client-Side vs Server-Side</div>
+<svg width="100%" viewBox="0 0 700 240" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Service discovery patterns showing client-side and server-side approaches">
+  <defs><marker id="sd-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-    <rect x="430" y="55" width="110" height="30" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="485" y="74" fill="#fff">svc-A v1 ·10.0.0.5</text>
-    <rect x="430" y="95" width="110" height="30" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="485" y="114" fill="#fff">svc-A v1 ·10.0.0.6</text>
-    <rect x="430" y="135" width="110" height="30" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="485" y="154" fill="#fff">svc-A v1 ·10.0.0.7</text>
-  </g>
-  <path d="M130 100 L230 60" stroke="#6c8cff" stroke-width="1.5" marker-end="url(#sd1)"/>
-  <text x="170" y="74" fill="#6c8cff" font-size="9" font-family="Inter">where is svc-A?</text>
-  <path d="M350 60 L430 70" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#sd1)"/>
-  <text x="395" y="50" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="Inter">heartbeat</text>
-  <path d="M230 60 L130 110" stroke="#34d399" stroke-width="1.5" marker-end="url(#sd1)"/>
-  <text x="185" y="100" fill="#34d399" font-size="9" font-family="Inter">[ips]</text>
-  <defs><marker id="sd1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+  <!-- CLIENT-SIDE (left half) -->
+  <rect x="10" y="10" width="330" height="110" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="175" y="26" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="800">Client-Side Discovery</text>
+
+  <rect x="20" y="35" width="90" height="40" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
+  <text x="65" y="52" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Client</text>
+  <text x="65" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">+ SDK / library</text>
+  <text x="65" y="72" text-anchor="middle" fill="var(--muted)" font-size="4.5">load balances locally</text>
+
+  <rect x="140" y="35" width="90" height="40" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="185" y="52" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Registry</text>
+  <text x="185" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">Consul / Eureka</text>
+  <text x="185" y="72" text-anchor="middle" fill="var(--y)" font-size="4.5">returns [IP list]</text>
+
+  <rect x="260" y="30" width="70" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="295" y="42" text-anchor="middle" fill="var(--g)" font-size="5">10.0.0.5</text>
+  <rect x="260" y="50" width="70" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="295" y="62" text-anchor="middle" fill="var(--g)" font-size="5">10.0.0.6</text>
+  <rect x="260" y="70" width="70" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="295" y="82" text-anchor="middle" fill="var(--g)" font-size="5">10.0.0.7</text>
+
+  <line x1="110" y1="50" x2="138" y2="50" stroke="var(--a)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <line x1="230" y1="55" x2="258" y2="55" stroke="var(--y)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+
+  <text x="175" y="100" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ No extra hop</text>
+  <text x="175" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ SDK per language, client complexity</text>
+
+  <!-- SERVER-SIDE (right half) -->
+  <rect x="360" y="10" width="330" height="110" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="525" y="26" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="800">Server-Side Discovery</text>
+
+  <rect x="370" y="35" width="80" height="40" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
+  <text x="410" y="52" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Client</text>
+  <text x="410" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">simple HTTP</text>
+
+  <rect x="480" y="35" width="90" height="40" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="525" y="52" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">LB / Proxy</text>
+  <text x="525" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">ALB / Envoy</text>
+  <text x="525" y="72" text-anchor="middle" fill="var(--g)" font-size="4.5">routes to healthy</text>
+
+  <rect x="600" y="30" width="70" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="635" y="42" text-anchor="middle" fill="var(--g)" font-size="5">svc-A:1</text>
+  <rect x="600" y="50" width="70" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="635" y="62" text-anchor="middle" fill="var(--g)" font-size="5">svc-A:2</text>
+  <rect x="600" y="70" width="70" height="18" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="635" y="82" text-anchor="middle" fill="var(--g)" font-size="5">svc-A:3</text>
+
+  <line x1="450" y1="55" x2="478" y2="55" stroke="var(--a)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <line x1="570" y1="55" x2="598" y2="55" stroke="var(--g)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+
+  <text x="525" y="100" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Simple client, language-agnostic</text>
+  <text x="525" y="112" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Extra network hop, LB is SPOF</text>
+
+  <!-- DNS-BASED (bottom) -->
+  <rect x="10" y="130" width="680" height="100" rx="6" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="350" y="146" text-anchor="middle" fill="var(--c)" font-size="7.5" font-weight="800">DNS-Based Discovery (K8s CoreDNS / Consul DNS)</text>
+
+  <rect x="30" y="155" width="100" height="35" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="80" y="170" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Pod A</text>
+  <text x="80" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">resolve: svc-b.ns</text>
+
+  <line x1="130" y1="172" x2="170" y2="172" stroke="var(--c)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+
+  <rect x="172" y="155" width="120" height="35" rx="4" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width="1"/>
+  <text x="232" y="170" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">CoreDNS</text>
+  <text x="232" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">A/SRV records</text>
+
+  <line x1="292" y1="172" x2="330" y2="172" stroke="var(--c)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+
+  <rect x="332" y="155" width="120" height="35" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="392" y="170" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">K8s Service</text>
+  <text x="392" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">ClusterIP / headless</text>
+
+  <line x1="452" y1="172" x2="490" y2="172" stroke="var(--g)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+
+  <rect x="492" y="158" width="60" height="14" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="522" y="168" text-anchor="middle" fill="var(--g)" font-size="5">Pod B:1</text>
+  <rect x="492" y="174" width="60" height="14" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="522" y="184" text-anchor="middle" fill="var(--g)" font-size="5">Pod B:2</text>
+
+  <text x="350" y="210" text-anchor="middle" fill="var(--c)" font-size="5.5">✓ Zero SDK, stdlib resolver | ✗ TTL caching can serve stale IPs, no client-side LB</text>
+  <text x="350" y="222" text-anchor="middle" fill="var(--muted)" font-size="5.5">K8s: ClusterIP (virtual IP + kube-proxy) vs Headless (returns all pod IPs directly)</text>
 </svg>
+
+<!-- ═══ Service Discovery Table ═══ -->
 <table>
-<tr><th>Pattern</th><th>Who calls registry</th><th>Examples</th></tr>
-<tr><td>Client-side</td><td>App library</td><td>Eureka + Ribbon, Consul SDK</td></tr>
-<tr><td>Server-side</td><td>Load balancer</td><td>AWS ALB + Cloud Map, Envoy</td></tr>
-<tr><td>DNS-based</td><td>Stdlib resolver</td><td>K8s CoreDNS, Consul DNS</td></tr>
+<tr><th>Pattern</th><th>Who Resolves</th><th>Examples</th><th>Pros</th><th>Cons</th></tr>
+<tr><td><span class="hi">Client-side</span></td><td>App library / SDK</td><td>Eureka + Ribbon, Consul SDK, gRPC name resolver</td><td>No extra hop, client LB</td><td>SDK per language, stale cache</td></tr>
+<tr><td><span class="hi">Server-side</span></td><td>Load balancer / proxy</td><td>AWS ALB + Cloud Map, Envoy, Istio</td><td>Simple client, language-agnostic</td><td>Extra hop, LB is SPOF</td></tr>
+<tr><td><span class="hi">DNS-based</span></td><td>Stdlib DNS resolver</td><td>K8s CoreDNS, Consul DNS, AWS Route 53</td><td>Zero SDK, universal</td><td>TTL caching, no health-aware LB</td></tr>
+<tr><td><span class="hi">Service Mesh</span></td><td>Sidecar proxy (transparent)</td><td>Istio/Envoy, Linkerd, Consul Connect</td><td>Zero app changes, mTLS, observability</td><td>Complexity, resource overhead</td></tr>
 </table>
-<div class="b bg"><b>Health checks</b> remove dead instances from the registry within seconds — critical for fast failover.</div>
+
+<!-- ═══ Service Discovery Tools ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Registry Implementations</div>
+<table>
+<tr><th>Tool</th><th>Consensus</th><th>Health Check</th><th>Key Feature</th></tr>
+<tr><td><span class="hi">Consul</span></td><td>Raft</td><td>HTTP, TCP, gRPC, script</td><td>Multi-DC, service mesh (Connect), KV store</td></tr>
+<tr><td><span class="hi">etcd</span></td><td>Raft</td><td>Lease-based TTL</td><td>K8s backbone, strong consistency, watch API</td></tr>
+<tr><td><span class="hi">Eureka</span></td><td>AP (peer replication)</td><td>Heartbeat (30s default)</td><td>Netflix OSS, self-preservation mode</td></tr>
+<tr><td><span class="hi">ZooKeeper</span></td><td>ZAB</td><td>Ephemeral nodes</td><td>Mature, Kafka/Hadoop ecosystem</td></tr>
+<tr><td><span class="hi">AWS Cloud Map</span></td><td>Managed</td><td>Route 53 health checks</td><td>Native AWS, API + DNS discovery</td></tr>
+<tr><td><span class="hi">K8s (built-in)</span></td><td>etcd</td><td>Liveness + readiness probes</td><td>Zero setup, CoreDNS, Endpoints API</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Health checks</span> remove dead instances within seconds — critical for fast failover. Use <span class="hg">liveness</span> (is it alive?) + <span class="hg">readiness</span> (can it serve traffic?) probes. Deregister unhealthy instances immediately, don't wait for TTL.</div>
+<div class="b by"><span class="hi">K8s patterns:</span> <span class="hg">ClusterIP</span> — virtual IP, kube-proxy routes (default). <span class="hg">Headless</span> — returns all pod IPs (for stateful sets, client-side LB). <span class="hg">ExternalName</span> — CNAME to external service. <span class="hg">Service Mesh</span> — Envoy sidecar intercepts all traffic transparently.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Hardcoded IPs</span> — breaks on any scale event. <span class="hr">Long DNS TTL</span> — routes to dead instances. <span class="hr">No health checks</span> — registry serves stale entries. <span class="hr">Single registry</span> without replication — SPOF.</div>
 </div>
 
 <div class="T" id="cicd">
-<h2>CI/CD &amp; Deployment Strategies</h2><p class="su">Ship safely without taking the site down</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deployment strategies">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <text x="80" y="18" fill="#fff" font-weight="600">Rolling</text>
-    <rect x="20" y="26" width="30" height="22" fill="#34d399" opacity=".7"/>
-    <rect x="52" y="26" width="30" height="22" fill="#34d399" opacity=".7"/>
-    <rect x="84" y="26" width="30" height="22" fill="#fbbf24" opacity=".75"/>
-    <rect x="116" y="26" width="30" height="22" fill="#6c8cff" opacity=".75"/>
-    <text x="83" y="42" fill="#0f1117" font-weight="700">old</text>
-    <text x="131" y="42" fill="#fff" font-weight="700">new</text>
+<h2>CI/CD &amp; Deployment Strategies</h2><p class="su">Ship safely without taking the site down — <span class="hg">automate everything</span> from commit to production</p>
 
-    <text x="320" y="18" fill="#fff" font-weight="600">Blue / Green</text>
-    <rect x="230" y="26" width="100" height="22" fill="#22d3ee" opacity=".55"/>
-    <text x="280" y="42" fill="#fff" font-weight="700">BLUE (live)</text>
-    <rect x="340" y="26" width="100" height="22" fill="#a78bfa" opacity=".55"/>
-    <text x="390" y="42" fill="#fff" font-weight="700">GREEN (warm)</text>
-    <path d="M280 56 L390 56" stroke="#fbbf24" stroke-width="1.6" marker-end="url(#cd1)"/>
-    <text x="335" y="50" fill="#fbbf24">flip router</text>
+<!-- ═══ Deployment Strategies Diagram ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Deployment Strategies Compared</div>
+<svg width="100%" viewBox="0 0 700 200" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deployment strategies showing rolling, blue-green, canary, and feature flag approaches">
+  <!-- Rolling -->
+  <rect x="10" y="10" width="160" height="80" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+  <text x="90" y="26" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Rolling Update</text>
+  <rect x="20" y="34" width="25" height="18" rx="2" fill="rgba(52,211,153,.3)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="32" y="46" text-anchor="middle" fill="var(--g)" font-size="5">v1</text>
+  <rect x="48" y="34" width="25" height="18" rx="2" fill="rgba(52,211,153,.3)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="60" y="46" text-anchor="middle" fill="var(--g)" font-size="5">v1</text>
+  <rect x="76" y="34" width="25" height="18" rx="2" fill="rgba(108,140,255,.3)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="88" y="46" text-anchor="middle" fill="var(--a)" font-size="5">v2</text>
+  <rect x="104" y="34" width="25" height="18" rx="2" fill="rgba(108,140,255,.3)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="116" y="46" text-anchor="middle" fill="var(--a)" font-size="5">v2</text>
+  <rect x="132" y="34" width="25" height="18" rx="2" fill="rgba(108,140,255,.3)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="144" y="46" text-anchor="middle" fill="var(--a)" font-size="5">v2</text>
+  <text x="90" y="66" text-anchor="middle" fill="var(--muted)" font-size="5">replace 1-by-1</text>
+  <text x="90" y="76" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">zero downtime</text>
+  <text x="90" y="86" text-anchor="middle" fill="var(--r)" font-size="4.5">mixed versions during rollout</text>
 
-    <text x="80" y="108" fill="#fff" font-weight="600">Canary</text>
-    <rect x="20" y="116" width="126" height="22" fill="#34d399" opacity=".55"/>
-    <text x="83" y="132" fill="#fff" font-weight="700">95% old</text>
-    <rect x="148" y="116" width="30" height="22" fill="#fb923c" opacity=".75"/>
-    <text x="163" y="132" fill="#0f1117" font-weight="700">5%</text>
-    <text x="100" y="154" fill="#8b93ac">monitor errors → ramp</text>
+  <!-- Blue/Green -->
+  <rect x="180" y="10" width="160" height="80" rx="5" fill="rgba(34,211,238,.03)" stroke="var(--c)" stroke-width="1"/>
+  <text x="260" y="26" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Blue / Green</text>
+  <rect x="190" y="36" width="60" height="22" rx="3" fill="rgba(34,211,238,.2)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="220" y="50" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">BLUE (live)</text>
+  <rect x="260" y="36" width="60" height="22" rx="3" fill="rgba(167,139,250,.2)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="290" y="50" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">GREEN</text>
+  <text x="260" y="68" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">→ flip router instantly</text>
+  <text x="260" y="78" text-anchor="middle" fill="var(--g)" font-size="5">instant rollback</text>
+  <text x="260" y="86" text-anchor="middle" fill="var(--r)" font-size="4.5">2× infrastructure cost</text>
 
-    <text x="320" y="108" fill="#fff" font-weight="600">Feature Flag</text>
-    <rect x="230" y="116" width="210" height="22" fill="#252a3a" stroke="#404863"/>
-    <rect x="330" y="116" width="50" height="22" fill="#f472b6" opacity=".7"/>
-    <text x="335" y="132" fill="#fff" font-weight="700">flag ON</text>
-    <text x="335" y="154" fill="#8b93ac">decoupled from deploy</text>
-  </g>
-  <defs><marker id="cd1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+  <!-- Canary -->
+  <rect x="350" y="10" width="160" height="80" rx="5" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+  <text x="430" y="26" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Canary</text>
+  <rect x="360" y="36" width="100" height="22" rx="3" fill="rgba(52,211,153,.15)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="410" y="50" text-anchor="middle" fill="var(--g)" font-size="5.5">95% → v1</text>
+  <rect x="464" y="36" width="36" height="22" rx="3" fill="rgba(251,146,60,.25)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="482" y="50" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">5%</text>
+  <text x="430" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">monitor errors → ramp up</text>
+  <text x="430" y="78" text-anchor="middle" fill="var(--g)" font-size="5">low blast radius</text>
+  <text x="430" y="86" text-anchor="middle" fill="var(--r)" font-size="4.5">slow rollout, complex routing</text>
+
+  <!-- Feature Flag -->
+  <rect x="520" y="10" width="160" height="80" rx="5" fill="rgba(244,114,182,.03)" stroke="var(--p)" stroke-width="1"/>
+  <text x="600" y="26" text-anchor="middle" fill="var(--p)" font-size="7" font-weight="700">Feature Flag</text>
+  <rect x="530" y="36" width="140" height="22" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".5"/>
+  <rect x="600" y="36" width="40" height="22" rx="3" fill="rgba(244,114,182,.25)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="620" y="50" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">ON</text>
+  <text x="600" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">decoupled from deploy</text>
+  <text x="600" y="78" text-anchor="middle" fill="var(--g)" font-size="5">per-user targeting</text>
+  <text x="600" y="86" text-anchor="middle" fill="var(--r)" font-size="4.5">flag debt, testing complexity</text>
+
+  <!-- Pipeline (bottom) -->
+  <rect x="10" y="100" width="680" height="90" rx="5" fill="rgba(255,255,255,.01)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="350" y="115" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">CI/CD Pipeline</text>
+
+  <rect x="20" y="125" width="70" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="55" y="137" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Commit</text>
+  <text x="55" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">PR merge</text>
+
+  <line x1="90" y1="139" x2="105" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="107" y="125" width="70" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="142" y="137" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Build</text>
+  <text x="142" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">compile, lint</text>
+
+  <line x1="177" y1="139" x2="192" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="194" y="125" width="70" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="229" y="137" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Test</text>
+  <text x="229" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">unit + integration</text>
+
+  <line x1="264" y1="139" x2="279" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="281" y="125" width="70" height="28" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="316" y="137" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Image</text>
+  <text x="316" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">Docker push</text>
+
+  <line x1="351" y1="139" x2="366" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="368" y="125" width="70" height="28" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="403" y="137" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Staging</text>
+  <text x="403" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">e2e tests</text>
+
+  <line x1="438" y1="139" x2="453" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="455" y="125" width="70" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="490" y="137" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Canary</text>
+  <text x="490" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">5% → monitor</text>
+
+  <line x1="525" y1="139" x2="540" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="542" y="125" width="70" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="577" y="137" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Prod 100%</text>
+  <text x="577" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">full rollout</text>
+
+  <line x1="612" y1="139" x2="627" y2="139" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sd-arr)"/>
+  <rect x="629" y="125" width="55" height="28" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="656" y="137" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Rollback</text>
+  <text x="656" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">auto on SLO</text>
+
+  <text x="350" y="175" text-anchor="middle" fill="var(--muted)" font-size="5.5">Auto-rollback on: error rate &gt; 1% | p99 latency &gt; 500ms | SLO breach</text>
+  <text x="350" y="186" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Tools: GitHub Actions, GitLab CI, ArgoCD, Spinnaker, Flux</text>
 </svg>
-<div class="b bp"><b>Pipeline:</b> commit → build → unit → image → deploy staging → e2e → promote prod (canary) → auto-rollback on SLO breach.</div>
+
+<table>
+<tr><th>Strategy</th><th>Downtime</th><th>Rollback Speed</th><th>Risk</th><th>Best For</th></tr>
+<tr><td><span class="hi">Rolling</span></td><td>Zero</td><td>Minutes (re-roll)</td><td>Mixed versions during rollout</td><td>Stateless services, K8s default</td></tr>
+<tr><td><span class="hi">Blue/Green</span></td><td>Zero</td><td><span class="hg">Instant</span> (flip router)</td><td>2× cost, DB schema must be compatible</td><td>Critical services, instant rollback needed</td></tr>
+<tr><td><span class="hi">Canary</span></td><td>Zero</td><td>Fast (route 0% to canary)</td><td>Slow rollout, needs good observability</td><td>High-traffic services, gradual confidence</td></tr>
+<tr><td><span class="hi">Feature Flag</span></td><td>Zero</td><td><span class="hg">Instant</span> (toggle off)</td><td>Flag debt, testing matrix grows</td><td>Per-user rollout, A/B testing, kill switch</td></tr>
+<tr><td><span class="hi">Recreate</span></td><td><span class="hr">Yes</span></td><td>Redeploy old version</td><td>Downtime during swap</td><td>Dev/staging, stateful apps that can't run mixed</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Pipeline:</span> commit → build → unit tests → image → deploy staging → e2e → promote prod (canary 5% → 25% → 100%) → <span class="hg">auto-rollback on SLO breach</span>. Use <span class="hg">GitOps</span> (ArgoCD/Flux) for declarative, auditable deployments.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Manual deploys</span> — error-prone, no audit trail. <span class="hr">No rollback plan</span> — "we'll fix forward" fails at 3am. <span class="hr">Big-bang releases</span> — all changes at once = impossible to debug. <span class="hr">No staging environment</span> — prod is your test environment.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Netflix</strong> — Spinnaker canary with automated analysis (Kayenta). <strong>Google</strong> — 1% → 10% → 50% → 100% over days. <strong>Amazon</strong> — one-box deployment (single host first). <strong>GitHub</strong> — feature flags + Scientist for safe refactoring.</div>
 </div>
 
 <div class="T" id="serverless">
-<h2>Serverless / FaaS</h2><p class="su">Pay-per-invocation compute that scales to zero</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Serverless cold start">
-  <g font-family="Inter" font-size="10" fill="#c8cee0">
-    <rect x="20" y="60" width="110" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="75" y="86" text-anchor="middle" fill="#fff">Event source</text>
-    <text x="75" y="100" text-anchor="middle" fill="#8b93ac">S3, SQS, API GW</text>
+<h2>Serverless / FaaS</h2><p class="su"><span class="hg">Pay-per-invocation</span> compute that scales to zero — no servers to manage, auto-scales per request</p>
 
-    <rect x="170" y="40" width="100" height="30" fill="#fbbf24" opacity=".25" stroke="#fbbf24" rx="6"/>
-    <text x="220" y="60" text-anchor="middle" fill="#fbbf24">cold start</text>
-    <rect x="170" y="80" width="100" height="30" fill="#34d399" opacity=".3" stroke="#34d399" rx="6"/>
-    <text x="220" y="100" text-anchor="middle" fill="#34d399">warm exec</text>
+<!-- ═══ Serverless Architecture ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Serverless Execution Model — Cold Start &amp; Warm Invocation</div>
+<svg width="100%" viewBox="0 0 700 200" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Serverless execution model showing event sources, cold start, warm execution, and downstream services">
+  <defs><marker id="sl-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-    <rect x="320" y="40" width="110" height="70" fill="#1e2230" stroke="#a78bfa" rx="6"/>
-    <text x="375" y="62" text-anchor="middle" fill="#fff">Function</text>
-    <text x="375" y="78" text-anchor="middle" fill="#8b93ac">Lambda / GCF</text>
-    <text x="375" y="94" text-anchor="middle" fill="#8b93ac">15 min max</text>
+  <!-- Event Sources -->
+  <rect x="10" y="30" width="120" height="120" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="70" y="46" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Event Sources</text>
+  <rect x="20" y="52" width="100" height="14" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="70" y="62" text-anchor="middle" fill="var(--a)" font-size="5">API Gateway (HTTP)</text>
+  <rect x="20" y="70" width="100" height="14" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".5"/>
+  <text x="70" y="80" text-anchor="middle" fill="var(--y)" font-size="5">SQS / SNS / EventBridge</text>
+  <rect x="20" y="88" width="100" height="14" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="70" y="98" text-anchor="middle" fill="var(--g)" font-size="5">S3 (object events)</text>
+  <rect x="20" y="106" width="100" height="14" rx="2" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="70" y="116" text-anchor="middle" fill="var(--a2)" font-size="5">DynamoDB Streams</text>
+  <rect x="20" y="124" width="100" height="14" rx="2" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".5"/>
+  <text x="70" y="134" text-anchor="middle" fill="var(--o)" font-size="5">Schedule (cron)</text>
 
-    <rect x="460" y="60" width="80" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
-    <text x="500" y="86" text-anchor="middle" fill="#fff">DB / next svc</text>
-  </g>
-  <path d="M130 80 L170 80" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#sl1)"/>
-  <path d="M270 80 L320 80" stroke="#34d399" stroke-width="1.5" marker-end="url(#sl1)"/>
-  <path d="M430 80 L460 80" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#sl1)"/>
-  <defs><marker id="sl1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
-  <text x="280" y="140" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">cold: 100ms–2s · warm: ms</text>
+  <line x1="130" y1="90" x2="165" y2="90" stroke="var(--a)" stroke-width="1.2" marker-end="url(#sl-arr)"/>
+
+  <!-- Cold Start vs Warm -->
+  <rect x="167" y="20" width="200" height="140" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="267" y="36" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="800">Execution Environment</text>
+
+  <!-- Cold start path -->
+  <rect x="177" y="44" width="180" height="50" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="267" y="57" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">❄ Cold Start (first invocation)</text>
+  <text x="267" y="69" text-anchor="middle" fill="var(--muted)" font-size="5">1. Download code + layers</text>
+  <text x="267" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">2. Init runtime (JVM, Node, Python)</text>
+  <text x="267" y="89" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">100ms – 10s (Java worst)</text>
+
+  <!-- Warm path -->
+  <rect x="177" y="100" width="180" height="35" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="267" y="113" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">🔥 Warm Invocation (reuse)</text>
+  <text x="267" y="125" text-anchor="middle" fill="var(--muted)" font-size="5">handler() called directly</text>
+  <text x="267" y="133" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1-5ms overhead</text>
+
+  <line x1="367" y1="90" x2="400" y2="90" stroke="var(--g)" stroke-width="1.2" marker-end="url(#sl-arr)"/>
+
+  <!-- Function -->
+  <rect x="402" y="40" width="130" height="100" rx="6" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="467" y="56" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Function</text>
+  <text x="467" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">your business logic</text>
+  <text x="467" y="82" text-anchor="middle" fill="var(--muted)" font-size="5">max: 15 min (Lambda)</text>
+  <text x="467" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">max: 60 min (GCF gen2)</text>
+  <text x="467" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">memory: 128MB – 10GB</text>
+  <text x="467" y="118" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">stateless (use external state)</text>
+  <text x="467" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">concurrency: 1000 default</text>
+
+  <line x1="532" y1="90" x2="565" y2="90" stroke="var(--a2)" stroke-width="1" marker-end="url(#sl-arr)"/>
+
+  <!-- Downstream -->
+  <rect x="567" y="30" width="120" height="120" rx="6" fill="rgba(34,211,238,.03)" stroke="var(--c)" stroke-width="1"/>
+  <text x="627" y="46" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Downstream</text>
+  <rect x="577" y="52" width="100" height="14" rx="2" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".5"/>
+  <text x="627" y="62" text-anchor="middle" fill="var(--c)" font-size="5">DynamoDB / RDS Proxy</text>
+  <rect x="577" y="70" width="100" height="14" rx="2" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".5"/>
+  <text x="627" y="80" text-anchor="middle" fill="var(--c)" font-size="5">S3 / ElastiCache</text>
+  <rect x="577" y="88" width="100" height="14" rx="2" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".5"/>
+  <text x="627" y="98" text-anchor="middle" fill="var(--c)" font-size="5">SQS / SNS (async)</text>
+  <rect x="577" y="106" width="100" height="14" rx="2" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".5"/>
+  <text x="627" y="116" text-anchor="middle" fill="var(--c)" font-size="5">External APIs</text>
+  <rect x="577" y="124" width="100" height="14" rx="2" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".5"/>
+  <text x="627" y="134" text-anchor="middle" fill="var(--c)" font-size="5">Step Functions (orchestrate)</text>
+
+  <!-- Cost model -->
+  <text x="350" y="175" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Cost Model: requests × duration × memory</text>
+  <text x="350" y="188" text-anchor="middle" fill="var(--muted)" font-size="5.5">Free tier: 1M requests + 400K GB-seconds/month | ~$0.20 per 1M requests after</text>
 </svg>
+
 <table>
-<tr><th>Good for</th><th>Bad for</th></tr>
-<tr><td>Event-driven glue, image resize, webhooks</td><td>Long-running jobs (&gt;15 min)</td></tr>
-<tr><td>Spiky low-volume traffic</td><td>Sustained high RPS (cost &gt; container)</td></tr>
-<tr><td>Cron + queue workers</td><td>Stateful sessions, websockets</td></tr>
+<tr><th>Good For</th><th>Bad For</th><th>Why</th></tr>
+<tr><td><span class="hg">Event-driven glue</span></td><td><span class="hr">Long-running jobs (&gt;15 min)</span></td><td>Timeout limits, cost per duration</td></tr>
+<tr><td><span class="hg">Spiky / low-volume traffic</span></td><td><span class="hr">Sustained high RPS</span></td><td>Cost exceeds containers at ~1M req/day</td></tr>
+<tr><td><span class="hg">Image/video processing</span></td><td><span class="hr">Stateful sessions / WebSockets</span></td><td>Stateless by design, no persistent connections</td></tr>
+<tr><td><span class="hg">Cron jobs + queue workers</span></td><td><span class="hr">Low-latency APIs (p99 &lt; 10ms)</span></td><td>Cold start adds 100ms-10s</td></tr>
+<tr><td><span class="hg">Prototyping / MVPs</span></td><td><span class="hr">Complex orchestration</span></td><td>Use Step Functions for multi-step workflows</td></tr>
 </table>
-<div class="b by"><b>Mitigate cold start:</b> provisioned concurrency, slim runtimes (Go, Rust), keep-warm pings, SnapStart.</div>
+
+<!-- ═══ Cold Start Mitigation ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Cold Start Mitigation Strategies</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Reduce Cold Start</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Provisioned Concurrency:</strong> pre-warm N instances ($$)</li>
+<li><strong>SnapStart:</strong> snapshot after init, restore on invoke (Java)</li>
+<li><strong>Slim runtimes:</strong> Go, Rust (10-50ms cold start)</li>
+<li><strong>Smaller packages:</strong> tree-shake, no unused deps</li>
+<li><strong>Keep-warm pings:</strong> scheduled invoke every 5 min</li>
+<li><strong>Init outside handler:</strong> DB connections in global scope</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Serverless Platforms</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>AWS Lambda:</strong> most mature, 15 min max, SnapStart</li>
+<li><strong>GCP Cloud Functions:</strong> gen2 (Cloud Run based), 60 min</li>
+<li><strong>Azure Functions:</strong> durable functions for orchestration</li>
+<li><strong>Cloudflare Workers:</strong> V8 isolates, 0ms cold start, edge</li>
+<li><strong>Vercel/Netlify:</strong> frontend-focused, edge functions</li>
+<li><strong>Knative:</strong> K8s-native serverless (scale to zero)</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Mitigate cold start:</span> <span class="hg">Provisioned concurrency</span> for latency-sensitive paths. <span class="hg">Slim runtimes</span> (Go, Rust: 10-50ms cold start vs Java: 3-10s). <span class="hg">SnapStart</span> (Lambda Java). <span class="hg">Init outside handler</span> — DB connections, SDK clients in global scope (reused across warm invocations).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Lambda monolith</span> — one giant function doing everything. <span class="hr">Synchronous chains</span> — Lambda → Lambda → Lambda (use Step Functions). <span class="hr">VPC without NAT</span> — adds 6-10s cold start. <span class="hr">Ignoring concurrency limits</span> — throttled at 1000 default.</div>
+<div class="b by"><span class="hi">Real-world:</span> <strong>Netflix</strong> — Lambda for encoding pipeline triggers. <strong>Coca-Cola</strong> — vending machine backend (spiky, event-driven). <strong>iRobot</strong> — IoT event processing. <strong>Capital One</strong> — real-time fraud detection. <strong>BBC</strong> — on-demand video transcoding.</div>
 </div>
 
 <div class="T" id="iac">
-<h2>Infrastructure as Code</h2><p class="su">Version-control your cloud just like your app</p>
+<h2>Infrastructure as Code</h2><p class="su">Version-control your cloud just like your app — <span class="hg">reproducible</span>, <span class="hg">auditable</span>, <span class="hg">reviewable</span> infrastructure</p>
+
+<!-- ═══ IaC Tools Comparison ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> IaC Tools — Declarative vs Imperative</div>
 <table>
-<tr><th>Tool</th><th>Language</th><th>Strength</th></tr>
-<tr><td>Terraform</td><td>HCL (declarative)</td><td>Multi-cloud, huge provider catalog</td></tr>
-<tr><td>CloudFormation</td><td>YAML/JSON</td><td>Native AWS, free state mgmt</td></tr>
-<tr><td>Pulumi</td><td>TS/Python/Go</td><td>Real code — loops, tests, abstractions</td></tr>
-<tr><td>CDK</td><td>TS/Py/Java</td><td>AWS-blessed L2/L3 constructs</td></tr>
+<tr><th>Tool</th><th>Language</th><th>Approach</th><th>State</th><th>Strength</th></tr>
+<tr><td><span class="hi">Terraform</span></td><td>HCL (declarative)</td><td>Plan → Apply</td><td>S3 + DynamoDB lock / TF Cloud</td><td>Multi-cloud, huge provider catalog, modules</td></tr>
+<tr><td><span class="hi">OpenTofu</span></td><td>HCL (declarative)</td><td>Plan → Apply</td><td>Same as Terraform</td><td>Open-source fork, community-driven</td></tr>
+<tr><td><span class="hi">CloudFormation</span></td><td>YAML/JSON</td><td>Stack-based</td><td>AWS-managed (free)</td><td>Native AWS, drift detection, StackSets</td></tr>
+<tr><td><span class="hi">Pulumi</span></td><td>TS/Python/Go/C#</td><td>Real code</td><td>Pulumi Cloud / self-managed</td><td>Loops, tests, abstractions, type safety</td></tr>
+<tr><td><span class="hi">AWS CDK</span></td><td>TS/Python/Java/Go</td><td>Synthesizes to CFN</td><td>CloudFormation</td><td>L2/L3 constructs, AWS-blessed patterns</td></tr>
+<tr><td><span class="hi">Crossplane</span></td><td>YAML (K8s CRDs)</td><td>Reconciliation loop</td><td>K8s etcd</td><td>GitOps-native, K8s-first, compositions</td></tr>
 </table>
-<pre><code>resource "aws_s3_bucket" "logs" {
+
+<!-- ═══ IaC Workflow ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> IaC Workflow &amp; Best Practices</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">GitOps Workflow</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>PR:</strong> change infra code → <code>terraform plan</code> in CI</li>
+<li><strong>Review:</strong> team reviews plan diff (what will change)</li>
+<li><strong>Merge:</strong> <code>terraform apply</code> runs automatically</li>
+<li><strong>State:</strong> remote backend (S3 + DynamoDB lock)</li>
+<li><strong>Drift:</strong> detect with scheduled <code>plan</code> runs</li>
+<li><strong>Modules:</strong> reusable components (VPC, EKS, RDS)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Best Practices</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Environments:</strong> separate state per env (dev/staging/prod)</li>
+<li><strong>Least privilege:</strong> CI role has only needed permissions</li>
+<li><strong>No manual changes:</strong> all changes through code</li>
+<li><strong>Blast radius:</strong> small stacks, not one mega-stack</li>
+<li><strong>Secrets:</strong> never in code — use Vault, SSM, SOPS</li>
+<li><strong>Testing:</strong> <code>tflint</code>, <code>checkov</code>, <code>terratest</code></li>
+</ul>
+</div>
+</div>
+
+<pre><code>// Terraform example — S3 bucket with versioning
+resource "aws_s3_bucket" "logs" {
   bucket = "acme-logs-prod"
-  versioning { enabled = true }
-  tags = { env = "prod" }
+  tags   = { env = "prod", team = "platform" }
+}
+
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  versioning_configuration { status = "Enabled" }
 }</code></pre>
-<div class="b bg"><b>Workflow:</b> PR → <code>plan</code> in CI (diff visible) → review → <code>apply</code> on merge. State in S3+DynamoDB lock or Terraform Cloud.</div>
+
+<div class="b bg"><span class="hi">Workflow:</span> PR → <code>plan</code> in CI (diff visible in PR comment) → team review → <code>apply</code> on merge. State in <span class="hg">S3 + DynamoDB lock</span> or Terraform Cloud. Use <span class="hg">workspaces</span> or <span class="hg">directory structure</span> for environment separation.</div>
+<div class="b by"><span class="hi">Testing IaC:</span> <span class="hg">tflint</span> — lint HCL for errors. <span class="hg">checkov / tfsec</span> — security scanning (open S3 buckets, missing encryption). <span class="hg">terratest</span> — integration tests (deploy, validate, destroy). <span class="hg">OPA/Sentinel</span> — policy-as-code (enforce tagging, region restrictions).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">ClickOps</span> — manual console changes that drift from code. <span class="hr">Mega-stack</span> — one state file for everything (slow, risky). <span class="hr">Secrets in state</span> — state file contains sensitive values (encrypt it). <span class="hr">No locking</span> — concurrent applies corrupt state.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>HashiCorp</strong> — Terraform manages millions of cloud resources globally. <strong>Shopify</strong> — CDK for AWS infrastructure. <strong>Uber</strong> — custom IaC for multi-cloud. <strong>GitLab</strong> — Terraform + GitOps for all infrastructure changes.</div>
 </div>
 
 </div>
@@ -866,6 +1148,11 @@ server {
 
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

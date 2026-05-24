@@ -1,0 +1,1587 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Slack handle 10+ billion messages per day? — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Slack handle 10+ billion messages per day across the globe?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">💬</span> Design a real-time messaging system that delivers messages to 50,000 online users within 200ms at 10B+ messages/day</div>
+
+<!-- ═══ PROBLEM STATEMENT ═══ -->
+<div class="T" id="problem">
+<p class="su">How does a real-time chat system deliver one message to 50,000 online users in under 200ms — while sustaining 10B+ messages per day at peak 200K msg/sec?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time delivery path only — not search, file storage, or push to offline users. The hard question: <span class="hr">how does one message fan-out to thousands of live WebSocket connections without write amplification killing the system?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="10" data-suffix="B+" style="font-size:1.5rem;font-weight:700;color:var(--o)">10B+</div>
+<div style="font-size:.72rem;color:var(--muted)">messages / day</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~115K avg msg/sec</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="200" data-suffix="K" style="font-size:1.5rem;font-weight:700;color:var(--r)">200K</div>
+<div style="font-size:.72rem;color:var(--muted)">msg/sec peak</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~1.7× avg load</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="10" data-suffix="M+" style="font-size:1.5rem;font-weight:700;color:var(--a)">10M+</div>
+<div style="font-size:.72rem;color:var(--muted)">concurrent WebSockets</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~20K Gateway servers</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="200" data-prefix="&lt;" data-suffix="ms" style="font-size:1.5rem;font-weight:700;color:var(--g)">&lt;200ms</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery P99</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~11ms same-region</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do — the core user-facing behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> User can <strong>send a text message</strong> to a channel or DM<br>
+  <span class="hg">2.</span> All <strong>online members</strong> of a channel receive the message in <strong>real time</strong> (&lt;200ms)<br>
+  <span class="hg">3.</span> Messages are <strong>ordered</strong> — every user sees them in the same sequence<br>
+  <span class="hg">4.</span> <strong>Offline users</strong> receive missed messages on reconnect (catch-up)<br>
+  <span class="hg">5.</span> Users can see <strong>presence</strong> — who is currently online in a channel<br>
+  <span class="hg">6.</span> Messages are <strong>persisted durably</strong> — never lost after the sender gets an ACK
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> Full-text message <strong>search</strong> (separate Elasticsearch pipeline)<br>
+  <span class="hr">✗</span> <strong>Push notifications</strong> to mobile when app is backgrounded (APNs / FCM)<br>
+  <span class="hr">✗</span> <strong>File / media uploads</strong> (separate blob storage path)<br>
+  <span class="hr">✗</span> <strong>Reactions, threads, edits, deletes</strong> (same delivery path, different events)<br>
+  <span class="hr">✗</span> <strong>User authentication</strong> and workspace management<br>
+  <span class="hr">✗</span> <strong>Read receipts</strong> at scale (separate aggregation problem)
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">The quality constraints that shape every architectural decision</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">P99 &lt;200ms</span> same-region · <span class="hg">&lt;250ms</span> cross-region</td><td>Chat feels broken above ~500ms. Drives WebSocket over polling, Redis over DB for hot path.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">200K msg/sec</span> peak sustained</td><td>Requires Kafka (1M+ msg/sec headroom), partitioned fan-out workers, and Gateway horizontal scale.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span> (&lt;52 min/year downtime)</td><td>No single point of failure. Gateway, Kafka, Redis, Vitess all multi-node. GeoDNS for region failover.</td></tr>
+<tr><td><span class="hi">Durability</span></td><td><span class="hg">Zero message loss</span> after producer ACK</td><td>Kafka <code>acks=all</code> + <code>min.insync.replicas=2</code>. Vitess synchronous replication within shard.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Per-channel ordering</span> (not global)</td><td>All members see messages in the same order within a channel. Cross-channel ordering not required.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td>Linear scale to <span class="hg">10M+ concurrent WS</span></td><td>Stateless fan-out workers + stateful Gateways (each holds ~500K connections). Add nodes independently.</td></tr>
+<tr><td><span class="hi">Fault tolerance</span></td><td>Survive <span class="hg">single-node failures</span> transparently</td><td>Client reconnects + seq-based catch-up means a Gateway crash is invisible to the user within seconds.</td></tr>
+<tr><td><span class="hi">Security</span></td><td>TLS everywhere · workspace isolation</td><td>All WS connections over WSS. Vitess shard-per-workspace prevents cross-tenant data leaks.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Availability vs. Consistency</span>. Slack chooses availability — a message may arrive 80ms later for a cross-region user, but the system never blocks. Ordering is guaranteed <em>within</em> a channel, not globally.</div>
+</div>
+
+<!-- ═══ KEY NUMBERS ═══ -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question → derive infrastructure sizing. Show this reasoning in an interview.</p>
+
+<!-- Given inputs -->
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>10B messages/day</strong> · <strong>50,000 online users per channel</strong> · <strong>&lt;200ms P99 delivery</strong> · <strong>10M+ concurrent users</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Avg msg/sec</td>
+  <td>10B ÷ 86,400 sec/day</td>
+  <td><span class="hg">~115K msg/sec</span></td>
+  <td>Baseline throughput — Kafka must sustain this 24/7</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Peak msg/sec</td>
+  <td>115K × 1.7× peak factor</td>
+  <td><span class="hg">~200K msg/sec</span></td>
+  <td>Size Kafka partitions and fan-out workers for peak, not avg</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Gateway servers needed</td>
+  <td>10M connections ÷ 500K conn/server (epoll limit)</td>
+  <td><span class="hg">~20 Gateway servers</span></td>
+  <td>Each Gateway holds 500K persistent WebSockets; Redis maps user → gateway</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Fan-out ops/sec (worst case)</td>
+  <td>200K msg/sec × 50K members/channel</td>
+  <td><span class="hr">10B ops/sec ✗</span></td>
+  <td>Impossible → must skip offline. Only ~10% online → 200K × 5K = <span class="hg">1B ops/sec ✓</span></td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Kafka partitions</td>
+  <td>200K msg/sec ÷ ~20 msg/sec per partition (safe throughput)</td>
+  <td><span class="hg">~10K partitions</span></td>
+  <td>1 partition per hot channel; hash-assigned for the rest. 1 fan-out worker per partition.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Message storage / day</td>
+  <td>10B msgs × 1KB avg payload</td>
+  <td><span class="hg">~10TB/day</span></td>
+  <td>Vitess sharded by workspace_id. 7-day retention → ~70TB total. Kafka retention separate.</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Redis memory (presence)</td>
+  <td>10M users × 50 bytes (user_id + gateway mapping)</td>
+  <td><span class="hg">~500MB</span></td>
+  <td>Fits comfortably in Redis. Channel online sets add ~100MB more. Total &lt;1GB hot data.</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Latency budget breakdown</td>
+  <td>200ms budget − 80ms cross-region gRPC = 120ms same-region budget</td>
+  <td><span class="hg">~11ms actual</span></td>
+  <td>Kafka (~5ms) + Redis (~1ms) + gRPC (~3ms) + WS push (~2ms) = ~11ms. Well within 200ms budget.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with step 1–2 (traffic), then step 3 (connections), then step 4 (fan-out math) — that's where the key insight lives. The 10B ops/sec impossibility is what forces the hybrid fan-out design. Derive the architecture from the numbers, not the other way around.</div>
+</div>
+
+<!-- ═══ APIs ═══ -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Three surfaces: <span class="hg">WebSocket</span> (real-time delivery) · <span class="hg">REST</span> (send + history) · <span class="hg">Internal gRPC</span> (fan-out worker → Gateway)</p>
+
+<style>
+.api-tabs{margin-top:10px}
+.api-tab-bar{
+  display:flex;gap:4px;padding:4px;
+  background:var(--card-2);border:1px solid var(--border);
+  border-radius:14px;margin-bottom:16px;
+  width:fit-content;
+}
+.api-tab-btn{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 20px;border-radius:10px;border:none;
+  background:transparent;color:var(--muted);
+  font-size:.82rem;font-weight:600;font-family:inherit;
+  cursor:pointer;transition:all .2s ease;
+  white-space:nowrap;position:relative;
+}
+.api-tab-btn:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.api-tab-btn .tab-icon{font-size:1.05rem;line-height:1}
+.api-tab-btn .tab-badge{
+  font-size:.6rem;padding:2px 7px;border-radius:999px;
+  font-weight:700;opacity:.8;
+}
+.api-tab-btn.active{color:#fff;font-weight:700}
+.api-tab-btn[data-tab="ws"].active{
+  background:rgba(108,140,255,.18);
+  box-shadow:0 0 0 1px rgba(108,140,255,.4) inset;
+}
+.api-tab-btn[data-tab="ws"].active .tab-badge{background:rgba(108,140,255,.3);color:var(--a)}
+.api-tab-btn[data-tab="rest"].active{
+  background:rgba(52,211,153,.15);
+  box-shadow:0 0 0 1px rgba(52,211,153,.35) inset;
+}
+.api-tab-btn[data-tab="rest"].active .tab-badge{background:rgba(52,211,153,.25);color:var(--g)}
+.api-tab-btn[data-tab="grpc"].active{
+  background:rgba(251,146,60,.15);
+  box-shadow:0 0 0 1px rgba(251,146,60,.35) inset;
+}
+.api-tab-btn[data-tab="grpc"].active .tab-badge{background:rgba(251,146,60,.25);color:var(--o)}
+.api-tab-pane{animation:apiPaneIn .2s ease}
+@keyframes apiPaneIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* Modern API cards */
+.api-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:16px;margin-bottom:12px;
+  transition:border-color .2s ease;
+}
+.api-card:hover{border-color:var(--border-strong)}
+.api-card-header{
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.api-method{
+  font-size:.7rem;font-weight:800;padding:3px 8px;
+  border-radius:6px;letter-spacing:.3px;
+  text-transform:uppercase;
+}
+.api-method.ws-in{background:rgba(108,140,255,.15);color:var(--a);border:1px solid rgba(108,140,255,.3)}
+.api-method.ws-out{background:rgba(52,211,153,.15);color:var(--g);border:1px solid rgba(52,211,153,.3)}
+.api-method.get{background:rgba(108,140,255,.12);color:var(--a);border:1px solid rgba(108,140,255,.25)}
+.api-method.post{background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.25)}
+.api-method.grpc-call{background:rgba(251,146,60,.12);color:var(--o);border:1px solid rgba(251,146,60,.25)}
+.api-endpoint{
+  font-family:'JetBrains Mono',monospace;font-size:.82rem;
+  color:var(--text);font-weight:600;
+}
+.api-desc{font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px}
+.api-payload{
+  background:var(--bg-2);border:1px solid var(--border);
+  border-radius:8px;padding:10px 14px;margin-bottom:8px;
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;
+  line-height:1.6;color:var(--text-2);overflow-x:auto;
+}
+.api-payload .comment{color:var(--muted);font-style:italic}
+.api-meta{
+  display:flex;gap:16px;flex-wrap:wrap;
+  font-size:.7rem;color:var(--muted);margin-top:8px;
+}
+.api-meta-item{display:flex;align-items:center;gap:4px}
+.api-meta-item .label{color:var(--muted);font-weight:500}
+.api-meta-item .value{color:var(--text-2);font-weight:600}
+.api-status-codes{
+  display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;
+}
+.api-status{
+  font-size:.65rem;padding:2px 7px;border-radius:5px;
+  font-family:'JetBrains Mono',monospace;font-weight:600;
+}
+.api-status.success{background:rgba(52,211,153,.1);color:var(--g);border:1px solid rgba(52,211,153,.2)}
+.api-status.error{background:rgba(248,113,113,.08);color:var(--r);border:1px solid rgba(248,113,113,.2)}
+.api-status.warn{background:rgba(251,191,36,.1);color:var(--y);border:1px solid rgba(251,191,36,.2)}
+.api-section-label{
+  font-size:.72rem;font-weight:700;color:var(--text);
+  margin:18px 0 10px;padding-bottom:6px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.api-section-label .icon{font-size:.9rem}
+.api-flow-step{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:8px 0;border-bottom:1px solid rgba(47,53,72,.5);
+}
+.api-flow-step:last-child{border-bottom:none}
+.api-flow-num{
+  min-width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;font-weight:800;flex-shrink:0;
+}
+.api-flow-content{flex:1;font-size:.76rem;line-height:1.5}
+</style>
+
+<div class="api-tabs">
+  <div class="api-tab-bar">
+    <button class="api-tab-btn active" data-tab="ws" onclick="apiTab(this,'ws')">
+      <span class="tab-icon">🔌</span> WebSocket
+      <span class="tab-badge">full-duplex</span>
+    </button>
+    <button class="api-tab-btn" data-tab="rest" onclick="apiTab(this,'rest')">
+      <span class="tab-icon">🌐</span> REST
+      <span class="tab-badge">4 endpoints</span>
+    </button>
+    <button class="api-tab-btn" data-tab="grpc" onclick="apiTab(this,'grpc')">
+      <span class="tab-icon">⚡</span> gRPC
+      <span class="tab-badge">internal</span>
+    </button>
+  </div>
+
+  <!-- ════ WebSocket Tab ════ -->
+  <div class="api-tab-pane" id="api-ws">
+
+    <div class="api-section-label"><span class="icon">🤝</span> Connection Handshake</div>
+
+    <div class="api-card">
+      <div class="api-flow-step">
+        <div class="api-flow-num" style="background:rgba(108,140,255,.15);color:var(--a)">1</div>
+        <div class="api-flow-content">
+          <strong style="color:var(--text)">Client fetches WSS endpoint via REST</strong><br>
+          <span style="color:var(--muted)">Then upgrades the connection:</span>
+          <div class="api-payload" style="margin-top:6px">
+GET /v1/ws?token=&lt;jwt&gt;&amp;workspace_id=&lt;id&gt;<br>
+Upgrade: websocket<br>
+Connection: Upgrade
+          </div>
+        </div>
+      </div>
+      <div class="api-flow-step">
+        <div class="api-flow-num" style="background:rgba(52,211,153,.15);color:var(--g)">2</div>
+        <div class="api-flow-content">
+          <strong style="color:var(--text)">Server responds</strong>
+          <div class="api-status-codes" style="margin-top:6px">
+            <span class="api-status success">101 Switching Protocols</span>
+            <span class="api-status error">401 Unauthorized</span>
+            <span class="api-status warn">429 Too Many Requests</span>
+          </div>
+        </div>
+      </div>
+      <div class="api-flow-step">
+        <div class="api-flow-num" style="background:rgba(251,191,36,.15);color:var(--y)">3</div>
+        <div class="api-flow-content">
+          <strong style="color:var(--text)">Client sends <code>hello</code> frame</strong> — declares last known position per channel
+          <div class="api-payload" style="margin-top:6px">
+{ "type": "hello", "last_seq_map": { "C123": 47, "C456": 12 } }
+          </div>
+        </div>
+      </div>
+      <div class="api-flow-step">
+        <div class="api-flow-num" style="background:rgba(167,139,250,.15);color:var(--a2)">4</div>
+        <div class="api-flow-content">
+          <strong style="color:var(--text)">Server replies with <code>hello_ack</code></strong> + backfill for any gaps
+          <div class="api-payload" style="margin-top:6px">
+{ "type": "hello_ack", "user_id": "U789", "session_id": "sess_abc" }<br>
+<span class="comment">// If gaps detected:</span><br>
+{ "type": "message.backfill", "channel_id": "C123", "messages": [...] }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="api-section-label"><span class="icon">📤</span> Client → Server Events</div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-in">C → S</span>
+        <span class="api-endpoint">hello</span>
+      </div>
+      <div class="api-desc">Declare last known seq per channel. Triggers backfill for any gaps.</div>
+      <div class="api-payload">{ last_seq_map: { channel_id: seq } }</div>
+      <div class="api-meta">
+        <div class="api-meta-item"><span class="label">Close code:</span><span class="value" style="color:var(--r)">4001 if token invalid</span></div>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-in">C → S</span>
+        <span class="api-endpoint">message.send</span>
+      </div>
+      <div class="api-desc">Send a message. <code>client_msg_id</code> is a client-generated UUID for dedup on retry.</div>
+      <div class="api-payload">{ channel_id, text, client_msg_id }</div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-in">C → S</span>
+        <span class="api-endpoint">ping</span>
+      </div>
+      <div class="api-desc">Heartbeat — Gateway closes connection if no ping received within 30s.</div>
+      <div class="api-payload">{ ts }</div>
+      <div class="api-meta">
+        <div class="api-meta-item"><span class="label">Close code:</span><span class="value" style="color:var(--r)">1001 if no ping in 30s</span></div>
+      </div>
+    </div>
+
+    <div class="api-section-label"><span class="icon">📥</span> Server → Client Events</div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">hello_ack</span>
+      </div>
+      <div class="api-desc">Confirms auth succeeded. Client can now send messages.</div>
+      <div class="api-payload">{ user_id, session_id }</div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">message.new</span>
+      </div>
+      <div class="api-desc">Real-time push of a new message. Client renders and advances <code>last_seq</code>.</div>
+      <div class="api-payload">{ channel_id, channel_seq, user_id, text, ts }</div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">message.ack</span>
+      </div>
+      <div class="api-desc">Confirms server received and persisted the sent message.</div>
+      <div class="api-payload">{ client_msg_id, channel_seq, ts }</div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">message.backfill</span>
+      </div>
+      <div class="api-desc">Catch-up batch after <code>hello</code> or when client detects a gap in sequence numbers.</div>
+      <div class="api-payload">{ channel_id, messages: [...], has_more }</div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">presence.update</span>
+      </div>
+      <div class="api-desc">Presence change broadcast to all online channel members.</div>
+      <div class="api-payload">{ user_id, channel_id, status: "online" | "away" | "offline" }</div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">error</span>
+      </div>
+      <div class="api-desc">Error response for invalid operations.</div>
+      <div class="api-payload">{ code, message, ref_id }<br><span class="comment">// codes: "not_in_channel", "rate_limited", "msg_too_long"</span></div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method ws-out">S → C</span>
+        <span class="api-endpoint">pong</span>
+      </div>
+      <div class="api-desc">Heartbeat reply.</div>
+      <div class="api-payload">{ ts }</div>
+    </div>
+
+    <div class="b bb"><span class="hi">Why WebSocket over SSE or long-polling?</span> SSE is server→client only — can't send messages. Long-polling adds 1 RTT per message and hammers the server. WebSocket is full-duplex, persistent, and handles 500K connections per server with epoll. The only tradeoff is stateful connections requiring sticky routing — solved by the Redis <code>user:{id}:gateway</code> mapping.</div>
+  </div>
+
+  <!-- ════ REST Tab ════ -->
+  <div class="api-tab-pane" id="api-rest" style="display:none">
+
+    <div class="api-section-label"><span class="icon">🌐</span> HTTP/2 · Bearer Token Auth · JSON Responses</div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method post">POST</span>
+        <span class="api-endpoint">/v1/ws/connect</span>
+      </div>
+      <div class="api-desc">Returns the nearest Gateway WSS URL via GeoDNS. Token is short-lived (60s), used only for the WebSocket upgrade handshake.</div>
+      <div class="api-payload">
+<span class="comment">// Request</span><br>
+{ workspace_id: "W123" }<br><br>
+<span class="comment">// Response 200</span><br>
+{ ws_url: "wss://gw-us-east-7.slack.com/ws", token: "eyJ...", expires_in: 60 }
+      </div>
+      <div class="api-status-codes">
+        <span class="api-status success">200 OK</span>
+        <span class="api-status error">401 Bad auth</span>
+        <span class="api-status error">404 Workspace not found</span>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method post">POST</span>
+        <span class="api-endpoint">/v1/messages</span>
+      </div>
+      <div class="api-desc">Fallback send when WebSocket is unavailable. Idempotent — same <code>client_msg_id</code> returns <code>409</code> with the original response.</div>
+      <div class="api-payload">
+<span class="comment">// Request</span><br>
+{ channel_id: "C123", text: "hello team!", client_msg_id: "uuid-abc-123" }<br><br>
+<span class="comment">// Response 201</span><br>
+{ message_id: "M789", channel_seq: 48, ts: "2025-01-15T10:30:00Z" }
+      </div>
+      <div class="api-status-codes">
+        <span class="api-status success">201 Created</span>
+        <span class="api-status error">400 Invalid payload</span>
+        <span class="api-status error">401 Unauthorized</span>
+        <span class="api-status error">403 Not in channel</span>
+        <span class="api-status warn">409 Duplicate client_msg_id</span>
+        <span class="api-status warn">429 Rate limited</span>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method get">GET</span>
+        <span class="api-endpoint">/v1/channels/{id}/messages</span>
+      </div>
+      <div class="api-desc">Paginated message history. Reads from Vitess by <code>(channel_id, channel_seq)</code> index. Max <code>limit=200</code>.</div>
+      <div class="api-payload">
+<span class="comment">// Request params</span><br>
+?before_seq=47&amp;limit=50<br><br>
+<span class="comment">// Response 200</span><br>
+{ messages: [{ channel_seq: 46, user_id: "U1", text: "..." }, ...], has_more: true, next_cursor: "seq:45" }
+      </div>
+      <div class="api-status-codes">
+        <span class="api-status success">200 OK</span>
+        <span class="api-status error">400 Invalid params</span>
+        <span class="api-status error">401 Unauthorized</span>
+        <span class="api-status error">403 Not in channel</span>
+        <span class="api-status error">404 Channel not found</span>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method get">GET</span>
+        <span class="api-endpoint">/v1/channels/{id}/members/online</span>
+      </div>
+      <div class="api-desc">Reads Redis <code>channel:{id}:online</code> SET. <code>as_of_ts</code> indicates data freshness (Redis TTL-based).</div>
+      <div class="api-payload">
+<span class="comment">// Response 200</span><br>
+{ user_ids: ["U1", "U2", "U3"], count: 3, as_of_ts: "2025-01-15T10:30:02Z" }
+      </div>
+      <div class="api-status-codes">
+        <span class="api-status success">200 OK</span>
+        <span class="api-status error">401 Unauthorized</span>
+        <span class="api-status error">403 Not in channel</span>
+        <span class="api-status error">404 Channel not found</span>
+      </div>
+    </div>
+
+    <div class="b bg"><span class="hi">Idempotency:</span> <code>client_msg_id</code> (client UUID) is the dedup key for REST retries — server returns <code>409</code> with the original response body. <code>channel_seq</code> (server-assigned monotonic) is the dedup key on the client side for WS delivery — duplicate frames are silently dropped.</div>
+  </div>
+
+  <!-- ════ gRPC Tab ════ -->
+  <div class="api-tab-pane" id="api-grpc" style="display:none">
+
+    <div class="api-section-label"><span class="icon">⚡</span> Fan-out Worker → Gateway (Internal Only)</div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method grpc-call">RPC</span>
+        <span class="api-endpoint">PushMessages</span>
+      </div>
+      <div class="api-desc">Fan-out worker groups users by gateway, calls each gateway once with a batch. <code>not_found</code> = user disconnected since Redis lookup.</div>
+      <div class="api-payload">
+<span class="comment">// Request</span><br>
+{ user_ids: ["U1", "U2", "U3"], message: MessageProto }<br><br>
+<span class="comment">// Response</span><br>
+{ delivered: ["U1", "U2"], not_found: ["U3"], failed: [] }
+      </div>
+      <div class="api-status-codes">
+        <span class="api-status success">OK</span>
+        <span class="api-status error">UNAVAILABLE — gateway overloaded</span>
+        <span class="api-status warn">DEADLINE_EXCEEDED — &gt;50ms</span>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <div class="api-card-header">
+        <span class="api-method grpc-call">RPC</span>
+        <span class="api-endpoint">GetConnectedUsers</span>
+      </div>
+      <div class="api-desc">Used to prune stale Redis entries after a gateway crash. Called lazily, not on every message.</div>
+      <div class="api-payload">
+<span class="comment">// Request</span><br>
+{ user_ids: ["U1", "U2", "U3"] }<br><br>
+<span class="comment">// Response</span><br>
+{ connected: ["U1", "U3"], disconnected: ["U2"] }
+      </div>
+      <div class="api-status-codes">
+        <span class="api-status success">OK</span>
+        <span class="api-status error">INVALID_ARGUMENT — empty list</span>
+      </div>
+    </div>
+
+    <div class="b bo"><span class="hi">Why gRPC?</span> Fan-out worker → Gateway calls are high-frequency and latency-sensitive. gRPC gives multiplexed HTTP/2 connections, typed protobuf contracts, and built-in deadline propagation. A single fan-out worker batches all users on the same gateway into one <code>PushMessages</code> call — not one call per user.</div>
+  </div>
+</div>
+</div>
+
+
+
+<!-- ═══ HIGH-LEVEL ARCHITECTURE ═══ -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Write path (send) → Kafka → Fan-out workers → Gateway → WebSocket push to clients</p>
+
+<svg width="100%" viewBox="0 0 760 320" style="max-width:760px;display:block;margin:4px auto 8px">
+<defs><marker id="sk1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- ═══ WRITE PATH ═══ -->
+<rect data-dp-step="1" x="4" y="4" width="752" height="60" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="1" x="380" y="18" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">WRITE PATH — User A sends "hello" in #general</text>
+
+<!-- User A -->
+<rect data-dp-step="2" x="14" y="28" width="70" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="49" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">User A</text>
+<text data-dp-step="2" x="49" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">WebSocket</text>
+<line data-dp-step="2" x1="84" y1="42" x2="108" y2="42" stroke="var(--a)" stroke-width="1" marker-end="url(#sk1)"/>
+
+<!-- Gateway -->
+<rect data-dp-step="3" x="110" y="28" width="80" height="28" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="3" x="150" y="40" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Gateway Server</text>
+<text data-dp-step="3" x="150" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">WS termination</text>
+<line data-dp-step="3" x1="190" y1="42" x2="214" y2="42" stroke="var(--y)" stroke-width="1" marker-end="url(#sk1)"/>
+
+<!-- Message Service -->
+<rect data-dp-step="4" x="216" y="28" width="80" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="4" x="256" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Message Service</text>
+<text data-dp-step="4" x="256" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">validate + persist</text>
+<line data-dp-step="4" x1="296" y1="36" x2="320" y2="36" stroke="var(--g)" stroke-width="1" marker-end="url(#sk1)"/>
+<line data-dp-step="4" x1="296" y1="48" x2="320" y2="48" stroke="var(--g)" stroke-width="1" marker-end="url(#sk1)"/>
+
+<!-- Vitess -->
+<rect data-dp-step="5" x="322" y="24" width="70" height="16" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".6"/>
+<text data-dp-step="5" x="357" y="35" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">Vitess/MySQL</text>
+
+<!-- Kafka -->
+<rect data-dp-step="6" x="322" y="42" width="70" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="6" x="357" y="53" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Kafka</text>
+<text data-dp-step="6" x="410" y="53" fill="var(--muted)" font-size="5">partition key = channel_id</text>
+
+<!-- ═══ FAN-OUT PATH ═══ -->
+<rect data-dp-step="7" x="4" y="72" width="752" height="100" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="7" x="380" y="86" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">FAN-OUT PATH — Deliver to all online members of #general</text>
+
+<!-- Kafka consumer -->
+<rect data-dp-step="8" x="14" y="96" width="90" height="34" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="8" x="59" y="108" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Fan-out Worker</text>
+<text data-dp-step="8" x="59" y="118" text-anchor="middle" fill="var(--muted)" font-size="5">consumes from Kafka</text>
+<text data-dp-step="8" x="59" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">partition = channel_id</text>
+<line data-dp-step="8" x1="104" y1="113" x2="128" y2="113" stroke="var(--a)" stroke-width="1" marker-end="url(#sk1)"/>
+
+<!-- Redis lookup -->
+<rect data-dp-step="9" x="130" y="96" width="100" height="34" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="9" x="180" y="108" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis</text>
+<text data-dp-step="9" x="180" y="118" text-anchor="middle" fill="var(--muted)" font-size="5">channel:123:online → {user_ids}</text>
+<text data-dp-step="9" x="180" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">user:456 → gateway-host-7</text>
+<line data-dp-step="9" x1="230" y1="113" x2="254" y2="113" stroke="var(--r)" stroke-width="1" marker-end="url(#sk1)"/>
+
+<!-- Route to gateways -->
+<rect data-dp-step="10" x="256" y="96" width="100" height="34" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="10" x="306" y="108" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Route to Gateways</text>
+<text data-dp-step="10" x="306" y="118" text-anchor="middle" fill="var(--muted)" font-size="5">group users by gateway</text>
+<text data-dp-step="10" x="306" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">gRPC / Redis Pub/Sub</text>
+<line data-dp-step="10" x1="356" y1="106" x2="380" y2="98" stroke="var(--y)" stroke-width=".8" marker-end="url(#sk1)"/>
+<line data-dp-step="10" x1="356" y1="113" x2="380" y2="113" stroke="var(--y)" stroke-width=".8" marker-end="url(#sk1)"/>
+<line data-dp-step="10" x1="356" y1="120" x2="380" y2="128" stroke="var(--y)" stroke-width=".8" marker-end="url(#sk1)"/>
+
+<!-- Gateway servers -->
+<rect data-dp-step="11" x="382" y="92" width="80" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="11" x="422" y="102" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-1 (500K conn)</text>
+<rect data-dp-step="11" x="382" y="108" width="80" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="11" x="422" y="118" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-2 (500K conn)</text>
+<rect data-dp-step="11" x="382" y="124" width="80" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="11" x="422" y="134" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-N (500K conn)</text>
+<line data-dp-step="11" x1="462" y1="99" x2="486" y2="99" stroke="var(--g)" stroke-width=".8" marker-end="url(#sk1)"/>
+<line data-dp-step="11" x1="462" y1="115" x2="486" y2="115" stroke="var(--g)" stroke-width=".8" marker-end="url(#sk1)"/>
+<line data-dp-step="11" x1="462" y1="131" x2="486" y2="131" stroke="var(--g)" stroke-width=".8" marker-end="url(#sk1)"/>
+<text data-dp-step="11" x="494" y="102" fill="var(--g)" font-size="6">👤👤👤 (WS push)</text>
+<text data-dp-step="11" x="494" y="118" fill="var(--g)" font-size="6">👤👤 (WS push)</text>
+<text data-dp-step="11" x="494" y="134" fill="var(--g)" font-size="6">👤👤👤👤 (WS push)</text>
+
+<!-- Latency annotation -->
+<rect data-dp-step="12" x="560" y="92" width="186" height="46" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="12" x="653" y="104" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Latency Breakdown</text>
+<text data-dp-step="12" x="570" y="116" fill="var(--muted)" font-size="5.5">Kafka consume: ~5ms</text>
+<text data-dp-step="12" x="570" y="126" fill="var(--muted)" font-size="5.5">Redis lookup: ~1ms</text>
+<text data-dp-step="12" x="570" y="136" fill="var(--muted)" font-size="5.5">Gateway push: ~2ms</text>
+<text data-dp-step="12" x="680" y="116" fill="var(--muted)" font-size="5.5">gRPC to gateway: ~3ms</text>
+<text data-dp-step="12" x="680" y="126" fill="var(--g)" font-size="5.5" font-weight="600">Total: ~11ms same-region</text>
+<text data-dp-step="12" x="680" y="136" fill="var(--o)" font-size="5.5" font-weight="600">+80ms cross-region</text>
+
+<!-- ═══ KEY DESIGN DECISIONS ═══ -->
+<rect data-dp-step="13" x="4" y="180" width="752" height="136" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="13" x="380" y="194" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">KEY DESIGN DECISIONS</text>
+<rect data-dp-step="13" x="14" y="202" width="176" height="54" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="13" x="102" y="214" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Connection Management</text>
+<text data-dp-step="13" x="102" y="226" text-anchor="middle" fill="var(--muted)" font-size="5">1 persistent WS per user</text>
+<text data-dp-step="13" x="102" y="236" text-anchor="middle" fill="var(--muted)" font-size="5">~500K conn per Gateway (epoll)</text>
+<text data-dp-step="13" x="102" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Redis: user:{id} → gateway-host</text>
+<text data-dp-step="13" x="102" y="254" text-anchor="middle" fill="var(--r)" font-size="5">disconnect → remove mapping</text>
+<rect data-dp-step="14" x="198" y="202" width="176" height="54" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="14" x="286" y="214" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Hybrid Fan-out</text>
+<text data-dp-step="14" x="286" y="226" text-anchor="middle" fill="var(--muted)" font-size="5">&lt;100 members: push to ALL</text>
+<text data-dp-step="14" x="286" y="236" text-anchor="middle" fill="var(--muted)" font-size="5">100-50K: push to ONLINE only</text>
+<text data-dp-step="14" x="286" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">&gt;50K: write log, clients pull</text>
+<text data-dp-step="14" x="286" y="254" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Skip offline = save 90% work</text>
+<rect data-dp-step="15" x="382" y="202" width="176" height="54" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+<text data-dp-step="15" x="470" y="214" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Ordering Guarantee</text>
+<text data-dp-step="15" x="470" y="226" text-anchor="middle" fill="var(--muted)" font-size="5">Kafka partition key = channel_id</text>
+<text data-dp-step="15" x="470" y="236" text-anchor="middle" fill="var(--muted)" font-size="5">→ strict order per channel</text>
+<text data-dp-step="15" x="470" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Each msg gets channel_seq (monotonic)</text>
+<text data-dp-step="15" x="470" y="254" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Client detects gaps → backfill</text>
+<rect data-dp-step="16" x="566" y="202" width="182" height="54" rx="4" fill="rgba(244,114,182,.04)" stroke="var(--p)" stroke-width=".6"/>
+<text data-dp-step="16" x="657" y="214" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="700">Vitess Sharding</text>
+<text data-dp-step="16" x="657" y="226" text-anchor="middle" fill="var(--muted)" font-size="5">Shard key = workspace_id</text>
+<text data-dp-step="16" x="657" y="236" text-anchor="middle" fill="var(--muted)" font-size="5">Each workspace on 1 shard</text>
+<text data-dp-step="16" x="657" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Large enterprise → dedicated shard</text>
+<text data-dp-step="16" x="657" y="254" text-anchor="middle" fill="var(--p)" font-size="5" font-weight="600">Vitess handles resharding</text>
+<rect data-dp-step="17" x="14" y="262" width="734" height="24" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
+<text data-dp-step="17" x="380" y="274" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Multi-Region: User connects to nearest Gateway (GeoDNS). Kafka in primary region. Cross-region delivery via internal gRPC (~80ms added).</text>
+<text data-dp-step="17" x="380" y="284" text-anchor="middle" fill="var(--muted)" font-size="5.5">Same-region P99: &lt;100ms | Cross-region P99: &lt;250ms | Presence: Redis SET per channel (online members only)</text>
+<rect data-dp-step="18" x="14" y="290" width="734" height="20" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="18" x="380" y="303" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Offline users: on reconnect, client sends last_seen_seq → server returns missed messages from Vitess (catch-up read)</text>
+</svg>
+</div>
+
+<!-- ═══ DATA MODEL ═══ -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su"><span class="hg">Hot path</span> (Redis, sub-ms) for presence and routing · <span class="hg">Cold path</span> (Vitess/MySQL) for durable message history</p>
+
+<svg width="100%" viewBox="0 0 680 120" style="max-width:680px;display:block;margin:6px auto">
+<defs><marker id="dm1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+<!-- Hot path box -->
+<rect data-dp-step="1" x="4" y="10" width="310" height="100" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2"/>
+<text data-dp-step="1" x="159" y="24" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="800">HOT PATH — Redis (sub-ms, ephemeral)</text>
+<rect data-dp-step="2" x="14" y="32" width="130" height="14" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".5"/>
+<text data-dp-step="2" x="79" y="42" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">channel:{id}:online → SET{user_ids}</text>
+<rect data-dp-step="2" x="14" y="50" width="130" height="14" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".5"/>
+<text data-dp-step="2" x="79" y="60" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">user:{id}:gateway → "gw-host-7"</text>
+<rect data-dp-step="2" x="14" y="68" width="130" height="14" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".5"/>
+<text data-dp-step="2" x="79" y="78" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">channel:{id}:members → SET{all}</text>
+<text data-dp-step="3" x="159" y="98" text-anchor="middle" fill="var(--muted)" font-size="5">Ephemeral — rebuilt from MySQL on restart. Failure = delivery disruption, NOT data loss.</text>
+<!-- Cold path box -->
+<rect data-dp-step="4" x="366" y="10" width="310" height="100" rx="6" fill="rgba(244,114,182,.03)" stroke="var(--p)" stroke-width="1.2"/>
+<text data-dp-step="4" x="521" y="24" text-anchor="middle" fill="var(--p)" font-size="7.5" font-weight="800">COLD PATH — Vitess/MySQL (durable)</text>
+<rect data-dp-step="5" x="376" y="32" width="130" height="14" rx="3" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width=".5"/>
+<text data-dp-step="5" x="441" y="42" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">messages(workspace_id, channel_seq)</text>
+<rect data-dp-step="5" x="376" y="50" width="130" height="14" rx="3" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width=".5"/>
+<text data-dp-step="5" x="441" y="60" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">channel_members(workspace_id)</text>
+<text data-dp-step="6" x="521" y="80" text-anchor="middle" fill="var(--muted)" font-size="5">Shard key = workspace_id. All workspace data</text>
+<text data-dp-step="6" x="521" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">on one shard → SQL joins work within workspace.</text>
+<text data-dp-step="6" x="521" y="100" text-anchor="middle" fill="var(--muted)" font-size="5">Large enterprise → dedicated shard.</text>
+<!-- Bridge arrows -->
+<line data-dp-step="7" x1="314" y1="50" x2="362" y2="50" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#dm1)"/>
+<text data-dp-step="7" x="338" y="44" text-anchor="middle" fill="var(--muted)" font-size="5">cache</text>
+<line data-dp-step="7" x1="362" y1="62" x2="314" y2="62" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#dm1)"/>
+<text data-dp-step="7" x="338" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">rebuild</text>
+</svg>
+<pre><code>-- ── COLD PATH: Vitess/MySQL (sharded by workspace_id) ──────────────────────
+
+CREATE TABLE messages (
+  workspace_id   BIGINT NOT NULL,    -- shard key: all workspace data on one shard
+  channel_id     BIGINT NOT NULL,
+  channel_seq    BIGINT NOT NULL,    -- monotonic per channel (gap detection + backfill)
+  user_id        BIGINT NOT NULL,
+  client_msg_id  VARCHAR(64),        -- client UUID for idempotent dedup (indexed)
+  content        TEXT,
+  ts             TIMESTAMP(6),
+  PRIMARY KEY (workspace_id, channel_id, channel_seq),
+  UNIQUE KEY uq_client_msg (workspace_id, user_id, client_msg_id)
+  -- PK doubles as the range-scan index for catch-up reads
+);
+
+CREATE TABLE channel_members (
+  workspace_id   BIGINT NOT NULL,
+  channel_id     BIGINT NOT NULL,
+  user_id        BIGINT NOT NULL,
+  joined_at      TIMESTAMP,
+  PRIMARY KEY (workspace_id, channel_id, user_id)
+);
+
+-- ── HOT PATH: Redis (sub-ms, ephemeral) ─────────────────────────────────────
+
+channel:{id}:online    → SET of user_ids currently connected (updated on WS connect/disconnect)
+user:{id}:gateway      → STRING "gateway-host-7"  (which Gateway holds this user's WS)
+channel:{id}:members   → SET of all user_ids       (cached from MySQL, TTL-refreshed)
+
+-- Fan-out worker reads channel:{id}:online → groups by gateway → gRPC batch push
+-- On disconnect: DEL user:{id}:gateway + SREM channel:{id}:online {user_id}</code></pre>
+<div class="b bg"><span class="hi">Hot/cold split:</span> Redis holds only <span class="hg">live session state</span> — it's ephemeral and can be rebuilt from MySQL on restart. MySQL holds the <span class="hg">durable ordered log</span>. This means a Redis failure doesn't lose messages; it only temporarily disrupts real-time delivery until presence is rebuilt.</div>
+<div class="b by"><span class="hi">Sharding key choice:</span> <code>workspace_id</code> (not <code>channel_id</code>) keeps all data for a workspace on one shard, enabling SQL joins and transactions within a workspace. Large enterprise customers get a <span class="hg">dedicated shard</span> to prevent noisy-neighbour problems.</div>
+</div>
+
+<!-- ═══ FAN-OUT STRATEGY DETAIL ═══ -->
+<div class="T" id="fanout">
+<h2>Fan-out Strategy — The Hard Part</h2>
+<p class="su">A 50K-member channel with 200K msg/sec would require <span class="hr">10 billion writes/sec</span> if you pushed to every member. The fix: push only to <span class="hg">online members</span> (~10% of total).</p>
+
+<svg width="100%" viewBox="0 0 680 175" style="max-width:680px;display:block;margin:6px auto">
+<defs><marker id="fo1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+<!-- Labels -->
+<text data-dp-step="1" x="340" y="14" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Hybrid Fan-out — Which strategy based on channel size?</text>
+<!-- Strategy 1: small -->
+<rect data-dp-step="2" x="4" y="24" width="200" height="128" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="2" x="104" y="38" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">&lt;100 members — Write-time fan-out</text>
+<rect data-dp-step="3" x="14" y="46" width="36" height="16" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+<text data-dp-step="3" x="32" y="57" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka</text>
+<line data-dp-step="3" x1="50" y1="54" x2="64" y2="54" stroke="var(--a)" stroke-width=".8" marker-end="url(#fo1)"/>
+<rect data-dp-step="3" x="66" y="46" width="44" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="3" x="88" y="57" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Fan-out</text>
+<line data-dp-step="3" x1="110" y1="54" x2="124" y2="48" stroke="var(--g)" stroke-width=".7" marker-end="url(#fo1)"/>
+<line data-dp-step="3" x1="110" y1="54" x2="124" y2="54" stroke="var(--g)" stroke-width=".7" marker-end="url(#fo1)"/>
+<line data-dp-step="3" x1="110" y1="54" x2="124" y2="60" stroke="var(--g)" stroke-width=".7" marker-end="url(#fo1)"/>
+<text data-dp-step="3" x="132" y="50" fill="var(--g)" font-size="6">👤</text>
+<text data-dp-step="3" x="132" y="58" fill="var(--g)" font-size="6">👤</text>
+<text data-dp-step="3" x="132" y="66" fill="var(--g)" font-size="6">👤</text>
+<text data-dp-step="4" x="104" y="84" text-anchor="middle" fill="var(--muted)" font-size="5.5">Push to ALL members immediately</text>
+<text data-dp-step="4" x="104" y="94" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">✓ Lowest latency</text>
+<text data-dp-step="4" x="104" y="104" text-anchor="middle" fill="var(--muted)" font-size="5">Fan-out cost is tiny — latency wins</text>
+<!-- Strategy 2: medium -->
+<rect data-dp-step="5" x="238" y="24" width="204" height="128" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="5" x="340" y="38" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">100–50K members — Hybrid</text>
+<rect data-dp-step="6" x="248" y="46" width="36" height="16" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+<text data-dp-step="6" x="266" y="57" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka</text>
+<line data-dp-step="6" x1="284" y1="54" x2="298" y2="54" stroke="var(--a)" stroke-width=".8" marker-end="url(#fo1)"/>
+<rect data-dp-step="6" x="300" y="46" width="36" height="16" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".6"/>
+<text data-dp-step="6" x="318" y="54" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Redis</text>
+<text data-dp-step="6" x="318" y="61" text-anchor="middle" fill="var(--muted)" font-size="4">online set</text>
+<line data-dp-step="6" x1="336" y1="54" x2="350" y2="48" stroke="var(--g)" stroke-width=".7" marker-end="url(#fo1)"/>
+<line data-dp-step="6" x1="336" y1="54" x2="350" y2="60" stroke="var(--r)" stroke-width=".7" stroke-dasharray="3,2"/>
+<text data-dp-step="6" x="358" y="50" fill="var(--g)" font-size="6">👤 online</text>
+<text data-dp-step="6" x="358" y="62" fill="var(--r)" font-size="6">👤 offline ✗</text>
+<text data-dp-step="7" x="340" y="84" text-anchor="middle" fill="var(--muted)" font-size="5.5">Push to ONLINE only, skip offline</text>
+<text data-dp-step="7" x="340" y="94" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">✓ 90% less work (5K online / 50K total)</text>
+<text data-dp-step="7" x="340" y="104" text-anchor="middle" fill="var(--muted)" font-size="5">Offline users catch up on reconnect via seq</text>
+<!-- Strategy 3: huge -->
+<rect data-dp-step="8" x="474" y="24" width="200" height="128" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="8" x="574" y="38" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">&gt;50K members — Read-time</text>
+<rect data-dp-step="9" x="484" y="46" width="36" height="16" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+<text data-dp-step="9" x="502" y="57" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka</text>
+<line data-dp-step="9" x1="520" y1="54" x2="534" y2="54" stroke="var(--a)" stroke-width=".8" marker-end="url(#fo1)"/>
+<rect data-dp-step="9" x="536" y="46" width="44" height="16" rx="3" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width=".6"/>
+<text data-dp-step="9" x="558" y="57" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">Channel log</text>
+<line data-dp-step="9" x1="580" y1="54" x2="594" y2="48" stroke="var(--g)" stroke-width=".7" stroke-dasharray="2,2" marker-end="url(#fo1)"/>
+<line data-dp-step="9" x1="580" y1="54" x2="594" y2="60" stroke="var(--g)" stroke-width=".7" stroke-dasharray="2,2" marker-end="url(#fo1)"/>
+<text data-dp-step="9" x="600" y="50" fill="var(--g)" font-size="6">👤 pull</text>
+<text data-dp-step="9" x="600" y="62" fill="var(--g)" font-size="6">👤 pull</text>
+<text data-dp-step="10" x="574" y="84" text-anchor="middle" fill="var(--muted)" font-size="5.5">Write to log once, clients stream cursor</text>
+<text data-dp-step="10" x="574" y="94" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">✓ O(1) write cost regardless of members</text>
+<text data-dp-step="10" x="574" y="104" text-anchor="middle" fill="var(--muted)" font-size="5">Write amplification at 50K+ is prohibitive</text>
+<!-- Math callout -->
+<rect data-dp-step="11" x="4" y="138" width="672" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text data-dp-step="11" x="340" y="150" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">The math: 200K msg/sec × 50K members = 10B fan-out ops/sec ✗</text><text data-dp-step="11" x="340" y="161" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">200K × 5K online = 1B ops/sec ✓ — skipping offline is the #1 scaling lever</text>
+</svg>
+
+<table>
+<tr><th>Channel Size</th><th>Strategy</th><th>Why</th></tr>
+<tr><td><span class="hi">&lt;100 members</span></td><td><span class="hg">Write-time fan-out</span> — push to every member's Gateway immediately</td><td>Fan-out is tiny; latency matters more than write cost</td></tr>
+<tr><td><span class="hi">100 – 50K members</span></td><td><span class="hg">Hybrid</span> — push to <em>online</em> members only, skip offline</td><td>50K members but only ~5K online → 90% less work. Offline users catch up on reconnect.</td></tr>
+<tr><td><span class="hi">&gt;50K members</span></td><td><span class="hg">Read-time fan-out</span> — write to channel log; clients stream from cursor</td><td>Write amplification at this scale is prohibitive regardless of online ratio</td></tr>
+</table>
+<div class="b bg"><span class="hi">Presence tracking:</span> <code>channel:{id}:online</code> → Redis SET, updated on WS connect/disconnect. Fan-out worker iterates this set — not the full membership list. For a 50K-member channel with 5K online, that's <span class="hg">90% fewer Gateway calls per message</span>. See Scale Estimation (step 4) for the full math.</div>
+<div class="b by"><span class="hi">Deep dive:</span> For channels with 1M+ members (Telegram scale), even the hybrid approach breaks. See <a href="telegram-large-group-fanout.html">Telegram Large Group Fan-out</a> for the read-time pull architecture that handles 20× this scale.</div>
+</div>
+
+<!-- ═══ PRESENCE PROTOCOL ═══ -->
+<div class="T" id="presence">
+<h2>Presence Protocol</h2>
+<p class="su">How does the system know who is online? Heartbeat-based presence with Redis TTL — no gossip protocol needed at this scale</p>
+
+<svg width="100%" viewBox="0 0 720 200" style="max-width:720px;display:block;margin:6px auto">
+<defs><marker id="pr1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Title -->
+<text x="360" y="14" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">Presence Protocol — Heartbeat + TTL</text>
+
+<!-- Client -->
+<rect x="10" y="30" width="90" height="36" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text x="55" y="44" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Client</text>
+<text x="55" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">sends ping every 15s</text>
+<text x="55" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">via WebSocket</text>
+
+<line x1="100" y1="48" x2="134" y2="48" stroke="var(--a)" stroke-width="1" marker-end="url(#pr1)"/>
+
+<!-- Gateway -->
+<rect x="136" y="30" width="100" height="36" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text x="186" y="44" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Gateway Server</text>
+<text x="186" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">tracks last_ping_ts</text>
+<text x="186" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">closes if no ping in 30s</text>
+
+<line x1="236" y1="48" x2="270" y2="48" stroke="var(--y)" stroke-width="1" marker-end="url(#pr1)"/>
+
+<!-- Redis Presence -->
+<rect x="272" y="30" width="130" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text x="337" y="44" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis Presence Store</text>
+<text x="337" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">SADD channel:{id}:online user_id</text>
+<text x="337" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">EXPIRE key 45s (auto-cleanup)</text>
+
+<line x1="402" y1="48" x2="436" y2="48" stroke="var(--r)" stroke-width="1" marker-end="url(#pr1)"/>
+
+<!-- Broadcast -->
+<rect x="438" y="30" width="130" height="36" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text x="503" y="44" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Presence Broadcast</text>
+<text x="503" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">presence.update event</text>
+<text x="503" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">to channel online members</text>
+
+<line x1="568" y1="48" x2="602" y2="48" stroke="var(--g)" stroke-width="1" marker-end="url(#pr1)"/>
+
+<!-- Other clients -->
+<rect x="604" y="30" width="90" height="36" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text x="649" y="44" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Other Clients</text>
+<text x="649" y="54" text-anchor="middle" fill="var(--muted)" font-size="5">update UI indicator</text>
+<text x="649" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">green dot / away</text>
+
+<!-- Timeout flow -->
+<rect x="10" y="86" width="700" height="50" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".6"/>
+<text x="360" y="100" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Timeout Path — No Ping for 30s</text>
+
+<rect x="30" y="108" width="120" height="22" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+<text x="90" y="122" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway: close WS conn</text>
+
+<line x1="150" y1="119" x2="184" y2="119" stroke="var(--muted)" stroke-width=".8" marker-end="url(#pr1)"/>
+
+<rect x="186" y="108" width="140" height="22" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text x="256" y="122" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Redis: SREM channel:{id}:online user</text>
+
+<line x1="326" y1="119" x2="360" y2="119" stroke="var(--muted)" stroke-width=".8" marker-end="url(#pr1)"/>
+
+<rect x="362" y="108" width="140" height="22" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text x="432" y="122" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Redis: DEL user:{id}:gateway</text>
+
+<line x1="502" y1="119" x2="536" y2="119" stroke="var(--muted)" stroke-width=".8" marker-end="url(#pr1)"/>
+
+<rect x="538" y="108" width="150" height="22" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+<text x="613" y="122" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Broadcast: presence.update → offline</text>
+
+<!-- Safety net annotation -->
+<rect x="10" y="148" width="700" height="40" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".6"/>
+<text x="360" y="162" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Safety Net — Redis TTL Auto-Expiry (45s)</text>
+<text x="360" y="178" text-anchor="middle" fill="var(--muted)" font-size="5.5">Even if Gateway crashes without cleanup, Redis key expires in 45s → stale presence auto-removed. No manual GC needed.</text>
+</svg>
+
+<div class="d-grid tri" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--c)">Heartbeat Mechanism</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Client ping:</span> Every <span class="hg">15 seconds</span> via WebSocket<br>
+<span class="hi">Gateway timeout:</span> No ping for <span class="hr">30 seconds</span> → close connection<br>
+<span class="hi">Redis TTL:</span> Presence keys expire in <span class="hr">45 seconds</span> (safety net)<br>
+<span class="hi">Jitter:</span> Clients add ±3s random jitter to avoid thundering herd on reconnect
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">State Transitions</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hg">online</span> → WS connected + ping received within 30s<br>
+<span class="hi">away</span> → No user activity for 5 min (client sends status change)<br>
+<span class="hr">offline</span> → WS closed OR no ping for 30s OR Redis TTL expired<br>
+<span class="hi">Broadcast:</span> Only on state <em>transitions</em>, not on every heartbeat
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Scalability Considerations</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">No gossip:</span> Centralized Redis — simpler than distributed gossip at 10M users<br>
+<span class="hi">Batch updates:</span> Gateway batches presence changes every 5s to Redis (not per-ping)<br>
+<span class="hi">Large channels:</span> Presence broadcast throttled to 1 update/sec for channels &gt;10K<br>
+<span class="hi">Memory:</span> 10M users × 50 bytes = ~500MB — fits in single Redis instance
+</div>
+</div>
+</div>
+<div class="b by"><span class="hi">Interview insight:</span> Presence is an <span class="hg">eventually consistent</span> system — a user might appear online for up to 45s after crashing. This is acceptable for chat. The alternative (synchronous presence with consensus) would add latency to every message delivery.</div>
+<div class="b bb"><span class="hi">Deep dive:</span> At 100M+ concurrent users (WhatsApp scale), centralized Redis breaks. See <a href="whatsapp-presence-100m.html">Presence at 100M Scale</a> for the distributed sharded presence architecture with subscription-based delivery.</div>
+</div>
+
+
+
+<!-- ═══ ORDERING & CONSISTENCY ═══ -->
+<div class="T" id="ordering">
+<h2>Ordering &amp; Consistency</h2>
+<p class="su">All messages in <code>#general</code> must arrive in the <span class="hg">same order for every user</span> — achieved via Kafka partition-per-channel + monotonic sequence numbers</p>
+
+<svg width="100%" viewBox="0 0 680 180" style="max-width:680px;display:block;margin:6px auto">
+<defs><marker id="ord1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+<marker id="ord2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#34d399"/></marker></defs>
+<!-- Title -->
+<text data-dp-step="1" x="340" y="14" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Message Ordering — End-to-End Sequence</text>
+<!-- Swimlane headers -->
+<rect data-dp-step="1" x="4" y="20" width="80" height="20" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+<text data-dp-step="1" x="44" y="33" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">User A (sender)</text>
+<rect data-dp-step="1" x="104" y="20" width="80" height="20" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="1" x="144" y="33" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Gateway</text>
+<rect data-dp-step="1" x="204" y="20" width="80" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="1" x="244" y="33" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Msg Service</text>
+<rect data-dp-step="1" x="304" y="20" width="80" height="20" rx="3" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".6"/>
+<text data-dp-step="1" x="344" y="33" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Kafka P0</text>
+<rect data-dp-step="1" x="404" y="20" width="80" height="20" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="1" x="444" y="33" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Fan-out Worker</text>
+<rect data-dp-step="1" x="504" y="20" width="80" height="20" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="1" x="544" y="33" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Gateway</text>
+<rect data-dp-step="1" x="604" y="20" width="72" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="1" x="640" y="33" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">User B (recv)</text>
+<!-- Lifelines -->
+<line data-dp-step="1" x1="44" y1="40" x2="44" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<line data-dp-step="1" x1="144" y1="40" x2="144" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<line data-dp-step="1" x1="244" y1="40" x2="244" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<line data-dp-step="1" x1="344" y1="40" x2="344" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<line data-dp-step="1" x1="444" y1="40" x2="444" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<line data-dp-step="1" x1="544" y1="40" x2="544" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<line data-dp-step="1" x1="640" y1="40" x2="640" y2="175" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,3"/>
+<!-- Step 1: send -->
+<line data-dp-step="2" x1="44" y1="55" x2="140" y2="55" stroke="var(--a)" stroke-width="1" marker-end="url(#ord1)"/>
+<text data-dp-step="2" x="92" y="52" text-anchor="middle" fill="var(--a)" font-size="5">message.send</text>
+<text data-dp-step="2" x="92" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">{ channel_id, text, client_msg_id }</text>
+<!-- Step 2: validate + persist -->
+<line data-dp-step="3" x1="144" y1="72" x2="240" y2="72" stroke="var(--y)" stroke-width="1" marker-end="url(#ord1)"/>
+<text data-dp-step="3" x="192" y="69" text-anchor="middle" fill="var(--y)" font-size="5">validate + persist</text>
+<!-- Step 3: assign seq + publish -->
+<line data-dp-step="4" x1="244" y1="88" x2="340" y2="88" stroke="var(--g)" stroke-width="1" marker-end="url(#ord1)"/>
+<text data-dp-step="4" x="292" y="85" text-anchor="middle" fill="var(--g)" font-size="5">publish(key=channel_id)</text>
+<text data-dp-step="4" x="244" y="98" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">← seq=48 assigned by Msg Service</text>
+<line data-dp-step="5" x1="344" y1="108" x2="440" y2="108" stroke="var(--a2)" stroke-width="1" marker-end="url(#ord1)"/>
+<text data-dp-step="5" x="392" y="105" text-anchor="middle" fill="var(--a2)" font-size="5">consume (ordered, offset++)</text>
+<!-- Step 5: lookup + push -->
+<line data-dp-step="6" x1="444" y1="124" x2="540" y2="124" stroke="var(--a2)" stroke-width="1" marker-end="url(#ord1)"/>
+<text data-dp-step="6" x="492" y="121" text-anchor="middle" fill="var(--a2)" font-size="5">gRPC PushMessages</text>
+<!-- Step 6: WS push -->
+<line data-dp-step="7" x1="544" y1="140" x2="608" y2="140" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ord2)"/>
+<text data-dp-step="7" x="576" y="137" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">message.new</text>
+<text data-dp-step="7" x="576" y="147" text-anchor="middle" fill="var(--g)" font-size="4.5">{ channel_seq: 48, text }</text>
+<!-- Step 7: ack back -->
+<line data-dp-step="8" x1="140" y1="158" x2="48" y2="158" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#ord1)"/>
+<text data-dp-step="8" x="92" y="155" text-anchor="middle" fill="var(--muted)" font-size="5">message.ack { channel_seq: 48 }</text>
+<!-- Gap detection note -->
+<rect data-dp-step="9" x="4" y="165" width="672" height="12" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".5"/>
+<text data-dp-step="9" x="340" y="174" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">User B sees seq 48 after 47 → no gap. If seq jumps 47→50, client requests backfill for 48,49 from Vitess.</text>
+</svg>
+
+<div class="d-grid tri" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">How Ordering Works</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">1.</span> All messages for <code>#general</code> → <span class="hg">same Kafka partition</span> (key = channel_id)<br>
+<span class="hi">2.</span> Single consumer per partition → messages processed in strict order<br>
+<span class="hi">3.</span> Each message assigned <code>channel_seq</code> — monotonic increment per channel<br>
+<span class="hi">4.</span> Client tracks last received seq. Gap detected → request backfill from Vitess<br>
+<span class="hi">5.</span> On reconnect: client sends <code>last_seq=47</code> → server returns msgs 48+
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Failure Scenarios</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">WS drop:</span> Client reconnects, sends last_seq → backfill from Vitess<br>
+<span class="hi">Gateway crash:</span> All users on that gateway reconnect; Redis mapping updated<br>
+<span class="hi">Duplicate delivery:</span> Client deduplicates by channel_seq (idempotent render)<br>
+<span class="hi">@channel in 50K:</span> Rate-limit fan-out, stagger over 1–2s to avoid thundering herd<br>
+<span class="hi">Cross-region lag:</span> EU user sees msg ~80ms after US user — acceptable for chat
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Guarantees Provided</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hg">Per-channel ordering:</span> Kafka partition key = channel_id ensures strict order within a channel<br>
+<span class="hg">No cross-channel ordering:</span> Different channels may be on different partitions — that's fine<br>
+<span class="hg">At-least-once delivery:</span> Gaps detected client-side; backfill closes them<br>
+<span class="hg">Idempotent render:</span> Duplicate messages silently dropped by seq dedup
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ SEQUENCE NUMBER GENERATION ═══ -->
+<div class="T" id="seq-generation">
+<h2>Sequence Number Generation</h2>
+<p class="su">How does the system assign monotonic <code>channel_seq</code> without becoming a bottleneck? Single-writer-per-channel via Kafka partition ownership.</p>
+
+<svg width="100%" viewBox="0 0 720 180" style="max-width:720px;display:block;margin:6px auto">
+<defs><marker id="sq1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Title -->
+<text x="360" y="14" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">channel_seq Assignment — Single Writer Pattern</text>
+
+<!-- The problem -->
+<rect x="10" y="28" width="340" height="60" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".6"/>
+<text x="180" y="42" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">❌ Naive Approach: DB Auto-Increment</text>
+<text x="20" y="58" fill="var(--muted)" font-size="5.5">• Multiple Message Service instances → race condition on INSERT</text>
+<text x="20" y="70" fill="var(--muted)" font-size="5.5">• DB lock contention at 200K msg/sec → bottleneck</text>
+<text x="20" y="82" fill="var(--muted)" font-size="5.5">• Gaps in sequence if transaction rolls back</text>
+
+<!-- The solution -->
+<rect x="370" y="28" width="340" height="60" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".6"/>
+<text x="540" y="42" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">✓ Solution: Kafka Partition = Single Writer</text>
+<text x="380" y="58" fill="var(--muted)" font-size="5.5">• One fan-out worker owns each partition (= channel)</text>
+<text x="380" y="70" fill="var(--muted)" font-size="5.5">• Worker maintains in-memory counter + Redis atomic INCR</text>
+<text x="380" y="82" fill="var(--muted)" font-size="5.5">• No contention: only one process writes seq for a channel</text>
+
+<!-- Flow diagram -->
+<rect x="10" y="100" width="700" height="70" rx="5" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width=".6"/>
+<text x="360" y="114" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Sequence Assignment Flow</text>
+
+<rect x="24" y="124" width="90" height="22" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+<text x="69" y="138" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Msg Service</text>
+<text x="69" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">validate only</text>
+
+<line x1="114" y1="135" x2="138" y2="135" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sq1)"/>
+
+<rect x="140" y="124" width="80" height="22" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="180" y="138" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka partition</text>
+<text x="180" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">key=channel_id</text>
+
+<line x1="220" y1="135" x2="244" y2="135" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sq1)"/>
+
+<rect x="246" y="124" width="100" height="22" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".6"/>
+<text x="296" y="138" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Fan-out Worker</text>
+<text x="296" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">single consumer</text>
+
+<line x1="346" y1="135" x2="370" y2="135" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sq1)"/>
+
+<rect x="372" y="124" width="120" height="22" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text x="432" y="138" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Redis INCR channel:seq</text>
+<text x="432" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">atomic, returns new seq</text>
+
+<line x1="492" y1="135" x2="516" y2="135" stroke="var(--muted)" stroke-width=".8" marker-end="url(#sq1)"/>
+
+<rect x="518" y="124" width="90" height="22" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".6"/>
+<text x="563" y="138" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">Vitess INSERT</text>
+<text x="563" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">with channel_seq</text>
+
+<line x1="608" y1="135" x2="632" y2="135" stroke="var(--g)" stroke-width=".8" marker-end="url(#sq1)"/>
+
+<rect x="634" y="124" width="66" height="22" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+<text x="667" y="138" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Push to clients</text>
+<text x="667" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">with seq attached</text>
+</svg>
+
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a2)">Why This Works</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Single writer:</span> Kafka guarantees one consumer per partition → no race conditions<br>
+<span class="hi">Redis INCR:</span> Atomic O(1) operation, ~0.1ms latency → no bottleneck<br>
+<span class="hi">Crash recovery:</span> New consumer reads last seq from Redis → resumes from correct position<br>
+<span class="hi">No gaps:</span> Unlike DB auto-increment, Redis INCR never creates gaps (no rollbacks)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Edge Cases</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Partition rebalance:</span> New consumer reads current seq from Redis before processing<br>
+<span class="hi">Redis failure:</span> Fall back to Vitess <code>SELECT MAX(channel_seq)</code> — slower but correct<br>
+<span class="hi">Duplicate INCR:</span> If worker crashes after INCR but before Vitess write → seq gap. Client backfill handles gracefully (empty gap = no-op)<br>
+<span class="hi">Hot channel:</span> One partition = one worker. If channel is too hot, split into sub-channels at app layer.
+</div>
+</div>
+</div>
+<div class="b by"><span class="hi">Interview tip:</span> This is a common follow-up: "How do you generate monotonic IDs without a single point of failure?" The answer is <span class="hg">partition-level single writer</span> — Kafka gives you distributed single-writer semantics for free. Each partition has exactly one active consumer, so no coordination needed.</div>
+</div>
+
+
+
+
+<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Five failure modes and how the architecture handles each without data loss or visible gaps</p>
+
+<svg width="100%" viewBox="0 0 680 100" style="max-width:680px;display:block;margin:6px auto">
+<defs><marker id="ch1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+<text data-dp-step="1" x="340" y="12" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="800">Gateway Crash — What Happens Next</text>
+<!-- Before crash -->
+<rect data-dp-step="2" x="4" y="20" width="140" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="2" x="74" y="33" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Gateway-7 crashes 💥</text>
+<text data-dp-step="2" x="74" y="44" text-anchor="middle" fill="var(--muted)" font-size="5">500K connections lost</text>
+<!-- Step 1: clients reconnect -->
+<line data-dp-step="3" x1="144" y1="35" x2="168" y2="35" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ch1)"/>
+<rect data-dp-step="3" x="170" y="20" width="130" height="30" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="3" x="235" y="33" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Clients reconnect</text>
+<text data-dp-step="3" x="235" y="44" text-anchor="middle" fill="var(--muted)" font-size="5">TCP timeout → any Gateway</text>
+<!-- Step 2: Redis remap -->
+<line data-dp-step="4" x1="300" y1="35" x2="324" y2="35" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ch1)"/>
+<rect data-dp-step="4" x="326" y="20" width="140" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="4" x="396" y="33" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis mapping updated</text>
+<text data-dp-step="4" x="396" y="44" text-anchor="middle" fill="var(--muted)" font-size="5">user:{id} → new-gateway-host</text>
+<!-- Step 3: backfill -->
+<line data-dp-step="5" x1="466" y1="35" x2="490" y2="35" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ch1)"/>
+<rect data-dp-step="5" x="492" y="20" width="180" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="5" x="582" y="33" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Client sends last_seq → backfill</text>
+<text data-dp-step="5" x="582" y="44" text-anchor="middle" fill="var(--muted)" font-size="5">missed messages returned from Vitess</text>
+<!-- Result -->
+<rect data-dp-step="6" x="4" y="62" width="672" height="16" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="6" x="340" y="73" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Result: crash is invisible to users within ~5–10s. No messages lost. Fan-out resumes immediately via new Redis mapping.</text>
+</svg>
+
+<table>
+<tr><th>#</th><th>Failure / Edge Case</th><th>What Breaks</th><th>How It's Handled</th></tr>
+<tr><td><span class="hi">1</span></td><td><span class="hr">WebSocket drops mid-session</span></td><td>Client misses messages sent while disconnected</td><td>On reconnect, client sends <code>last_seq</code> → server backfills from Vitess. Gap closed transparently.</td></tr>
+<tr><td><span class="hi">2</span></td><td><span class="hr">Gateway server crash</span></td><td>All ~500K connections on that host lost</td><td>Clients reconnect to any Gateway. Redis <code>user:{id}:gateway</code> mapping updated. Fan-out resumes immediately.</td></tr>
+<tr><td><span class="hi">3</span></td><td><span class="hr">Duplicate delivery</span></td><td>Same message rendered twice in UI</td><td>Client deduplicates by <code>channel_seq</code> — idempotent render, second copy silently dropped.</td></tr>
+<tr><td><span class="hi">4</span></td><td><span class="hr">@channel in 50K-member channel</span></td><td>Thundering herd: 50K fan-out ops at once</td><td>Rate-limit fan-out worker; stagger delivery over 1–2s for huge channels. Acceptable for broadcast notifications.</td></tr>
+<tr><td><span class="hi">5</span></td><td><span class="hr">Kafka consumer lag spike</span></td><td>Fan-out falls behind; messages delayed</td><td>Partition count = number of hot channels. Scale fan-out workers horizontally. Alert on consumer lag &gt; threshold.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Key insight:</span> The system tolerates delivery failures by making the <span class="hg">client responsible for gap detection</span>. The server never needs to track per-user delivery state — it just stores the ordered log and lets clients request what they missed.</div>
+</div>
+
+<!-- ═══ BACKPRESSURE & FLOW CONTROL ═══ -->
+<div class="T" id="backpressure">
+<h2>Backpressure &amp; Flow Control</h2>
+<p class="su">What happens when a Gateway is overwhelmed, Kafka consumers lag, or a viral message hits a 50K channel? Layered defense from client to storage.</p>
+
+<svg width="100%" viewBox="0 0 720 220" style="max-width:720px;display:block;margin:6px auto">
+<defs><marker id="bp1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- Title -->
+<text x="360" y="14" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">Backpressure — 4 Layers of Defense</text>
+
+<!-- Layer 1: Client -->
+<rect x="10" y="28" width="165" height="80" rx="5" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".8"/>
+<text x="92" y="42" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">① Client Rate Limit</text>
+<text x="20" y="58" fill="var(--muted)" font-size="5.5">• Max 1 msg/sec per user per channel</text>
+<text x="20" y="70" fill="var(--muted)" font-size="5.5">• Exponential backoff on 429 response</text>
+<text x="20" y="82" fill="var(--muted)" font-size="5.5">• Client-side queue with dedup</text>
+<text x="20" y="94" fill="var(--muted)" font-size="5.5">• WS error frame: "rate_limited"</text>
+<text x="20" y="104" fill="var(--g)" font-size="5" font-weight="600">Prevents: single user flooding a channel</text>
+
+<line x1="175" y1="68" x2="189" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#bp1)"/>
+
+<!-- Layer 2: Gateway -->
+<rect x="191" y="28" width="165" height="80" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
+<text x="273" y="42" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">② Gateway Admission</text>
+<text x="201" y="58" fill="var(--muted)" font-size="5.5">• Connection limit: 500K per server</text>
+<text x="201" y="70" fill="var(--muted)" font-size="5.5">• New connections rejected at capacity</text>
+<text x="201" y="82" fill="var(--muted)" font-size="5.5">• Per-workspace msg/sec quota</text>
+<text x="201" y="94" fill="var(--muted)" font-size="5.5">• Slow consumers: buffer 100 msgs then drop</text>
+<text x="201" y="104" fill="var(--g)" font-size="5" font-weight="600">Prevents: Gateway OOM / connection exhaustion</text>
+
+<line x1="356" y1="68" x2="370" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#bp1)"/>
+
+<!-- Layer 3: Fan-out -->
+<rect x="372" y="28" width="165" height="80" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".8"/>
+<text x="454" y="42" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">③ Fan-out Circuit Breaker</text>
+<text x="382" y="58" fill="var(--muted)" font-size="5.5">• gRPC deadline: 50ms per PushMessages</text>
+<text x="382" y="70" fill="var(--muted)" font-size="5.5">• Circuit opens after 5 consecutive fails</text>
+<text x="382" y="82" fill="var(--muted)" font-size="5.5">• Half-open: retry 1 req every 10s</text>
+<text x="382" y="94" fill="var(--muted)" font-size="5.5">• Stagger large channels over 1-2s</text>
+<text x="382" y="104" fill="var(--g)" font-size="5" font-weight="600">Prevents: slow Gateway cascading to all workers</text>
+
+<line x1="537" y1="68" x2="551" y2="68" stroke="var(--muted)" stroke-width=".8" marker-end="url(#bp1)"/>
+
+<!-- Layer 4: Kafka -->
+<rect x="553" y="28" width="157" height="80" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8"/>
+<text x="631" y="42" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">④ Kafka Consumer Lag</text>
+<text x="563" y="58" fill="var(--muted)" font-size="5.5">• Alert on lag > 10K messages</text>
+<text x="563" y="70" fill="var(--muted)" font-size="5.5">• Auto-scale fan-out workers</text>
+<text x="563" y="82" fill="var(--muted)" font-size="5.5">• Partition reassignment on crash</text>
+<text x="563" y="94" fill="var(--muted)" font-size="5.5">• Max poll records: 500 (batch size)</text>
+<text x="563" y="104" fill="var(--g)" font-size="5" font-weight="600">Prevents: unbounded delivery delay</text>
+
+<!-- What happens when overloaded -->
+<rect x="10" y="120" width="700" height="90" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".6"/>
+<text x="360" y="136" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Degradation Cascade — What Happens Under Extreme Load</text>
+
+<text x="30" y="154" fill="var(--y)" font-size="5.5" font-weight="600">Stage 1 (normal):</text>
+<text x="150" y="154" fill="var(--muted)" font-size="5.5">All messages delivered in &lt;200ms. No backpressure active.</text>
+
+<text x="30" y="168" fill="var(--o)" font-size="5.5" font-weight="600">Stage 2 (elevated):</text>
+<text x="150" y="168" fill="var(--muted)" font-size="5.5">Consumer lag rising → auto-scale fan-out workers. Delivery at 200-500ms. Users don't notice.</text>
+
+<text x="30" y="182" fill="var(--r)" font-size="5.5" font-weight="600">Stage 3 (degraded):</text>
+<text x="150" y="182" fill="var(--muted)" font-size="5.5">Gateway buffers full → drop oldest undelivered msgs for slow clients. Client detects gap via seq → backfill from Vitess.</text>
+
+<text x="30" y="196" fill="var(--r)" font-size="5.5" font-weight="600">Stage 4 (critical):</text>
+<text x="150" y="196" fill="var(--muted)" font-size="5.5">Circuit breakers open → large channels switch to read-time fan-out. Small channels still get real-time delivery.</text>
+</svg>
+
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Key Principle: Graceful Degradation</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Never lose messages:</span> Even under extreme load, messages are persisted in Kafka + Vitess. Delivery may be delayed, but data is never lost.<br>
+<span class="hi">Prioritize small channels:</span> Under load, large broadcast channels degrade first (switch to pull). DMs and small channels keep real-time delivery.<br>
+<span class="hi">Client self-heals:</span> Gap detection + backfill means any dropped delivery is automatically recovered on the client side.
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Monitoring & Alerts</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Kafka consumer lag:</span> Alert if any partition &gt; 10K messages behind<br>
+<span class="hi">Gateway connection count:</span> Alert at 80% capacity (400K connections)<br>
+<span class="hi">gRPC error rate:</span> Alert if &gt; 1% of PushMessages calls fail<br>
+<span class="hi">P99 delivery latency:</span> Alert if &gt; 500ms (2.5× budget)<br>
+<span class="hi">Circuit breaker state:</span> Alert on any circuit opening
+</div>
+</div>
+</div>
+<div class="b bg"><span class="hi">Interview insight:</span> Interviewers love hearing about <span class="hg">graceful degradation</span>. The system doesn't crash under 10× load — it progressively reduces real-time guarantees for large channels while protecting small channels and DMs. Messages are never lost, only delayed.</div>
+</div>
+
+
+
+<!-- ═══ MULTI-REGION ARCHITECTURE ═══ -->
+<div class="T" id="multi-region">
+<h2>Multi-Region Architecture</h2>
+<p class="su">How does a message sent in US-East reach a user in EU-West within 250ms? GeoDNS + regional Kafka clusters + async cross-region replication</p>
+
+<svg width="100%" viewBox="0 0 720 280" style="max-width:720px;display:block;margin:6px auto">
+<defs>
+<marker id="mr1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+<marker id="mr2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#34d399"/></marker>
+</defs>
+
+<!-- Title -->
+<text x="360" y="14" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">Multi-Region Message Delivery</text>
+
+<!-- US-East Region -->
+<rect x="10" y="26" width="330" height="170" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text x="175" y="42" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">🇺🇸 US-East (Primary for workspace)</text>
+
+<!-- US components -->
+<rect x="24" y="52" width="70" height="24" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+<text x="59" y="67" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway US</text>
+
+<rect x="104" y="52" width="70" height="24" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+<text x="139" y="67" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Msg Service</text>
+
+<rect x="184" y="52" width="60" height="24" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="214" y="67" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka US</text>
+
+<rect x="254" y="52" width="70" height="24" rx="3" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".6"/>
+<text x="289" y="67" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">Vitess US</text>
+
+<!-- US Fan-out -->
+<rect x="24" y="86" width="70" height="24" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+<text x="59" y="101" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Fan-out US</text>
+
+<rect x="104" y="86" width="70" height="24" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text x="139" y="101" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Redis US</text>
+
+<!-- US users -->
+<text x="24" y="128" fill="var(--g)" font-size="6">👤👤👤 US users → ~11ms delivery</text>
+
+<!-- Arrows within US -->
+<line x1="94" y1="64" x2="104" y2="64" stroke="var(--muted)" stroke-width=".6" marker-end="url(#mr1)"/>
+<line x1="174" y1="64" x2="184" y2="64" stroke="var(--muted)" stroke-width=".6" marker-end="url(#mr1)"/>
+<line x1="244" y1="64" x2="254" y2="64" stroke="var(--muted)" stroke-width=".6" marker-end="url(#mr1)"/>
+
+<!-- Cross-region replication arrow -->
+<rect x="160" y="142" width="160" height="20" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+<text x="240" y="155" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="700">MirrorMaker / Cross-Region Replication</text>
+
+<line x1="240" y1="162" x2="240" y2="176" stroke="var(--o)" stroke-width="1.2" marker-end="url(#mr1)"/>
+<text x="260" y="172" fill="var(--o)" font-size="5">~60-80ms</text>
+
+<!-- EU-West Region -->
+<rect x="10" y="180" width="330" height="90" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text x="175" y="196" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">🇪🇺 EU-West (Read Replica)</text>
+
+<!-- EU components -->
+<rect x="24" y="206" width="70" height="24" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+<text x="59" y="221" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway EU</text>
+
+<rect x="104" y="206" width="60" height="24" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+<text x="134" y="221" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Kafka EU</text>
+
+<rect x="174" y="206" width="70" height="24" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+<text x="209" y="221" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Fan-out EU</text>
+
+<rect x="254" y="206" width="70" height="24" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
+<text x="289" y="221" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Redis EU</text>
+
+<!-- EU users -->
+<text x="24" y="254" fill="var(--g)" font-size="6">👤👤 EU users → ~80-90ms total delivery</text>
+
+<!-- Right side: Latency breakdown -->
+<rect x="380" y="26" width="330" height="244" rx="6" fill="rgba(251,146,60,.02)" stroke="var(--o)" stroke-width=".6"/>
+<text x="545" y="42" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Cross-Region Delivery Timeline</text>
+
+<!-- Timeline -->
+<line x1="420" y1="56" x2="420" y2="250" stroke="var(--border)" stroke-width=".5"/>
+
+<text x="430" y="68" fill="var(--g)" font-size="5.5" font-weight="600">t=0ms</text>
+<text x="490" y="68" fill="var(--muted)" font-size="5.5">User A sends message (US-East)</text>
+
+<text x="430" y="88" fill="var(--g)" font-size="5.5" font-weight="600">t=5ms</text>
+<text x="490" y="88" fill="var(--muted)" font-size="5.5">Kafka US produces + Vitess persists</text>
+
+<text x="430" y="108" fill="var(--g)" font-size="5.5" font-weight="600">t=11ms</text>
+<text x="490" y="108" fill="var(--g)" font-size="5.5">US users receive message ✓</text>
+
+<text x="430" y="134" fill="var(--o)" font-size="5.5" font-weight="600">t=5ms</text>
+<text x="490" y="134" fill="var(--o)" font-size="5.5">MirrorMaker replicates to Kafka EU</text>
+
+<text x="430" y="154" fill="var(--o)" font-size="5.5" font-weight="600">t=65ms</text>
+<text x="490" y="154" fill="var(--muted)" font-size="5.5">Message arrives in Kafka EU (~60ms network)</text>
+
+<text x="430" y="174" fill="var(--o)" font-size="5.5" font-weight="600">t=70ms</text>
+<text x="490" y="174" fill="var(--muted)" font-size="5.5">EU Fan-out worker consumes from Kafka EU</text>
+
+<text x="430" y="194" fill="var(--o)" font-size="5.5" font-weight="600">t=72ms</text>
+<text x="490" y="194" fill="var(--muted)" font-size="5.5">Redis EU lookup: online EU members</text>
+
+<text x="430" y="214" fill="var(--o)" font-size="5.5" font-weight="600">t=76ms</text>
+<text x="490" y="214" fill="var(--muted)" font-size="5.5">gRPC to EU Gateways</text>
+
+<text x="430" y="234" fill="var(--g)" font-size="5.5" font-weight="600">t=80ms</text>
+<text x="490" y="234" fill="var(--g)" font-size="5.5">EU users receive message ✓</text>
+
+<rect x="420" y="244" width="270" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".4"/>
+<text x="555" y="254" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Total: ~80ms cross-region — well within 250ms budget</text>
+</svg>
+
+<div class="d-grid tri" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Replication Strategy</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Kafka MirrorMaker 2:</span> Async replication US→EU, EU→US<br>
+<span class="hi">Lag:</span> ~60-80ms (network RTT between regions)<br>
+<span class="hi">Vitess:</span> Read replicas in each region for history queries<br>
+<span class="hi">Redis:</span> Independent per region — each region tracks its own online users
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Write Routing</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Workspace home region:</span> All writes for a workspace go to its primary region<br>
+<span class="hi">GeoDNS:</span> Routes user to nearest Gateway, but writes proxy to primary<br>
+<span class="hi">EU user sends msg:</span> Gateway EU → Msg Service US (primary) → Kafka US → replicate to EU<br>
+<span class="hi">Extra latency:</span> ~80ms for cross-region write — acceptable for sender ACK
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Failover</h4>
+<div style="font-size:.75rem;line-height:1.55">
+<span class="hi">Region down:</span> GeoDNS removes unhealthy region in ~30s<br>
+<span class="hi">Promote replica:</span> EU Kafka becomes primary; Vitess promotes read replica<br>
+<span class="hi">Data loss window:</span> Up to ~80ms of unreplicated messages (async replication)<br>
+<span class="hi">Recovery:</span> Clients reconnect, send last_seq → backfill closes any gaps
+</div>
+</div>
+</div>
+<div class="b by"><span class="hi">Key tradeoff:</span> Async replication means EU users see messages ~80ms after US users. The alternative — synchronous cross-region writes — would add 80ms to <em>every</em> message for <em>every</em> user. Slack chooses <span class="hg">availability over strict consistency</span> across regions.</div>
+<div class="b bb"><span class="hi">Deep dive:</span> For systems requiring <em>causal ordering guarantees</em> across regions (not just eventual consistency), see <a href="multi-region-ordering.html">Multi-Region Message Ordering</a> — covers HLC, vector clocks, and conflict resolution during region failover.</div>
+</div>
+
+
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="T" id="stack">
+<h2>Tech Stack &amp; Tradeoffs</h2>
+<p class="su">Each choice made for a specific reason — and what was rejected</p>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
+<tr><td><span class="hi">WebSocket Gateway</span></td><td>Custom (Go / Java)</td><td>500K conn per server via epoll; full control over heartbeat, reconnect, backpressure</td><td>Nginx/HAProxy: not designed for stateful long-lived connections at this density</td></tr>
+<tr><td><span class="hi">Message Bus</span></td><td>Kafka</td><td>Partition by channel_id → strict ordering. Durable, replayable. 1M+ msg/sec.</td><td>RabbitMQ: no replay, lower throughput, fan-out harder. SQS: no ordering across messages.</td></tr>
+<tr><td><span class="hi">Primary Storage</span></td><td>Vitess (MySQL)</td><td>Shard by workspace_id — all workspace data co-located. Transparent resharding. SQL joins work within shard.</td><td>Cassandra: no transactions, harder to query by seq range. DynamoDB: vendor lock-in, cost at this scale.</td></tr>
+<tr><td><span class="hi">Hot Data / Presence</span></td><td>Redis</td><td>Sub-ms SET/GET. Channel online sets + user→gateway mapping. Pub/Sub for internal fan-out.</td><td>Memcached: no sets/sorted sets. In-memory on Gateway: doesn't survive restarts, not shared.</td></tr>
+<tr><td><span class="hi">Internal RPC</span></td><td>gRPC</td><td>Fan-out worker → Gateway. Multiplexed, low latency, typed contracts via protobuf.</td><td>REST/HTTP: higher overhead per call. Raw TCP: no service discovery, no load balancing.</td></tr>
+<tr><td><span class="hi">Search</span></td><td>Elasticsearch</td><td>Full-text search across message history. Separate from delivery path — no latency coupling.</td><td>MySQL FULLTEXT: doesn't scale to 10B messages. Solr: operationally heavier.</td></tr>
+<tr><td><span class="hi">DNS Routing</span></td><td>GeoDNS</td><td>Routes each user to nearest Gateway region. Reduces cross-region hops by ~80ms.</td><td>Single-region: unacceptable latency for global users. Anycast: complex to operate.</td></tr>
+</table>
+<div class="b bg"><span class="hi">Decision rule:</span> <span class="hg">Stateful hot path</span> (connections, presence) → Redis. <span class="hg">Ordered durable log</span> (messages, fan-out) → Kafka. <span class="hg">Queryable history</span> (catch-up, search) → Vitess + Elasticsearch. Each component owns exactly one concern — no overlap.</div>
+<div class="b by"><span class="hi">Real-world validation:</span> <strong>Slack</strong> uses this exact stack. <strong>Discord</strong> uses a similar pattern (Cassandra instead of Vitess). <strong>WhatsApp</strong> uses Erlang/BEAM for the gateway layer instead of Go/Java — same architectural shape, different runtime.</div>
+</div>
+
+
+
+
+<div class="T" id="related">
+<h2>Related Deep Dives</h2>
+<p class="su">Each problem below explores one aspect of this system at greater depth or different scale</p>
+<div class="d-grid tri" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--y)"><a href="whatsapp-offline-delivery.html">WhatsApp Offline Delivery</a></h4><div style="font-size:.75rem;color:var(--muted)">Store-and-forward for 2B+ users. E2E encryption. Server as temporary mailbox. Erlang/BEAM.</div></div>
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--a)"><a href="discord-websocket-infra.html">Discord WebSocket Infrastructure</a></h4><div style="font-size:.75rem;color:var(--muted)">Guild-level sharding vs user-level routing. Voice signaling. Elixir/BEAM for 1M conn/node.</div></div>
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--g)"><a href="multi-region-ordering.html">Multi-Region Ordering</a></h4><div style="font-size:.75rem;color:var(--muted)">HLC for causal ordering. Conflict resolution. Region failover without message loss.</div></div>
+</div>
+<div class="d-grid tri" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--o)"><a href="telegram-large-group-fanout.html">Telegram 1M+ Fan-out</a></h4><div style="font-size:.75rem;color:var(--muted)">Read-time pull from append-only log. Why write-time fan-out is impossible at 1M+.</div></div>
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--c)"><a href="whatsapp-presence-100m.html">Presence at 100M</a></h4><div style="font-size:.75rem;color:var(--muted)">Distributed sharded presence. Subscription model. Flap suppression. 20× Slack scale.</div></div>
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--r)"><a href="slack-typing-indicators.html">Typing Indicators</a></h4><div style="font-size:.75rem;color:var(--muted)">Ephemeral events. No Kafka. Redis Pub/Sub. Fire-and-forget. 8s TTL.</div></div>
+</div>
+<div class="d-grid tri" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--p)"><a href="slack-chat-search.html">Chat Search (10B msgs)</a></h4><div style="font-size:.75rem;color:var(--muted)">Elasticsearch NRT indexing. Permission-aware queries. BM25 + recency ranking.</div></div>
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--a2)"><a href="whatsapp-push-notifications.html">Push Notifications</a></h4><div style="font-size:.75rem;color:var(--muted)">APNs/FCM. Idempotency dedup. Token lifecycle. Collapse keys for batching.</div></div>
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--g)"><a href="telegram-multi-device-sync.html">Multi-Device Sync</a></h4><div style="font-size:.75rem;color:var(--muted)">pts/qts sequences. getDifference API. LWW conflict resolution.</div></div>
+</div>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left"><h4 style="color:var(--y)"><a href="slack-active-channels.html">Top Active Channels</a></h4><div style="font-size:.75rem;color:var(--muted)">Sliding window aggregation. Redis sorted sets. Count-Min Sketch for approximate top-K.</div></div>
+</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 8 things an interviewer wants to hear — say these and you've covered the design</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a)">
+<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">① WebSocket + Redis routing</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each user holds one persistent WebSocket to a Gateway server. Redis maps <code>user:{id} → gateway-host</code>. Fan-out worker looks up this mapping to know which gateway to call.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a2)">
+<div style="font-size:.72rem;font-weight:700;color:var(--a2);margin-bottom:4px">② Kafka partition per channel</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Partition key = <code>channel_id</code>. All messages for a channel land on the same partition → strict ordering guaranteed. One fan-out worker per partition → no race conditions.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
+<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">③ Hybrid fan-out (skip offline)</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Push only to online members (Redis SET). 50K members but 5K online = 90% less work. Channels &gt;50K use read-time fan-out — write once to log, clients pull.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
+<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">④ Monotonic channel_seq + backfill</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Every message gets a <code>channel_seq</code>. Client tracks last seen. Gap detected → request backfill from Vitess. On reconnect, client sends <code>last_seq</code> → server returns missed messages.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
+<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">⑤ Vitess sharded by workspace_id</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">All data for a workspace on one shard → SQL joins work. Large enterprise gets dedicated shard. Vitess handles transparent resharding as workspaces grow.</div>
+</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--c)">
+<div style="font-size:.72rem;font-weight:700;color:var(--c);margin-bottom:4px">⑥ Presence via heartbeat + Redis TTL</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Client pings every 15s. Gateway closes on 30s timeout. Redis SET with 45s TTL auto-expires stale presence. Broadcast only on state transitions — not every heartbeat. Eventually consistent (up to 45s stale).</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--p)">
+<div style="font-size:.72rem;font-weight:700;color:var(--p);margin-bottom:4px">⑦ Multi-region: async replication + local fan-out</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Writes go to workspace's primary region. Kafka MirrorMaker replicates to other regions (~60-80ms). Each region has local fan-out workers + Redis + Gateways. EU users see messages ~80ms after US users — acceptable for chat.</div>
+</div>
+<div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">⑧ Backpressure: 4-layer graceful degradation</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Client rate limit → Gateway admission control → Fan-out circuit breaker → Kafka consumer auto-scale. Under extreme load, large channels degrade to pull-based while DMs keep real-time. Messages never lost, only delayed.</div>
+</div>
+
+<div class="b bg" style="margin-top:8px"><span class="hi">One-liner answer:</span> <em>"WebSocket per user with Redis routing, Kafka partitioned by channel for ordering, hybrid fan-out to online-only members, monotonic sequence numbers for gap detection and catch-up, Vitess sharded by workspace, heartbeat-based presence with Redis TTL, async multi-region replication via MirrorMaker, and 4-layer backpressure for graceful degradation."</em></div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<!-- Progress bar -->
+<div id="read-progress" style="position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--a),var(--g));z-index:9998;transition:width .1s linear"></div>
+
+<script>
+// Progress bar
+window.addEventListener('scroll',function(){
+  var d=document.documentElement;
+  var pct=(d.scrollTop/(d.scrollHeight-d.clientHeight))*100;
+  document.getElementById('read-progress').style.width=Math.min(100,pct)+'%';
+});
+// Back to top
+var b=document.getElementById('topBtn');
+window.addEventListener('scroll',function(){b.style.display=window.scrollY>400?'flex':'none'});
+
+// API tabs
+function apiTab(btn,id){
+  document.querySelectorAll('.api-tab-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelectorAll('.api-tab-pane').forEach(function(p){p.style.display='none'});
+  btn.classList.add('active');
+  document.getElementById('api-'+id).style.display='block';
+}
+
+// Count-up animation on scroll into view
+(function(){
+  var done=false;
+  function countUp(){
+    if(done)return;
+    var els=document.querySelectorAll('.stat-num');
+    var allVisible=true;
+    els.forEach(function(el){
+      var r=el.getBoundingClientRect();
+      if(r.top>window.innerHeight)allVisible=false;
+    });
+    if(!allVisible)return;
+    done=true;
+    els.forEach(function(el){
+      var target=parseInt(el.getAttribute('data-target'),10);
+      var suffix=el.getAttribute('data-suffix')||'';
+      var prefix=el.getAttribute('data-prefix')||'';
+      var duration=900,steps=30,step=0;
+      var iv=setInterval(function(){
+        step++;
+        var val=Math.round(target*(step/steps));
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

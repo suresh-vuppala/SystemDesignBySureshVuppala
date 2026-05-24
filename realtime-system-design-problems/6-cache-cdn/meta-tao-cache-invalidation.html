@@ -1,0 +1,273 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does Meta invalidate cache across 1000+ servers in 1 second? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Meta's TAO invalidate cached objects across 1000+ servers within 1 second?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">⚡</span> Design a cache invalidation system: 1000+ servers, &lt;1s propagation, no thundering herd</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a social platform invalidate cached objects across 1000+ servers within 1 second of a write, preventing stale reads while avoiding thundering herd on the backing store?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A user updates their profile photo. That photo URL is cached on 1000+ servers worldwide. You must <span class="hr">invalidate all copies within 1 second without causing 1000 simultaneous DB reads (thundering herd)</span>.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">1000+</div>
+<div style="font-size:.72rem;color:var(--muted)">cache servers</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">globally distributed</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;1s</div>
+<div style="font-size:.72rem;color:var(--muted)">invalidation latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">write → all caches cleared</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">10B+</div>
+<div style="font-size:.72rem;color:var(--muted)">cache reads/sec</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">99.9% hit rate target</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">0</div>
+<div style="font-size:.72rem;color:var(--muted)">thundering herd</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">single refill per key</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> On write to DB, <strong>invalidate all cached copies</strong> within 1 second<br>
+  <span class="hg">2.</span> Prevent <strong>thundering herd</strong> — only one request refills cache per key<br>
+  <span class="hg">3.</span> Support <strong>graph-structured data</strong> (objects + associations)<br>
+  <span class="hg">4.</span> Maintain <strong>99.9%+ cache hit rate</strong> despite invalidations<br>
+  <span class="hg">5.</span> Handle <strong>cross-region invalidation</strong> with bounded staleness<br>
+  <span class="hg">6.</span> Support <strong>lease-based protection</strong> against stale sets
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">✗</span> Full database design (focus on cache layer)<br>
+  <span class="hr">✗</span> Application-level business logic<br>
+  <span class="hr">✗</span> User authentication and authorization<br>
+  <span class="hr">✗</span> CDN for static assets (separate system)
+</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Design Impact</th></tr>
+<tr><td><span class="hi">Invalidation Latency</span></td><td><span class="hg">&lt;1 second</span> globally</td><td>Pub/sub invalidation bus (not polling). McRouter + mcrouter-based fanout.</td></tr>
+<tr><td><span class="hi">Hit Rate</span></td><td><span class="hg">99.9%+</span></td><td>Tiered caching (L1 local + L2 regional). Warm cache on startup.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">10B+ reads/sec</span></td><td>Memcached clusters per region. Consistent hashing for key distribution.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Read-after-write</span> for writer</td><td>Writer reads from DB directly after write. Others get eventual consistency.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span></td><td>Cache miss falls through to DB. Gutter pool absorbs failed nodes.</td></tr>
+</table>
+</div>
+
+<div class="T" id="architecture">
+<h2>High-Level Architecture</h2>
+<p class="su">Meta's TAO: a graph-aware distributed cache with invalidation</p>
+
+<div class="d-title"><span class="num d-blue">▸</span> TAO Architecture — Write Path &amp; Invalidation</div>
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TAO cache invalidation end-to-end architecture">
+  <defs><marker id="tao-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ LAYER 1: WRITE PATH ═══ -->
+  <rect x="10" y="8" width="760" height="135" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: WRITE PATH — App writes to DB → Publish invalidation (DELETE key, not UPDATE) → Invalidation Bus</text>
+
+  <rect x="25" y="35" width="120" height="90" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="85" y="52" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Client Write</text>
+  <text x="85" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">update profile photo</text>
+  <text x="85" y="80" text-anchor="middle" fill="var(--muted)" font-size="5">change relationship</text>
+  <text x="85" y="93" text-anchor="middle" fill="var(--muted)" font-size="5">post new content</text>
+  <text x="85" y="106" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">write request → leader</text>
+
+  <line x1="145" y1="75" x2="175" y2="75" stroke="var(--a)" stroke-width="1.2" marker-end="url(#tao-arr)"/>
+
+  <rect x="180" y="35" width="200" height="90" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="280" y="52" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">TAO Leader Cache</text>
+  <text x="280" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">write-through to MySQL</text>
+  <text x="280" y="80" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">DELETE key locally (not UPDATE)</text>
+  <text x="280" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">publish invalidation event</text>
+  <text x="280" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">lease-based stale-set protection</text>
+  <text x="280" y="119" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">writer reads from DB directly</text>
+
+  <line x1="380" y1="75" x2="410" y2="75" stroke="var(--y)" stroke-width="1.2" marker-end="url(#tao-arr)"/>
+
+  <!-- DB -->
+  <rect x="180" y="128" width="100" height="10" rx="2" fill="none" stroke="none"/>
+  <line x1="280" y1="125" x2="280" y2="140" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="2,2"/>
+
+  <rect x="415" y="35" width="220" height="90" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="525" y="52" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Invalidation Bus</text>
+  <text x="525" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">pub/sub: key invalidated events</text>
+  <text x="525" y="80" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">fan-out to ALL follower caches</text>
+  <text x="525" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">message: DELETE(key) + version</text>
+  <text x="525" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">&lt;1s propagation globally</text>
+  <text x="525" y="119" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">cross-region via dedicated channel</text>
+
+  <!-- MySQL -->
+  <rect x="660" y="45" width="100" height="65" rx="5" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="710" y="62" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">MySQL</text>
+  <text x="710" y="77" text-anchor="middle" fill="var(--muted)" font-size="5.5">source of truth</text>
+  <text x="710" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">graph data (TAO)</text>
+  <text x="710" y="103" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">objects + edges</text>
+
+  <line x1="280" y1="125" x2="658" y2="77" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#tao-arr)"/>
+  <text x="450" y="108" fill="var(--a2)" font-size="5">write-through</text>
+
+  <!-- ═══ LAYER 2: CACHE TOPOLOGY ═══ -->
+  <rect x="10" y="150" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="165" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: CACHE TOPOLOGY — Leader → Followers (async &lt;1s) + Lease mechanism (prevents stale-set)</text>
+
+  <!-- Leader -->
+  <rect x="25" y="178" width="180" height="100" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="115" y="195" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Leader Cache</text>
+  <text x="115" y="210" text-anchor="middle" fill="var(--muted)" font-size="5.5">receives invalidations first</text>
+  <text x="115" y="223" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">serves reads (low latency)</text>
+  <text x="115" y="236" text-anchor="middle" fill="var(--muted)" font-size="5">issues lease tokens on miss</text>
+  <text x="115" y="249" text-anchor="middle" fill="var(--muted)" font-size="5">revokes lease on invalidation</text>
+  <text x="115" y="262" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">1 leader per shard per region</text>
+
+  <!-- Arrows to followers -->
+  <line x1="205" y1="210" x2="240" y2="195" stroke="var(--g)" stroke-width="1" marker-end="url(#tao-arr)"/>
+  <line x1="205" y1="230" x2="240" y2="230" stroke="var(--g)" stroke-width="1" marker-end="url(#tao-arr)"/>
+  <line x1="205" y1="250" x2="240" y2="265" stroke="var(--g)" stroke-width="1" marker-end="url(#tao-arr)"/>
+  <text x="222" y="185" fill="var(--g)" font-size="4.5">&lt;1s async</text>
+
+  <!-- Followers -->
+  <rect x="245" y="178" width="100" height="35" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="295" y="195" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Follower 1</text>
+  <text x="295" y="208" text-anchor="middle" fill="var(--muted)" font-size="5">delete(key)</text>
+
+  <rect x="245" y="218" width="100" height="35" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="295" y="235" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Follower 2</text>
+  <text x="295" y="248" text-anchor="middle" fill="var(--muted)" font-size="5">delete(key)</text>
+
+  <rect x="245" y="258" width="100" height="35" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="295" y="275" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Follower N</text>
+  <text x="295" y="288" text-anchor="middle" fill="var(--muted)" font-size="5">delete(key)</text>
+
+  <!-- Lease mechanism -->
+  <rect x="370" y="178" width="390" height="100" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="565" y="195" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Lease Mechanism (Stale-Set Protection)</text>
+  <text x="565" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">1. On cache miss → issue lease token (SETNX-like, ~10s TTL)</text>
+  <text x="565" y="227" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Only lease holder can SET the value in cache</text>
+  <text x="565" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">3. If invalidation arrives → lease REVOKED (prevents stale data)</text>
+  <text x="565" y="257" text-anchor="middle" fill="var(--muted)" font-size="5.5">4. Other requesters wait for lease result (no thundering herd)</text>
+  <text x="565" y="272" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Result: 1 DB read per key per invalidation, not 1000</text>
+
+  <!-- ═══ LAYER 3: READ PATH ═══ -->
+  <rect x="10" y="302" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
+  <text x="390" y="317" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: READ PATH — Cache hit → serve | Cache miss → Lease → DB query → SET → Serve (thundering herd protected)</text>
+
+  <rect x="25" y="330" width="110" height="55" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+  <text x="80" y="350" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Reader</text>
+  <text x="80" y="365" text-anchor="middle" fill="var(--muted)" font-size="5.5">GET object/edge</text>
+  <text x="80" y="378" text-anchor="middle" fill="var(--muted)" font-size="5">billions/sec</text>
+
+  <line x1="135" y1="357" x2="165" y2="357" stroke="var(--g)" stroke-width="1.2" marker-end="url(#tao-arr)"/>
+
+  <rect x="170" y="330" width="150" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="245" y="350" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Follower Cache</text>
+  <text x="245" y="365" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">HIT → return immediately</text>
+  <text x="245" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">MISS → request lease from leader</text>
+
+  <line x1="320" y1="357" x2="350" y2="357" stroke="var(--g)" stroke-width="1" marker-end="url(#tao-arr)"/>
+  <text x="335" y="350" fill="var(--muted)" font-size="4.5">miss</text>
+
+  <rect x="355" y="330" width="180" height="55" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="445" y="350" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Lease Issued</text>
+  <text x="445" y="365" text-anchor="middle" fill="var(--muted)" font-size="5.5">holder fetches from DB</text>
+  <text x="445" y="378" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">SET with lease token → serve</text>
+
+  <line x1="535" y1="357" x2="565" y2="357" stroke="var(--y)" stroke-width="1" marker-end="url(#tao-arr)"/>
+
+  <rect x="570" y="330" width="190" height="55" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="665" y="347" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Thundering Herd Protection</text>
+  <text x="665" y="362" text-anchor="middle" fill="var(--muted)" font-size="5.5">1000 concurrent misses on same key</text>
+  <text x="665" y="377" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">only 1 goes to DB (lease holder)</text>
+
+  <!-- Gutter pool -->
+  <rect x="25" y="395" width="350" height="45" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
+  <text x="200" y="412" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Gutter Pool (Failure Handling)</text>
+  <text x="200" y="427" text-anchor="middle" fill="var(--muted)" font-size="5.5">failed cache node → traffic goes to backup pool (not DB) → prevents cascade failure</text>
+
+  <!-- Why DELETE not UPDATE -->
+  <rect x="395" y="395" width="365" height="45" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="577" y="412" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Why DELETE not UPDATE?</text>
+  <text x="577" y="427" text-anchor="middle" fill="var(--muted)" font-size="5.5">DELETE is commutative (order-independent) — concurrent writes can't leave stale data. Next read refills from DB.</text>
+
+  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <rect x="10" y="455" width="760" height="38" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="390" y="470" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">DELETE not UPDATE (commutative, order-independent) | Lease prevents stale-set race | Leader/follower: &lt;1s propagation | 10B+ reads/sec</text>
+  <text x="390" y="486" text-anchor="middle" fill="var(--muted)" font-size="5.5">1000+ cache servers | 99.9% hit rate | Gutter pool absorbs failures | Only 1 DB read per key per invalidation (lease-based)</text>
+</svg>
+</div>
+
+<div class="T" id="key-decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">The architectural choices that make this work at Meta's scale</p>
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
+<tr><td><span class="hi">Invalidation strategy</span></td><td>Delete on write (not update)</td><td>Avoids race conditions between concurrent writes</td><td>Write-through (complex ordering)</td></tr>
+<tr><td><span class="hi">Thundering herd</span></td><td>Lease-based (token on first miss)</td><td>Only 1 request hits DB per key per invalidation</td><td>Mutex lock (doesn't scale across servers)</td></tr>
+<tr><td><span class="hi">Propagation</span></td><td>Pub/sub invalidation bus</td><td>&lt;1s fanout to all followers</td><td>Polling (too slow), TTL-only (too stale)</td></tr>
+<tr><td><span class="hi">Topology</span></td><td>Leader-follower per region</td><td>Writes go to leader, reads from local follower</td><td>Flat (no write coordination)</td></tr>
+<tr><td><span class="hi">Failure handling</span></td><td>Gutter pool (backup cache tier)</td><td>Failed node traffic goes to gutter, not DB</td><td>Direct DB fallback (overloads DB)</td></tr>
+<tr><td><span class="hi">Data model</span></td><td>Graph-aware (objects + edges)</td><td>Social data is naturally a graph</td><td>Key-value only (loses relationship semantics)</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Why DELETE not UPDATE:</span> If two writes happen concurrently (W1 sets value=A, W2 sets value=B), update-based invalidation can leave cache with stale value if messages arrive out of order. DELETE is <span class="hg">commutative</span> — order doesn't matter, next read always gets fresh data from DB.</div>
+<div class="b by"><span class="hi">Lease mechanism:</span> On cache miss, server issues a <span class="hg">lease token</span> (short-lived, ~10s). Only the lease holder can SET the value. If an invalidation arrives while lease is active, the lease is <span class="hr">revoked</span> — preventing stale data from being cached. This solves both thundering herd AND stale-set race conditions.</div>
+<div class="b br"><span class="hi">Tradeoffs:</span> <span class="hr">Eventual consistency</span> — followers may serve stale data for up to 1 second after write. <span class="hr">Complexity</span> — leader/follower topology adds operational overhead. <span class="hr">Cross-region latency</span> — invalidation across regions takes longer (bounded by network RTT).</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Meta TAO</strong> — serves 10B+ reads/sec for social graph. <strong>Netflix EVCache</strong> — similar lease-based thundering herd protection. <strong>Twitter</strong> — Manhattan cache with pub/sub invalidation. <strong>Memcached</strong> at Facebook paper (2013) — foundational design for this pattern.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 8 things to say for cache invalidation design</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>DELETE on write, not UPDATE</strong> — commutative, order-independent, prevents stale-set races<br>
+<span class="hg">2.</span> <strong>Lease mechanism</strong> — only lease holder can SET value, revoked on invalidation (prevents thundering herd + stale)<br>
+<span class="hg">3.</span> <strong>Leader/follower cache topology</strong> — writes go to leader, async replicate to followers (&lt;1s)<br>
+<span class="hg">4.</span> <strong>Pub/Sub invalidation bus</strong> — write triggers invalidation event → all cache servers subscribe<br>
+<span class="hg">5.</span> <strong>Thundering herd protection</strong> — on miss, only 1 request goes to DB (others wait for lease result)<br>
+<span class="hg">6.</span> <strong>Eventual consistency accepted</strong> — followers may serve stale for ~1s (acceptable for social data)<br>
+<span class="hg">7.</span> <strong>Version/generation numbers</strong> — detect stale writes (only accept SET if version matches)<br>
+<span class="hg">8.</span> <strong>Cross-region: async replication</strong> — invalidation propagates across regions via dedicated channel
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

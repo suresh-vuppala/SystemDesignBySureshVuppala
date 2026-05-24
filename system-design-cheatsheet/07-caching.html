@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>7. Caching — System Design Cheatsheet</title>
+<title>7. Caching — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-4"><span class="e">🗄️</span> 7 · CACHING</div>
 
@@ -174,7 +175,7 @@
 </div>
 
 <div class="T" id="redis">
-<h2>Redis</h2><p class="su"><span class="hg">In-memory</span> data store — <span class="hi">sub-ms latency, 100K–1M ops/sec</span>. Cache + data structures + messaging</p>
+<h2>Redis — Data Structures</h2><p class="su"><span class="hg">In-memory</span> data store — <span class="hi">sub-ms latency, 100K–1M ops/sec</span>. Cache + data structures + messaging</p>
 <table>
 <tr><th>Structure</th><th>Commands</th><th>Use Case</th></tr>
 <tr><td><span class="hi">String</span></td><td>SET/GET/INCR/SETNX/EXPIRE</td><td><span class="hg">Counters</span> · <span class="hg">Session tokens</span> · <span class="hg">Cache</span> · <span class="hg">Distributed lock</span> (SETNX) · <span class="hg">Feature flags</span></td></tr>
@@ -184,11 +185,13 @@
 <tr><td><span class="hi">Sorted Set</span></td><td>ZADD/ZRANGE/ZRANK/ZREVRANK/ZINCRBY</td><td><span class="hg">Leaderboards</span> · <span class="hg">Rate limiting</span> (sliding window) · <span class="hg">Priority queues</span> · <span class="hg">Trending topics</span> · <span class="hg">Delayed jobs</span></td></tr>
 <tr><td><span class="hi">HyperLogLog</span></td><td>PFADD/PFCOUNT/PFMERGE</td><td><span class="hg">Approximate unique count</span> with <span class="hg">0.81% error</span> at fixed <span class="hg">12KB memory</span> · <span class="hg">DAU</span> · <span class="hg">Unique page views</span></td></tr>
 <tr><td><span class="hi">Geo</span></td><td>GEOADD/GEODIST/GEORADIUS/GEOPOS/GEOSEARCH</td><td><span class="hg">Nearby drivers</span> (Uber/Lyft) · <span class="hg">Store locator</span> · <span class="hg">Location tracking</span> · Uses <span class="hg">Sorted Set with Geohash</span></td></tr>
+<tr><td><span class="hi">Stream</span></td><td>XADD/XREAD/XREADGROUP/XACK/XRANGE</td><td><span class="hg">Event log</span> · <span class="hg">Consumer groups</span> · <span class="hg">Lightweight Kafka</span> · <span class="hg">Audit trail</span></td></tr>
 </table>
+</div>
 
 <div class="T" id="redis-fast">
-<h2>Why Redis is So Fast?</h2>
-<p class="su">Multiple design decisions compound together</p>
+<h2>Why Redis is So Fast</h2>
+<p class="su">Multiple design decisions compound together — <span class="hg">100K–1M ops/sec</span> on a single thread</p>
 <div class="b by"><span class="hi">In-Memory</span> — all data in <span class="hg">RAM</span>. RAM ~<span class="hg">100ns</span> vs disk ~<span class="hg">10ms</span> = 100,000x faster.</div>
 <div class="b by"><span class="hi">Single-Threaded Core</span> — <span class="hg">no locks, no context switching, no race conditions</span>. Commands execute atomically.</div>
 <div class="b by"><span class="hi">Non-Blocking I/O</span> — <span class="hg">epoll</span> multiplexing — single thread watches <span class="hg">100K+ sockets</span>.</div>
@@ -200,34 +203,41 @@
 Single GET/SET  → 100K–1M ops/sec
 With Pipelining → up to 10x gain
 Bottleneck = NETWORK, not CPU → single thread is enough</code></pre>
-<div class="b bg"><span class="hi">Redis 6.0+:</span> <span class="hg">I/O threads</span> for network read/write — still single-threaded for command execution.</div>
-<div class="b br"><span class="hi">Watch out:</span> <span class="hr">RAM-bound</span> · <span class="hr">avoid KEYS * / SMEMBERS</span> on huge sets · use <span class="hg">Redis Cluster</span> to shard.</div>
+<div class="b bg"><span class="hi">Redis 6.0+:</span> <span class="hg">I/O threads</span> for network read/write — still single-threaded for command execution. Redis 7.0: functions, multi-part AOF, sharded pub/sub.</div>
+<div class="b br"><span class="hi">Watch out:</span> <span class="hr">RAM-bound</span> · <span class="hr">avoid KEYS * / SMEMBERS</span> on huge sets (use SCAN) · <span class="hr">big keys</span> block the event loop · use <span class="hg">Redis Cluster</span> to shard beyond single-node limits.</div>
 </div>
 
-<h3>🗄️ Redis as Cache</h3>
+<div class="T" id="redis-cache">
+<h2>Redis as Cache</h2><p class="su">App checks Redis first — <span class="hg">cache hit</span> returns instantly, <span class="hg">cache miss</span> fetches from DB and populates cache</p>
 <div class="b by"><span class="hi">Pattern:</span> App checks Redis first → <span class="hg">cache hit</span> returns instantly · <span class="hg">cache miss</span> → fetch from DB → write to Redis with TTL → serve.</div>
-<div class="b by"><span class="hi">Strategies:</span> <span class="hg">Cache-aside</span> (most common). <span class="hg">Write-through</span>. <span class="hg">Write-back</span>. <span class="hg">TTL-based eviction</span>.</div>
-<div class="b by"><span class="hi">Eviction Policies:</span> <span class="hg">LRU</span> (default for cache). <span class="hg">LFU</span>. <span class="hg">allkeys-lru</span>. <span class="hg">volatile-lru</span>.</div>
+<div class="b by"><span class="hi">Strategies:</span> <span class="hg">Cache-aside</span> (most common — app manages cache). <span class="hg">Write-through</span> (write to cache + DB together). <span class="hg">Write-back</span> (write to cache, async flush to DB). <span class="hg">Read-through</span> (cache fetches from DB on miss).</div>
+<div class="b by"><span class="hi">Eviction Policies:</span> <span class="hg">allkeys-lru</span> (evict least recently used — best for cache). <span class="hg">allkeys-lfu</span> (evict least frequently used). <span class="hg">volatile-lru</span> (only evict keys with TTL). <span class="hg">noeviction</span> (return error when full — for data store use).</div>
+<div class="b bg"><span class="hi">Cache problems:</span> <span class="hg">Thundering herd</span> — many requests hit DB on same cache miss → use SETNX lock or probabilistic early expiry. <span class="hg">Cache penetration</span> — queries for non-existent keys always miss → cache null values with short TTL. <span class="hg">Cache avalanche</span> — many keys expire simultaneously → add random jitter to TTLs.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No TTL</span> — stale data forever. <span class="hr">Cache everything</span> — wastes RAM on cold data. <span class="hr">No eviction policy</span> — OOM crash. <span class="hr">Inconsistent invalidation</span> — cache and DB disagree.</div>
+</div>
 
-<h3>📢 Redis Pub/Sub</h3>
+<div class="T" id="redis-pubsub">
+<h2>Redis Pub/Sub &amp; Streams</h2><p class="su">Real-time messaging built into Redis — from fire-and-forget broadcast to durable event logs</p>
+
+<div class="d-title"><span class="num d-orange">▸</span> Pub/Sub — Real-Time Broadcast</div>
 <pre><code>PUBLISH  chat:room1 "Hello!"           → sends to all current subscribers
 SUBSCRIBE chat:room1                   → receives "Hello!" instantly
 PSUBSCRIBE chat:*                      → pattern match — all chat channels
 Subscriber joins later → NO history   → messages already gone</code></pre>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Real-time delivery</span> (&lt;1ms). <span class="hg">Fan-out</span>. <span class="hg">Pattern matching</span>.</div>
-<div class="b br"><span class="hi">Limitations:</span> <span class="hr">No persistence</span>. <span class="hr">No replay</span>. <span class="hr">No acknowledgment</span>. <span class="hr">No consumer groups</span>.</div>
-<div class="b by"><span class="hi">Real-world:</span> <strong>Figma</strong> — real-time collaboration. <strong>Slack</strong> — online presence. Cache invalidation across servers.</div>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Real-time delivery</span> (&lt;1ms). <span class="hg">Fan-out</span> to all subscribers. <span class="hg">Pattern matching</span>.</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">No persistence</span>. <span class="hr">No replay</span>. <span class="hr">No acknowledgment</span>. <span class="hr">No consumer groups</span>. Fire-and-forget only.</div>
+<div class="b by"><span class="hi">Use cases:</span> <strong>Figma</strong> — real-time collaboration signals. <strong>Slack</strong> — online presence indicators. Cache invalidation across app servers. Chat typing indicators.</div>
 
-<h3>🌊 Redis Streams</h3>
+<div class="d-title"><span class="num d-green">▸</span> Streams — Durable Event Log (Lightweight Kafka)</div>
 <pre><code>XADD   orders * customer_id 5 amount 100 status "pending"  → 1704067200000-0
 XGROUP CREATE orders payment-service 0                      → create consumer group
 XREADGROUP GROUP payment-service consumer1 STREAMS orders > → read unprocessed
 XACK   orders payment-service 1704067200000-0               → acknowledge done
 XRANGE orders - +                                           → replay all entries</code></pre>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Persistence</span>. <span class="hg">Replay</span>. <span class="hg">Consumer groups</span>. <span class="hg">At-least-once</span>. <span class="hg">Blocking reads</span>.</div>
-<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Single node</span> — &lt;100K events/sec. <span class="hr">RAM-bound</span>. Good <span class="hg">lightweight Kafka</span> when you already have Redis.</div>
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Persistence</span> (survives restart). <span class="hg">Replay</span> (XRANGE from any point). <span class="hg">Consumer groups</span> (competing consumers). <span class="hg">At-least-once delivery</span>. <span class="hg">Blocking reads</span> (XREADGROUP BLOCK).</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Single node throughput</span> — &lt;100K events/sec (vs Kafka millions). <span class="hr">RAM-bound</span>. <span class="hr">No cross-cluster replication</span>. Best as <span class="hg">lightweight Kafka</span> when you already have Redis.</div>
 
-<h3>⚖️ Cache vs Pub/Sub vs Streams</h3>
+<div class="d-title"><span class="num d-cyan">▸</span> Cache vs Pub/Sub vs Streams — When to Use What</div>
 <table>
 <tr><th>Feature</th><th>Cache</th><th>Pub/Sub</th><th>Streams</th></tr>
 <tr><td>Purpose</td><td><span class="hg">Read acceleration</span></td><td><span class="hg">Real-time broadcast</span></td><td><span class="hg">Durable event log</span></td></tr>
@@ -237,8 +247,10 @@ XRANGE orders - +                                           → replay all entri
 <tr><td>Acknowledgment</td><td>❌</td><td><span class="hr">❌ Fire-and-forget</span></td><td><span class="hg">✅ XACK</span></td></tr>
 <tr><td>Best For</td><td>DB offload, sessions</td><td>Presence, signals, invalidation</td><td>Order pipelines, audit, IoT</td></tr>
 </table>
+</div>
 
-<h3>🔧 Persistence, HA &amp; Cluster</h3>
+<div class="T" id="redis-ha">
+<h2>Redis Persistence &amp; High Availability</h2><p class="su">From single-node to sharded cluster — persistence, replication, and failover</p>
 
 <!-- ═══ Persistence Visual ═══ -->
 <div class="d-title"><span class="num d-yellow">▸</span> Persistence: RDB vs AOF</div>
@@ -247,23 +259,17 @@ XRANGE orders - +                                           → replay all entri
 <h4 style="color:var(--y)">RDB (Snapshot)</h4>
 <svg width="100%" viewBox="0 0 220 70" style="max-width:220px;display:block;margin:0 auto">
   <defs><marker id="rd1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
-  <!-- Redis memory -->
   <rect x="10" y="8" width="50" height="24" rx="5" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="35" y="24" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Memory</text>
-  <!-- fork() -->
   <line x1="60" y1="20" x2="82" y2="20" stroke="var(--y)" stroke-width="1" marker-end="url(#rd1)"/>
   <text x="71" y="14" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">fork()</text>
-  <!-- Child snapshot -->
   <rect x="84" y="8" width="50" height="24" rx="5" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1"/>
   <text x="109" y="18" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">snapshot</text>
   <text x="109" y="28" text-anchor="middle" fill="var(--muted)" font-size="6">(point-in-time)</text>
-  <!-- Arrow to disk -->
   <line x1="134" y1="20" x2="156" y2="20" stroke="var(--muted)" stroke-width="1" marker-end="url(#rd1)"/>
-  <!-- Disk -->
   <rect x="158" y="8" width="50" height="24" rx="5" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
   <text x="183" y="18" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">.rdb file</text>
   <text x="183" y="28" text-anchor="middle" fill="var(--muted)" font-size="6">on disk</text>
-  <!-- Recovery -->
   <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="7">On crash: load .rdb → fast restore</text>
   <text x="110" y="60" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">⚠ Data since last snapshot is lost</text>
 </svg>
@@ -271,124 +277,39 @@ XRANGE orders - +                                           → replay all entri
 <div class="d-panel" style="padding:8px">
 <h4 style="color:var(--g)">AOF (Append-Only File)</h4>
 <svg width="100%" viewBox="0 0 220 70" style="max-width:220px;display:block;margin:0 auto">
-  <!-- Redis -->
   <rect x="10" y="8" width="50" height="24" rx="5" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="35" y="24" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Redis</text>
-  <!-- Every write -->
   <line x1="60" y1="20" x2="82" y2="20" stroke="var(--g)" stroke-width="1" marker-end="url(#rd1)"/>
   <text x="71" y="14" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">every write</text>
-  <!-- AOF log -->
   <rect x="84" y="4" width="70" height="32" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
   <text x="119" y="16" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">1, 2, 3, 4, … N</text>
   <text x="119" y="28" text-anchor="middle" fill="var(--muted)" font-size="6">append-only file</text>
-  <!-- Persisted blocks -->
   <rect x="160" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".3"/>
   <rect x="170" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".4"/>
   <rect x="180" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".5"/>
   <rect x="190" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".6"/>
   <rect x="200" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".7"/>
   <text x="190" y="30" text-anchor="middle" fill="var(--muted)" font-size="6">persisted</text>
-  <!-- Recovery -->
   <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="7">On crash: replay AOF → near-zero data loss</text>
   <text x="110" y="60" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">✓ Hybrid (RDB + AOF) = best of both (Redis 4.0+)</text>
 </svg>
 </div>
 </div>
 
-<!-- ═══ Architecture: Simple → Sentinel → Cluster ═══ -->
+<!-- ═══ Deployment Modes ═══ -->
 <div class="d-title"><span class="num d-blue">▸</span> Redis Deployment Modes</div>
-<div class="d-grid tri" style="margin:4px 0">
-
-<!-- Simple -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--g)">Simple (Single Node)</h4>
-<svg width="100%" viewBox="0 0 120 60" style="max-width:120px;display:block;margin:0 auto">
-  <rect x="30" y="8" width="60" height="24" rx="5" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.5"/>
-  <text x="60" y="24" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">Main</text>
-  <text x="60" y="46" text-anchor="middle" fill="var(--muted)" font-size="7">Single instance</text>
-  <text x="60" y="56" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">No HA — SPOF</text>
-</svg>
-</div>
-
-<!-- Sentinel -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--a)">Sentinel (HA)</h4>
-<svg width="100%" viewBox="0 0 150 90" style="max-width:150px;display:block;margin:0 auto">
-  <!-- Sentinel nodes -->
-  <circle cx="40" cy="10" r="6" fill="rgba(251,191,36,.2)" stroke="var(--y)" stroke-width="1"/>
-  <circle cx="75" cy="10" r="6" fill="rgba(251,191,36,.2)" stroke="var(--y)" stroke-width="1"/>
-  <circle cx="110" cy="10" r="6" fill="rgba(251,191,36,.2)" stroke="var(--y)" stroke-width="1"/>
-  <text x="75" y="6" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Sentinel nodes</text>
-  <!-- Arrows to main -->
-  <line x1="40" y1="16" x2="60" y2="30" stroke="var(--y)" stroke-width=".7" stroke-dasharray="2,2"/>
-  <line x1="75" y1="16" x2="75" y2="30" stroke="var(--y)" stroke-width=".7" stroke-dasharray="2,2"/>
-  <line x1="110" y1="16" x2="90" y2="30" stroke="var(--y)" stroke-width=".7" stroke-dasharray="2,2"/>
-  <!-- Main -->
-  <rect x="48" y="32" width="54" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="75" y="44" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Main</text>
-  <!-- Replication arrows -->
-  <line x1="60" y1="50" x2="30" y2="64" stroke="var(--a)" stroke-width=".8" marker-end="url(#rd1)"/>
-  <line x1="90" y1="50" x2="120" y2="64" stroke="var(--a)" stroke-width=".8" marker-end="url(#rd1)"/>
-  <text x="75" y="58" text-anchor="middle" fill="var(--a)" font-size="5.5">replication</text>
-  <!-- Secondaries -->
-  <rect x="8" y="66" width="44" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
-  <text x="30" y="77" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Secondary 1</text>
-  <rect x="98" y="66" width="44" height="16" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
-  <text x="120" y="77" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">Secondary 2</text>
-</svg>
-<div style="font-size:.68rem;color:var(--muted);line-height:1.3;margin-top:2px">Sentinels monitor main, auto-failover promotes replica. No sharding.</div>
-</div>
-
-<!-- Cluster -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--a2)">Cluster (Sharded)</h4>
-<svg width="100%" viewBox="0 0 150 90" style="max-width:150px;display:block;margin:0 auto">
-  <!-- Masters -->
-  <rect x="30" y="4" width="30" height="16" rx="3" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1"/>
-  <text x="45" y="15" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">M1</text>
-  <rect x="64" y="4" width="30" height="16" rx="3" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1"/>
-  <text x="79" y="15" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">M2</text>
-  <rect x="98" y="4" width="30" height="16" rx="3" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1"/>
-  <text x="113" y="15" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">M3</text>
-  <!-- Replication arrows -->
-  <line x1="45" y1="20" x2="45" y2="34" stroke="var(--a)" stroke-width=".7" marker-end="url(#rd1)"/>
-  <line x1="79" y1="20" x2="79" y2="34" stroke="var(--a)" stroke-width=".7" marker-end="url(#rd1)"/>
-  <line x1="113" y1="20" x2="113" y2="34" stroke="var(--a)" stroke-width=".7" marker-end="url(#rd1)"/>
-  <!-- Replicas -->
-  <rect x="30" y="36" width="30" height="14" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".7"/>
-  <text x="45" y="46" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">S1</text>
-  <rect x="64" y="36" width="30" height="14" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".7"/>
-  <text x="79" y="46" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">S2</text>
-  <rect x="98" y="36" width="30" height="14" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".7"/>
-  <text x="113" y="46" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">S3</text>
-  <!-- Gossip lines -->
-  <line x1="55" y1="12" x2="64" y2="12" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="2,2"/>
-  <line x1="89" y1="12" x2="98" y2="12" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="2,2"/>
-  <text x="79" y="60" text-anchor="middle" fill="var(--muted)" font-size="6">gossip protocol</text>
-  <!-- Clients -->
-  <text x="8" y="14" font-size="8">👤</text>
-  <line x1="18" y1="10" x2="30" y2="10" stroke="var(--muted)" stroke-width=".7" marker-end="url(#rd1)"/>
-  <text x="8" y="26" fill="var(--muted)" font-size="5.5">r/w</text>
-  <text x="140" y="14" font-size="8">👤</text>
-  <line x1="128" y1="10" x2="136" y2="10" stroke="var(--muted)" stroke-width=".7"/>
-  <text x="140" y="26" fill="var(--muted)" font-size="5.5">read</text>
-  <!-- Hash slots -->
-  <rect x="20" y="68" width="118" height="14" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
-  <text x="79" y="78" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="600">16,384 hash slots across M1/M2/M3</text>
-</svg>
-</div>
-</div>
-
-<!-- Existing table kept below -->
-<table style="margin-top:4px">
-<tr><th>Feature</th><th>Detail</th></tr>
-<tr><td><span class="hi">Persistence</span></td><td><span class="hg">RDB</span> (periodic snapshot) · <span class="hg">AOF</span> (log every write) · <span class="hg">Hybrid</span> (both, Redis 4.0+)</td></tr>
-<tr><td><span class="hi">Sentinel</span></td><td><span class="hg">HA mode</span> — monitors master, auto-failover promotes replica. No sharding.</td></tr>
-<tr><td><span class="hi">Cluster</span></td><td><span class="hg">16,384 hash slots</span> across N masters. Each master has replicas. Horizontal scale.</td></tr>
-<tr><td><span class="hi">Redlock</span></td><td>Distributed lock — acquire on <span class="hg">majority (N/2+1)</span> nodes. TTL prevents deadlock.</td></tr>
+<table>
+<tr><th>Mode</th><th>Architecture</th><th>Sharding</th><th>HA</th><th>Use Case</th></tr>
+<tr><td><span class="hi">Single Node</span></td><td>One instance</td><td>No</td><td><span class="hr">No (SPOF)</span></td><td>Dev, small cache, non-critical</td></tr>
+<tr><td><span class="hi">Sentinel</span></td><td>Master + replicas + sentinel monitors</td><td>No</td><td><span class="hg">Yes (auto-failover)</span></td><td>HA cache, sessions, moderate load</td></tr>
+<tr><td><span class="hi">Cluster</span></td><td>N masters (16,384 hash slots) + replicas</td><td><span class="hg">Yes</span></td><td><span class="hg">Yes</span></td><td>Large datasets, high throughput, horizontal scale</td></tr>
+<tr><td><span class="hi">Managed</span></td><td>ElastiCache / MemoryDB / Upstash</td><td>Yes</td><td>Yes</td><td>Production — no ops overhead</td></tr>
 </table>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Atomic operations</span>. <span class="hg">Sub-ms latency</span>. <span class="hg">Lua scripting</span> — multi-step atomic transactions.</div>
-<div class="b br"><span class="hi">Limitations:</span> <span class="hr">RAM-bound</span>. <span class="hr">Single-threaded core</span>. <span class="hr">Not a primary DB</span>. <span class="hr">No complex queries</span>.</div>
+
+<div class="b bg"><span class="hi">Cluster details:</span> <span class="hg">16,384 hash slots</span> distributed across masters. Key → CRC16(key) % 16384 → slot → node. Each master has 1+ replicas. <span class="hg">Gossip protocol</span> for node discovery. <span class="hg">MOVED/ASK</span> redirects for client routing. Multi-key ops only within same slot (use hash tags: <code>{user:123}.profile</code>).</div>
+<div class="b by"><span class="hi">Redlock (distributed lock):</span> Acquire lock on <span class="hg">majority (N/2+1)</span> of independent Redis nodes. Set TTL to prevent deadlock. Validate lock still held before critical section. <span class="hr">Controversial</span> — Martin Kleppmann argues it's unsafe (clock drift). Alternative: use <span class="hg">etcd/ZooKeeper</span> for strong locks.</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">RAM-bound</span> — all data must fit in memory. <span class="hr">Single-threaded core</span> — one slow command blocks everything. <span class="hr">Not a primary DB</span> — use as cache/accelerator. <span class="hr">Async replication</span> — data loss possible on failover (use WAIT for sync).</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Twitter</strong> — timeline cache (Redis Cluster). <strong>GitHub</strong> — job queues (Resque/Sidekiq). <strong>Snapchat</strong> — rate limiting. <strong>Pinterest</strong> — graph storage (billions of edges in Redis). <strong>Discord</strong> — presence, message cache.</div>
 </div>
 
 <div class="T" id="cdn">
@@ -414,6 +335,11 @@ XRANGE orders - +                                           → replay all entri
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

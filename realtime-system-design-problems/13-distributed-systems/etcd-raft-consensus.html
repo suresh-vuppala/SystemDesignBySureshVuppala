@@ -1,0 +1,243 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How does etcd achieve consensus with Raft? — System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does etcd achieve consensus across 5 nodes with Raft?</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">🔗</span> Design a distributed KV store: Raft consensus, leader election, split-brain prevention, majority quorum</div>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How does a distributed key-value store achieve consensus across 5 nodes, handling leader election, log replication, and split-brain prevention requiring majority quorum (3 of 5) for all decisions?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> 5 nodes must agree on the same sequence of operations. A node crashes. A network partition splits the cluster. <span class="hr">How do you guarantee all surviving nodes have the same data, elect exactly one leader, and prevent split-brain?</span></div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">5 Nodes</div>
+<div style="font-size:.72rem;color:var(--muted)">typical cluster</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">tolerates 2 failures</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">1 Leader</div>
+<div style="font-size:.72rem;color:var(--muted)">at any time</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">all writes through leader</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Majority</div>
+<div style="font-size:.72rem;color:var(--muted)">quorum (3/5)</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">for all decisions</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">&lt;10ms</div>
+<div style="font-size:.72rem;color:var(--muted)">write latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">same-region cluster</div>
+</div>
+</div>
+</div>
+
+<div class="T" id="architecture">
+<h2>Raft Consensus — How It Works</h2>
+<p class="su">Leader election → log replication → safety guarantee</p>
+
+<!-- ═══ Raft SVG ═══ -->
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Raft consensus detailed architecture showing client layer, consensus layer, and safety layer">
+  <defs><marker id="rf-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- ═══ LAYER 1: CLIENT LAYER ═══ -->
+  <rect x="10" y="5" width="760" height="80" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">CLIENT LAYER</text>
+
+  <rect x="30" y="28" width="150" height="48" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="105" y="43" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client (Writer)</text>
+  <text x="105" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">PUT /key → Leader only</text>
+  <text x="105" y="68" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">all writes serialized</text>
+
+  <line x1="180" y1="52" x2="220" y2="52" stroke="var(--a)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <text x="200" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">PUT /key=val</text>
+
+  <rect x="230" y="28" width="180" height="48" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="320" y="43" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Client (Reader)</text>
+  <text x="320" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Linearizable reads via ReadIndex</text>
+  <text x="320" y="68" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Leader confirms still leader before read</text>
+
+  <rect x="450" y="28" width="300" height="48" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
+  <text x="600" y="43" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Client Guarantees</text>
+  <text x="600" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">Linearizable: read reflects latest committed write</text>
+  <text x="600" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">Sequential consistency across all clients</text>
+
+  <!-- ═══ LAYER 2: CONSENSUS LAYER ═══ -->
+  <rect x="10" y="90" width="760" height="195" rx="6" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="103" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">CONSENSUS LAYER — Log Replication</text>
+
+  <!-- Leader (large, prominent) -->
+  <rect x="30" y="112" width="240" height="85" rx="7" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="2"/>
+  <text x="150" y="128" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">LEADER (Node 1)</text>
+  <text x="150" y="142" text-anchor="middle" fill="var(--muted)" font-size="5.5">Accepts ALL writes, serializes into log</text>
+  <text x="150" y="155" text-anchor="middle" fill="var(--muted)" font-size="5.5">Replicates AppendEntries → all followers</text>
+  <text x="150" y="168" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Heartbeat every 100ms (empty AppendEntries)</text>
+  <text x="150" y="181" text-anchor="middle" fill="var(--muted)" font-size="5">Term = monotonically increasing epoch number</text>
+  <text x="150" y="193" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Single point of serialization → no conflicts</text>
+
+  <!-- AppendEntries arrows -->
+  <line x1="270" y1="135" x2="340" y2="135" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <line x1="270" y1="155" x2="340" y2="175" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <line x1="270" y1="175" x2="340" y2="215" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <line x1="270" y1="185" x2="340" y2="255" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#rf-arr)"/>
+  <text x="305" y="128" fill="var(--y)" font-size="5" font-weight="600">AppendEntries</text>
+
+  <!-- Follower 1 (healthy) -->
+  <rect x="345" y="115" width="130" height="42" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="410" y="130" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Follower (Node 2)</text>
+  <text x="410" y="142" text-anchor="middle" fill="var(--muted)" font-size="5">replicates log, votes</text>
+  <text x="410" y="153" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">ACK ✓ term 4, idx 12</text>
+
+  <!-- Follower 2 (healthy) -->
+  <rect x="345" y="162" width="130" height="42" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="410" y="177" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Follower (Node 3)</text>
+  <text x="410" y="189" text-anchor="middle" fill="var(--muted)" font-size="5">replicates log, votes</text>
+  <text x="410" y="200" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">ACK ✓ term 4, idx 12</text>
+
+  <!-- Follower 3 (healthy) -->
+  <rect x="345" y="209" width="130" height="42" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="410" y="224" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Follower (Node 4)</text>
+  <text x="410" y="236" text-anchor="middle" fill="var(--muted)" font-size="5">replicates log, votes</text>
+  <text x="410" y="247" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">ACK ✓ term 4, idx 12</text>
+
+  <!-- Unreachable Node (dashed) -->
+  <rect x="345" y="256" width="130" height="42" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="3,2"/>
+  <text x="410" y="271" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Node 5 (down)</text>
+  <text x="410" y="283" text-anchor="middle" fill="var(--muted)" font-size="5">network partition</text>
+  <text x="410" y="294" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">✗ unreachable</text>
+
+  <!-- Log Entries Visualization -->
+  <rect x="520" y="112" width="235" height="120" rx="5" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="637" y="126" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Replicated Log (all nodes)</text>
+  <!-- Committed entries -->
+  <rect x="535" y="133" width="205" height="14" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="637" y="143" text-anchor="middle" fill="var(--g)" font-size="5">idx 10 | term 4 | SET x=1 | COMMITTED ✓</text>
+  <rect x="535" y="150" width="205" height="14" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="637" y="160" text-anchor="middle" fill="var(--g)" font-size="5">idx 11 | term 4 | SET y=2 | COMMITTED ✓</text>
+  <rect x="535" y="167" width="205" height="14" rx="2" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="637" y="177" text-anchor="middle" fill="var(--g)" font-size="5">idx 12 | term 4 | DEL z   | COMMITTED ✓</text>
+  <!-- Uncommitted entry -->
+  <rect x="535" y="184" width="205" height="14" rx="2" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".5" stroke-dasharray="2,1"/>
+  <text x="637" y="194" text-anchor="middle" fill="var(--y)" font-size="5">idx 13 | term 4 | SET w=3 | PENDING ⏳</text>
+  <text x="637" y="212" text-anchor="middle" fill="var(--muted)" font-size="5">Committed = majority (3/5) have entry</text>
+  <text x="637" y="224" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Once committed → never lost (safety)</text>
+
+  <!-- Quorum indicator -->
+  <text x="500" y="275" fill="var(--g)" font-size="5.5" font-weight="600">3 ACK ✓ = majority → COMMIT</text>
+  <text x="500" y="285" fill="var(--muted)" font-size="4.5">Node 5 down → doesn't block progress</text>
+
+  <!-- ═══ LAYER 3: SAFETY LAYER ═══ -->
+  <rect x="10" y="295" width="760" height="110" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="308" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">SAFETY LAYER — Election, Commit Rules, Membership</text>
+
+  <!-- Commit Rule -->
+  <rect x="25" y="316" width="230" height="80" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="140" y="331" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Commit Rule</text>
+  <text x="140" y="345" text-anchor="middle" fill="var(--muted)" font-size="5.5">Majority (3/5) ACK → committed</text>
+  <text x="140" y="358" text-anchor="middle" fill="var(--muted)" font-size="5.5">Committed entries applied to state machine</text>
+  <text x="140" y="371" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">2f+1 nodes tolerates f failures</text>
+  <text x="140" y="384" text-anchor="middle" fill="var(--muted)" font-size="5">Only one partition can have majority</text>
+  <text x="140" y="395" text-anchor="middle" fill="var(--g)" font-size="4.5">→ prevents split-brain</text>
+
+  <!-- Leader Election -->
+  <rect x="275" y="316" width="240" height="80" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="395" y="331" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Leader Election</text>
+  <text x="395" y="345" text-anchor="middle" fill="var(--muted)" font-size="5.5">Timeout: 150-300ms (randomized)</text>
+  <text x="395" y="358" text-anchor="middle" fill="var(--muted)" font-size="5.5">Follower → Candidate → RequestVote</text>
+  <text x="395" y="371" text-anchor="middle" fill="var(--muted)" font-size="5.5">Majority votes → becomes new Leader</text>
+  <text x="395" y="384" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Random timeout prevents split vote</text>
+  <text x="395" y="395" text-anchor="middle" fill="var(--muted)" font-size="4.5">New term incremented on each election</text>
+
+  <!-- Membership Change -->
+  <rect x="535" y="316" width="220" height="80" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="645" y="331" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Membership Change</text>
+  <text x="645" y="345" text-anchor="middle" fill="var(--muted)" font-size="5.5">Joint consensus protocol</text>
+  <text x="645" y="358" text-anchor="middle" fill="var(--muted)" font-size="5.5">Old + new config both must agree</text>
+  <text x="645" y="371" text-anchor="middle" fill="var(--muted)" font-size="5.5">Safe add/remove nodes</text>
+  <text x="645" y="384" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">No split-brain during reconfig</text>
+  <text x="645" y="395" text-anchor="middle" fill="var(--muted)" font-size="4.5">One node at a time (simplified)</text>
+
+  <!-- ═══ BOTTOM: Key Guarantees ═══ -->
+  <rect x="10" y="415" width="760" height="78" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="430" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">KEY GUARANTEES</text>
+
+  <rect x="25" y="438" width="170" height="48" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="110" y="452" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">Safety</text>
+  <text x="110" y="464" text-anchor="middle" fill="var(--muted)" font-size="5">All nodes agree on</text>
+  <text x="110" y="475" text-anchor="middle" fill="var(--muted)" font-size="5">same log order</text>
+  <text x="110" y="484" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Never diverge</text>
+
+  <rect x="210" y="438" width="170" height="48" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="295" y="452" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Liveness</text>
+  <text x="295" y="464" text-anchor="middle" fill="var(--muted)" font-size="5">Eventually progresses</text>
+  <text x="295" y="475" text-anchor="middle" fill="var(--muted)" font-size="5">if majority available</text>
+  <text x="295" y="484" text-anchor="middle" fill="var(--a)" font-size="4.5" font-weight="600">Tolerates f failures</text>
+
+  <rect x="395" y="438" width="180" height="48" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="485" y="452" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Log Completeness</text>
+  <text x="485" y="464" text-anchor="middle" fill="var(--muted)" font-size="5">New leader has ALL</text>
+  <text x="485" y="475" text-anchor="middle" fill="var(--muted)" font-size="5">committed entries</text>
+  <text x="485" y="484" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">No data loss on failover</text>
+
+  <rect x="590" y="438" width="165" height="48" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="672" y="452" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Fencing (Terms)</text>
+  <text x="672" y="464" text-anchor="middle" fill="var(--muted)" font-size="5">Monotonic term numbers</text>
+  <text x="672" y="475" text-anchor="middle" fill="var(--muted)" font-size="5">prevent stale leader</text>
+  <text x="672" y="484" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">Old leader can't write</text>
+
+  <!-- Labels -->
+  <text x="390" y="498" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">2f+1 nodes tolerates f failures | heartbeat every 100ms | &lt;10ms write latency same-region</text>
+</svg>
+
+<table>
+<tr><th>Phase</th><th>Mechanism</th><th>Guarantee</th></tr>
+<tr><td><span class="hi">Leader Election</span></td><td>Follower times out (150-300ms random) → becomes candidate → requests votes → majority grants → becomes leader</td><td>Exactly one leader per term. Random timeout prevents split vote.</td></tr>
+<tr><td><span class="hi">Log Replication</span></td><td>Leader appends entry → sends AppendEntries to all followers → majority ACK → entry committed</td><td>Committed entries never lost. All nodes converge to same log.</td></tr>
+<tr><td><span class="hi">Safety</span></td><td>Candidate must have all committed entries to win election (log completeness)</td><td>New leader always has all committed data. No data loss on failover.</td></tr>
+<tr><td><span class="hi">Heartbeat</span></td><td>Leader sends empty AppendEntries every 100ms</td><td>Followers know leader is alive. No unnecessary elections.</td></tr>
+<tr><td><span class="hi">Membership Change</span></td><td>Joint consensus: old + new config both must agree during transition</td><td>Safe add/remove nodes without split-brain during reconfiguration.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Split-brain prevention:</span> Majority quorum (3/5) means <span class="hg">at most one partition can have a majority</span>. The minority partition cannot elect a leader (can't get 3 votes). Stale leader in minority detects it lost majority → steps down. <span class="hg">Fencing tokens</span> (monotonic term numbers) prevent stale leaders from making progress.</div>
+<div class="b by"><span class="hi">etcd specifics:</span> Backbone of <span class="hg">Kubernetes</span> (stores all cluster state). <span class="hg">Watch API</span> — clients subscribe to key changes (efficient notification). <span class="hg">Lease-based TTL</span> — keys auto-expire (used for leader election, service discovery). <span class="hg">Linearizable reads</span> via ReadIndex (leader confirms it's still leader before serving read).</div>
+<div class="b br"><span class="hi">Limitations:</span> <span class="hr">Write throughput limited by leader</span> (~10K writes/sec). <span class="hr">Cross-region latency</span> — consensus requires RTT to majority (100ms+ cross-region). <span class="hr">Large values</span> — etcd optimized for small KV (&lt;1.5MB per value). <span class="hr">Cluster size</span> — 3 or 5 nodes (more = slower consensus).</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Kubernetes</strong> — all cluster state in etcd. <strong>CockroachDB</strong> — Raft per data range. <strong>TiKV</strong> — Raft for distributed KV. <strong>Consul</strong> — Raft for service catalog. <strong>Kafka KRaft</strong> — replacing ZooKeeper with Raft controller.</div>
+</div>
+
+<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 7 things to say for consensus/Raft design</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Majority quorum (2f+1)</strong> — 5 nodes tolerates 2 failures. Only one partition can have majority.<br>
+<span class="hg">2.</span> <strong>Leader handles all writes</strong> — single point of serialization, no conflicts<br>
+<span class="hg">3.</span> <strong>Random election timeout (150-300ms)</strong> — prevents split vote, ensures one candidate wins<br>
+<span class="hg">4.</span> <strong>Log completeness</strong> — candidate must have all committed entries to win election (no data loss)<br>
+<span class="hg">5.</span> <strong>Committed = majority ACK</strong> — entry is durable once 3/5 nodes have it<br>
+<span class="hg">6.</span> <strong>Heartbeats every 100ms</strong> — followers know leader is alive, no unnecessary elections<br>
+<span class="hg">7.</span> <strong>Fencing tokens (term numbers)</strong> — stale leader can't make progress (monotonically increasing term)
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

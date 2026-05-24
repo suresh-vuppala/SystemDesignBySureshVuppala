@@ -1,61 +1,472 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3. Security — System Design Cheatsheet</title>
+<title>3. Security — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-2"><span class="e">🔒</span> 3 · SECURITY</div>
 
 <div class="T" id="authentication">
-<h2>Authentication</h2><p class="su">Verifying identity — <span class="hg">"Who are you?"</span></p>
+<h2>Authentication</h2><p class="su">Verifying identity — <span class="hg">"Who are you?"</span> — the gateway to every secure system</p>
+
+<!-- ═══ Authentication Methods Diagram ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Authentication Methods — From Simple to Zero-Trust</div>
+<svg width="100%" viewBox="0 0 700 180" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Authentication methods spectrum from basic auth to mTLS">
+  <defs><marker id="auth-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Security spectrum arrow -->
+  <line x1="30" y1="16" x2="670" y2="16" stroke="var(--muted)" stroke-width="1"/>
+  <text x="30" y="10" fill="var(--r)" font-size="5.5" font-weight="600">Low Security</text>
+  <text x="670" y="10" text-anchor="end" fill="var(--g)" font-size="5.5" font-weight="600">High Security</text>
+
+  <!-- Basic Auth -->
+  <rect x="10" y="25" width="120" height="65" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
+  <text x="70" y="40" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Basic Auth</text>
+  <text x="70" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">base64(user:pass)</text>
+  <text x="70" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">in Authorization header</text>
+  <text x="70" y="76" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">⚠ only over HTTPS</text>
+  <text x="70" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">Use: internal/dev APIs</text>
+
+  <!-- API Key -->
+  <rect x="145" y="25" width="120" height="65" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
+  <text x="205" y="40" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">API Key</text>
+  <text x="205" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">X-API-Key header</text>
+  <text x="205" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">scoped per service</text>
+  <text x="205" y="76" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">rotate regularly</text>
+  <text x="205" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">Use: S2S, third-party APIs</text>
+
+  <!-- JWT -->
+  <rect x="280" y="25" width="120" height="65" rx="5" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="340" y="40" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">JWT (Bearer)</text>
+  <text x="340" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">signed token (RS256/ES256)</text>
+  <text x="340" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">stateless verification</text>
+  <text x="340" y="76" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">short-lived (15min)</text>
+  <text x="340" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">Use: APIs, microservices</text>
+
+  <!-- OAuth 2.0 -->
+  <rect x="415" y="25" width="120" height="65" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="475" y="40" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">OAuth 2.0 + OIDC</text>
+  <text x="475" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">delegated authorization</text>
+  <text x="475" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">"Sign in with Google"</text>
+  <text x="475" y="76" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">PKCE for public clients</text>
+  <text x="475" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">Use: SSO, social login</text>
+
+  <!-- mTLS -->
+  <rect x="550" y="25" width="130" height="65" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="615" y="40" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">mTLS + SPIFFE</text>
+  <text x="615" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">mutual certificates</text>
+  <text x="615" y="63" text-anchor="middle" fill="var(--muted)" font-size="5">workload identity</text>
+  <text x="615" y="76" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">zero-trust, auto-rotate</text>
+  <text x="615" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">Use: service mesh</text>
+
+  <!-- JWT Structure (bottom) -->
+  <rect x="10" y="100" width="680" height="70" rx="5" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="350" y="114" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">JWT Structure: header.payload.signature</text>
+  <text x="350" y="128" text-anchor="middle" fill="var(--muted)" font-size="5.5">Header: {"alg":"RS256","typ":"JWT"} · Payload: {"sub":"user123","exp":1700000000,"role":"admin","iss":"auth.example.com"}</text>
+  <text x="350" y="140" text-anchor="middle" fill="var(--muted)" font-size="5.5">Signature: RSASHA256(base64url(header) + "." + base64url(payload), privateKey)</text>
+  <text x="200" y="156" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">HS256 = shared secret (single service)</text>
+  <text x="500" y="156" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">RS256/ES256 = asymmetric (microservices, public key verifies)</text>
+  <text x="350" y="166" text-anchor="middle" fill="var(--r)" font-size="5">⚠ Never store JWT in localStorage (XSS vulnerable) — use httpOnly secure cookie</text>
+</svg>
+
+<!-- ═══ Auth Methods Table ═══ -->
 <table>
-<tr><th>Method</th><th>Best For</th><th>Security</th></tr>
-<tr><td><span class="hi">Basic Auth</span> — base64(user:pass)</td><td>Internal APIs, dev</td><td><span class="tr">Low</span></td></tr>
-<tr><td><span class="hi">API Key</span> — X-API-Key header</td><td>Service-to-service</td><td><span class="tr">Medium</span></td></tr>
-<tr><td><span class="hi">JWT</span> — Bearer token (RS256/ES256)</td><td><span class="hg">Stateless APIs, microservices</span></td><td><span class="tg">High</span></td></tr>
-<tr><td><span class="hi">OAuth 2.0 + OIDC</span></td><td>"Sign in with Google", SSO</td><td><span class="tg">High</span></td></tr>
-<tr><td><span class="hi">mTLS</span> — mutual certificates</td><td>Service mesh, zero-trust</td><td><span class="tg">High</span></td></tr>
+<tr><th>Method</th><th>Mechanism</th><th>Stateless?</th><th>Best For</th><th>Security Level</th></tr>
+<tr><td><span class="hi">Basic Auth</span></td><td>base64(user:pass) in header</td><td>Yes</td><td>Internal APIs, dev/test</td><td><span class="hr">Low</span> — credentials in every request</td></tr>
+<tr><td><span class="hi">API Key</span></td><td>X-API-Key header or query param</td><td>Yes</td><td>Service-to-service, third-party</td><td>Medium — no expiry by default</td></tr>
+<tr><td><span class="hi">Session Cookie</span></td><td>Server-side session store + cookie ID</td><td>No (stateful)</td><td>Traditional web apps</td><td>Medium — CSRF risk, server state</td></tr>
+<tr><td><span class="hi">JWT (Bearer)</span></td><td>Signed token with claims</td><td><span class="hg">Yes</span></td><td>APIs, microservices, mobile</td><td><span class="hg">High</span> — self-contained, verifiable</td></tr>
+<tr><td><span class="hi">OAuth 2.0 + OIDC</span></td><td>Delegated auth via authorization server</td><td>Yes (token-based)</td><td>SSO, social login, third-party access</td><td><span class="hg">High</span> — industry standard</td></tr>
+<tr><td><span class="hi">mTLS</span></td><td>Mutual X.509 certificates</td><td>Yes</td><td>Service mesh, zero-trust</td><td><span class="hg">Highest</span> — cryptographic identity</td></tr>
+<tr><td><span class="hi">Passkeys / WebAuthn</span></td><td>FIDO2 public key credential</td><td>Yes</td><td>Passwordless user login</td><td><span class="hg">Highest</span> — phishing-resistant</td></tr>
 </table>
-<div class="b bg"><span class="hi">JWT Guarantees:</span> <span class="hg">Integrity</span> — signature proves token wasn't tampered. <span class="hg">Stateless verification</span> — no DB lookup needed (public key validates). <span class="hg">Expiration</span> — <code>exp</code> claim forces re-auth. Best practice: <span class="hg">RS256</span> for microservices, <span class="hg">httpOnly cookie</span> storage, short-lived access (15min) + refresh token (7d).</div>
-<div class="b by"><span class="hi">Real-world:</span> <strong>Auth0/Keycloak/Firebase Auth</strong> as identity providers. <strong>Stripe</strong> uses scoped API keys. <strong>Google</strong> issues JWTs for API access.</div>
-<div class="b bp"><span class="hv">JWT Structure:</span> <code>header.payload.signature</code> — Header: <code>{"alg":"RS256","typ":"JWT"}</code> · Payload: <code>{"sub":"user123","exp":1700000000,"role":"admin"}</code> · Signature: <code>RSASHA256(base64(header)+"."+base64(payload), privateKey)</code>. <span class="hi">HS256</span> = shared secret (simple, single service). <span class="hi">RS256</span> = asymmetric (public key verifies, private key signs — microservices).</div>
-<div class="b bb"><span class="hi">OAuth 2.0 Flows:</span> <span class="hg">Authorization Code + PKCE</span> — browser/mobile apps (most secure, no client secret exposed). <span class="hg">Client Credentials</span> — service-to-service (machine-to-machine, no user involved). <span class="hg">Implicit</span> — deprecated (token in URL fragment, insecure). <span class="hg">Device Code</span> — smart TVs, CLI tools (user authorizes on separate device).</div>
-<div class="b bg"><span class="hi">Zero Trust:</span> "Never trust, always verify" — every request authenticated regardless of network location. <span class="hg">mTLS</span> between all services. No implicit trust for internal traffic. <span class="hg">Least privilege</span> per request. Identity-based access, not network-based. Used by Google BeyondCorp, Cloudflare Access.</div>
+
+<!-- ═══ OAuth 2.0 Flows ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> OAuth 2.0 Flows — Choosing the Right Grant Type</div>
+<table>
+<tr><th>Flow</th><th>Client Type</th><th>Use Case</th><th>Security</th></tr>
+<tr><td><span class="hi">Authorization Code + PKCE</span></td><td>Public (SPA, mobile, CLI)</td><td>User login, "Sign in with Google"</td><td><span class="hg">Most secure</span> — no client secret exposed</td></tr>
+<tr><td><span class="hi">Client Credentials</span></td><td>Confidential (backend service)</td><td>Machine-to-machine, no user context</td><td>High — client_id + client_secret</td></tr>
+<tr><td><span class="hi">Device Code</span></td><td>Input-constrained (TV, IoT)</td><td>User authorizes on separate device</td><td>High — out-of-band verification</td></tr>
+<tr><td><span class="hi">Refresh Token</span></td><td>Any</td><td>Get new access token without re-login</td><td>Rotate on use, bind to device</td></tr>
+<tr><td><span class="hi">Implicit</span></td><td>—</td><td><span class="hr">DEPRECATED</span></td><td><span class="hr">Insecure</span> — token in URL fragment</td></tr>
+</table>
+
+<!-- ═══ Auth Best Practices ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Authentication Best Practices</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Token Security</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Access token:</strong> short-lived (15 min), in memory</li>
+<li><strong>Refresh token:</strong> longer (7d), httpOnly cookie, rotate on use</li>
+<li><strong>Storage:</strong> httpOnly + Secure + SameSite=Strict cookie</li>
+<li><strong>Never:</strong> localStorage (XSS), URL params (logs)</li>
+<li><strong>Revocation:</strong> token blocklist or short expiry</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Multi-Factor Auth (MFA)</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>TOTP:</strong> Google Authenticator, Authy (6-digit code)</li>
+<li><strong>WebAuthn/Passkeys:</strong> biometric + device (phishing-proof)</li>
+<li><strong>SMS:</strong> <span class="hr">weakest</span> — SIM swap attacks</li>
+<li><strong>Push notification:</strong> Duo, Microsoft Authenticator</li>
+<li><strong>Hardware key:</strong> YubiKey (FIDO2) — strongest</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Identity Providers:</span> <span class="hg">Auth0</span> — universal login, social + enterprise SSO. <span class="hg">Keycloak</span> — open-source, self-hosted. <span class="hg">Firebase Auth</span> — mobile-first. <span class="hg">Okta</span> — enterprise workforce identity. <span class="hg">AWS Cognito</span> — serverless user pools.</div>
+<div class="b by"><span class="hi">Microservices auth pattern:</span> API Gateway validates JWT → extracts claims → passes user context in headers → downstream services trust gateway. <span class="hg">Token exchange</span> for service-to-service calls (audience-restricted tokens). <span class="hg">Service accounts</span> for machine identity.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Rolling your own auth</span> — use battle-tested IdPs. <span class="hr">Long-lived tokens without rotation</span> — compromised token valid forever. <span class="hr">Symmetric JWT (HS256) across services</span> — shared secret = any service can forge tokens. <span class="hr">No rate-limiting on login</span> — credential stuffing.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Google</strong> — OIDC tokens for all API access. <strong>Stripe</strong> — scoped API keys with restricted permissions. <strong>GitHub</strong> — fine-grained PATs replacing classic tokens. <strong>Cloudflare</strong> — Access replaces VPN with identity-aware proxy.</div>
 </div>
 
 <div class="T" id="authorization">
-<h2>Authorization</h2><p class="su">Verifying permissions — <span class="hg">"What can you do?"</span></p>
+<h2>Authorization</h2><p class="su">Verifying permissions — <span class="hg">"What can you do?"</span> — enforce <span class="hi">least privilege</span> at every layer</p>
+
+<!-- ═══ Authorization Models Diagram ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Authorization Models — RBAC → ABAC → ReBAC</div>
+<svg width="100%" viewBox="0 0 700 200" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Authorization models showing RBAC, ABAC, and ReBAC approaches">
+  <defs><marker id="az-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- RBAC -->
+  <rect x="10" y="10" width="210" height="90" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="115" y="26" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="800">RBAC (Role-Based)</text>
+  <text x="115" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">Users → Roles → Permissions</text>
+
+  <!-- RBAC flow -->
+  <rect x="20" y="44" width="40" height="18" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="40" y="56" text-anchor="middle" fill="var(--a)" font-size="5">User</text>
+  <line x1="60" y1="53" x2="75" y2="53" stroke="var(--a)" stroke-width=".7" marker-end="url(#az-arr)"/>
+  <rect x="77" y="44" width="50" height="18" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="102" y="56" text-anchor="middle" fill="var(--y)" font-size="5">Role:admin</text>
+  <line x1="127" y1="53" x2="142" y2="53" stroke="var(--y)" stroke-width=".7" marker-end="url(#az-arr)"/>
+  <rect x="144" y="44" width="66" height="18" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="177" y="56" text-anchor="middle" fill="var(--g)" font-size="5">read,write,delete</text>
+
+  <text x="115" y="76" text-anchor="middle" fill="var(--g)" font-size="5">✓ Simple, auditable</text>
+  <text x="115" y="87" text-anchor="middle" fill="var(--r)" font-size="5">✗ Role explosion at scale</text>
+  <text x="115" y="97" text-anchor="middle" fill="var(--muted)" font-size="4.5">Use: GitHub, AWS IAM, K8s RBAC</text>
+
+  <!-- ABAC -->
+  <rect x="240" y="10" width="210" height="90" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="345" y="26" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="800">ABAC (Attribute-Based)</text>
+  <text x="345" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rules on attributes (who, what, where, when)</text>
+
+  <rect x="250" y="44" width="190" height="30" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="345" y="56" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">IF role=doctor AND dept=cardiology</text>
+  <text x="345" y="67" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">AND time=business_hours → ALLOW read:patient</text>
+
+  <text x="345" y="84" text-anchor="middle" fill="var(--g)" font-size="5">✓ Fine-grained, context-aware</text>
+  <text x="345" y="95" text-anchor="middle" fill="var(--r)" font-size="5">✗ Complex policies, hard to audit</text>
+  <text x="345" y="97" text-anchor="middle" fill="var(--muted)" font-size="4.5"></text>
+
+  <!-- ReBAC -->
+  <rect x="470" y="10" width="210" height="90" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="575" y="26" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="800">ReBAC (Relationship-Based)</text>
+  <text x="575" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">Relationships define access (graph-based)</text>
+
+  <rect x="480" y="44" width="190" height="30" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="575" y="56" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">user:alice IS owner OF doc:report</text>
+  <text x="575" y="67" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">→ owner CAN edit, share, delete</text>
+
+  <text x="575" y="84" text-anchor="middle" fill="var(--g)" font-size="5">✓ Natural for sharing, hierarchies</text>
+  <text x="575" y="95" text-anchor="middle" fill="var(--r)" font-size="5">✗ Graph traversal complexity</text>
+
+  <!-- Policy-Based (bottom) -->
+  <rect x="10" y="110" width="680" height="80" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="350" y="126" text-anchor="middle" fill="var(--a2)" font-size="7.5" font-weight="800">Policy-Based Authorization (OPA / Cedar / Rego)</text>
+  <text x="350" y="140" text-anchor="middle" fill="var(--muted)" font-size="5.5">Externalized policies — decouple authorization logic from application code</text>
+
+  <rect x="30" y="148" width="200" height="30" rx="3" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6"/>
+  <text x="130" y="160" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">allow { input.method == "GET"</text>
+  <text x="130" y="172" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">  input.user.role == "viewer" }</text>
+
+  <rect x="260" y="148" width="180" height="30" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="350" y="162" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Decision: ALLOW / DENY</text>
+  <text x="350" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">+ audit log of every decision</text>
+
+  <rect x="470" y="148" width="200" height="30" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="570" y="160" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Tools: OPA/Rego, AWS Cedar,</text>
+  <text x="570" y="172" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Casbin, Cerbos, Permit.io</text>
+</svg>
+
+<!-- ═══ Authorization Models Table ═══ -->
 <table>
-<tr><th>Model</th><th>How</th><th>Use Case</th></tr>
-<tr><td><span class="hi">RBAC</span></td><td>Users → Roles → Permissions</td><td>Most systems (GitHub roles)</td></tr>
-<tr><td><span class="hi">ABAC</span></td><td>Rules on attributes (role, time, IP, resource)</td><td>Healthcare, finance</td></tr>
-<tr><td><span class="hi">ReBAC</span></td><td>Relationships define access</td><td>Google Drive sharing (Zanzibar)</td></tr>
-<tr><td><span class="hi">Policy-Based</span></td><td>JSON/Rego policies (OPA)</td><td>AWS IAM, multi-tenant</td></tr>
+<tr><th>Model</th><th>How It Works</th><th>Scalability</th><th>Use Case</th><th>Example Systems</th></tr>
+<tr><td><span class="hi">RBAC</span></td><td>Users → Roles → Permissions</td><td>Simple, limited flexibility</td><td>Most apps, admin panels</td><td>GitHub, AWS IAM, K8s, PostgreSQL</td></tr>
+<tr><td><span class="hi">ABAC</span></td><td>Rules on attributes (role, time, IP, resource tags)</td><td>Very flexible, complex policies</td><td>Healthcare, finance, compliance</td><td>AWS IAM Conditions, XACML</td></tr>
+<tr><td><span class="hi">ReBAC</span></td><td>Graph of relationships (user→resource)</td><td>Handles sharing/hierarchy naturally</td><td>File sharing, social, multi-tenant</td><td>Google Zanzibar, AuthZed, Ory Keto</td></tr>
+<tr><td><span class="hi">Policy-Based</span></td><td>Externalized rules (Rego/Cedar DSL)</td><td>Decoupled, testable, versionable</td><td>Microservices, multi-tenant SaaS</td><td>OPA, AWS Cedar, Cerbos</td></tr>
+<tr><td><span class="hi">ACL</span></td><td>Per-resource access control list</td><td>Simple but doesn't scale</td><td>File systems, small apps</td><td>Linux permissions, S3 ACLs (legacy)</td></tr>
 </table>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Least privilege</span> — minimal permissions needed. <span class="hg">Deny by default</span> — explicit grants only. <span class="hg">Auditability</span> — log who accessed what (GDPR/HIPAA).</div>
+
+<!-- ═══ Authorization Patterns ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Authorization Patterns in Microservices</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Where to Enforce</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>API Gateway:</strong> coarse-grained (valid token? correct scope?)</li>
+<li><strong>Service layer:</strong> business rules (can this user edit THIS resource?)</li>
+<li><strong>Database:</strong> row-level security (Postgres RLS, Citus)</li>
+<li><strong>Sidecar/mesh:</strong> OPA sidecar for policy decisions</li>
+<li><strong>Frontend:</strong> UI-only (never trust — always verify server-side)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--o)">Google Zanzibar (ReBAC)</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Powers Google Drive, YouTube, Cloud IAM</li>
+<li>Relationship tuples: (user, relation, object)</li>
+<li>Check: "does user:alice have edit on doc:123?"</li>
+<li>Handles billions of relationships, &lt;10ms checks</li>
+<li>Open-source: <strong>SpiceDB</strong>, <strong>Ory Keto</strong>, <strong>OpenFGA</strong></li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Principles:</span> <span class="hg">Least privilege</span> — minimal permissions needed. <span class="hg">Deny by default</span> — explicit grants only. <span class="hg">Separation of duties</span> — no single role can do everything. <span class="hg">Auditability</span> — log every access decision (who, what, when, allowed/denied).</div>
+<div class="b by"><span class="hi">Multi-tenant authorization:</span> Every query must include <span class="hg">tenant_id</span> filter. Use <span class="hg">row-level security</span> (Postgres RLS) as defense-in-depth. <span class="hg">Tenant isolation</span> at every layer: API → service → DB. Test with cross-tenant access attempts.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Checking permissions only in UI</span> — API must enforce independently. <span class="hr">God role</span> — one role with all permissions (audit nightmare). <span class="hr">Hardcoded permissions</span> in code — can't change without deploy. <span class="hr">No tenant isolation</span> — one customer sees another's data.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Google</strong> — Zanzibar for all products (Drive, YouTube, Cloud). <strong>GitHub</strong> — RBAC (owner/admin/write/read) + fine-grained permissions. <strong>AWS</strong> — IAM policies (ABAC with conditions). <strong>Notion</strong> — workspace → team → page hierarchy (ReBAC).</div>
 </div>
 
 <div class="T" id="encryption">
-<h2>Encryption</h2><p class="su">Protecting data <span class="hg">at rest</span> and <span class="hg">in transit</span></p>
+<h2>Encryption</h2><p class="su">Protecting data <span class="hg">at rest</span> and <span class="hg">in transit</span> — the foundation of confidentiality and integrity</p>
+
+<!-- ═══ Encryption Types Diagram ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Encryption Types — Symmetric, Asymmetric &amp; Hashing</div>
+<svg width="100%" viewBox="0 0 700 200" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Encryption types showing symmetric, asymmetric, and hashing approaches">
+  <defs><marker id="enc-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Symmetric -->
+  <rect x="10" y="10" width="210" height="85" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="115" y="26" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="800">Symmetric (AES-256-GCM)</text>
+  <text x="115" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">same key encrypts + decrypts</text>
+
+  <rect x="20" y="44" width="50" height="20" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="45" y="57" text-anchor="middle" fill="var(--a)" font-size="5.5">plaintext</text>
+  <line x1="70" y1="54" x2="90" y2="54" stroke="var(--a)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+  <rect x="92" y="44" width="40" height="20" rx="3" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="112" y="55" text-anchor="middle" fill="var(--y)" font-size="5">🔑 key</text>
+  <line x1="132" y1="54" x2="152" y2="54" stroke="var(--a)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+  <rect x="154" y="44" width="56" height="20" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="182" y="57" text-anchor="middle" fill="var(--a)" font-size="5.5">ciphertext</text>
+
+  <text x="115" y="76" text-anchor="middle" fill="var(--g)" font-size="5">✓ Fast (hardware AES-NI)</text>
+  <text x="115" y="87" text-anchor="middle" fill="var(--muted)" font-size="5">Use: disk encryption, DB encryption, S3 SSE</text>
+
+  <!-- Asymmetric -->
+  <rect x="240" y="10" width="210" height="85" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="345" y="26" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="800">Asymmetric (RSA / ECDSA)</text>
+  <text x="345" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">public key encrypts, private key decrypts</text>
+
+  <rect x="250" y="44" width="50" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="275" y="57" text-anchor="middle" fill="var(--g)" font-size="5.5">plaintext</text>
+  <line x1="300" y1="54" x2="315" y2="54" stroke="var(--g)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+  <rect x="317" y="44" width="50" height="20" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="342" y="55" text-anchor="middle" fill="var(--g)" font-size="5">🔑 pub</text>
+  <line x1="367" y1="54" x2="382" y2="54" stroke="var(--g)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+  <rect x="384" y="44" width="56" height="20" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="412" y="57" text-anchor="middle" fill="var(--g)" font-size="5.5">ciphertext</text>
+
+  <text x="345" y="76" text-anchor="middle" fill="var(--r)" font-size="5">✗ Slow (1000× slower than AES)</text>
+  <text x="345" y="87" text-anchor="middle" fill="var(--muted)" font-size="5">Use: TLS handshake, JWT signing, SSH, PGP</text>
+
+  <!-- Hashing -->
+  <rect x="470" y="10" width="210" height="85" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="575" y="26" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="800">Hashing (One-Way)</text>
+  <text x="575" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">irreversible transformation, no key needed</text>
+
+  <rect x="480" y="44" width="50" height="20" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="505" y="57" text-anchor="middle" fill="var(--o)" font-size="5.5">input</text>
+  <line x1="530" y1="54" x2="550" y2="54" stroke="var(--o)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+  <rect x="552" y="44" width="60" height="20" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="582" y="57" text-anchor="middle" fill="var(--o)" font-size="5.5">hash (fixed)</text>
+  <line x1="612" y1="54" x2="632" y2="54" stroke="var(--r)" stroke-width=".8" stroke-dasharray="2,2"/>
+  <text x="655" y="57" fill="var(--r)" font-size="5">✗ no reverse</text>
+
+  <text x="575" y="76" text-anchor="middle" fill="var(--g)" font-size="5">✓ Verify without storing secret</text>
+  <text x="575" y="87" text-anchor="middle" fill="var(--muted)" font-size="5">Use: passwords (bcrypt), integrity (SHA-256)</text>
+
+  <!-- Envelope Encryption (bottom) -->
+  <rect x="10" y="105" width="680" height="85" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="350" y="120" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="800">Envelope Encryption (KMS Pattern)</text>
+  <text x="350" y="132" text-anchor="middle" fill="var(--muted)" font-size="5.5">Data key encrypts data; master key (in HSM) encrypts data key — never expose master key</text>
+
+  <rect x="30" y="140" width="80" height="24" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="70" y="155" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Your Data</text>
+
+  <line x1="110" y1="152" x2="135" y2="152" stroke="var(--muted)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+
+  <rect x="137" y="140" width="90" height="24" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="182" y="150" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Data Key (DEK)</text>
+  <text x="182" y="160" text-anchor="middle" fill="var(--muted)" font-size="4.5">AES-256, per-object</text>
+
+  <line x1="227" y1="152" x2="252" y2="152" stroke="var(--muted)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+  <text x="240" y="145" fill="var(--muted)" font-size="4.5">encrypts</text>
+
+  <rect x="254" y="140" width="90" height="24" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="299" y="155" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Encrypted Data</text>
+
+  <rect x="400" y="140" width="100" height="24" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1"/>
+  <text x="450" y="150" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Master Key (KEK)</text>
+  <text x="450" y="160" text-anchor="middle" fill="var(--muted)" font-size="4.5">in HSM, never leaves</text>
+
+  <line x1="400" y1="152" x2="345" y2="152" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="372" y="145" fill="var(--y)" font-size="4.5">wraps DEK</text>
+
+  <rect x="540" y="140" width="130" height="24" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="605" y="150" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Encrypted DEK</text>
+  <text x="605" y="160" text-anchor="middle" fill="var(--muted)" font-size="4.5">stored alongside data</text>
+
+  <line x1="500" y1="152" x2="538" y2="152" stroke="var(--y)" stroke-width=".8" marker-end="url(#enc-arr)"/>
+
+  <text x="350" y="182" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">AWS KMS / GCP Cloud KMS / Azure Key Vault / HashiCorp Vault</text>
+</svg>
+
+<!-- ═══ Encryption Algorithms Table ═══ -->
 <table>
-<tr><th>Type</th><th>How</th><th>Use Case</th></tr>
-<tr><td><span class="hi">Symmetric (AES-256)</span></td><td>Same key encrypts/decrypts</td><td>Data at rest, disk encryption</td></tr>
-<tr><td><span class="hi">Asymmetric (RSA/ECDSA)</span></td><td>Public encrypts, private decrypts</td><td>TLS, JWT signing, SSH</td></tr>
-<tr><td><span class="hi">Hashing (bcrypt/Argon2)</span></td><td>One-way, slow + salted</td><td>Password storage (never plaintext!)</td></tr>
-<tr><td><span class="hi">Envelope Encryption</span></td><td>Data key encrypts data; master key encrypts data key</td><td>AWS KMS, GCP KMS pattern</td></tr>
+<tr><th>Type</th><th>Algorithm</th><th>Key Size</th><th>Use Case</th><th>Notes</th></tr>
+<tr><td><span class="hi">Symmetric</span></td><td>AES-256-GCM</td><td>256-bit</td><td>Data at rest, disk, DB column encryption</td><td><span class="hg">Standard choice</span>. GCM provides authentication.</td></tr>
+<tr><td><span class="hi">Symmetric</span></td><td>ChaCha20-Poly1305</td><td>256-bit</td><td>TLS on mobile (no AES-NI)</td><td>Software-fast, used by WireGuard</td></tr>
+<tr><td><span class="hi">Asymmetric</span></td><td>RSA-2048+</td><td>2048-4096 bit</td><td>TLS certs, JWT RS256 signing</td><td>Slow, being replaced by ECDSA</td></tr>
+<tr><td><span class="hi">Asymmetric</span></td><td>ECDSA (P-256)</td><td>256-bit</td><td>TLS 1.3, JWT ES256, SSH keys</td><td><span class="hg">Preferred</span>. Smaller keys, faster.</td></tr>
+<tr><td><span class="hi">Asymmetric</span></td><td>Ed25519</td><td>256-bit</td><td>SSH keys, signing</td><td>Fastest, simplest, no config pitfalls</td></tr>
+<tr><td><span class="hi">Key Exchange</span></td><td>X25519 (ECDH)</td><td>256-bit</td><td>TLS 1.3 key exchange</td><td>Forward secrecy (new key per session)</td></tr>
+<tr><td><span class="hi">Hashing</span></td><td>bcrypt / Argon2id</td><td>N/A</td><td>Password storage</td><td><span class="hg">Slow by design</span>. Salt + work factor.</td></tr>
+<tr><td><span class="hi">Hashing</span></td><td>SHA-256 / SHA-3</td><td>N/A</td><td>Integrity checks, HMAC, content addressing</td><td>Fast. Never for passwords.</td></tr>
+<tr><td><span class="hi">Envelope</span></td><td>DEK + KEK</td><td>Varies</td><td>Cloud KMS pattern (AWS, GCP, Azure)</td><td>Master key never leaves HSM</td></tr>
 </table>
+
+<!-- ═══ TLS Deep Dive ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> TLS 1.3 — Encryption in Transit</div>
+<svg width="100%" viewBox="0 0 680 140" style="max-width:680px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TLS 1.3 handshake showing 1-RTT connection establishment">
+  <defs><marker id="tls-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Client -->
+  <rect x="10" y="20" width="80" height="100" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="50" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
+  <line x1="50" y1="45" x2="50" y2="115" stroke="var(--a)" stroke-width=".5" stroke-dasharray="2,2"/>
+
+  <!-- Server -->
+  <rect x="560" y="20" width="80" height="100" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="600" y="38" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Server</text>
+  <line x1="600" y1="45" x2="600" y2="115" stroke="var(--g)" stroke-width=".5" stroke-dasharray="2,2"/>
+
+  <!-- ClientHello -->
+  <line x1="90" y1="55" x2="560" y2="55" stroke="var(--a)" stroke-width="1" marker-end="url(#tls-arr)"/>
+  <text x="325" y="50" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">ClientHello: supported ciphers + key_share (X25519)</text>
+
+  <!-- ServerHello + Finished -->
+  <line x1="560" y1="75" x2="90" y2="75" stroke="var(--g)" stroke-width="1" marker-end="url(#tls-arr)"/>
+  <text x="325" y="70" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">ServerHello: chosen cipher + key_share + cert + Finished</text>
+
+  <!-- Client Finished -->
+  <line x1="90" y1="95" x2="560" y2="95" stroke="var(--y)" stroke-width="1.2" marker-end="url(#tls-arr)"/>
+  <text x="325" y="90" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Client Finished → encrypted app data begins</text>
+
+  <!-- Labels -->
+  <text x="325" y="115" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">TLS 1.3: 1-RTT handshake (vs 2-RTT in TLS 1.2) | 0-RTT resumption possible</text>
+  <text x="325" y="128" text-anchor="middle" fill="var(--muted)" font-size="5.5">Cipher: TLS_AES_256_GCM_SHA384 + X25519 key exchange + Ed25519 cert</text>
+
+  <!-- RTT indicator -->
+  <rect x="100" y="48" width="30" height="52" rx="2" fill="none" stroke="var(--y)" stroke-width=".8" stroke-dasharray="2,2"/>
+  <text x="115" y="78" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">1 RTT</text>
+</svg>
+
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Data in Transit</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>TLS 1.3:</strong> all external traffic (HTTPS, gRPC-TLS)</li>
+<li><strong>mTLS:</strong> service-to-service (Istio, Linkerd)</li>
+<li><strong>VPN/WireGuard:</strong> site-to-site, remote access</li>
+<li><strong>SSH:</strong> admin access (Ed25519 keys preferred)</li>
+<li>Enforce: HSTS header, cert pinning for mobile</li>
+</ul>
 </div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Data at Rest</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Disk:</strong> LUKS, BitLocker, AWS EBS encryption</li>
+<li><strong>Database:</strong> TDE (Transparent Data Encryption)</li>
+<li><strong>Object storage:</strong> S3 SSE-KMS, GCS CMEK</li>
+<li><strong>Column-level:</strong> encrypt PII fields individually</li>
+<li><strong>Backup:</strong> encrypt before upload (client-side)</li>
+</ul>
+</div>
+</div>
+
+<!-- ═══ Secrets Management ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Secrets Management — Never Hardcode Secrets</div>
+<table>
+<tr><th>Tool</th><th>Type</th><th>Key Feature</th><th>Use Case</th></tr>
+<tr><td><span class="hi">HashiCorp Vault</span></td><td>Secrets engine</td><td>Dynamic secrets, auto-rotation, audit log</td><td>DB creds, API keys, PKI certs</td></tr>
+<tr><td><span class="hi">AWS Secrets Manager</span></td><td>Managed</td><td>Auto-rotation for RDS, Redshift</td><td>AWS-native apps, Lambda</td></tr>
+<tr><td><span class="hi">AWS SSM Parameter Store</span></td><td>Config + secrets</td><td>Free tier, hierarchical paths</td><td>Config values, non-rotating secrets</td></tr>
+<tr><td><span class="hi">GCP Secret Manager</span></td><td>Managed</td><td>IAM-based access, versioning</td><td>GCP workloads</td></tr>
+<tr><td><span class="hi">Azure Key Vault</span></td><td>Managed</td><td>HSM-backed, cert management</td><td>Azure workloads, .NET integration</td></tr>
+<tr><td><span class="hi">SOPS</span></td><td>File encryption</td><td>Encrypt values in YAML/JSON, git-friendly</td><td>GitOps, IaC secrets in repo</td></tr>
+<tr><td><span class="hi">K8s External Secrets</span></td><td>Operator</td><td>Sync from Vault/AWS/GCP → K8s Secrets</td><td>K8s workloads needing external secrets</td></tr>
+</table>
+
+<!-- ═══ Security Best Practices ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> Encryption Best Practices &amp; Common Mistakes</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Do</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Use <strong>AES-256-GCM</strong> (authenticated encryption)</li>
+<li>Use <strong>bcrypt/Argon2id</strong> for passwords (cost factor ≥ 12)</li>
+<li>Use <strong>envelope encryption</strong> (KMS) for data at rest</li>
+<li><strong>Rotate keys</strong> regularly (90 days for data keys)</li>
+<li>Enable <strong>TLS 1.3</strong> everywhere, disable TLS 1.0/1.1</li>
+<li>Use <strong>forward secrecy</strong> (ephemeral key exchange)</li>
+<li>Store secrets in <strong>Vault/KMS</strong>, never in code/env vars</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Never Do</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><span class="hr">MD5/SHA1 for passwords</span> — rainbow table attacks</li>
+<li><span class="hr">ECB mode</span> — reveals patterns in ciphertext</li>
+<li><span class="hr">Hardcoded keys</span> in source code or Docker images</li>
+<li><span class="hr">Reuse IVs/nonces</span> — breaks AES-GCM completely</li>
+<li><span class="hr">Roll your own crypto</span> — use vetted libraries</li>
+<li><span class="hr">Encrypt without authenticating</span> — use AEAD modes</li>
+<li><span class="hr">Log sensitive data</span> — PII, tokens, keys in logs</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Key rotation:</span> <span class="hg">Envelope encryption</span> makes rotation easy — rotate the master key (KEK), re-wrap data keys. Data itself doesn't need re-encryption. <span class="hg">Automatic rotation</span> via KMS (AWS: every 365 days, configurable). Old key versions kept for decryption of existing data.</div>
+<div class="b by"><span class="hi">Compliance:</span> <span class="hg">PCI-DSS</span> — encrypt cardholder data, rotate keys annually. <span class="hg">HIPAA</span> — encrypt PHI at rest and in transit. <span class="hg">GDPR</span> — encryption as a technical safeguard. <span class="hg">SOC 2</span> — demonstrate encryption controls in audit.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Secrets in .env committed to git</span> — scan with truffleHog/gitleaks. <span class="hr">Same key for all environments</span> — dev key compromise = prod compromise. <span class="hr">No key rotation</span> — compromised key valid forever. <span class="hr">Client-side encryption without key escrow</span> — data lost if key lost.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>AWS</strong> — KMS + envelope encryption for S3, EBS, RDS (default). <strong>Google</strong> — default encryption at rest with Google-managed keys + CMEK option. <strong>Stripe</strong> — PGP for API key delivery, AES-256 for card data. <strong>Signal</strong> — Double Ratchet protocol (forward secrecy per message).</div>
+</div>
+
 </div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>9. Consistency &amp; Distributed Systems — System Design Cheatsheet</title>
+<title>9. Consistency &amp; Distributed Systems — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-9"><span class="e">🔗</span> 9 · CONSISTENCY &amp; DISTRIBUTED SYSTEMS</div>
 
@@ -214,28 +215,213 @@
 </div>
 
 <div class="T" id="consistency-models">
-<h2>Consistency Models</h2><p class="su">From strongest to weakest — each level trades latency for correctness</p>
+<h2>Consistency Models</h2><p class="su">From <span class="hg">strongest to weakest</span> — each level trades <span class="hi">latency</span> for <span class="hi">correctness</span>. Choose based on your domain's tolerance for stale reads.</p>
+
+<!-- ═══ Consistency Spectrum Diagram ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Consistency Spectrum — Strongest to Weakest</div>
+<svg width="100%" viewBox="0 0 700 180" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Consistency models spectrum from linearizable to eventual">
+  <defs><marker id="cm-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Spectrum arrow -->
+  <line x1="30" y1="20" x2="670" y2="20" stroke="var(--muted)" stroke-width="1.5"/>
+  <text x="30" y="12" fill="var(--a)" font-size="6" font-weight="700">STRONGEST (slowest)</text>
+  <text x="670" y="12" text-anchor="end" fill="var(--g)" font-size="6" font-weight="700">WEAKEST (fastest)</text>
+
+  <!-- Linearizable -->
+  <rect x="20" y="30" width="120" height="70" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="80" y="44" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">Linearizable</text>
+  <text x="80" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">single-copy illusion</text>
+  <text x="80" y="67" text-anchor="middle" fill="var(--muted)" font-size="5">real-time ordering</text>
+  <text x="80" y="78" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">read returns latest write</text>
+  <text x="80" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">etcd, ZooKeeper, Spanner</text>
+
+  <!-- Sequential -->
+  <rect x="155" y="30" width="120" height="70" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="215" y="44" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="800">Sequential</text>
+  <text x="215" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">all see same order</text>
+  <text x="215" y="67" text-anchor="middle" fill="var(--muted)" font-size="5">not real-time bound</text>
+  <text x="215" y="78" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">total order preserved</text>
+  <text x="215" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">Kafka partitions, Zab</text>
+
+  <!-- Causal -->
+  <rect x="290" y="30" width="120" height="70" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="350" y="44" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">Causal</text>
+  <text x="350" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">causally related ordered</text>
+  <text x="350" y="67" text-anchor="middle" fill="var(--muted)" font-size="5">concurrent ops unordered</text>
+  <text x="350" y="78" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">reply after its comment</text>
+  <text x="350" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">MongoDB (causal sessions)</text>
+
+  <!-- Read-your-writes -->
+  <rect x="425" y="30" width="120" height="70" rx="5" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="485" y="44" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="800">Read-Your-Writes</text>
+  <text x="485" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">you see your own writes</text>
+  <text x="485" y="67" text-anchor="middle" fill="var(--muted)" font-size="5">others may see stale</text>
+  <text x="485" y="78" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">profile update visible</text>
+  <text x="485" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">DynamoDB (consistent read)</text>
+
+  <!-- Eventual -->
+  <rect x="560" y="30" width="120" height="70" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="620" y="44" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">Eventual</text>
+  <text x="620" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">replicas converge</text>
+  <text x="620" y="67" text-anchor="middle" fill="var(--muted)" font-size="5">no ordering guarantee</text>
+  <text x="620" y="78" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">fastest, most available</text>
+  <text x="620" y="92" text-anchor="middle" fill="var(--muted)" font-size="4.5">Cassandra, DNS, S3</text>
+
+  <!-- Tradeoff labels -->
+  <text x="80" y="115" text-anchor="middle" fill="var(--r)" font-size="5.5">high latency</text>
+  <text x="80" y="126" text-anchor="middle" fill="var(--g)" font-size="5.5">perfect correctness</text>
+  <text x="620" y="115" text-anchor="middle" fill="var(--g)" font-size="5.5">low latency</text>
+  <text x="620" y="126" text-anchor="middle" fill="var(--r)" font-size="5.5">stale reads possible</text>
+
+  <!-- Use case guidance -->
+  <rect x="20" y="138" width="660" height="34" rx="4" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="350" y="152" text-anchor="middle" fill="var(--muted)" font-size="6" font-weight="700">Choosing: What happens if a user reads stale data?</text>
+  <text x="350" y="165" text-anchor="middle" fill="var(--muted)" font-size="5.5">Money lost → Linearizable | Wrong order → Sequential/Causal | Slightly outdated → Eventual | User confused → Read-your-writes</text>
+</svg>
+
+<!-- ═══ Consistency Models Table ═══ -->
 <table>
-<tr><th>Model</th><th>Guarantee</th><th>Use Case</th></tr>
-<tr><td><span class="hi">Linearizable</span></td><td>Appears as single copy, real-time ordering</td><td>Distributed locks (etcd, ZooKeeper)</td></tr>
-<tr><td><span class="hi">Sequential</span></td><td>All see same order (not real-time)</td><td>Kafka partitions</td></tr>
-<tr><td><span class="hi">Causal</span></td><td>Causally related writes ordered</td><td>Comments/replies</td></tr>
-<tr><td><span class="hi">Read-your-writes</span></td><td>You see your own writes</td><td>Profile updates</td></tr>
-<tr><td><span class="hi">Eventual</span></td><td>Replicas converge over time</td><td>Likes, DNS, carts</td></tr>
+<tr><th>Model</th><th>Guarantee</th><th>Latency</th><th>Use Case</th><th>Systems</th></tr>
+<tr><td><span class="hi">Linearizable</span></td><td>Appears as single copy, real-time ordering</td><td><span class="hr">Highest</span> (quorum write + read)</td><td>Distributed locks, leader election, counters</td><td>etcd, ZooKeeper, Spanner, CockroachDB</td></tr>
+<tr><td><span class="hi">Sequential</span></td><td>All observers see same order (not real-time)</td><td>High</td><td>Event logs, total-order broadcast</td><td>Kafka partitions, ZAB, Raft log</td></tr>
+<tr><td><span class="hi">Causal</span></td><td>Causally related writes ordered; concurrent unordered</td><td>Medium</td><td>Comments/replies, chat messages</td><td>MongoDB (causal sessions), COPS</td></tr>
+<tr><td><span class="hi">Read-your-writes</span></td><td>Client always sees its own writes</td><td>Medium-Low</td><td>Profile updates, settings changes</td><td>DynamoDB (consistent read), session affinity</td></tr>
+<tr><td><span class="hi">Monotonic reads</span></td><td>Never see older value after seeing newer</td><td>Low</td><td>Timelines, feeds (no "going back in time")</td><td>Read from same replica, version tracking</td></tr>
+<tr><td><span class="hi">Eventual</span></td><td>Replicas converge given no new writes</td><td><span class="hg">Lowest</span></td><td>Likes, DNS, shopping carts, CDN</td><td>Cassandra, DynamoDB, S3, CouchDB</td></tr>
 </table>
-<div class="b bb"><span class="hi">CRDTs:</span> Data structures that <span class="hg">merge concurrent updates without conflicts</span>. G-Counter, OR-Set. Used in Figma, Apple Notes. <span class="hi">Vector Clocks:</span> Track causal history per node. <span class="hi">Lamport Timestamps:</span> Total ordering (simpler, no conflict detection).</div>
+
+<!-- ═══ Tunable Consistency ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Tunable Consistency (Quorum Systems)</div>
+<div class="b bb"><span class="hi">Quorum formula:</span> <code>W + R &gt; N</code> guarantees overlap (strong consistency). <span class="hg">N=3, W=2, R=2</span> — majority quorum (standard). <span class="hg">N=3, W=3, R=1</span> — fast reads, slow writes. <span class="hg">N=3, W=1, R=1</span> — eventual consistency (fastest, may read stale). Cassandra and DynamoDB let you tune per-query.</div>
+
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Strong Consistency Techniques</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Quorum reads/writes:</strong> W+R &gt; N ensures overlap</li>
+<li><strong>Synchronous replication:</strong> wait for all replicas</li>
+<li><strong>Consensus (Raft/Paxos):</strong> leader-based agreement</li>
+<li><strong>Serializable isolation:</strong> DB-level (Spanner, CockroachDB)</li>
+<li>Cost: higher latency, lower availability during partitions</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Eventual Consistency Techniques</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Async replication:</strong> write to leader, replicate later</li>
+<li><strong>Anti-entropy:</strong> Merkle trees detect divergence (Cassandra)</li>
+<li><strong>Read repair:</strong> fix stale replicas on read</li>
+<li><strong>Hinted handoff:</strong> store writes for unavailable nodes</li>
+<li>Cost: stale reads, conflict resolution needed</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">CRDTs:</span> Data structures that <span class="hg">merge concurrent updates without conflicts</span>. G-Counter (grow-only), PN-Counter (inc/dec), OR-Set (add/remove), RGA (text). Used in <strong>Figma</strong>, <strong>Apple Notes</strong>, <strong>Redis Active-Active</strong>. Guarantee: all replicas converge to same state regardless of message order.</div>
+<div class="b by"><span class="hi">Real-world choices:</span> <strong>Spanner</strong> — linearizable globally (TrueTime). <strong>DynamoDB</strong> — eventual by default, strong per-read option. <strong>Cassandra</strong> — tunable per query (ONE, QUORUM, ALL). <strong>MongoDB</strong> — causal consistency with sessions. <strong>Redis</strong> — eventual (async replication), strong with WAIT command.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Assuming strong consistency</span> when using eventual (lost updates). <span class="hr">Linearizable for everything</span> — unnecessary latency for non-critical reads. <span class="hr">No conflict resolution strategy</span> for eventual systems. <span class="hr">Ignoring replication lag</span> in read replicas.</div>
 </div>
 
 <div class="T" id="consensus">
-<h2>Consensus Algorithms</h2><p class="su">How nodes <span class="hg">agree on a single value</span> despite failures</p>
+<h2>Consensus Algorithms</h2><p class="su">How nodes <span class="hg">agree on a single value</span> despite failures — the foundation of distributed coordination</p>
+
+<!-- ═══ Raft Algorithm Diagram ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Raft Consensus — Leader Election &amp; Log Replication</div>
+<svg width="100%" viewBox="0 0 700 220" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Raft consensus algorithm showing leader election and log replication">
+  <defs><marker id="rf-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Leader -->
+  <rect x="280" y="10" width="140" height="60" rx="8" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="2"/>
+  <text x="350" y="28" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">LEADER</text>
+  <text x="350" y="40" text-anchor="middle" fill="var(--muted)" font-size="5.5">accepts all writes</text>
+  <text x="350" y="51" text-anchor="middle" fill="var(--muted)" font-size="5.5">replicates log entries</text>
+  <text x="350" y="62" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">sends heartbeats</text>
+
+  <!-- Follower 1 -->
+  <rect x="50" y="100" width="120" height="50" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="110" y="118" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Follower 1</text>
+  <text x="110" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">replicates log</text>
+  <text x="110" y="141" text-anchor="middle" fill="var(--muted)" font-size="5">votes in elections</text>
+
+  <!-- Follower 2 -->
+  <rect x="290" y="100" width="120" height="50" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="350" y="118" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Follower 2</text>
+  <text x="350" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">replicates log</text>
+  <text x="350" y="141" text-anchor="middle" fill="var(--muted)" font-size="5">votes in elections</text>
+
+  <!-- Follower 3 -->
+  <rect x="530" y="100" width="120" height="50" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="590" y="118" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Follower 3</text>
+  <text x="590" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">replicates log</text>
+  <text x="590" y="141" text-anchor="middle" fill="var(--muted)" font-size="5">votes in elections</text>
+
+  <!-- Arrows: Leader → Followers (AppendEntries) -->
+  <line x1="310" y1="70" x2="140" y2="98" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <line x1="350" y1="70" x2="350" y2="98" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <line x1="390" y1="70" x2="560" y2="98" stroke="var(--y)" stroke-width="1.2" marker-end="url(#rf-arr)"/>
+  <text x="200" y="82" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">AppendEntries (log + heartbeat)</text>
+
+  <!-- Commit rule -->
+  <rect x="180" y="165" width="340" height="45" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+  <text x="350" y="180" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Commit Rule: majority (2/3) acknowledge → committed</text>
+  <text x="350" y="193" text-anchor="middle" fill="var(--muted)" font-size="5.5">Leader waits for majority ACK before responding to client</text>
+  <text x="350" y="204" text-anchor="middle" fill="var(--muted)" font-size="5.5">Survives f failures with 2f+1 nodes (e.g., 1 failure with 3 nodes)</text>
+
+  <!-- Election timeout -->
+  <rect x="540" y="165" width="140" height="45" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+  <text x="610" y="180" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Leader Failure</text>
+  <text x="610" y="193" text-anchor="middle" fill="var(--muted)" font-size="5">election timeout (150-300ms)</text>
+  <text x="610" y="204" text-anchor="middle" fill="var(--muted)" font-size="5">follower → candidate → new leader</text>
+
+  <!-- Client -->
+  <rect x="540" y="20" width="100" height="35" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="590" y="36" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Client</text>
+  <text x="590" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">writes to leader only</text>
+  <line x1="540" y1="37" x2="422" y2="37" stroke="var(--a)" stroke-width="1" marker-end="url(#rf-arr)"/>
+</svg>
+
+<!-- ═══ Consensus Algorithms Table ═══ -->
 <table>
-<tr><th>Algorithm</th><th>How</th><th>Used By</th></tr>
-<tr><td><span class="hi">Raft</span></td><td>Leader election → log replication → safety. Designed to be <span class="hg">understandable</span>.</td><td>etcd, CockroachDB, Consul</td></tr>
-<tr><td><span class="hi">Paxos</span></td><td>Proposer → Acceptors (prepare/accept). Majority quorum. <span class="hr">Hard to implement</span>.</td><td>Google Chubby, Spanner</td></tr>
-<tr><td><span class="hi">ZAB</span></td><td>ZooKeeper Atomic Broadcast. Leader-based total order.</td><td>ZooKeeper</td></tr>
-<tr><td><span class="hi">PBFT</span></td><td>Byzantine Fault Tolerant. Tolerates malicious nodes (3f+1).</td><td>Blockchain</td></tr>
+<tr><th>Algorithm</th><th>Mechanism</th><th>Fault Model</th><th>Performance</th><th>Used By</th></tr>
+<tr><td><span class="hi">Raft</span></td><td>Leader election → log replication → safety</td><td>Crash (2f+1 nodes)</td><td>1 RTT for committed write</td><td>etcd, CockroachDB, Consul, TiKV</td></tr>
+<tr><td><span class="hi">Multi-Paxos</span></td><td>Proposer → Acceptors (prepare/accept). Majority quorum.</td><td>Crash (2f+1 nodes)</td><td>1-2 RTT (optimized)</td><td>Google Chubby, Spanner, Megastore</td></tr>
+<tr><td><span class="hi">ZAB</span></td><td>ZooKeeper Atomic Broadcast. Leader-based total order.</td><td>Crash (2f+1 nodes)</td><td>1 RTT (leader stable)</td><td>ZooKeeper, Kafka (controller)</td></tr>
+<tr><td><span class="hi">EPaxos</span></td><td>Leaderless Paxos. Any node can propose.</td><td>Crash (2f+1 nodes)</td><td>1 RTT (no conflicts)</td><td>Research, CockroachDB (partial)</td></tr>
+<tr><td><span class="hi">PBFT</span></td><td>Pre-prepare → Prepare → Commit. Tolerates malicious nodes.</td><td><span class="hr">Byzantine (3f+1)</span></td><td>3 RTT (expensive)</td><td>Blockchain, Hyperledger</td></tr>
+<tr><td><span class="hi">Viewstamped Rep.</span></td><td>Similar to Raft, predates it. View changes for leader failure.</td><td>Crash (2f+1 nodes)</td><td>1 RTT</td><td>Academic, influenced Raft</td></tr>
 </table>
-<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Safety</span> — all nodes agree. <span class="hg">Liveness</span> — eventually makes progress. Survives <span class="hg">f failures with 2f+1 nodes</span>. <span class="hi">FLP Impossibility:</span> No deterministic consensus in async system with even 1 crash (practical systems use timeouts).</div>
+
+<!-- ═══ Raft vs Paxos ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Raft vs Paxos — Key Differences</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Raft (Preferred for New Systems)</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Understandable:</strong> designed for clarity (vs Paxos complexity)</li>
+<li><strong>Strong leader:</strong> all writes go through leader</li>
+<li><strong>Log-based:</strong> ordered append-only log replicated</li>
+<li><strong>Membership changes:</strong> joint consensus protocol</li>
+<li><strong>Implementations:</strong> etcd, Consul, CockroachDB, TiKV</li>
+<li><strong>Tradeoff:</strong> leader bottleneck for write throughput</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a2)">Paxos (Theoretical Foundation)</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Flexible:</strong> no mandatory leader (Multi-Paxos adds one)</li>
+<li><strong>Proven:</strong> mathematically verified safety</li>
+<li><strong>Complex:</strong> notoriously hard to implement correctly</li>
+<li><strong>Variants:</strong> Basic, Multi, Fast, EPaxos, Flexible</li>
+<li><strong>Implementations:</strong> Google Spanner, Chubby, Megastore</li>
+<li><strong>Tradeoff:</strong> implementation complexity, subtle bugs</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Safety</span> — all nodes agree on same value (never disagree). <span class="hg">Liveness</span> — eventually makes progress (given stable leader). Survives <span class="hg">f failures with 2f+1 nodes</span> (e.g., 2 failures with 5 nodes). <span class="hi">FLP Impossibility:</span> No deterministic consensus in async system with even 1 crash — practical systems use timeouts to circumvent.</div>
+<div class="b by"><span class="hi">When you need consensus:</span> <span class="hg">Leader election</span> (who's the primary?). <span class="hg">Distributed locks</span> (mutual exclusion). <span class="hg">Atomic broadcast</span> (total order of messages). <span class="hg">State machine replication</span> (replicated log → same state). <span class="hg">Configuration management</span> (cluster membership).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Using consensus for every write</span> — too slow for high-throughput data. <span class="hr">Odd cluster sizes only</span> (3, 5, 7) — even numbers don't improve fault tolerance. <span class="hr">Cross-region consensus</span> — RTT kills performance (use multi-region Paxos or local consensus + async replication). <span class="hr">Ignoring split-brain</span> — always use fencing tokens.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>etcd</strong> — Raft, backbone of Kubernetes (stores all cluster state). <strong>Google Spanner</strong> — Paxos per shard, globally consistent. <strong>CockroachDB</strong> — Raft per range (64MB chunks). <strong>Kafka KRaft</strong> — replacing ZooKeeper with Raft-based controller (Kafka 3.3+).</div>
 </div>
 
 <div class="T" id="transactions">
@@ -779,95 +965,467 @@
 <div class="b bb" style="margin-top:6px"><span class="hi">Isolation Levels:</span> <span class="hg">Read Uncommitted</span> → <span class="hg">Read Committed</span> (Postgres default) → <span class="hg">Repeatable Read</span> (MySQL default) → <span class="hg">Serializable</span> (strongest, slowest). <span class="hi">MVCC</span> — readers see snapshot, no read locks. <span class="hi">Deadlock prevention:</span> Acquire locks in same order, use timeouts.</div>
 </div><!-- ═══ Consistency: separate compact lessons ═══ -->
 <div class="T" id="saga-orchestration">
-<h2>Saga — Orchestration vs Choreography</h2><p class="su">Long-running distributed transactions with compensations</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Saga patterns">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <text x="140" y="18" fill="#fff" font-weight="600">Orchestration</text>
-    <rect x="100" y="30" width="80" height="30" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="140" y="49" fill="#fbbf24">Orchestrator</text>
-    <rect x="20" y="100" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="55" y="119">Order</text>
-    <rect x="105" y="100" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="140" y="119">Payment</text>
-    <rect x="190" y="100" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="225" y="119">Ship</text>
-    <path d="M140 60 L55 100" stroke="#fbbf24" stroke-width="1.3"/>
-    <path d="M140 60 L140 100" stroke="#fbbf24" stroke-width="1.3"/>
-    <path d="M140 60 L225 100" stroke="#fbbf24" stroke-width="1.3"/>
+<h2>Saga — Orchestration vs Choreography</h2><p class="su">Long-running distributed transactions with <span class="hg">compensating actions</span> — when 2PC is too slow or spans too many services</p>
 
-    <text x="420" y="18" fill="#fff" font-weight="600">Choreography (events)</text>
-    <rect x="310" y="50" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="345" y="69">Order</text>
-    <rect x="410" y="50" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="445" y="69">Payment</text>
-    <rect x="360" y="110" width="70" height="30" fill="#1e2230" stroke="#34d399" rx="6"/><text x="395" y="129">Ship</text>
-    <path d="M380 65 L410 65" stroke="#a78bfa" stroke-width="1.3" marker-end="url(#sa1)"/>
-    <path d="M445 80 L395 110" stroke="#a78bfa" stroke-width="1.3" marker-end="url(#sa1)"/>
-  </g>
-  <text x="280" y="180" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">On any failure: emit compensating action (refund, cancel reservation)</text>
-  <defs><marker id="sa1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+<!-- ═══ Saga Orchestration Diagram ═══ -->
+<div class="d-title"><span class="num d-yellow">▸</span> Orchestration Pattern — Central Coordinator</div>
+<svg width="100%" viewBox="0 0 720 280" style="max-width:720px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Saga orchestration pattern showing central coordinator managing steps and compensations">
+  <defs>
+    <marker id="sg-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker>
+    <marker id="sg-arr-g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#34d399"/></marker>
+    <marker id="sg-arr-r" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#f87171"/></marker>
+  </defs>
+
+  <!-- Orchestrator (center) -->
+  <rect x="280" y="10" width="160" height="60" rx="8" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="2"/>
+  <text x="360" y="30" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="800">Saga Orchestrator</text>
+  <text x="360" y="42" text-anchor="middle" fill="var(--muted)" font-size="5.5">manages state machine</text>
+  <text x="360" y="53" text-anchor="middle" fill="var(--muted)" font-size="5.5">decides next step / compensation</text>
+  <text x="360" y="64" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Temporal / Step Functions / Cadence</text>
+
+  <!-- HAPPY PATH (top row) -->
+  <text x="360" y="88" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Happy Path (all succeed)</text>
+
+  <!-- Step 1: Create Order -->
+  <rect x="30" y="100" width="120" height="50" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="90" y="115" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">① Order Service</text>
+  <text x="90" y="127" text-anchor="middle" fill="var(--muted)" font-size="5.5">createOrder()</text>
+  <text x="90" y="138" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">status: PENDING</text>
+  <text x="90" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">compensate: cancelOrder()</text>
+
+  <!-- Step 2: Reserve Inventory -->
+  <rect x="180" y="100" width="120" height="50" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="240" y="115" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">② Inventory Svc</text>
+  <text x="240" y="127" text-anchor="middle" fill="var(--muted)" font-size="5.5">reserveStock()</text>
+  <text x="240" y="138" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">status: RESERVED</text>
+  <text x="240" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">compensate: releaseStock()</text>
+
+  <!-- Step 3: Process Payment -->
+  <rect x="330" y="100" width="120" height="50" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="390" y="115" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">③ Payment Svc</text>
+  <text x="390" y="127" text-anchor="middle" fill="var(--muted)" font-size="5.5">chargeCard()</text>
+  <text x="390" y="138" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">status: CHARGED</text>
+  <text x="390" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">compensate: refund()</text>
+
+  <!-- Step 4: Ship -->
+  <rect x="480" y="100" width="120" height="50" rx="5" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="540" y="115" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">④ Shipping Svc</text>
+  <text x="540" y="127" text-anchor="middle" fill="var(--muted)" font-size="5.5">scheduleShipment()</text>
+  <text x="540" y="138" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">status: SHIPPED</text>
+  <text x="540" y="148" text-anchor="middle" fill="var(--muted)" font-size="4.5">compensate: cancelShipment()</text>
+
+  <!-- Success -->
+  <rect x="630" y="108" width="70" height="34" rx="5" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="665" y="123" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">✓ DONE</text>
+  <text x="665" y="135" text-anchor="middle" fill="var(--g)" font-size="5.5">COMPLETED</text>
+
+  <!-- Arrows between steps -->
+  <line x1="150" y1="125" x2="178" y2="125" stroke="var(--g)" stroke-width="1" marker-end="url(#sg-arr-g)"/>
+  <line x1="300" y1="125" x2="328" y2="125" stroke="var(--g)" stroke-width="1" marker-end="url(#sg-arr-g)"/>
+  <line x1="450" y1="125" x2="478" y2="125" stroke="var(--g)" stroke-width="1" marker-end="url(#sg-arr-g)"/>
+  <line x1="600" y1="125" x2="628" y2="125" stroke="var(--g)" stroke-width="1" marker-end="url(#sg-arr-g)"/>
+
+  <!-- Orchestrator arrows down to steps -->
+  <line x1="310" y1="70" x2="90" y2="98" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <line x1="330" y1="70" x2="240" y2="98" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <line x1="380" y1="70" x2="390" y2="98" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <line x1="410" y1="70" x2="540" y2="98" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+
+  <!-- COMPENSATION PATH (bottom row) -->
+  <text x="360" y="175" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Compensation Path (Payment fails at step ③)</text>
+
+  <!-- Compensation arrows (reverse) -->
+  <rect x="330" y="190" width="120" height="40" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="390" y="207" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">③ FAILED</text>
+  <text x="390" y="220" text-anchor="middle" fill="var(--r)" font-size="5">chargeCard() threw error</text>
+
+  <line x1="328" y1="210" x2="300" y2="210" stroke="var(--r)" stroke-width="1" marker-end="url(#sg-arr-r)"/>
+  <rect x="180" y="190" width="120" height="40" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="240" y="207" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">② releaseStock()</text>
+  <text x="240" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">undo reservation</text>
+
+  <line x1="178" y1="210" x2="150" y2="210" stroke="var(--r)" stroke-width="1" marker-end="url(#sg-arr-r)"/>
+  <rect x="30" y="190" width="120" height="40" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="90" y="207" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">① cancelOrder()</text>
+  <text x="90" y="220" text-anchor="middle" fill="var(--muted)" font-size="5">mark CANCELLED</text>
+
+  <!-- Final state -->
+  <rect x="30" y="240" width="120" height="24" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="90" y="256" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">Saga ROLLED BACK</text>
+
+  <!-- Legend -->
+  <rect x="560" y="180" width="140" height="70" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="630" y="194" text-anchor="middle" fill="var(--muted)" font-size="6" font-weight="700">Orchestrator manages:</text>
+  <text x="630" y="208" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Step execution order</text>
+  <text x="630" y="220" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Compensation on failure</text>
+  <text x="630" y="232" text-anchor="middle" fill="var(--y)" font-size="5.5">⟳ Retry with backoff</text>
+  <text x="630" y="244" text-anchor="middle" fill="var(--a)" font-size="5.5">📊 Full visibility/tracing</text>
 </svg>
+
+<!-- ═══ Choreography Diagram ═══ -->
+<div class="d-title"><span class="num d-purple">▸</span> Choreography Pattern — Event-Driven, No Central Coordinator</div>
+<svg width="100%" viewBox="0 0 700 200" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Saga choreography pattern showing event-driven communication between services">
+  <defs><marker id="sg-ch" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#a78bfa"/></marker></defs>
+
+  <!-- Event Bus (center line) -->
+  <rect x="50" y="85" width="600" height="24" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="350" y="100" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Event Bus (Kafka / SNS+SQS / EventBridge)</text>
+
+  <!-- Order Service -->
+  <rect x="50" y="20" width="120" height="45" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="110" y="36" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Order Service</text>
+  <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="5.5">publishes:</text>
+  <text x="110" y="59" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">OrderCreated</text>
+  <line x1="110" y1="65" x2="110" y2="83" stroke="var(--a2)" stroke-width="1" marker-end="url(#sg-ch)"/>
+
+  <!-- Payment Service -->
+  <rect x="210" y="20" width="120" height="45" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="270" y="36" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Payment Service</text>
+  <text x="270" y="48" text-anchor="middle" fill="var(--muted)" font-size="5.5">listens: OrderCreated</text>
+  <text x="270" y="59" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">publishes: PaymentCharged</text>
+  <line x1="270" y1="65" x2="270" y2="83" stroke="var(--a2)" stroke-width="1" marker-end="url(#sg-ch)"/>
+  <line x1="270" y1="109" x2="270" y2="83" stroke="var(--a2)" stroke-width="1"/>
+
+  <!-- Inventory Service -->
+  <rect x="370" y="20" width="120" height="45" rx="5" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="430" y="36" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Inventory Service</text>
+  <text x="430" y="48" text-anchor="middle" fill="var(--muted)" font-size="5.5">listens: PaymentCharged</text>
+  <text x="430" y="59" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">publishes: StockReserved</text>
+  <line x1="430" y1="65" x2="430" y2="83" stroke="var(--a2)" stroke-width="1" marker-end="url(#sg-ch)"/>
+
+  <!-- Shipping Service -->
+  <rect x="530" y="20" width="120" height="45" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="590" y="36" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Shipping Service</text>
+  <text x="590" y="48" text-anchor="middle" fill="var(--muted)" font-size="5.5">listens: StockReserved</text>
+  <text x="590" y="59" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">publishes: Shipped</text>
+  <line x1="590" y1="65" x2="590" y2="83" stroke="var(--a2)" stroke-width="1" marker-end="url(#sg-ch)"/>
+
+  <!-- Compensation events (bottom) -->
+  <text x="350" y="125" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">On failure: each service publishes compensation event</text>
+
+  <rect x="210" y="135" width="120" height="35" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="270" y="150" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">PaymentFailed</text>
+  <text x="270" y="162" text-anchor="middle" fill="var(--muted)" font-size="5">→ Order listens → cancel</text>
+
+  <rect x="370" y="135" width="120" height="35" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="430" y="150" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">StockUnavailable</text>
+  <text x="430" y="162" text-anchor="middle" fill="var(--muted)" font-size="5">→ Payment refunds</text>
+
+  <!-- Flow arrows on bus -->
+  <line x1="140" y1="97" x2="200" y2="97" stroke="var(--a2)" stroke-width="1.2" marker-end="url(#sg-ch)"/>
+  <line x1="300" y1="97" x2="360" y2="97" stroke="var(--a2)" stroke-width="1.2" marker-end="url(#sg-ch)"/>
+  <line x1="460" y1="97" x2="520" y2="97" stroke="var(--a2)" stroke-width="1.2" marker-end="url(#sg-ch)"/>
+
+  <!-- Key difference callout -->
+  <text x="350" y="190" text-anchor="middle" fill="var(--muted)" font-size="6">No single point of failure — but harder to trace, debug, and reason about ordering</text>
+</svg>
+
+<!-- ═══ Comparison Table ═══ -->
 <table>
 <tr><th></th><th>Orchestration</th><th>Choreography</th></tr>
-<tr><td>Coordinator</td><td>Central (Temporal, Cadence, AWS Step Functions)</td><td>None — services react to events</td></tr>
-<tr><td>Visibility</td><td>Easy to trace</td><td>Hidden in event flows</td></tr>
-<tr><td>Coupling</td><td>Coupled to orchestrator</td><td>Loosely coupled</td></tr>
-<tr><td>Best for</td><td>Complex flows, many steps</td><td>Few simple steps, autonomous teams</td></tr>
+<tr><td><span class="hi">Coordinator</span></td><td>Central orchestrator (Temporal, Cadence, Step Functions)</td><td>None — services react to domain events</td></tr>
+<tr><td><span class="hi">Coupling</span></td><td>Services coupled to orchestrator</td><td><span class="hg">Loosely coupled</span> — only know their own events</td></tr>
+<tr><td><span class="hi">Visibility</span></td><td><span class="hg">Easy to trace</span> — single workflow definition</td><td><span class="hr">Hard to trace</span> — distributed across event logs</td></tr>
+<tr><td><span class="hi">Complexity</span></td><td>Grows linearly with steps</td><td><span class="hr">Grows exponentially</span> with interactions</td></tr>
+<tr><td><span class="hi">Failure handling</span></td><td>Orchestrator decides compensation order</td><td>Each service must handle its own compensation</td></tr>
+<tr><td><span class="hi">Testing</span></td><td>Test workflow as unit</td><td>Requires integration tests across services</td></tr>
+<tr><td><span class="hi">Best for</span></td><td>Complex flows (5+ steps), strict ordering needed</td><td>Simple flows (2-3 steps), autonomous teams</td></tr>
 </table>
+
+<!-- ═══ Saga Implementation Tools ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Saga Implementation Tools</div>
+<table>
+<tr><th>Tool</th><th>Type</th><th>Language</th><th>Key Feature</th></tr>
+<tr><td><span class="hi">Temporal</span></td><td>Orchestration</td><td>Go, Java, TypeScript, Python</td><td>Durable execution, automatic retries, versioning</td></tr>
+<tr><td><span class="hi">AWS Step Functions</span></td><td>Orchestration</td><td>Any (via Lambda)</td><td>Serverless, visual workflow, built-in error handling</td></tr>
+<tr><td><span class="hi">Cadence</span></td><td>Orchestration</td><td>Go, Java</td><td>Uber-built, predecessor to Temporal</td></tr>
+<tr><td><span class="hi">Axon Framework</span></td><td>Both</td><td>Java/Kotlin</td><td>CQRS + Event Sourcing + Saga built-in</td></tr>
+<tr><td><span class="hi">MassTransit</span></td><td>Both</td><td>.NET</td><td>State machine sagas, RabbitMQ/Kafka transport</td></tr>
+<tr><td><span class="hi">Eventuate Tram</span></td><td>Choreography</td><td>Java</td><td>Outbox pattern, CDC-based event publishing</td></tr>
+</table>
+
+<!-- ═══ Saga Design Patterns ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Saga Design Patterns &amp; Considerations</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Compensation Design Rules</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>Semantic undo:</strong> compensations are business-level (refund, not DB rollback)</li>
+<li><strong>Idempotent:</strong> compensations may run multiple times</li>
+<li><strong>Commutative:</strong> order of compensations shouldn't matter</li>
+<li><strong>Never fail:</strong> compensations must always succeed (retry forever)</li>
+<li><strong>Backward recovery:</strong> undo in reverse order of execution</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Common Pitfalls</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><span class="hr">No isolation:</span> dirty reads between saga steps (use semantic locks)</li>
+<li><span class="hr">Lost compensations:</span> compensation event lost → inconsistent state</li>
+<li><span class="hr">Cyclic dependencies:</span> A→B→C→A creates deadlock</li>
+<li><span class="hr">Too many steps:</span> >7 steps = consider splitting into sub-sagas</li>
+<li><span class="hr">No timeout:</span> saga hangs forever if step never responds</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Isolation countermeasures:</span> <span class="hg">Semantic locks</span> — mark resources as "processing" (order status = PENDING). <span class="hg">Commutative updates</span> — operations that work in any order. <span class="hg">Pessimistic view</span> — reread data before compensation. <span class="hg">Reread value</span> — verify state hasn't changed before acting.</div>
+<div class="b by"><span class="hi">When to use Sagas vs 2PC:</span> Use <span class="hg">2PC</span> when you need strong consistency across 2-3 databases in same trust boundary (short-lived). Use <span class="hg">Sagas</span> when spanning multiple microservices, long-running processes, or when availability matters more than immediate consistency.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Saga without compensations</span> — just a distributed transaction that can't roll back. <span class="hr">Synchronous sagas</span> — defeats the purpose, use 2PC instead. <span class="hr">Shared mutable state</span> — services reading each other's DB directly.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Uber</strong> — trip lifecycle saga (match → pickup → ride → payment → rating). <strong>Netflix</strong> — content ingestion pipeline (transcode → validate → publish). <strong>Airbnb</strong> — booking saga (reserve → charge → confirm host → send confirmation).</div>
 </div>
 
 <div class="T" id="conflict-resolution">
-<h2>Conflict Resolution</h2><p class="su">Reconciling concurrent writes in eventually consistent systems</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Conflict resolution">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="40" width="100" height="40" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="70" y="58" fill="#fff">Node A</text>
-    <text x="70" y="72" fill="#8b93ac">x = 5 @ t=10</text>
-    <rect x="20" y="100" width="100" height="40" fill="#1e2230" stroke="#a78bfa" rx="6"/>
-    <text x="70" y="118" fill="#fff">Node B</text>
-    <text x="70" y="132" fill="#8b93ac">x = 7 @ t=11</text>
-    <rect x="180" y="30" width="160" height="40" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="260" y="50" fill="#fff">LWW → keeps t=11</text>
-    <text x="260" y="64" fill="#8b93ac">simple, can lose data</text>
-    <rect x="180" y="80" width="160" height="40" fill="#1e2230" stroke="#22d3ee" rx="6"/>
-    <text x="260" y="100" fill="#fff">Vector clock</text>
-    <text x="260" y="114" fill="#8b93ac">detects true conflicts</text>
-    <rect x="180" y="130" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="260" y="150" fill="#fff">CRDT</text>
-    <text x="260" y="164" fill="#8b93ac">auto-merges, no loss</text>
-    <rect x="380" y="80" width="160" height="40" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="460" y="100" fill="#fff">x = {5,7} → 12</text>
-    <text x="460" y="114" fill="#8b93ac">G-Counter merge</text>
-  </g>
-  <path d="M120 60 L180 50" stroke="#fbbf24" stroke-width="1.3"/>
-  <path d="M120 100 L180 100" stroke="#22d3ee" stroke-width="1.3"/>
-  <path d="M120 120 L180 150" stroke="#34d399" stroke-width="1.3"/>
-  <path d="M340 150 L380 100" stroke="#34d399" stroke-width="1.3" marker-end="url(#cr1)"/>
-  <defs><marker id="cr1" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+<h2>Conflict Resolution</h2><p class="su">Reconciling <span class="hg">concurrent writes</span> in eventually consistent systems — when two nodes disagree, who wins?</p>
+
+<!-- ═══ Conflict Resolution Strategies Diagram ═══ -->
+<div class="d-title"><span class="num d-blue">▸</span> Conflict Detection &amp; Resolution Strategies</div>
+<svg width="100%" viewBox="0 0 700 260" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Conflict resolution strategies showing LWW, vector clocks, and CRDTs">
+  <defs><marker id="cr-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Concurrent writes scenario -->
+  <rect x="10" y="10" width="200" height="90" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="110" y="26" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Concurrent Writes (Conflict)</text>
+
+  <rect x="20" y="34" width="85" height="28" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="62" y="47" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Node A</text>
+  <text x="62" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">x = "blue" @ t=10</text>
+
+  <rect x="115" y="34" width="85" height="28" rx="4" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="157" y="47" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="600">Node B</text>
+  <text x="157" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">x = "red" @ t=11</text>
+
+  <text x="110" y="80" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">⚠ Which value is correct?</text>
+  <text x="110" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">Network partition prevented sync</text>
+
+  <!-- Arrow to strategies -->
+  <line x1="210" y1="55" x2="250" y2="40" stroke="var(--muted)" stroke-width="1" marker-end="url(#cr-arr)"/>
+  <line x1="210" y1="55" x2="250" y2="100" stroke="var(--muted)" stroke-width="1" marker-end="url(#cr-arr)"/>
+  <line x1="210" y1="55" x2="250" y2="170" stroke="var(--muted)" stroke-width="1" marker-end="url(#cr-arr)"/>
+
+  <!-- Strategy 1: LWW -->
+  <rect x="252" y="15" width="200" height="55" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="352" y="30" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Last-Writer-Wins (LWW)</text>
+  <text x="352" y="42" text-anchor="middle" fill="var(--muted)" font-size="5.5">Highest timestamp wins: x = "red"</text>
+  <text x="352" y="53" text-anchor="middle" fill="var(--r)" font-size="5">⚠ "blue" silently lost (data loss)</text>
+  <text x="352" y="64" text-anchor="middle" fill="var(--muted)" font-size="5">Simple but dangerous for important data</text>
+
+  <!-- Strategy 2: Vector Clocks -->
+  <rect x="252" y="78" width="200" height="55" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1.2"/>
+  <text x="352" y="93" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Vector Clocks / Version Vectors</text>
+  <text x="352" y="105" text-anchor="middle" fill="var(--muted)" font-size="5.5">Detect: A[1,0] vs B[0,1] = CONFLICT</text>
+  <text x="352" y="117" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Surface conflict → app/user resolves</text>
+  <text x="352" y="128" text-anchor="middle" fill="var(--muted)" font-size="5">No data loss, but complex resolution logic</text>
+
+  <!-- Strategy 3: CRDTs -->
+  <rect x="252" y="142" width="200" height="65" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="352" y="157" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">CRDTs (Conflict-Free)</text>
+  <text x="352" y="169" text-anchor="middle" fill="var(--muted)" font-size="5.5">Mathematically guaranteed merge</text>
+  <text x="352" y="181" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">G-Counter: {A:5, B:7} → sum = 12</text>
+  <text x="352" y="193" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">OR-Set: union of adds, track removes</text>
+  <text x="352" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">No conflicts possible — always converges</text>
+
+  <!-- Results -->
+  <line x1="452" y1="42" x2="490" y2="42" stroke="var(--y)" stroke-width="1" marker-end="url(#cr-arr)"/>
+  <rect x="492" y="25" width="180" height="35" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="582" y="40" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Result: x = "red"</text>
+  <text x="582" y="52" text-anchor="middle" fill="var(--r)" font-size="5">Lost: "blue" (acceptable for caches)</text>
+
+  <line x1="452" y1="105" x2="490" y2="105" stroke="var(--c)" stroke-width="1" marker-end="url(#cr-arr)"/>
+  <rect x="492" y="88" width="180" height="35" rx="4" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="582" y="103" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="600">Result: siblings ["blue","red"]</text>
+  <text x="582" y="115" text-anchor="middle" fill="var(--muted)" font-size="5">App picks or shows both to user</text>
+
+  <line x1="452" y1="175" x2="490" y2="175" stroke="var(--g)" stroke-width="1" marker-end="url(#cr-arr)"/>
+  <rect x="492" y="158" width="180" height="35" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="582" y="173" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Result: auto-merged</text>
+  <text x="582" y="185" text-anchor="middle" fill="var(--muted)" font-size="5">No human intervention needed</text>
+
+  <!-- Bottom comparison -->
+  <rect x="10" y="220" width="680" height="30" rx="4" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="120" y="238" text-anchor="middle" fill="var(--y)" font-size="6">LWW: simple, lossy</text>
+  <text x="350" y="238" text-anchor="middle" fill="var(--c)" font-size="6">Vector Clocks: detects conflicts, app resolves</text>
+  <text x="580" y="238" text-anchor="middle" fill="var(--g)" font-size="6">CRDTs: auto-merge, no loss, limited data types</text>
 </svg>
+
+<!-- ═══ Conflict Resolution Strategies Table ═══ -->
 <table>
-<tr><th>Strategy</th><th>Used by</th></tr>
-<tr><td>Last-Writer-Wins</td><td>Cassandra (default), DynamoDB</td></tr>
-<tr><td>Vector / version clocks</td><td>Riak, Voldemort — surfaces siblings</td></tr>
-<tr><td>CRDTs (G-Counter, OR-Set, RGA)</td><td>Figma, Apple Notes, Redis CRDT, Yjs / Automerge</td></tr>
+<tr><th>Strategy</th><th>How It Works</th><th>Data Loss?</th><th>Used By</th></tr>
+<tr><td><span class="hi">Last-Writer-Wins (LWW)</span></td><td>Highest timestamp wins, discard others</td><td><span class="hr">Yes</span> — silent data loss</td><td>Cassandra (default), DynamoDB</td></tr>
+<tr><td><span class="hi">Vector Clocks</span></td><td>Track causal history per node, detect true conflicts</td><td>No — surfaces siblings for resolution</td><td>Riak, Voldemort</td></tr>
+<tr><td><span class="hi">Version Vectors</span></td><td>Simplified vector clocks (per-replica, not per-client)</td><td>No — detects concurrent updates</td><td>Riak (newer), Dynamo paper</td></tr>
+<tr><td><span class="hi">CRDTs</span></td><td>Mathematically convergent data structures</td><td><span class="hg">No</span> — auto-merges</td><td>Figma, Apple Notes, Redis CRDT, Yjs</td></tr>
+<tr><td><span class="hi">Operational Transform</span></td><td>Transform concurrent ops to maintain intent</td><td>No — preserves all edits</td><td>Google Docs</td></tr>
+<tr><td><span class="hi">Application-level merge</span></td><td>Custom merge logic per domain</td><td>Depends on logic</td><td>Git (3-way merge), custom apps</td></tr>
 </table>
+
+<!-- ═══ CRDT Types ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> CRDT Types — Conflict-Free Replicated Data Types</div>
+<div class="d-grid tri" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Counters</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>G-Counter:</strong> grow-only (likes, views)</li>
+<li><strong>PN-Counter:</strong> increment + decrement</li>
+<li>Merge: max per node, sum across</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a)">Sets</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>G-Set:</strong> grow-only (add, never remove)</li>
+<li><strong>OR-Set:</strong> observed-remove (add + remove)</li>
+<li><strong>LWW-Element-Set:</strong> timestamp per element</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--a2)">Sequences / Text</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li><strong>RGA:</strong> Replicated Growable Array</li>
+<li><strong>LSEQ:</strong> position-based sequence</li>
+<li>Used for collaborative text editing</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Key Insight:</span> <span class="hg">CRDTs guarantee convergence</span> — all replicas reach the same state without coordination. The tradeoff: limited to data types with commutative, associative, idempotent merge operations. Not all business logic fits naturally into CRDTs.</div>
+<div class="b by"><span class="hi">Choosing a strategy:</span> <span class="hg">LWW</span> for caches, session data, non-critical writes. <span class="hg">Vector clocks</span> for shopping carts, user preferences (surface conflicts). <span class="hg">CRDTs</span> for collaborative editing, counters, distributed sets. <span class="hg">OT</span> for real-time text collaboration with central server.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">LWW for financial data</span> — lost writes = lost money. <span class="hr">Ignoring clock skew</span> — NTP drift makes LWW unreliable. <span class="hr">Unbounded vector clocks</span> — grow forever without pruning. <span class="hr">CRDTs for everything</span> — overkill for simple use cases.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Figma</strong> — CRDTs for multiplayer design (custom implementation). <strong>Apple Notes</strong> — CRDTs for offline-first sync. <strong>Redis</strong> — Active-Active with CRDT-based conflict resolution. <strong>Riak</strong> — vector clocks + sibling resolution. <strong>Google Docs</strong> — Operational Transform (centralized).</div>
 </div>
 
 <div class="T" id="clock-sync">
-<h2>Clock Sync &amp; Time</h2><p class="su">Why “now” is harder than it looks in distributed systems</p>
-<svg width="100%" style="max-width:280px;display:block;margin:6px auto 10px" viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Clock sync sources">
-  <g font-family="Inter" font-size="10" fill="#c8cee0" text-anchor="middle">
-    <rect x="20" y="40" width="160" height="60" fill="#1e2230" stroke="#6c8cff" rx="6"/>
-    <text x="100" y="60" fill="#fff">NTP</text>
-    <text x="100" y="76" fill="#8b93ac">~ms accuracy</text>
-    <text x="100" y="92" fill="#8b93ac">drift, no bound</text>
-    <rect x="200" y="40" width="160" height="60" fill="#1e2230" stroke="#fbbf24" rx="6"/>
-    <text x="280" y="60" fill="#fff">TrueTime (Spanner)</text>
-    <text x="280" y="76" fill="#8b93ac">GPS + atomic</text>
-    <text x="280" y="92" fill="#8b93ac">bounded ε</text>
-    <rect x="380" y="40" width="160" height="60" fill="#1e2230" stroke="#34d399" rx="6"/>
-    <text x="460" y="60" fill="#fff">Hybrid Logical Clock</text>
-    <text x="460" y="76" fill="#8b93ac">physical + logical</text>
-    <text x="460" y="92" fill="#8b93ac">CockroachDB, YugabyteDB</text>
-  </g>
-  <text x="280" y="130" text-anchor="middle" fill="#8b93ac" font-family="Inter" font-size="9">Used for global ordering, MVCC snapshots, lease expiry</text>
+<h2>Clock Sync &amp; Time</h2><p class="su">Why "now" is harder than it looks — <span class="hr">clocks drift</span>, <span class="hr">networks delay</span>, and <span class="hr">ordering requires coordination</span></p>
+
+<!-- ═══ Clock Types Diagram ═══ -->
+<div class="d-title"><span class="num d-orange">▸</span> Clock Types in Distributed Systems</div>
+<svg width="100%" viewBox="0 0 700 240" style="max-width:700px;display:block;margin:4px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Clock types showing physical clocks, logical clocks, and hybrid approaches">
+  <defs><marker id="ck-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- Physical Clocks -->
+  <rect x="10" y="10" width="210" height="100" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="115" y="26" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Physical Clocks</text>
+  <text x="115" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">wall-clock time (real-world time)</text>
+
+  <rect x="20" y="44" width="90" height="55" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="65" y="57" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">NTP</text>
+  <text x="65" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">~1-10ms accuracy</text>
+  <text x="65" y="79" text-anchor="middle" fill="var(--r)" font-size="5">unbounded drift</text>
+  <text x="65" y="90" text-anchor="middle" fill="var(--muted)" font-size="4.5">can jump backward</text>
+
+  <rect x="120" y="44" width="90" height="55" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="165" y="57" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">TrueTime</text>
+  <text x="165" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">GPS + atomic clocks</text>
+  <text x="165" y="79" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">bounded ε (~7ms)</text>
+  <text x="165" y="90" text-anchor="middle" fill="var(--muted)" font-size="4.5">Google Spanner only</text>
+
+  <!-- Logical Clocks -->
+  <rect x="240" y="10" width="210" height="100" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="345" y="26" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">Logical Clocks</text>
+  <text x="345" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">ordering without real time</text>
+
+  <rect x="250" y="44" width="90" height="55" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="295" y="57" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Lamport</text>
+  <text x="295" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">single counter</text>
+  <text x="295" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">total ordering</text>
+  <text x="295" y="90" text-anchor="middle" fill="var(--r)" font-size="4.5">can't detect concurrency</text>
+
+  <rect x="350" y="44" width="90" height="55" rx="4" fill="rgba(34,211,238,.06)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="395" y="57" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Vector Clock</text>
+  <text x="395" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">counter per node</text>
+  <text x="395" y="79" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">detects concurrency</text>
+  <text x="395" y="90" text-anchor="middle" fill="var(--r)" font-size="4.5">grows with nodes</text>
+
+  <!-- Hybrid Clocks -->
+  <rect x="470" y="10" width="210" height="100" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="575" y="26" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Hybrid Clocks</text>
+  <text x="575" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">physical + logical combined</text>
+
+  <rect x="480" y="44" width="90" height="55" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="525" y="57" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">HLC</text>
+  <text x="525" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">physical + logical</text>
+  <text x="525" y="79" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">causal + real-time</text>
+  <text x="525" y="90" text-anchor="middle" fill="var(--muted)" font-size="4.5">CockroachDB, YugabyteDB</text>
+
+  <rect x="580" y="44" width="90" height="55" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="625" y="57" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Commit Wait</text>
+  <text x="625" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">wait for ε to pass</text>
+  <text x="625" y="79" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">external consistency</text>
+  <text x="625" y="90" text-anchor="middle" fill="var(--muted)" font-size="4.5">Spanner (TrueTime)</text>
+
+  <!-- Use Cases (bottom) -->
+  <rect x="10" y="120" width="680" height="110" rx="6" fill="rgba(255,255,255,.01)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="350" y="136" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Where Clocks Matter</text>
+
+  <rect x="20" y="144" width="150" height="38" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="95" y="158" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">MVCC Snapshots</text>
+  <text x="95" y="170" text-anchor="middle" fill="var(--muted)" font-size="5">read at timestamp T</text>
+  <text x="95" y="180" text-anchor="middle" fill="var(--muted)" font-size="4.5">Spanner, CockroachDB</text>
+
+  <rect x="180" y="144" width="150" height="38" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="255" y="158" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Lease Expiry</text>
+  <text x="255" y="170" text-anchor="middle" fill="var(--muted)" font-size="5">leader lease valid until T</text>
+  <text x="255" y="180" text-anchor="middle" fill="var(--muted)" font-size="4.5">etcd, ZooKeeper, DynamoDB</text>
+
+  <rect x="340" y="144" width="150" height="38" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="415" y="158" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Event Ordering</text>
+  <text x="415" y="170" text-anchor="middle" fill="var(--muted)" font-size="5">causal ordering of events</text>
+  <text x="415" y="180" text-anchor="middle" fill="var(--muted)" font-size="4.5">Kafka, EventStore</text>
+
+  <rect x="500" y="144" width="150" height="38" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="575" y="158" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Conflict Resolution</text>
+  <text x="575" y="170" text-anchor="middle" fill="var(--muted)" font-size="5">LWW needs timestamps</text>
+  <text x="575" y="180" text-anchor="middle" fill="var(--muted)" font-size="4.5">Cassandra, DynamoDB</text>
+
+  <!-- Clock skew problem illustration -->
+  <rect x="20" y="190" width="310" height="30" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="175" y="204" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">⚠ Clock Skew Problem</text>
+  <text x="175" y="215" text-anchor="middle" fill="var(--muted)" font-size="5">Node A: 10:00:00.000 | Node B: 10:00:00.150 | Δ = 150ms → wrong ordering</text>
+
+  <rect x="340" y="190" width="310" height="30" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="495" y="204" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">✓ Solution: Logical/Hybrid Clocks</text>
+  <text x="495" y="215" text-anchor="middle" fill="var(--muted)" font-size="5">Don't rely on wall-clock agreement — use causal ordering instead</text>
 </svg>
-<div class="b br"><b>Never</b> assume system clocks agree across nodes. Use logical clocks for ordering, monotonic clocks for timeouts.</div>
+
+<!-- ═══ Clock Comparison Table ═══ -->
+<table>
+<tr><th>Clock Type</th><th>Accuracy</th><th>Detects Concurrency</th><th>Real-Time Ordering</th><th>Used By</th></tr>
+<tr><td><span class="hi">NTP</span></td><td>~1-10ms (LAN), ~100ms (WAN)</td><td><span class="hr">No</span></td><td>Approximate</td><td>Most systems (default)</td></tr>
+<tr><td><span class="hi">TrueTime</span></td><td><span class="hg">~7ms bounded</span></td><td>No (but bounded uncertainty)</td><td><span class="hg">Yes (with commit-wait)</span></td><td>Google Spanner</td></tr>
+<tr><td><span class="hi">Lamport Timestamp</span></td><td>N/A (logical)</td><td><span class="hr">No</span> — total order only</td><td>No</td><td>Simple ordering needs</td></tr>
+<tr><td><span class="hi">Vector Clock</span></td><td>N/A (logical)</td><td><span class="hg">Yes</span></td><td>No</td><td>Riak, Dynamo</td></tr>
+<tr><td><span class="hi">HLC</span></td><td>Physical + logical</td><td><span class="hg">Yes</span></td><td>Approximate + causal</td><td>CockroachDB, YugabyteDB</td></tr>
+</table>
+
+<!-- ═══ Clock Patterns ═══ -->
+<div class="d-title"><span class="num d-red">▸</span> Clock Pitfalls &amp; Best Practices</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--r)">Never Assume</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>System clocks agree across nodes</li>
+<li>Clock always moves forward (NTP can jump back)</li>
+<li>Timestamps are unique (sub-ms collisions)</li>
+<li>Network delay is symmetric</li>
+<li>Leap seconds don't exist (they do: 23:59:60)</li>
+</ul>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Best Practices</h4>
+<ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.6">
+<li>Use <strong>monotonic clocks</strong> for timeouts/durations</li>
+<li>Use <strong>logical clocks</strong> for event ordering</li>
+<li>Use <strong>HLC</strong> when you need both time + causality</li>
+<li>Store timestamps as <strong>UTC + timezone offset</strong></li>
+<li>Add <strong>node ID</strong> to break timestamp ties</li>
+</ul>
+</div>
+</div>
+
+<div class="b bg"><span class="hi">Monotonic vs Wall Clock:</span> <span class="hg">Monotonic</span> (clock_gettime CLOCK_MONOTONIC) — never goes backward, use for measuring durations, timeouts, lease expiry. <span class="hg">Wall clock</span> (gettimeofday) — can jump forward/backward on NTP sync, use only for human-readable timestamps.</div>
+<div class="b by"><span class="hi">How Spanner achieves external consistency:</span> TrueTime returns interval [earliest, latest]. On commit, Spanner <span class="hg">waits until latest has passed</span> (commit-wait ~7ms). This guarantees if T1 commits before T2 starts, T1's timestamp &lt; T2's timestamp. Cost: ~7ms added latency per write.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Using System.currentTimeMillis() for ordering</span> — clock skew breaks it. <span class="hr">Comparing timestamps across machines</span> without bounded uncertainty. <span class="hr">Relying on NTP for distributed locks</span> — drift can cause split-brain. <span class="hr">Ignoring leap seconds</span> in time-sensitive financial systems.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Google Spanner</strong> — TrueTime + commit-wait for global consistency. <strong>CockroachDB</strong> — HLC for serializable transactions without GPS. <strong>Amazon</strong> — time sync service for EC2 (chrony, ~1ms accuracy). <strong>Cloudflare</strong> — Roughtime protocol for untrusted time sources.</div>
 </div>
 
 </div>
@@ -876,6 +1434,11 @@
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>

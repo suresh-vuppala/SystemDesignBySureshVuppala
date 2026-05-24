@@ -1,14 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>15. Decision Flowcharts — System Design Cheatsheet</title>
+<title>15. Decision Flowcharts — System Design Concepts</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="stylesheet" href="../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Cheatsheet</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
+<div class="hero" id="top"><h1><span>System Design Concepts</span></h1><p>Staff / Sr SWE — Complete Reference</p></div>
 <div class="ct">
 <div class="sd sd-8"><span class="e">🧭</span> 15 · DECISION FLOWCHARTS</div>
 
@@ -186,6 +187,16 @@
   <rect x="170" y="160" width="140" height="20" rx="5" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width="1.5"/>
   <text x="240" y="174" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">SNS → SQS → Lambda</text>
 </svg>
+<table>
+<tr><th>Technology</th><th>Model</th><th>Ordering</th><th>Retention</th><th>Best For</th></tr>
+<tr><td><span class="hi">SQS</span></td><td>Queue (1 consumer per msg)</td><td>FIFO optional</td><td>14 days max</td><td>Task distribution, decoupling services</td></tr>
+<tr><td><span class="hi">Kafka</span></td><td>Log (N consumers, replay)</td><td><span class="hg">Partition-ordered</span></td><td>Configurable (days→forever)</td><td>Event sourcing, streaming, high throughput</td></tr>
+<tr><td><span class="hi">RabbitMQ</span></td><td>Queue + Exchange routing</td><td>Per-queue FIFO</td><td>Until consumed</td><td>Complex routing, priority queues, RPC</td></tr>
+<tr><td><span class="hi">Redis Pub/Sub</span></td><td>Pub/Sub (fire & forget)</td><td>None</td><td><span class="hr">Zero (no persistence)</span></td><td>Ephemeral events, typing indicators, cache invalidation</td></tr>
+<tr><td><span class="hi">SNS + SQS</span></td><td>Fan-out (1 msg → N queues)</td><td>Per-subscriber queue</td><td>Per SQS settings</td><td>Event notifications to multiple services</td></tr>
+<tr><td><span class="hi">NATS</span></td><td>Pub/Sub + JetStream</td><td>Stream-ordered</td><td>JetStream: configurable</td><td>Lightweight microservice messaging, IoT</td></tr>
+</table>
+<div class="b bg"><span class="hi">Decision shortcut:</span> Need replay? → <span class="hg">Kafka</span>. Need exactly-once task processing? → <span class="hg">SQS</span>. Need complex routing (topic/fanout/headers)? → <span class="hg">RabbitMQ</span>. Need fire-and-forget speed? → <span class="hg">Redis Pub/Sub</span>. Need fan-out to multiple services? → <span class="hg">SNS+SQS</span>.</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ -->
@@ -287,6 +298,16 @@
   <line x1="230" y1="128" x2="230" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#fc1)"/>
   <text x="230" y="158" text-anchor="middle" fill="var(--muted)" font-size="7">Simple / legacy? → <tspan fill="var(--o)" font-weight="600">Long Polling</tspan></text>
 </svg>
+<table>
+<tr><th>Technology</th><th>Direction</th><th>Latency</th><th>Connection</th><th>Best For</th></tr>
+<tr><td><span class="hi">WebSocket</span></td><td>Bidirectional</td><td><span class="hg">&lt;50ms</span></td><td>Persistent, stateful</td><td>Chat, gaming, collaborative editing</td></tr>
+<tr><td><span class="hi">SSE</span></td><td>Server → Client only</td><td><span class="hg">&lt;100ms</span></td><td>Persistent, HTTP-based</td><td>Live feeds, notifications, dashboards</td></tr>
+<tr><td><span class="hi">gRPC Streaming</span></td><td>Both (4 modes)</td><td><span class="hg">&lt;10ms</span></td><td>HTTP/2 multiplexed</td><td>Internal microservice streaming, telemetry</td></tr>
+<tr><td><span class="hi">Long Polling</span></td><td>Client pulls</td><td>100-1000ms</td><td>Repeated HTTP requests</td><td>Simple fallback, legacy browser support</td></tr>
+<tr><td><span class="hi">WebRTC</span></td><td>Peer-to-peer</td><td><span class="hg">&lt;100ms</span></td><td>P2P (STUN/TURN)</td><td>Video/audio calls, screen sharing</td></tr>
+<tr><td><span class="hi">MQTT</span></td><td>Pub/Sub (lightweight)</td><td><span class="hg">&lt;50ms</span></td><td>Persistent TCP</td><td>IoT devices, low-bandwidth networks</td></tr>
+</table>
+<div class="b by"><span class="hi">Decision shortcut:</span> Browser + bidirectional? → <span class="hg">WebSocket</span>. Browser + server-push only? → <span class="hg">SSE</span> (simpler, auto-reconnect). Internal services? → <span class="hg">gRPC streaming</span>. Video/audio? → <span class="hg">WebRTC</span>. IoT/constrained? → <span class="hg">MQTT</span>. Legacy/simple? → <span class="hg">Long Polling</span>.</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ -->
@@ -343,41 +364,158 @@
 </svg>
 </div>
 
-<!-- ═══ Additional Decision Tables ═══ -->
 <div class="T" id="more-decisions">
-<h2>More Decision Guides</h2><p class="su">Quick reference tables for common architecture decisions</p>
+<h2>More Decision Flowcharts</h2><p class="su">Quick decision trees for common architecture choices</p>
 
-<table>
-<tr><th colspan="3" style="color:var(--c)">Sync vs Async Communication</th></tr>
-<tr><th>Question</th><th>Sync (HTTP/gRPC)</th><th>Async (Queue/Event)</th></tr>
-<tr><td>Need immediate response?</td><td><span class="hg">Yes → Sync</span></td><td>No → Async</td></tr>
-<tr><td>Can caller wait?</td><td><span class="hg">Yes → Sync</span></td><td>No → Async (202 + poll)</td></tr>
-<tr><td>Tight coupling OK?</td><td>Yes → Sync</td><td><span class="hg">No → Async (decoupled)</span></td></tr>
-<tr><td>Need retry/replay?</td><td>Manual retry</td><td><span class="hg">Built-in (Kafka offset, SQS DLQ)</span></td></tr>
-</table>
+<!-- ═══ Sync vs Async Flowchart ═══ -->
+<h3 style="color:var(--a);margin-top:12px">Sync vs Async Communication</h3>
+<svg width="100%" viewBox="0 0 480 170" style="max-width:480px;display:block;margin:4px auto">
+  <defs><marker id="md1" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
+  <!-- Q1 -->
+  <rect x="170" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="240" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Need immediate response?</text>
+  <!-- Yes → Sync -->
+  <line x1="170" y1="18" x2="90" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="12" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="10" y="6" width="78" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="49" y="22" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Sync</text>
+  <text x="49" y="38" text-anchor="middle" fill="var(--muted)" font-size="6">HTTP / gRPC</text>
+  <text x="49" y="46" text-anchor="middle" fill="var(--muted)" font-size="6">direct call + wait</text>
+  <!-- No -->
+  <line x1="240" y1="32" x2="240" y2="52" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="254" y="44" fill="var(--muted)" font-size="7" font-weight="600">No</text>
+  <!-- Q2 -->
+  <rect x="170" y="54" width="140" height="28" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="240" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Need retry / replay?</text>
+  <!-- Yes → Event Stream -->
+  <line x1="170" y1="68" x2="90" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="62" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="4" y="56" width="84" height="24" rx="5" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="46" y="72" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="800">Event Stream</text>
+  <text x="46" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">Kafka · durable log</text>
+  <!-- No -->
+  <line x1="240" y1="82" x2="240" y2="102" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="254" y="94" fill="var(--muted)" font-size="7" font-weight="600">No</text>
+  <!-- Q3 -->
+  <rect x="170" y="104" width="140" height="28" rx="6" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="240" y="122" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Multiple consumers?</text>
+  <!-- Yes → Pub/Sub -->
+  <line x1="310" y1="118" x2="380" y2="118" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="345" y="112" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="382" y="106" width="88" height="24" rx="5" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="426" y="122" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="800">Pub/Sub</text>
+  <text x="426" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">SNS · fan-out</text>
+  <!-- No → Task Queue -->
+  <line x1="170" y1="118" x2="90" y2="118" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="112" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="10" y="106" width="78" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="49" y="122" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Task Queue</text>
+  <text x="49" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">SQS · RabbitMQ</text>
+  <!-- Summary -->
+  <rect x="120" y="148" width="240" height="16" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="240" y="159" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Rule: if caller can't wait → async. If need replay → Kafka.</text>
+</svg>
 
-<table style="margin-top:8px">
-<tr><th colspan="3" style="color:var(--g)">Monolith vs Microservices</th></tr>
-<tr><th>Question</th><th>Monolith</th><th>Microservices</th></tr>
-<tr><td>Team size?</td><td><span class="hg">&lt;10 devs → Monolith</span></td><td>&gt;10 devs, multiple teams → Micro</td></tr>
-<tr><td>Deploy speed?</td><td>Single deploy (simple)</td><td><span class="hg">Independent deploys per service</span></td></tr>
-<tr><td>Complexity budget?</td><td><span class="hg">Low → Monolith</span></td><td>Can handle distributed complexity → Micro</td></tr>
-<tr><td>Scaling needs?</td><td>Scale entire app</td><td><span class="hg">Scale hot services independently</span></td></tr>
-<tr><td>Data consistency?</td><td><span class="hg">Single DB, ACID easy</span></td><td>Distributed txns (Saga), eventual consistency</td></tr>
-</table>
+<!-- ═══ Monolith vs Microservices Flowchart ═══ -->
+<h3 style="color:var(--o);margin-top:12px">Monolith vs Microservices</h3>
+<svg width="100%" viewBox="0 0 480 170" style="max-width:480px;display:block;margin:4px auto">
+  <!-- Q1 -->
+  <rect x="170" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="240" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Team size &gt; 10 engineers?</text>
+  <!-- No → Monolith -->
+  <line x1="170" y1="18" x2="90" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="12" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="10" y="6" width="78" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="49" y="22" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Monolith</text>
+  <text x="49" y="38" text-anchor="middle" fill="var(--muted)" font-size="6">simple deploy</text>
+  <text x="49" y="46" text-anchor="middle" fill="var(--muted)" font-size="6">single codebase</text>
+  <!-- Yes -->
+  <line x1="240" y1="32" x2="240" y2="52" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="254" y="44" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <!-- Q2 -->
+  <rect x="170" y="54" width="140" height="28" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="240" y="68" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Need independent deploy</text>
+  <text x="240" y="78" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">per service?</text>
+  <!-- No → Modular Monolith -->
+  <line x1="170" y1="68" x2="90" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="62" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="4" y="56" width="84" height="24" rx="5" fill="rgba(251,191,36,.12)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="46" y="72" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Modular Mono</text>
+  <text x="46" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">bounded contexts</text>
+  <text x="46" y="96" text-anchor="middle" fill="var(--muted)" font-size="6">single deploy unit</text>
+  <!-- Yes -->
+  <line x1="240" y1="82" x2="240" y2="102" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="254" y="94" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <!-- Q3 -->
+  <rect x="170" y="104" width="140" height="28" rx="6" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="240" y="122" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Need different tech stacks?</text>
+  <!-- Yes → Full Microservices -->
+  <line x1="310" y1="118" x2="380" y2="118" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="345" y="112" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="382" y="106" width="88" height="24" rx="5" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="426" y="122" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Microservices</text>
+  <text x="426" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">polyglot · independent</text>
+  <!-- No → Service-Oriented -->
+  <line x1="170" y1="118" x2="90" y2="118" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="112" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="4" y="106" width="84" height="24" rx="5" fill="rgba(251,146,60,.12)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="46" y="122" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">SOA / Mini-svc</text>
+  <text x="46" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">same stack, split deploys</text>
+  <!-- Summary -->
+  <rect x="100" y="148" width="280" height="16" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="240" y="159" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">Rule: start monolith → modular mono → split to services when team/scale demands</text>
+</svg>
 
-<table style="margin-top:8px">
-<tr><th colspan="3" style="color:var(--a2)">SQL vs NoSQL (Simplified)</th></tr>
-<tr><th>Question</th><th>SQL</th><th>NoSQL</th></tr>
-<tr><td>Need ACID + JOINs?</td><td><span class="hg">Yes → SQL</span></td><td>No</td></tr>
-<tr><td>Schema known upfront?</td><td><span class="hg">Yes → SQL</span></td><td>Evolving → NoSQL (flexible schema)</td></tr>
-<tr><td>Write throughput &gt;100K/sec?</td><td>Hard (single leader)</td><td><span class="hg">Yes → Cassandra/DynamoDB</span></td></tr>
-<tr><td>Need horizontal scale?</td><td>Sharding is painful</td><td><span class="hg">Built-in (masterless, auto-shard)</span></td></tr>
-<tr><td>Complex queries?</td><td><span class="hg">SQL excels (JOINs, aggregations)</span></td><td>Must denormalize, no JOINs</td></tr>
-</table>
+<!-- ═══ SQL vs NoSQL Flowchart ═══ -->
+<h3 style="color:var(--g);margin-top:12px">SQL vs NoSQL</h3>
+<svg width="100%" viewBox="0 0 480 170" style="max-width:480px;display:block;margin:4px auto">
+  <!-- Q1 -->
+  <rect x="170" y="4" width="140" height="28" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="240" y="22" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Need ACID + complex JOINs?</text>
+  <!-- Yes → SQL -->
+  <line x1="170" y1="18" x2="90" y2="18" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="12" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="10" y="6" width="78" height="24" rx="5" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="49" y="22" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">SQL</text>
+  <text x="49" y="38" text-anchor="middle" fill="var(--muted)" font-size="6">Postgres · MySQL</text>
+  <text x="49" y="46" text-anchor="middle" fill="var(--muted)" font-size="6">strong consistency</text>
+  <!-- No -->
+  <line x1="240" y1="32" x2="240" y2="52" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="254" y="44" fill="var(--muted)" font-size="7" font-weight="600">No</text>
+  <!-- Q2 -->
+  <rect x="170" y="54" width="140" height="28" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="240" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Write-heavy (&gt;100K/sec)?</text>
+  <!-- Yes → Wide-Column -->
+  <line x1="310" y1="68" x2="380" y2="68" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="345" y="62" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="382" y="56" width="88" height="24" rx="5" fill="rgba(108,140,255,.12)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="426" y="72" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">Wide-Column</text>
+  <text x="426" y="88" text-anchor="middle" fill="var(--muted)" font-size="6">Cassandra · ScyllaDB</text>
+  <!-- No -->
+  <line x1="240" y1="82" x2="240" y2="102" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="254" y="94" fill="var(--muted)" font-size="7" font-weight="600">No</text>
+  <!-- Q3 -->
+  <rect x="170" y="104" width="140" height="28" rx="6" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="240" y="122" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="700">Flexible schema / JSON docs?</text>
+  <!-- Yes → Document DB -->
+  <line x1="170" y1="118" x2="90" y2="118" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="130" y="112" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Yes</text>
+  <rect x="10" y="106" width="78" height="24" rx="5" fill="rgba(167,139,250,.12)" stroke="var(--a2)" stroke-width="1.5"/>
+  <text x="49" y="122" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="800">Document</text>
+  <text x="49" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">MongoDB · DynamoDB</text>
+  <!-- No → Key-Value -->
+  <line x1="310" y1="118" x2="380" y2="118" stroke="var(--muted)" stroke-width="1" marker-end="url(#md1)"/>
+  <text x="345" y="112" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">No</text>
+  <rect x="382" y="106" width="88" height="24" rx="5" fill="rgba(248,113,113,.12)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="426" y="122" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="800">Key-Value</text>
+  <text x="426" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">Redis · DynamoDB</text>
+  <text x="426" y="146" text-anchor="middle" fill="var(--muted)" font-size="6">sub-ms lookups</text>
+  <!-- Summary -->
+  <rect x="120" y="152" width="240" height="16" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="240" y="163" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Rule: relationships → SQL. Scale writes → Cassandra. Flexible → Mongo.</text>
+</svg>
 
-<div class="b bb" style="margin-top:6px"><span class="hi">Microservices Patterns:</span> <span class="hg">Strangler Fig</span> — gradually replace monolith pieces with services. <span class="hg">BFF</span> — separate API gateway per client type. <span class="hg">Sidecar</span> — attach proxy (Envoy) to each service for cross-cutting concerns. <span class="hg">DDD</span> — bounded contexts define service boundaries (each service owns its domain + data).</div>
-<div class="b bg"><span class="hi">Data Privacy:</span> <span class="hg">GDPR</span> — EU data stays in EU, right to deletion, consent required. <span class="hg">PII handling</span> — encrypt at rest + transit, mask in logs, tokenize for analytics. <span class="hg">Data residency</span> — geo-sharding ensures compliance. Audit trail for all access.</div>
+<div class="b bb"><span class="hi">Interview meta-tip:</span> When asked "how would you design X?" — start by identifying which of these decisions apply. Most systems need: <span class="hg">API style</span> (REST/gRPC) + <span class="hg">database</span> (SQL/NoSQL) + <span class="hg">communication</span> (sync/async) + <span class="hg">caching strategy</span>. Name the tradeoff explicitly: "I'm choosing X over Y because of Z constraint."</div>
 </div>
 
 </div>
@@ -385,6 +523,11 @@
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>
-<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/auth.js"></script>
+
 </body>
 </html>
