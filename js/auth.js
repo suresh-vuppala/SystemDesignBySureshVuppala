@@ -14,13 +14,15 @@
 // ═══ CONFIGURATION ═══
 var CONFIG = {
   admin: false, // Set to true to bypass premium gates (for local testing). Set false for production.
-  firebase: window.FIREBASE_CONFIG || {
-    apiKey: "",
+  firebase: {
+    apiKey: "AIzaSyAbwqzKR-23IPRJy_S4JbQ-_EYWb8mTAzo",
     authDomain: "varaq-gif.firebaseapp.com",
+    databaseURL: "https://varaq-gif-default-rtdb.firebaseio.com",
     projectId: "varaq-gif",
     storageBucket: "varaq-gif.appspot.com",
     messagingSenderId: "350573799970",
-    appId: ""
+    appId: "1:350573799970:web:c68e797081eb3818aa787b",
+    measurementId: "G-RZ951SNE5G"
   },
   razorpay: {
     key: "rzp_live_YOUR_KEY",  // or rzp_test_ for testing
