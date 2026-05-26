@@ -31,8 +31,8 @@ export default function middleware(request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
-  // Check if this is a premium page
-  const isPremiumPage = ALL_PREMIUM_PATHS.some(p => pathname === p || pathname.endsWith(p));
+  // Only check pages that are in the premium list
+  const isPremiumPage = ALL_PREMIUM_PATHS.some(p => pathname === p);
   if (!isPremiumPage) {
     return; // Free page — pass through
   }
@@ -42,21 +42,29 @@ export default function middleware(request) {
   const sessionMatch = cookies.match(/hellosde_session=([^;]+)/);
 
   if (!sessionMatch || !sessionMatch[1]) {
-    // No session — rewrite to premium gate page
-    url.pathname = '/premium-required.html';
-    return Response.redirect(url.toString(), 302);
+    // No session — redirect to premium gate page
+    const gateUrl = new URL('/premium-required.html', request.url);
+    return Response.redirect(gateUrl.toString(), 302);
   }
 
   // Cookie exists — let the page through
-  // (Full token verification happens client-side via Firebase;
-  //  the cookie presence is the gate. For stronger verification,
-  //  use an API route — but Edge Middleware can't call external APIs reliably)
   return;
 }
 
 export const config = {
   matcher: [
-    '/system-design-cheatsheet/:path*.html',
-    '/realtime-system-design-problems/:path*',
+    '/system-design-cheatsheet/10-scalability.html',
+    '/system-design-cheatsheet/11-data-pipelines.html',
+    '/system-design-cheatsheet/12-distributed-systems.html',
+    '/system-design-cheatsheet/13-observability.html',
+    '/system-design-cheatsheet/14-ai-systems.html',
+    '/system-design-cheatsheet/15-key-numbers.html',
+    '/system-design-cheatsheet/16-decision-flowcharts.html',
+    '/realtime-system-design-problems/1-chat-messaging/whatsapp-presence-100m.html',
+    '/realtime-system-design-problems/1-chat-messaging/slack-typing-indicators.html',
+    '/realtime-system-design-problems/1-chat-messaging/slack-chat-search.html',
+    '/realtime-system-design-problems/1-chat-messaging/whatsapp-push-notifications.html',
+    '/realtime-system-design-problems/1-chat-messaging/telegram-multi-device-sync.html',
+    '/realtime-system-design-problems/1-chat-messaging/slack-active-channels.html',
   ],
 };
