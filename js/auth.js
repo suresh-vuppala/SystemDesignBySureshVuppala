@@ -13,7 +13,7 @@
 
 // ═══ CONFIGURATION ═══
 var CONFIG = {
-  admin: false, // Set to true to bypass premium gates (for local testing). Set false for production.
+  admin: true, // Set to true to bypass premium gates (for local testing). Set false for production.
   firebase: {
     apiKey: "AIzaSyAbwqzKR-23IPRJy_S4JbQ-_EYWb8mTAzo",
     authDomain: "varaq-gif.firebaseapp.com",
