@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Comprehensive System Design Reference - 201 Real-Time Problems & Solutions",
   "main": "index.html",
-  "type": "module",
   "scripts": {
     "dev": "python -m http.server 8000",
     "build": "echo 'No build required for static site'"
@@ -12,9 +11,7 @@
     "system-design",
     "real-time",
     "distributed-systems",
-    "interview-prep",
-    "web-scale",
-    "cheatsheet"
+    "interview-prep"
   ],
   "author": "Suresh Vuppala",
   "license": "MIT",
