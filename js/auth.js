@@ -36,16 +36,24 @@ var CONFIG = {
 
 // ═══ FIREBASE INITIALIZATION ═══
 var firebaseReady = false;
+console.log('[HelloSDE] auth.js loaded');
+console.log('[HelloSDE] typeof firebase:', typeof firebase);
 if(typeof firebase !== 'undefined'){
+  console.log('[HelloSDE] firebase.apps.length:', firebase.apps.length);
   try {
     if(!firebase.apps.length){
       firebase.initializeApp(CONFIG.firebase);
+      console.log('[HelloSDE] firebase.initializeApp() SUCCESS');
+    } else {
+      console.log('[HelloSDE] Firebase already initialized');
     }
     firebaseReady = true;
   } catch(e){
-    console.error('Firebase init failed:', e);
+    console.error('[HelloSDE] Firebase init FAILED:', e.message);
     firebaseReady = false;
   }
+} else {
+  console.warn('[HelloSDE] firebase is UNDEFINED — SDK not loaded');
 }
 
 // ═══ STATE ═══
@@ -598,11 +606,14 @@ window.HelloSDE = {
 
 // ═══ INITIALIZATION ═══
 function init(){
+  console.log('[HelloSDE] init() called, firebaseReady:', firebaseReady);
   injectStyles();
   
   // Check if Firebase is loaded and initialized
   if(firebaseReady && firebase.auth){
+    console.log('[HelloSDE] Calling firebase.auth().onAuthStateChanged');
     firebase.auth().onAuthStateChanged(function(user){
+      console.log('[HelloSDE] onAuthStateChanged, user:', user ? user.email : 'null');
       state.user = user;
       if(user){
         // Refresh session cookie for Vercel middleware
@@ -623,6 +634,7 @@ function init(){
     });
   } else {
     // Firebase not loaded — use localStorage fallback
+    console.warn('[HelloSDE] Firebase NOT ready, using localStorage fallback');
     state.isPremium = localStorage.getItem('hellosde_premium') === 'true';
     injectAuthUI();
     setupAuthMenu();
