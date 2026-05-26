@@ -3,19 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Bitly generate unique short codes at 1000+ URLs/sec? — System Design</title>
+<title>How does Bitly generate unique short codes at 1000+ URLs/sec? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a URL shortener generate globally unique short codes at scale?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">🔗</span> Design a URL shortener: 1000+ URLs/sec, 7-char codes, no collisions, 100K redirects/sec</div>
+<div class="sd sd-5"><span class="e">??</span> Design a URL shortener: 1000+ URLs/sec, 7-char codes, no collisions, 100K redirects/sec</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/06-storage.html#nosql">NoSQL</a>
+<a href="../../system-design-cheatsheet/07-caching.html#caching">Caching</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#consistent-hashing">Consistent Hashing</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+<a href="../../system-design-cheatsheet/07-caching.html#cdn">CDN</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a URL shortener generate globally unique short codes at 1000+ URLs/sec, ensuring no collisions across distributed nodes while keeping codes short (7 chars) and supporting custom aliases?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> 7 chars (base62) = 62⁷ = <span class="hg">3.5 trillion</span> possible codes. But generating them without collisions across multiple servers — without a central coordinator bottleneck — requires careful ID generation strategy.</div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> 7 chars (base62) = 627 = <span class="hg">3.5 trillion</span> possible codes. But generating them without collisions across multiple servers &middot; without a central coordinator bottleneck &middot; requires careful ID generation strategy.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -42,9 +53,9 @@
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="URL shortener full architecture showing write path, read path, and analytics layer">
   <defs><marker id="url-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-  <!-- ═══ LAYER 1: WRITE PATH ═══ -->
+  <!-- --- LAYER 1: WRITE PATH --- -->
   <rect x="10" y="5" width="760" height="130" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1" stroke-dasharray="4,3"/>
-  <text x="390" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">WRITE PATH — POST /shorten (1000 URLs/sec)</text>
+  <text x="390" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">WRITE PATH &middot; POST /shorten (1000 URLs/sec)</text>
 
   <rect x="25" y="30" width="100" height="50" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="75" y="48" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Client</text>
@@ -64,14 +75,14 @@
   <rect x="335" y="28" width="165" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="417" y="43" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">ID Generator</text>
   <text x="417" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Pre-allocated counter ranges</text>
-  <text x="417" y="68" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">base62(counter) → 7 chars</text>
+  <text x="417" y="68" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">base62(counter) ? 7 chars</text>
   <text x="417" y="79" text-anchor="middle" fill="var(--muted)" font-size="4.5">Collision-free by construction</text>
 
   <line x1="500" y1="55" x2="530" y2="55" stroke="var(--g)" stroke-width="1.2" marker-end="url(#url-arr)"/>
 
   <rect x="535" y="28" width="110" height="55" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
   <text x="590" y="43" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">DB Write</text>
-  <text x="590" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">code → long_url</text>
+  <text x="590" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">code ? long_url</text>
   <text x="590" y="68" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">DynamoDB/Cassandra</text>
   <text x="590" y="79" text-anchor="middle" fill="var(--muted)" font-size="4.5">Highly available</text>
 
@@ -88,9 +99,9 @@
   <text x="417" y="117" text-anchor="middle" fill="var(--muted)" font-size="4.5">node1: 1-1M, node2: 1M-2M, node3: 2M-3M</text>
   <line x1="417" y1="83" x2="417" y2="90" stroke="var(--y)" stroke-width=".7" stroke-dasharray="2,2"/>
 
-  <!-- ═══ LAYER 2: READ PATH ═══ -->
+  <!-- --- LAYER 2: READ PATH --- -->
   <rect x="10" y="140" width="760" height="130" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,3"/>
-  <text x="390" y="153" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">READ PATH — GET /abc123 → 301 Redirect (100K req/sec)</text>
+  <text x="390" y="153" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">READ PATH &middot; GET /abc123 ? 301 Redirect (100K req/sec)</text>
 
   <rect x="25" y="165" width="100" height="50" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="75" y="183" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Browser</text>
@@ -101,7 +112,7 @@
 
   <rect x="165" y="163" width="170" height="55" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
   <text x="250" y="178" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Redis Cache</text>
-  <text x="250" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">GET code → long_url</text>
+  <text x="250" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">GET code ? long_url</text>
   <text x="250" y="205" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">99% hit rate | &lt;1ms</text>
   <text x="250" y="215" text-anchor="middle" fill="var(--muted)" font-size="4.5">170GB for top 20% URLs (Pareto)</text>
 
@@ -112,7 +123,7 @@
   <line x1="250" y1="218" x2="250" y2="240" stroke="var(--r)" stroke-width=".8" stroke-dasharray="2,2" marker-end="url(#url-arr)"/>
   <text x="270" y="235" fill="var(--r)" font-size="4.5">miss (1%)</text>
   <rect x="195" y="242" width="110" height="25" rx="3" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".8"/>
-  <text x="250" y="258" text-anchor="middle" fill="var(--a2)" font-size="5">DB lookup → cache fill</text>
+  <text x="250" y="258" text-anchor="middle" fill="var(--a2)" font-size="5">DB lookup ? cache fill</text>
 
   <rect x="375" y="163" width="150" height="55" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="450" y="178" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">301/302 Redirect</text>
@@ -133,9 +144,9 @@
   <text x="660" y="198" text-anchor="middle" fill="var(--muted)" font-size="5">Browser follows redirect</text>
   <text x="660" y="210" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Total: &lt;10ms redirect latency</text>
 
-  <!-- ═══ LAYER 3: ANALYTICS LAYER ═══ -->
+  <!-- --- LAYER 3: ANALYTICS LAYER --- -->
   <rect x="10" y="275" width="760" height="115" rx="6" fill="rgba(251,146,60,.02)" stroke="var(--o)" stroke-width="1" stroke-dasharray="4,3"/>
-  <text x="390" y="288" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">ANALYTICS LAYER — Real-time Click Stats</text>
+  <text x="390" y="288" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">ANALYTICS LAYER &middot; Real-time Click Stats</text>
 
   <rect x="30" y="300" width="160" height="75" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.2"/>
   <text x="110" y="315" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Kafka</text>
@@ -171,35 +182,35 @@
   <text x="697" y="355" text-anchor="middle" fill="var(--muted)" font-size="5">Geo heatmap</text>
   <text x="697" y="367" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Top referrers</text>
 
-  <!-- ═══ BOTTOM: Key Insight ═══ -->
+  <!-- --- BOTTOM: Key Insight --- -->
   <rect x="10" y="400" width="760" height="92" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
   <text x="390" y="416" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">KEY DESIGN DECISIONS</text>
-  <text x="390" y="432" text-anchor="middle" fill="var(--muted)" font-size="5.5">Write:Read = 1:100 → optimize for reads | Cache is the critical path, DB is fallback only</text>
+  <text x="390" y="432" text-anchor="middle" fill="var(--muted)" font-size="5.5">Write:Read = 1:100 ? optimize for reads | Cache is the critical path, DB is fallback only</text>
   <text x="390" y="448" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">base62(counter) = collision-free by construction | 3.5 trillion possible 7-char codes (won't exhaust for centuries)</text>
-  <text x="390" y="464" text-anchor="middle" fill="var(--muted)" font-size="5.5">301 (permanent, browser caches → fewer server hits) vs 302 (temporary, track every click for analytics)</text>
+  <text x="390" y="464" text-anchor="middle" fill="var(--muted)" font-size="5.5">301 (permanent, browser caches ? fewer server hits) vs 302 (temporary, track every click for analytics)</text>
   <text x="390" y="480" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">1000 URLs/sec write | 100K redirects/sec read | 7 chars base62 | &lt;10ms redirect</text>
 </svg>
 
-<div class="b bg"><span class="hi">ID generation:</span> Pre-allocate counter ranges from a central sequence (ZooKeeper/DB). Each node gets a range (e.g., 1M IDs). Encode counter as base62 → 7 chars. <span class="hg">No coordination during normal operation</span> — only when range exhausted.</div>
-<div class="b by"><span class="hi">Redirect path:</span> GET /abc1234 → Redis lookup (1ms) → if miss, DB lookup → 301 redirect. <span class="hg">301 (permanent)</span> for SEO, <span class="hg">302 (temporary)</span> if you need analytics on every click.</div>
-<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Random hash + check-for-collision</span> — race conditions under load. <span class="hr">Auto-increment single DB</span> — bottleneck. <span class="hr">No cache for redirects</span> — DB melts at 100K req/sec.</div>
+<div class="b bg"><span class="hi">ID generation:</span> Pre-allocate counter ranges from a central sequence (ZooKeeper/DB). Each node gets a range (e.g., 1M IDs). Encode counter as base62 ? 7 chars. <span class="hg">No coordination during normal operation</span> &middot; only when range exhausted.</div>
+<div class="b by"><span class="hi">Redirect path:</span> GET /abc1234 ? Redis lookup (1ms) ? if miss, DB lookup ? 301 redirect. <span class="hg">301 (permanent)</span> for SEO, <span class="hg">302 (temporary)</span> if you need analytics on every click.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Random hash + check-for-collision</span> &middot; race conditions under load. <span class="hr">Auto-increment single DB</span> &middot; bottleneck. <span class="hr">No cache for redirects</span> &middot; DB melts at 100K req/sec.</div>
 </div>
 
-<!-- ═══ SCALE ESTIMATION ═══ -->
+<!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
 <table>
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
-<tr><td><span class="hi">1</span></td><td>New URLs: 1000/sec × 86400</td><td><span class="hg">~86M URLs/day</span></td><td>Write-light — DB handles easily</td></tr>
-<tr><td><span class="hi">2</span></td><td>Redirects: 100:1 read/write ratio</td><td><span class="hg">100K redirects/sec</span></td><td>Read-heavy — must cache aggressively</td></tr>
-<tr><td><span class="hi">3</span></td><td>Storage: 86M/day × 365 × 5 years × 500 bytes</td><td><span class="hg">~7.8 TB total</span></td><td>Fits in single sharded DB cluster</td></tr>
+<tr><td><span class="hi">1</span></td><td>New URLs: 1000/sec &middot; 86400</td><td><span class="hg">~86M URLs/day</span></td><td>Write-light &middot; DB handles easily</td></tr>
+<tr><td><span class="hi">2</span></td><td>Redirects: 100:1 read/write ratio</td><td><span class="hg">100K redirects/sec</span></td><td>Read-heavy &middot; must cache aggressively</td></tr>
+<tr><td><span class="hi">3</span></td><td>Storage: 86M/day &middot; 365 &middot; 5 years &middot; 500 bytes</td><td><span class="hg">~7.8 TB total</span></td><td>Fits in single sharded DB cluster</td></tr>
 <tr><td><span class="hi">4</span></td><td>Cache: top 20% URLs = 80% traffic (Pareto)</td><td><span class="hg">~170 GB Redis</span></td><td>Hot URLs cached, 99% hit rate</td></tr>
-<tr><td><span class="hi">5</span></td><td>ID space: 7 chars base62 = 62⁷</td><td><span class="hg">3.5 trillion codes</span></td><td>Won't exhaust for centuries at 86M/day</td></tr>
-<tr><td><span class="hi">6</span></td><td>Bandwidth: 100K req/sec × 500 bytes response</td><td><span class="hg">~50 MB/sec outbound</span></td><td>Trivial for modern infrastructure</td></tr>
+<tr><td><span class="hi">5</span></td><td>ID space: 7 chars base62 = 627</td><td><span class="hg">3.5 trillion codes</span></td><td>Won't exhaust for centuries at 86M/day</td></tr>
+<tr><td><span class="hi">6</span></td><td>Bandwidth: 100K req/sec &middot; 500 bytes response</td><td><span class="hg">~50 MB/sec outbound</span></td><td>Trivial for modern infrastructure</td></tr>
 </table>
 </div>
 
-<!-- ═══ RESILIENCE ═══ -->
+<!-- --- RESILIENCE --- -->
 <div class="T" id="resilience">
 <h2>Resilience &amp; Edge Cases</h2>
 <table>
@@ -215,17 +226,17 @@
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Base62 encoding of counter</strong> — 7 chars = 3.5T unique codes, collision-free<br>
-<span class="hg">2.</span> <strong>Pre-allocated counter ranges</strong> — no coordination during normal operation<br>
-<span class="hg">3.</span> <strong>Read-heavy (100:1)</strong> — cache redirects aggressively (Redis, 99% hit rate)<br>
-<span class="hg">4.</span> <strong>301 vs 302</strong> — permanent (SEO, browser caches) vs temporary (track every click)<br>
-<span class="hg">5.</span> <strong>Custom aliases</strong> — check uniqueness, store separately, higher priority in lookup<br>
-<span class="hg">6.</span> <strong>Analytics async</strong> — log click event to Kafka, don't block redirect path
+<span class="hg">1.</span> <strong>Base62 encoding of counter</strong> &middot; 7 chars = 3.5T unique codes, collision-free<br>
+<span class="hg">2.</span> <strong>Pre-allocated counter ranges</strong> &middot; no coordination during normal operation<br>
+<span class="hg">3.</span> <strong>Read-heavy (100:1)</strong> &middot; cache redirects aggressively (Redis, 99% hit rate)<br>
+<span class="hg">4.</span> <strong>301 vs 302</strong> &middot; permanent (SEO, browser caches) vs temporary (track every click)<br>
+<span class="hg">5.</span> <strong>Custom aliases</strong> &middot; check uniqueness, store separately, higher priority in lookup<br>
+<span class="hg">6.</span> <strong>Analytics async</strong> &middot; log click event to Kafka, don't block redirect path
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

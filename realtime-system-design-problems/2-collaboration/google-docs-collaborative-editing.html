@@ -3,16 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Google Docs handle 100 users editing simultaneously? — System Design</title>
+<title>How does Google Docs handle 100 users editing simultaneously? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google Docs handle 100 users editing the same paragraph simultaneously?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">📝</span> Design a collaborative editor resolving conflicting edits without locks, converging within 50ms</div>
+<div class="sd sd-5"><span class="e">??</span> Design a collaborative editor resolving conflicting edits without locks, converging within 50ms</div>
 
-<!-- ═══ PROBLEM STATEMENT ═══ -->
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/09-consistency.html#conflict-resolution">Conflict Resolution</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#consistency-models">Eventual Consistency</a>
+<a href="../../system-design-cheatsheet/04-apis.html#realtime">WebSocket</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#pubsub">Pub/Sub</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a collaborative editor handle 100 users editing the same paragraph simultaneously, resolving conflicting character insertions without a central lock while maintaining convergence across all clients within 50ms?</p>
@@ -42,17 +52,17 @@
 </div>
 </div>
 
-<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
 <div class="T" id="functional-requirements">
 <h2>Functional Requirements</h2>
-<p class="su">What the system must do — core collaborative editing behaviours</p>
+<p class="su">What the system must do &middot; core collaborative editing behaviours</p>
 <div class="d-grid" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--g)">Must Have (Core)</h4>
 <ul style="margin:0;padding-left:14px;font-size:.82rem;line-height:1.7">
 <li>Multiple users edit same document simultaneously</li>
 <li>All clients converge to identical state (consistency)</li>
-<li>No locking — users never blocked from typing</li>
+<li>No locking &middot; users never blocked from typing</li>
 <li>Preserve user intent (insertions don't overwrite each other)</li>
 <li>Real-time cursor/selection visibility of other users</li>
 <li>Undo/redo works correctly per-user in collaborative context</li>
@@ -72,7 +82,7 @@
 </div>
 </div>
 
-<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
 <div class="T" id="nfr">
 <h2>Non-Functional Requirements</h2>
 <table>
@@ -86,7 +96,7 @@
 </table>
 </div>
 
-<!-- ═══ HIGH-LEVEL ARCHITECTURE ═══ -->
+<!-- --- HIGH-LEVEL ARCHITECTURE --- -->
 <div class="T" id="architecture">
 <h2>High-Level Architecture</h2>
 <p class="su">Client-side OT with server as single source of truth</p>
@@ -94,18 +104,18 @@
 <svg width="100%" viewBox="0 0 780 520" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Google Docs collaborative editing end-to-end architecture">
   <defs><marker id="ot-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-  <!-- ═══ TITLE ═══ -->
-  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Google Docs — End-to-End Collaborative Editing Architecture</text>
+  <!-- --- TITLE --- -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Google Docs &middot; End-to-End Collaborative Editing Architecture</text>
 
-  <!-- ═══ CLIENT LAYER (top) ═══ -->
+  <!-- --- CLIENT LAYER (top) --- -->
   <rect x="10" y="25" width="760" height="120" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
-  <text x="390" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">CLIENT LAYER — Optimistic Local Apply (instant feedback, no waiting for server)</text>
+  <text x="390" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">CLIENT LAYER &middot; Optimistic Local Apply (instant feedback, no waiting for server)</text>
 
   <!-- Client A -->
   <rect x="20" y="45" width="220" height="90" rx="6" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="130" y="60" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="800">Client A (Browser)</text>
   <rect x="30" y="66" width="200" height="12" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".4"/>
-  <text x="130" y="75" text-anchor="middle" fill="var(--a)" font-size="5">1. User types → create Operation (insert 'H' at pos 5)</text>
+  <text x="130" y="75" text-anchor="middle" fill="var(--a)" font-size="5">1. User types ? create Operation (insert 'H' at pos 5)</text>
   <rect x="30" y="80" width="200" height="12" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".4"/>
   <text x="130" y="89" text-anchor="middle" fill="var(--g)" font-size="5">2. Apply locally IMMEDIATELY (no wait)</text>
   <rect x="30" y="94" width="200" height="12" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".4"/>
@@ -118,7 +128,7 @@
   <rect x="540" y="45" width="220" height="90" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="650" y="60" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="800">Client B (Browser)</text>
   <rect x="550" y="66" width="200" height="12" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".4"/>
-  <text x="650" y="75" text-anchor="middle" fill="var(--g)" font-size="5">1. User types → create Operation (insert 'X' at pos 5)</text>
+  <text x="650" y="75" text-anchor="middle" fill="var(--g)" font-size="5">1. User types ? create Operation (insert 'X' at pos 5)</text>
   <rect x="550" y="80" width="200" height="12" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".4"/>
   <text x="650" y="89" text-anchor="middle" fill="var(--g)" font-size="5">2. Apply locally IMMEDIATELY</text>
   <rect x="550" y="94" width="200" height="12" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".4"/>
@@ -134,7 +144,7 @@
   <text x="340" y="93" text-anchor="middle" fill="var(--muted)" font-size="5">same architecture per client</text>
   <text x="340" y="103" text-anchor="middle" fill="var(--o)" font-size="4.5" font-weight="600">cursor positions shared</text>
 
-  <!-- ═══ NETWORK LAYER ═══ -->
+  <!-- --- NETWORK LAYER --- -->
   <line x1="130" y1="135" x2="300" y2="170" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ot-arr)"/>
   <text x="190" y="150" fill="var(--a)" font-size="5" font-weight="600">send op (base_rev=N)</text>
   <line x1="650" y1="135" x2="480" y2="170" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ot-arr)"/>
@@ -146,9 +156,9 @@
   <rect x="500" y="152" width="80" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".5"/>
   <text x="540" y="162" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">WebSocket</text>
 
-  <!-- ═══ SERVER LAYER (middle) ═══ -->
+  <!-- --- SERVER LAYER (middle) --- -->
   <rect x="10" y="170" width="760" height="150" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="390" y="183" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">SERVER LAYER — Single Source of Truth (serialization point per document)</text>
+  <text x="390" y="183" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">SERVER LAYER &middot; Single Source of Truth (serialization point per document)</text>
 
   <!-- Collaboration Server -->
   <rect x="200" y="190" width="380" height="120" rx="7" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="2"/>
@@ -157,15 +167,15 @@
 
   <!-- Server steps -->
   <rect x="210" y="224" width="360" height="14" rx="2" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".4"/>
-  <text x="390" y="234" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">① Receive op from Client A (base_rev=5, insert 'H' at pos 5)</text>
+  <text x="390" y="234" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">? Receive op from Client A (base_rev=5, insert 'H' at pos 5)</text>
   <rect x="210" y="240" width="360" height="14" rx="2" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".4"/>
-  <text x="390" y="250" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">② Transform against ops since base_rev (if any concurrent ops)</text>
+  <text x="390" y="250" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">? Transform against ops since base_rev (if any concurrent ops)</text>
   <rect x="210" y="256" width="360" height="14" rx="2" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".4"/>
-  <text x="390" y="266" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">③ Append to revision log → assign rev=6</text>
+  <text x="390" y="266" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">? Append to revision log ? assign rev=6</text>
   <rect x="210" y="272" width="360" height="14" rx="2" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".4"/>
-  <text x="390" y="282" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">④ ACK to sender (your op is rev=6)</text>
+  <text x="390" y="282" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">? ACK to sender (your op is rev=6)</text>
   <rect x="210" y="288" width="360" height="14" rx="2" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".4"/>
-  <text x="390" y="298" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">⑤ Broadcast transformed op to ALL other clients</text>
+  <text x="390" y="298" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">? Broadcast transformed op to ALL other clients</text>
 
   <!-- Presence Service (side) -->
   <rect x="20" y="195" width="160" height="60" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
@@ -177,9 +187,9 @@
   <!-- Load Balancer (side) -->
   <rect x="600" y="195" width="160" height="60" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
   <text x="680" y="210" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Doc Router / LB</text>
-  <text x="680" y="223" text-anchor="middle" fill="var(--muted)" font-size="5">hash(docId) → server</text>
+  <text x="680" y="223" text-anchor="middle" fill="var(--muted)" font-size="5">hash(docId) ? server</text>
   <text x="680" y="235" text-anchor="middle" fill="var(--muted)" font-size="5">sticky sessions per doc</text>
-  <text x="680" y="247" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">failover → new server</text>
+  <text x="680" y="247" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">failover ? new server</text>
 
   <!-- Broadcast arrows back to clients -->
   <line x1="300" y1="190" x2="130" y2="145" stroke="var(--a2)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ot-arr)"/>
@@ -187,9 +197,9 @@
   <line x1="480" y1="190" x2="650" y2="145" stroke="var(--a2)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ot-arr)"/>
   <text x="585" y="170" fill="var(--a2)" font-size="4.5">broadcast transformed op</text>
 
-  <!-- ═══ STORAGE LAYER (bottom) ═══ -->
+  <!-- --- STORAGE LAYER (bottom) --- -->
   <rect x="10" y="330" width="760" height="100" rx="8" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1.2" stroke-dasharray="4,3"/>
-  <text x="390" y="343" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">STORAGE LAYER — Durable Persistence + History</text>
+  <text x="390" y="343" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">STORAGE LAYER &middot; Durable Persistence + History</text>
 
   <!-- Revision Log -->
   <rect x="30" y="352" width="200" height="65" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1.2"/>
@@ -228,50 +238,50 @@
   <line x1="390" y1="310" x2="360" y2="350" stroke="var(--g)" stroke-width="1" marker-end="url(#ot-arr)"/>
   <line x1="390" y1="310" x2="560" y2="350" stroke="var(--o)" stroke-width=".8" marker-end="url(#ot-arr)"/>
 
-  <!-- ═══ OT TRANSFORM EXAMPLE (bottom) ═══ -->
+  <!-- --- OT TRANSFORM EXAMPLE (bottom) --- -->
   <rect x="10" y="435" width="760" height="75" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="390" y="450" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="800">OT Transform — How Conflicts Are Resolved</text>
+  <text x="390" y="450" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="800">OT Transform &middot; How Conflicts Are Resolved</text>
 
   <!-- Conflict scenario -->
   <text x="130" y="466" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Client A: insert('H', pos=5) at rev=5</text>
   <text x="390" y="466" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">CONFLICT: both edit same position!</text>
   <text x="650" y="466" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Client B: insert('X', pos=5) at rev=5</text>
 
-  <text x="390" y="482" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Server receives A first → A gets rev=6. Transform B: pos 5 → pos 6 (shift right)</text>
-  <text x="390" y="495" text-anchor="middle" fill="var(--g)" font-size="5.5">Result: "HelloHXWorld" — both insertions preserved, order determined by server arrival</text>
-  <text x="390" y="506" text-anchor="middle" fill="var(--muted)" font-size="5">All clients converge to SAME final state regardless of network delays — guaranteed by OT transform properties</text>
+  <text x="390" y="482" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Server receives A first ? A gets rev=6. Transform B: pos 5 ? pos 6 (shift right)</text>
+  <text x="390" y="495" text-anchor="middle" fill="var(--g)" font-size="5.5">Result: "HelloHXWorld" &middot; both insertions preserved, order determined by server arrival</text>
+  <text x="390" y="506" text-anchor="middle" fill="var(--muted)" font-size="5">All clients converge to SAME final state regardless of network delays &middot; guaranteed by OT transform properties</text>
 </svg>
 </div>
 
-<!-- ═══ OT vs CRDT ═══ -->
+<!-- --- OT vs CRDT --- -->
 <div class="T" id="ot-vs-crdt">
-<h2>OT vs CRDT — Core Algorithm Choice</h2>
+<h2>OT vs CRDT &middot; Core Algorithm Choice</h2>
 <p class="su">Two fundamentally different approaches to conflict resolution</p>
 
-<div class="d-title"><span class="num d-orange">▸</span> Operational Transformation (OT) — Google's Approach</div>
-<div class="b bg"><span class="hi">How OT works:</span> Each edit is an <span class="hg">operation</span> (insert 'H' at position 5, delete at position 3). When two ops conflict, a <span class="hg">transform function</span> adjusts positions so both can apply correctly. Server maintains <span class="hg">linear revision history</span> — all ops are serialized through one point.</div>
+<div class="d-title"><span class="num d-orange">?</span> Operational Transformation (OT) &middot; Google's Approach</div>
+<div class="b bg"><span class="hi">How OT works:</span> Each edit is an <span class="hg">operation</span> (insert 'H' at position 5, delete at position 3). When two ops conflict, a <span class="hg">transform function</span> adjusts positions so both can apply correctly. Server maintains <span class="hg">linear revision history</span> &middot; all ops are serialized through one point.</div>
 
 <pre><code>// OT Transform Example:
 // User A: insert('X', pos=3)  at revision 5
 // User B: insert('Y', pos=1)  at revision 5  (concurrent!)
 
-// Server receives A first → applies at pos 3 → rev 6
+// Server receives A first ? applies at pos 3 ? rev 6
 // Server receives B (based on rev 5, but now rev 6 exists)
 // Transform: B's pos=1 < A's pos=3, so B stays at pos=1
-// Result: "abYcXdef" — both insertions preserved, positions adjusted
+// Result: "abYcXdef" &middot; both insertions preserved, positions adjusted
 
 transform(insertA, insertB):
   if A.pos <= B.pos: B.pos += len(A.text)
   if B.pos < A.pos:  A.pos += len(B.text)</code></pre>
 
-<div class="d-title"><span class="num d-green">▸</span> CRDT (Conflict-Free Replicated Data Types) — Figma's Approach</div>
-<div class="b bg"><span class="hi">How CRDTs work:</span> Each character has a <span class="hg">unique ID</span> (not position-based). Operations reference IDs, not indices. Merge is <span class="hg">commutative + associative</span> — order doesn't matter, result is always the same. No central server needed for correctness.</div>
+<div class="d-title"><span class="num d-green">?</span> CRDT (Conflict-Free Replicated Data Types) &middot; Figma's Approach</div>
+<div class="b bg"><span class="hi">How CRDTs work:</span> Each character has a <span class="hg">unique ID</span> (not position-based). Operations reference IDs, not indices. Merge is <span class="hg">commutative + associative</span> &middot; order doesn't matter, result is always the same. No central server needed for correctness.</div>
 
 <table>
 <tr><th></th><th>OT (Google Docs)</th><th>CRDT (Figma, Yjs, Automerge)</th></tr>
-<tr><td><span class="hi">Server</span></td><td><span class="hg">Required</span> — serializes ops</td><td>Optional — peer-to-peer possible</td></tr>
-<tr><td><span class="hi">Complexity</span></td><td>Transform functions (O(n²) worst case)</td><td>Unique IDs per character (metadata overhead)</td></tr>
-<tr><td><span class="hi">Offline</span></td><td>Limited (must sync through server)</td><td><span class="hg">Excellent</span> — merge on reconnect</td></tr>
+<tr><td><span class="hi">Server</span></td><td><span class="hg">Required</span> &middot; serializes ops</td><td>Optional &middot; peer-to-peer possible</td></tr>
+<tr><td><span class="hi">Complexity</span></td><td>Transform functions (O(n&middot;) worst case)</td><td>Unique IDs per character (metadata overhead)</td></tr>
+<tr><td><span class="hi">Offline</span></td><td>Limited (must sync through server)</td><td><span class="hg">Excellent</span> &middot; merge on reconnect</td></tr>
 <tr><td><span class="hi">Memory</span></td><td>Low (ops are small)</td><td>Higher (tombstones, unique IDs)</td></tr>
 <tr><td><span class="hi">Correctness</span></td><td>Proven for specific transform pairs</td><td><span class="hg">Mathematically guaranteed</span> convergence</td></tr>
 <tr><td><span class="hi">Latency</span></td><td>Server round-trip for confirmation</td><td>Instant local, async merge</td></tr>
@@ -279,7 +289,7 @@ transform(insertA, insertB):
 </table>
 </div>
 
-<!-- ═══ KEY DESIGN DECISIONS ═══ -->
+<!-- --- KEY DESIGN DECISIONS --- -->
 <div class="T" id="design-decisions">
 <h2>Key Design Decisions</h2>
 <p class="su">Critical choices that determine system behavior</p>
@@ -288,10 +298,10 @@ transform(insertA, insertB):
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--a)">Client-Side OT Pipeline</h4>
 <ul style="margin:0;padding-left:14px;font-size:.78rem;line-height:1.7">
-<li><strong>Local apply:</strong> user types → apply immediately (0ms latency)</li>
+<li><strong>Local apply:</strong> user types ? apply immediately (0ms latency)</li>
 <li><strong>Buffer:</strong> store pending ops not yet ACKed by server</li>
 <li><strong>Send:</strong> send op with base revision to server</li>
-<li><strong>ACK:</strong> server confirms → remove from buffer</li>
+<li><strong>ACK:</strong> server confirms ? remove from buffer</li>
 <li><strong>Remote op arrives:</strong> transform against pending buffer</li>
 <li><strong>Apply transformed:</strong> update local doc with remote changes</li>
 </ul>
@@ -333,7 +343,7 @@ transform(insertA, insertB):
 </div>
 </div>
 
-<!-- ═══ SCALING ═══ -->
+<!-- --- SCALING --- -->
 <div class="T" id="scaling">
 <h2>Scaling & Production Considerations</h2>
 <table>
@@ -348,27 +358,27 @@ transform(insertA, insertB):
 
 <div class="b bg"><span class="hi">Google's approach:</span> OT with server as serialization point. Each document has a <span class="hg">single collaboration server</span> (sharded by docId). Server maintains linear revision history. Clients optimistically apply locally, server transforms and broadcasts. <span class="hg">Jupiter protocol</span> (Google's OT variant) handles the client-server transform.</div>
 <div class="b by"><span class="hi">Real-world numbers:</span> Google Docs handles <strong>1B+ documents</strong>, <strong>100+ concurrent editors</strong> per doc, <strong>&lt;50ms local latency</strong>, <strong>&lt;200ms sync latency</strong>. Revision log stored in <strong>Spanner</strong> for strong consistency. Presence via <strong>Colossus</strong> (Google's distributed file system).</div>
-<div class="b br"><span class="hi">Common mistakes:</span> <span class="hr">Position-based without transform</span> — divergence guaranteed. <span class="hr">Locking paragraphs</span> — terrible UX. <span class="hr">Last-write-wins</span> — loses edits silently. <span class="hr">Sending full document on each edit</span> — bandwidth explosion.</div>
+<div class="b br"><span class="hi">Common mistakes:</span> <span class="hr">Position-based without transform</span> &middot; divergence guaranteed. <span class="hr">Locking paragraphs</span> &middot; terrible UX. <span class="hr">Last-write-wins</span> &middot; loses edits silently. <span class="hr">Sending full document on each edit</span> &middot; bandwidth explosion.</div>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 8 things to say for collaborative editing design</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>OT (Operational Transform)</strong> — transform concurrent ops against each other to preserve intent<br>
-<span class="hg">2.</span> <strong>Server as serialization point</strong> — single source of truth, assigns revision numbers<br>
-<span class="hg">3.</span> <strong>Optimistic local apply</strong> — user sees their edit instantly, sync happens async<br>
-<span class="hg">4.</span> <strong>Transform function</strong> — insert(pos=5) vs insert(pos=3) → shift first to pos=6<br>
-<span class="hg">5.</span> <strong>CRDTs as alternative</strong> — no server needed (P2P), but larger metadata overhead<br>
-<span class="hg">6.</span> <strong>Cursor/selection sync</strong> — broadcast cursor positions via presence channel (ephemeral)<br>
-<span class="hg">7.</span> <strong>Undo = inverse operation</strong> — not "restore previous state" (would undo others' edits)<br>
-<span class="hg">8.</span> <strong>Revision log for history</strong> — every op stored, enables time-travel and "see changes"
+<span class="hg">1.</span> <strong>OT (Operational Transform)</strong> &middot; transform concurrent ops against each other to preserve intent<br>
+<span class="hg">2.</span> <strong>Server as serialization point</strong> &middot; single source of truth, assigns revision numbers<br>
+<span class="hg">3.</span> <strong>Optimistic local apply</strong> &middot; user sees their edit instantly, sync happens async<br>
+<span class="hg">4.</span> <strong>Transform function</strong> &middot; insert(pos=5) vs insert(pos=3) ? shift first to pos=6<br>
+<span class="hg">5.</span> <strong>CRDTs as alternative</strong> &middot; no server needed (P2P), but larger metadata overhead<br>
+<span class="hg">6.</span> <strong>Cursor/selection sync</strong> &middot; broadcast cursor positions via presence channel (ephemeral)<br>
+<span class="hg">7.</span> <strong>Undo = inverse operation</strong> &middot; not "restore previous state" (would undo others' edits)<br>
+<span class="hg">8.</span> <strong>Revision log for history</strong> &middot; every op stored, enables time-travel and "see changes"
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

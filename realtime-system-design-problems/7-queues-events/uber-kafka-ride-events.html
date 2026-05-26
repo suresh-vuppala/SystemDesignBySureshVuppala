@@ -3,19 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Uber process 1M+ ride events/sec with exactly-once? — System Design</title>
+<title>How does Uber process 1M+ ride events/sec with exactly-once? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Uber process 1M+ ride events per second with exactly-once semantics?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">🚗</span> Design an event streaming platform: 1M+ events/sec, city-level locality, exactly-once, real-time surge pricing</div>
+<div class="sd sd-5"><span class="e">??</span> Design an event streaming platform: 1M+ events/sec, city-level locality, exactly-once, real-time surge pricing</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#partitioning">Partitioning</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#event-sourcing">Event Sourcing</a>
+<a href="../../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Stream Processing</a>
+<a href="../../system-design-cheatsheet/04-apis.html#idempotent-apis">Idempotency</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a ride-hailing platform process 1M+ ride events per second with city-level locality, guaranteeing exactly-once processing semantics and computing real-time surge pricing from the event stream?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Every ride generates 10+ events (requested, matched, en-route, arrived, started, GPS×N, completed, rated). At Uber's scale, that's <span class="hr">millions of events/sec that must be processed exactly once, partitioned by city, and feed real-time pricing models</span>.</div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Every ride generates 10+ events (requested, matched, en-route, arrived, started, GPS&middot;N, completed, rated). At Uber's scale, that's <span class="hr">millions of events/sec that must be processed exactly once, partitioned by city, and feed real-time pricing models</span>.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -48,8 +59,8 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--g)">Must Have (Core)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hg">1.</span> Ingest ride lifecycle events (requested → matched → started → GPS → completed → rated)<br>
-  <span class="hg">2.</span> Guarantee <strong>exactly-once processing</strong> — no duplicate charges, no lost events<br>
+  <span class="hg">1.</span> Ingest ride lifecycle events (requested ? matched ? started ? GPS ? completed ? rated)<br>
+  <span class="hg">2.</span> Guarantee <strong>exactly-once processing</strong> &middot; no duplicate charges, no lost events<br>
   <span class="hg">3.</span> Partition events by <strong>city/zone</strong> for locality-aware processing<br>
   <span class="hg">4.</span> Compute <strong>real-time surge pricing</strong> per zone (supply/demand ratio) within 10 seconds<br>
   <span class="hg">5.</span> Feed downstream consumers: billing, analytics, ML models, driver payouts<br>
@@ -59,11 +70,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">✗</span> Driver-rider matching algorithm (separate service)<br>
-  <span class="hr">✗</span> GPS routing and ETA calculation<br>
-  <span class="hr">✗</span> Payment processing (downstream consumer)<br>
-  <span class="hr">✗</span> Push notifications to riders/drivers<br>
-  <span class="hr">✗</span> Historical analytics (batch pipeline)
+  <span class="hr">?</span> Driver-rider matching algorithm (separate service)<br>
+  <span class="hr">?</span> GPS routing and ETA calculation<br>
+  <span class="hr">?</span> Payment processing (downstream consumer)<br>
+  <span class="hr">?</span> Push notifications to riders/drivers<br>
+  <span class="hr">?</span> Historical analytics (batch pipeline)
 </div>
 </div>
 </div>
@@ -79,20 +90,20 @@
 <tr><td><span class="hi">Exactly-once</span></td><td>Zero duplicates in downstream state</td><td>Kafka transactions + idempotent producers + Flink checkpoints</td></tr>
 <tr><td><span class="hi">Ordering</span></td><td>Per-ride ordering (not global)</td><td>Partition key = ride_id ensures all events for one ride are ordered</td></tr>
 <tr><td><span class="hi">Durability</span></td><td>Zero event loss after producer ACK</td><td>acks=all, min.insync.replicas=2, RF=3</td></tr>
-<tr><td><span class="hi">Availability</span></td><td>99.99% — rides can't stop</td><td>Multi-AZ Kafka, cross-region replication for DR</td></tr>
+<tr><td><span class="hi">Availability</span></td><td>99.99% &middot; rides can't stop</td><td>Multi-AZ Kafka, cross-region replication for DR</td></tr>
 <tr><td><span class="hi">Scalability</span></td><td>Linear scale with city count</td><td>City-based topic partitioning, independent consumer groups per use case</td></tr>
 </table>
 </div>
 
 <div class="T" id="architecture">
 <h2>High-Level Architecture</h2>
-<p class="su">Event-driven pipeline: produce → partition → process → materialize</p>
+<p class="su">Event-driven pipeline: produce ? partition ? process ? materialize</p>
 
-<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Uber Kafka Ride Events — End-to-End Architecture">
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Uber Kafka Ride Events &middot; End-to-End Architecture">
   <defs><marker id="ub-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
   <!-- TITLE -->
-  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Uber Kafka Ride Events — End-to-End Architecture</text>
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Uber Kafka Ride Events &middot; End-to-End Architecture</text>
 
   <!-- LAYER 1: PRODUCER LAYER -->
   <rect x="10" y="25" width="760" height="105" rx="8" fill="rgba(251,146,60,.02)" stroke="var(--o)" stroke-width="1.2" stroke-dasharray="4,3"/>
@@ -121,7 +132,7 @@
   <!-- Producer config box -->
   <rect x="610" y="48" width="148" height="35" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
   <text x="684" y="62" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Idempotent Producer</text>
-  <text x="684" y="74" text-anchor="middle" fill="var(--muted)" font-size="4.5">key=ride_id · acks=all</text>
+  <text x="684" y="74" text-anchor="middle" fill="var(--muted)" font-size="4.5">key=ride_id &middot; acks=all</text>
 
   <!-- Partition key label -->
   <text x="390" y="100" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Partition Key: ride_id (per-ride ordering) | city_zone (GPS locality)</text>
@@ -134,7 +145,7 @@
 
   <!-- LAYER 2: KAFKA CLUSTER -->
   <rect x="10" y="135" width="760" height="115" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="390" y="150" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">KAFKA CLUSTER — 10K+ Partitions · RF=3 · acks=all</text>
+  <text x="390" y="150" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">KAFKA CLUSTER &middot; 10K+ Partitions &middot; RF=3 &middot; acks=all</text>
 
   <!-- Topic: ride-events -->
   <rect x="25" y="158" width="170" height="38" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".8"/>
@@ -161,7 +172,7 @@
   <text x="665" y="192" text-anchor="middle" fill="var(--muted)" font-size="4.5">fare, payment, refund</text>
 
   <!-- Kafka config -->
-  <text x="390" y="215" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Idempotent Producer + Kafka Transactions | min.insync.replicas=2 | 7-day retention → S3 tiered</text>
+  <text x="390" y="215" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Idempotent Producer + Kafka Transactions | min.insync.replicas=2 | 7-day retention ? S3 tiered</text>
   <text x="390" y="228" text-anchor="middle" fill="var(--muted)" font-size="5">Avro + Schema Registry (backward-compatible evolution) | Consumer groups per use-case</text>
 
   <!-- Arrows from Kafka to Processing -->
@@ -183,8 +194,8 @@
   <!-- Trip State Machine -->
   <rect x="150" y="280" width="110" height="35" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
   <text x="205" y="294" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Trip State Machine</text>
-  <text x="205" y="305" text-anchor="middle" fill="var(--muted)" font-size="4.5">requested→matched→</text>
-  <text x="205" y="313" text-anchor="middle" fill="var(--muted)" font-size="4.5">started→completed</text>
+  <text x="205" y="305" text-anchor="middle" fill="var(--muted)" font-size="4.5">requested?matched?</text>
+  <text x="205" y="313" text-anchor="middle" fill="var(--muted)" font-size="4.5">started?completed</text>
 
   <!-- Fraud Detection -->
   <rect x="275" y="280" width="110" height="35" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
@@ -228,15 +239,15 @@
 
   <!-- BOTTOM: Exactly-Once Explanation -->
   <rect x="10" y="370" width="760" height="120" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
-  <text x="390" y="386" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Exactly-Once Guarantee — End-to-End Pipeline</text>
+  <text x="390" y="386" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Exactly-Once Guarantee &middot; End-to-End Pipeline</text>
 
-  <text x="390" y="404" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">① Idempotent Producer: producer_id + sequence_number → Kafka deduplicates retries at broker</text>
-  <text x="390" y="420" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">② Kafka Transactions: atomic write across multiple partitions (all-or-nothing commit)</text>
-  <text x="390" y="436" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">③ Flink Checkpoints: consumer offset + operator state snapshot committed atomically every 30s</text>
-  <text x="390" y="452" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">④ Idempotent Sinks: upsert with ride_id as key → safe to replay on recovery</text>
+  <text x="390" y="404" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">? Idempotent Producer: producer_id + sequence_number ? Kafka deduplicates retries at broker</text>
+  <text x="390" y="420" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">? Kafka Transactions: atomic write across multiple partitions (all-or-nothing commit)</text>
+  <text x="390" y="436" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">? Flink Checkpoints: consumer offset + operator state snapshot committed atomically every 30s</text>
+  <text x="390" y="452" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">? Idempotent Sinks: upsert with ride_id as key ? safe to replay on recovery</text>
 
-  <text x="390" y="470" text-anchor="middle" fill="var(--muted)" font-size="5.5">End-to-end: produce exactly-once → process exactly-once → sink idempotently = zero duplicates in downstream state</text>
-  <text x="390" y="484" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Without this: network retry → duplicate event → rider charged twice for same ride | surge computed from stale data</text>
+  <text x="390" y="470" text-anchor="middle" fill="var(--muted)" font-size="5.5">End-to-end: produce exactly-once ? process exactly-once ? sink idempotently = zero duplicates in downstream state</text>
+  <text x="390" y="484" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Without this: network retry ? duplicate event ? rider charged twice for same ride | surge computed from stale data</text>
 </svg>
 </div>
 
@@ -245,7 +256,7 @@
 <p class="su">The architectural choices that make this work at Uber's scale</p>
 <table>
 <tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
-<tr><td><span class="hi">Partition Key</span></td><td>ride_id for ride events, city_zone for GPS</td><td>All events for one ride land in same partition → ordered</td><td>Random (loses ordering), user_id (hot partition for frequent riders)</td></tr>
+<tr><td><span class="hi">Partition Key</span></td><td>ride_id for ride events, city_zone for GPS</td><td>All events for one ride land in same partition ? ordered</td><td>Random (loses ordering), user_id (hot partition for frequent riders)</td></tr>
 <tr><td><span class="hi">Exactly-Once</span></td><td>Kafka transactions + Flink checkpoints</td><td>End-to-end guarantee without application-level dedup</td><td>At-least-once + app dedup (complex, error-prone)</td></tr>
 <tr><td><span class="hi">Surge Computation</span></td><td>Flink tumbling window (10s)</td><td>Real-time supply/demand ratio per zone</td><td>Batch (too slow), polling DB (doesn't scale)</td></tr>
 <tr><td><span class="hi">Multi-City</span></td><td>Topic-per-city or city prefix in partition key</td><td>City-level isolation, independent scaling</td><td>Single global topic (cross-city interference)</td></tr>
@@ -253,34 +264,34 @@
 <tr><td><span class="hi">Retention</span></td><td>7 days in Kafka, then S3 (Parquet)</td><td>Replay window for bug fixes + cold storage for analytics</td><td>Infinite retention (cost), short retention (can't replay)</td></tr>
 </table>
 
-<div class="b bg"><span class="hi">Surge pricing algorithm:</span> Every 10 seconds, Flink counts <span class="hg">active ride requests</span> (demand) and <span class="hg">available drivers</span> (supply) per H3 hex zone. Ratio &gt; 1.5 → surge multiplier applied. Smoothing prevents oscillation (exponential moving average). Results written to Redis → rider app reads on next request.</div>
-<div class="b by"><span class="hi">Real-world scale:</span> Uber's Kafka processes <span class="hg">4+ trillion messages/day</span> across multiple clusters. Each city has independent consumer groups. GPS events alone = ~5M updates/sec globally (1M drivers × every 4 seconds).</div>
-<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Consumer lag</span> → surge pricing stale → auto-scale consumers via KEDA. <span class="hr">Kafka broker failure</span> → ISR takes over, no data loss. <span class="hr">Flink checkpoint failure</span> → restart from last checkpoint, reprocess (idempotent sinks handle duplicates).</div>
+<div class="b bg"><span class="hi">Surge pricing algorithm:</span> Every 10 seconds, Flink counts <span class="hg">active ride requests</span> (demand) and <span class="hg">available drivers</span> (supply) per H3 hex zone. Ratio &gt; 1.5 ? surge multiplier applied. Smoothing prevents oscillation (exponential moving average). Results written to Redis ? rider app reads on next request.</div>
+<div class="b by"><span class="hi">Real-world scale:</span> Uber's Kafka processes <span class="hg">4+ trillion messages/day</span> across multiple clusters. Each city has independent consumer groups. GPS events alone = ~5M updates/sec globally (1M drivers &middot; every 4 seconds).</div>
+<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Consumer lag</span> ? surge pricing stale ? auto-scale consumers via KEDA. <span class="hr">Kafka broker failure</span> ? ISR takes over, no data loss. <span class="hr">Flink checkpoint failure</span> ? restart from last checkpoint, reprocess (idempotent sinks handle duplicates).</div>
 </div>
 
-<!-- ═══ SCALE ESTIMATION ═══ -->
+<!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
-<p class="su">Back-of-envelope math — derive infrastructure from given numbers</p>
-<div class="b bb" style="margin-bottom:10px"><span class="hi">Given:</span> <strong>1M events/sec</strong> peak · <strong>600 cities</strong> · <strong>5M active drivers</strong> (GPS every 4s) · <strong>10 event types per ride</strong> · <strong>avg 15M rides/day</strong></div>
+<p class="su">Back-of-envelope math &middot; derive infrastructure from given numbers</p>
+<div class="b bb" style="margin-bottom:10px"><span class="hi">Given:</span> <strong>1M events/sec</strong> peak &middot; <strong>600 cities</strong> &middot; <strong>5M active drivers</strong> (GPS every 4s) &middot; <strong>10 event types per ride</strong> &middot; <strong>avg 15M rides/day</strong></div>
 <table>
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
-<tr><td><span class="hi">1</span></td><td>GPS updates: 5M drivers ÷ 4s interval</td><td><span class="hg">1.25M GPS/sec</span></td><td>Separate topic for GPS (high volume, lower criticality)</td></tr>
-<tr><td><span class="hi">2</span></td><td>Ride events: 15M rides × 10 events ÷ 86400s</td><td><span class="hg">~1,700 ride events/sec avg</span></td><td>Much lower than GPS — but each is critical (exactly-once)</td></tr>
-<tr><td><span class="hi">3</span></td><td>Peak ride events: 1,700 × 5× peak factor</td><td><span class="hg">~8,500 ride events/sec peak</span></td><td>Kafka handles easily — GPS is the real throughput challenge</td></tr>
+<tr><td><span class="hi">1</span></td><td>GPS updates: 5M drivers &middot; 4s interval</td><td><span class="hg">1.25M GPS/sec</span></td><td>Separate topic for GPS (high volume, lower criticality)</td></tr>
+<tr><td><span class="hi">2</span></td><td>Ride events: 15M rides &middot; 10 events &middot; 86400s</td><td><span class="hg">~1,700 ride events/sec avg</span></td><td>Much lower than GPS &middot; but each is critical (exactly-once)</td></tr>
+<tr><td><span class="hi">3</span></td><td>Peak ride events: 1,700 &middot; 5&middot; peak factor</td><td><span class="hg">~8,500 ride events/sec peak</span></td><td>Kafka handles easily &middot; GPS is the real throughput challenge</td></tr>
 <tr><td><span class="hi">4</span></td><td>Total events: 1.25M GPS + 8.5K ride + misc</td><td><span class="hg">~1.3M events/sec peak</span></td><td>Need 10K+ Kafka partitions across multiple clusters</td></tr>
-<tr><td><span class="hi">5</span></td><td>Kafka partitions: 1.3M ÷ 5K msg/partition/sec</td><td><span class="hg">~260 partitions minimum</span></td><td>Use 1000+ for headroom and city-level isolation</td></tr>
-<tr><td><span class="hi">6</span></td><td>Storage: 1.3M × 1KB avg × 86400s × 7 days</td><td><span class="hg">~786 TB retention</span></td><td>Tiered storage: 7d hot (SSD) → S3 cold (Parquet)</td></tr>
-<tr><td><span class="hi">7</span></td><td>Flink workers for surge: 600 cities × 1 worker</td><td><span class="hg">~600 Flink task slots</span></td><td>Each city independently computes surge every 10s</td></tr>
-<tr><td><span class="hi">8</span></td><td>Kafka brokers: 1.3M msg/sec ÷ 100K/broker</td><td><span class="hg">~13 brokers minimum</span></td><td>Use 30+ for replication (RF=3) and headroom</td></tr>
+<tr><td><span class="hi">5</span></td><td>Kafka partitions: 1.3M &middot; 5K msg/partition/sec</td><td><span class="hg">~260 partitions minimum</span></td><td>Use 1000+ for headroom and city-level isolation</td></tr>
+<tr><td><span class="hi">6</span></td><td>Storage: 1.3M &middot; 1KB avg &middot; 86400s &middot; 7 days</td><td><span class="hg">~786 TB retention</span></td><td>Tiered storage: 7d hot (SSD) ? S3 cold (Parquet)</td></tr>
+<tr><td><span class="hi">7</span></td><td>Flink workers for surge: 600 cities &middot; 1 worker</td><td><span class="hg">~600 Flink task slots</span></td><td>Each city independently computes surge every 10s</td></tr>
+<tr><td><span class="hi">8</span></td><td>Kafka brokers: 1.3M msg/sec &middot; 100K/broker</td><td><span class="hg">~13 brokers minimum</span></td><td>Use 30+ for replication (RF=3) and headroom</td></tr>
 </table>
 </div>
 
-<!-- ═══ APIs ═══ -->
+<!-- --- APIs --- -->
 <div class="T" id="apis">
 <h2>APIs</h2>
 <p class="su">Event schema + producer/consumer interfaces</p>
-<pre><code>// ═══ Ride Event Schema (Avro) ═══
+<pre><code>// --- Ride Event Schema (Avro) ---
 {
   "type": "record",
   "name": "RideEvent",
@@ -304,40 +315,40 @@
   ]
 }
 
-// ═══ Producer (Trip Service) ═══
+// --- Producer (Trip Service) ---
 POST /internal/events/publish
 Headers: X-Idempotency-Key: {event_id}
 Body: { ride_id, event_type, ... }
-→ Kafka produce with key=ride_id, transactional
+? Kafka produce with key=ride_id, transactional
 
-// ═══ Consumer (Surge Pricing) ═══
+// --- Consumer (Surge Pricing) ---
 Kafka Consumer Group: "surge-pricing-service"
 Topic: "uber.ride-events" (filtered: RIDE_REQUESTED, TRIP_COMPLETED)
-Processing: Flink tumbling window (10s) → count per H3 zone → write Redis
+Processing: Flink tumbling window (10s) ? count per H3 zone ? write Redis
 
-// ═══ Surge Query API ═══
+// --- Surge Query API ---
 GET /api/surge?lat={lat}&lng={lng}
-→ Redis HGET surge:{h3_cell} multiplier
+? Redis HGET surge:{h3_cell} multiplier
 Response: { "multiplier": 1.8, "zone": "h3_abc123", "expires_in_sec": 10 }</code></pre>
 </div>
 
-<!-- ═══ DATA MODEL ═══ -->
+<!-- --- DATA MODEL --- -->
 <div class="T" id="data-model">
 <h2>Data Model</h2>
-<p class="su">Hot path (Kafka + Redis) for real-time · Cold path (Cassandra + S3) for state and analytics</p>
+<p class="su">Hot path (Kafka + Redis) for real-time &middot; Cold path (Cassandra + S3) for state and analytics</p>
 <table>
 <tr><th>Store</th><th>Data</th><th>Access Pattern</th><th>Retention</th></tr>
 <tr><td><span class="hi">Kafka</span></td><td>All raw events (immutable log)</td><td>Sequential read by consumer groups</td><td>7 days hot, then tiered to S3</td></tr>
-<tr><td><span class="hi">Redis</span></td><td>Surge multipliers per zone</td><td>GET surge:{h3_cell} — &lt;1ms</td><td>TTL 10s (auto-refresh by Flink)</td></tr>
+<tr><td><span class="hi">Redis</span></td><td>Surge multipliers per zone</td><td>GET surge:{h3_cell} &middot; &lt;1ms</td><td>TTL 10s (auto-refresh by Flink)</td></tr>
 <tr><td><span class="hi">Redis</span></td><td>Active ride state machine</td><td>HGET ride:{ride_id} status</td><td>TTL 24h (ride lifecycle)</td></tr>
 <tr><td><span class="hi">Cassandra</span></td><td>Completed ride history</td><td>Query by rider_id or driver_id + time range</td><td>Forever (compliance)</td></tr>
 <tr><td><span class="hi">S3 (Parquet)</span></td><td>Archived events for analytics</td><td>Batch queries via Spark/Presto</td><td>Years (data lake)</td></tr>
 <tr><td><span class="hi">Schema Registry</span></td><td>Avro schemas (versioned)</td><td>Lookup by schema_id on deserialize</td><td>Forever (all versions kept)</td></tr>
 </table>
-<div class="b bg"><span class="hi">Ride state machine (Redis):</span> Each ride is a hash: <code>{status, driver_id, rider_id, pickup_lat, pickup_lng, started_at, ...}</code>. State transitions are atomic (Lua script): only valid transitions allowed (e.g., can't go from COMPLETED → EN_ROUTE). Flink updates state on each event.</div>
+<div class="b bg"><span class="hi">Ride state machine (Redis):</span> Each ride is a hash: <code>{status, driver_id, rider_id, pickup_lat, pickup_lng, started_at, ...}</code>. State transitions are atomic (Lua script): only valid transitions allowed (e.g., can't go from COMPLETED ? EN_ROUTE). Flink updates state on each event.</div>
 </div>
 
-<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<!-- --- RESILIENCE & EDGE CASES --- -->
 <div class="T" id="resilience">
 <h2>Resilience &amp; Edge Cases</h2>
 <p class="su">What breaks and how the system recovers</p>
@@ -345,7 +356,7 @@ Response: { "multiplier": 1.8, "zone": "h3_abc123", "expires_in_sec": 10 }</code
 <tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
 <tr><td><span class="hr">Kafka broker dies</span></td><td>Partitions on that broker unavailable for ~10s</td><td>ISR replica promoted to leader. Producers retry. Zero data loss (acks=all).</td></tr>
 <tr><td><span class="hr">Flink job crashes</span></td><td>Surge pricing stale for affected cities</td><td>Restart from last checkpoint (every 30s). Reprocess buffered events. Idempotent Redis writes.</td></tr>
-<tr><td><span class="hr">Consumer lag &gt; 5min</span></td><td>Surge pricing outdated → wrong prices</td><td>KEDA auto-scales consumers. Alert at 2min lag. Fallback: use last-known surge.</td></tr>
+<tr><td><span class="hr">Consumer lag &gt; 5min</span></td><td>Surge pricing outdated ? wrong prices</td><td>KEDA auto-scales consumers. Alert at 2min lag. Fallback: use last-known surge.</td></tr>
 <tr><td><span class="hr">Schema incompatibility</span></td><td>Consumer can't deserialize new events</td><td>Schema Registry rejects breaking changes in CI. Backward-compatible only.</td></tr>
 <tr><td><span class="hr">Duplicate events (network retry)</span></td><td>Could double-charge rider</td><td>Idempotent producer (producer_id + seq). Flink dedup by event_id. Sink upsert by ride_id.</td></tr>
 <tr><td><span class="hr">City-wide outage</span></td><td>All events for one city lost</td><td>Cross-region Kafka replication (MirrorMaker 2). Failover to DR cluster within 60s.</td></tr>
@@ -353,7 +364,7 @@ Response: { "multiplier": 1.8, "zone": "h3_abc123", "expires_in_sec": 10 }</code
 </table>
 </div>
 
-<!-- ═══ TECH STACK ═══ -->
+<!-- --- TECH STACK --- -->
 <div class="T" id="stack">
 <h2>Tech Stack &amp; Tradeoffs</h2>
 <p class="su">Why each technology was chosen</p>
@@ -368,24 +379,24 @@ Response: { "multiplier": 1.8, "zone": "h3_abc123", "expires_in_sec": 10 }</code
 </table>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 8 things to say in a system design interview for this problem</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Partition by ride_id</strong> — guarantees per-ride ordering without global coordination<br>
+<span class="hg">1.</span> <strong>Partition by ride_id</strong> &middot; guarantees per-ride ordering without global coordination<br>
 <span class="hg">2.</span> <strong>Exactly-once = idempotent producer + Kafka transactions + Flink checkpoints + idempotent sinks</strong><br>
-<span class="hg">3.</span> <strong>Separate topics by event type</strong> — GPS (high volume, lossy OK) vs ride events (low volume, critical)<br>
-<span class="hg">4.</span> <strong>Surge pricing via Flink tumbling windows</strong> — 10s window, count supply/demand per H3 zone, write to Redis<br>
-<span class="hg">5.</span> <strong>City-level isolation</strong> — independent consumer groups per city, no cross-city interference<br>
-<span class="hg">6.</span> <strong>Schema Registry</strong> — enforce backward compatibility, reject breaking changes in CI<br>
-<span class="hg">7.</span> <strong>Tiered storage</strong> — 7d hot in Kafka, then S3 Parquet for analytics (cost-effective)<br>
-<span class="hg">8.</span> <strong>DLQ + auto-scaling</strong> — poison messages isolated, consumer lag triggers KEDA scale-up
+<span class="hg">3.</span> <strong>Separate topics by event type</strong> &middot; GPS (high volume, lossy OK) vs ride events (low volume, critical)<br>
+<span class="hg">4.</span> <strong>Surge pricing via Flink tumbling windows</strong> &middot; 10s window, count supply/demand per H3 zone, write to Redis<br>
+<span class="hg">5.</span> <strong>City-level isolation</strong> &middot; independent consumer groups per city, no cross-city interference<br>
+<span class="hg">6.</span> <strong>Schema Registry</strong> &middot; enforce backward compatibility, reject breaking changes in CI<br>
+<span class="hg">7.</span> <strong>Tiered storage</strong> &middot; 7d hot in Kafka, then S3 Parquet for analytics (cost-effective)<br>
+<span class="hg">8.</span> <strong>DLQ + auto-scaling</strong> &middot; poison messages isolated, consumer lag triggers KEDA scale-up
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

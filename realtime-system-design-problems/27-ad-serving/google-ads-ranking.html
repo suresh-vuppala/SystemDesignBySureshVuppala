@@ -3,19 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Google Ads select the best ad from 10M+ candidates in &lt;100ms? — System Design</title>
+<title>How does Google Ads select the best ad from 10M+ candidates in &lt;100ms? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google Ads select the best ad from 10M+ candidates in &lt;100ms?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">📢</span> Design an ad serving system: 10M candidates, &lt;100ms selection, 10B req/day, real-time budget pacing</div>
+<div class="sd sd-5"><span class="e">??</span> Design an ad serving system: 10M candidates, &lt;100ms selection, 10B req/day, real-time budget pacing</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/07-caching.html#caching">Caching</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+<a href="../../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Stream Processing</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
-<p class="su">How does an ad serving platform select the optimal ad from 10M+ candidates in under 100ms, ranking by predicted CTR × bid × relevance, while serving 10B requests/day and enforcing real-time budget pacing?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Can't score all 10M ads per request in 100ms. Need a <span class="hg">funnel approach</span>: fast retrieval (10M→10K) → lightweight scoring (10K→100) → heavy ML ranking (100→10) → auction. All while tracking budgets in real-time across billions of requests.</div>
+<p class="su">How does an ad serving platform select the optimal ad from 10M+ candidates in under 100ms, ranking by predicted CTR &middot; bid &middot; relevance, while serving 10B requests/day and enforcing real-time budget pacing?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Can't score all 10M ads per request in 100ms. Need a <span class="hg">funnel approach</span>: fast retrieval (10M?10K) ? lightweight scoring (10K?100) ? heavy ML ranking (100?10) ? auction. All while tracking budgets in real-time across billions of requests.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -42,9 +53,9 @@
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ad serving end-to-end architecture">
   <defs><marker id="ad-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
 
-  <!-- ═══ LAYER 1: RETRIEVAL ═══ -->
+  <!-- --- LAYER 1: RETRIEVAL --- -->
   <rect x="10" y="8" width="760" height="130" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: RETRIEVAL — 10M → 10K candidates (~10ms) → Pre-scoring 10K → 100 (~20ms)</text>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: RETRIEVAL &middot; 10M ? 10K candidates (~10ms) ? Pre-scoring 10K ? 100 (~20ms)</text>
 
   <rect x="25" y="35" width="100" height="70" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="75" y="52" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Ad Request</text>
@@ -58,7 +69,7 @@
 
   <rect x="160" y="35" width="180" height="90" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="250" y="52" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Retrieval</text>
-  <text x="250" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">10M → 10K candidates</text>
+  <text x="250" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">10M ? 10K candidates</text>
   <text x="250" y="78" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">inverted index by keyword</text>
   <text x="250" y="91" text-anchor="middle" fill="var(--muted)" font-size="5">targeting: geo, demo, interest</text>
   <text x="250" y="104" text-anchor="middle" fill="var(--muted)" font-size="5">active campaigns only</text>
@@ -69,7 +80,7 @@
 
   <rect x="375" y="35" width="190" height="90" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="470" y="52" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Pre-scoring</text>
-  <text x="470" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">10K → 100 candidates</text>
+  <text x="470" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">10K ? 100 candidates</text>
   <text x="470" y="78" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">lightweight ML (logistic reg)</text>
   <text x="470" y="91" text-anchor="middle" fill="var(--muted)" font-size="5">budget eligibility filter</text>
   <text x="470" y="104" text-anchor="middle" fill="var(--muted)" font-size="5">frequency cap check</text>
@@ -84,14 +95,14 @@
   <text x="677" y="96" text-anchor="middle" fill="var(--muted)" font-size="5">click redirect URL</text>
   <text x="677" y="109" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">viewability beacon</text>
 
-  <!-- ═══ LAYER 2: RANKING ═══ -->
+  <!-- --- LAYER 2: RANKING --- -->
   <rect x="10" y="145" width="760" height="140" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="160" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: RANKING — Deep ML (100→10, ~50ms) → Auction (2nd price/VCG, ~5ms) → Winner</text>
+  <text x="390" y="160" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: RANKING &middot; Deep ML (100?10, ~50ms) ? Auction (2nd price/VCG, ~5ms) ? Winner</text>
 
   <rect x="25" y="170" width="240" height="100" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
   <text x="145" y="187" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Deep Ranking (Neural Net)</text>
-  <text x="145" y="202" text-anchor="middle" fill="var(--muted)" font-size="5.5">100 → top 10 candidates</text>
-  <text x="145" y="215" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Score = pCTR × bid × quality</text>
+  <text x="145" y="202" text-anchor="middle" fill="var(--muted)" font-size="5.5">100 ? top 10 candidates</text>
+  <text x="145" y="215" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Score = pCTR &middot; bid &middot; quality</text>
   <text x="145" y="228" text-anchor="middle" fill="var(--muted)" font-size="5.5">GPU inference, batched requests</text>
   <text x="145" y="241" text-anchor="middle" fill="var(--muted)" font-size="5">user embeddings + ad embeddings</text>
   <text x="145" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">cross-features, attention layers</text>
@@ -112,7 +123,7 @@
   <!-- Formula bar -->
   <rect x="540" y="175" width="220" height="35" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1"/>
   <text x="650" y="190" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Ad Rank Formula</text>
-  <text x="650" y="204" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">pCTR × bid × quality_score</text>
+  <text x="650" y="204" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">pCTR &middot; bid &middot; quality_score</text>
 
   <!-- Winner selection -->
   <rect x="540" y="220" width="220" height="50" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
@@ -122,16 +133,16 @@
 
   <line x1="520" y1="220" x2="538" y2="237" stroke="var(--a)" stroke-width="1" marker-end="url(#ad-arr)"/>
 
-  <!-- ═══ LAYER 3: FEEDBACK ═══ -->
+  <!-- --- LAYER 3: FEEDBACK --- -->
   <rect x="10" y="292" width="760" height="155" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="307" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: FEEDBACK — Budget Pacing + CTR Retraining + Impression/Click Tracking</text>
+  <text x="390" y="307" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: FEEDBACK &middot; Budget Pacing + CTR Retraining + Impression/Click Tracking</text>
 
   <!-- Budget Pacing -->
   <rect x="25" y="315" width="230" height="120" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.2"/>
   <text x="140" y="332" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Budget Pacing Controller</text>
   <text x="140" y="347" text-anchor="middle" fill="var(--muted)" font-size="5.5">spend daily budget evenly across 24h</text>
-  <text x="140" y="362" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Overspending → reduce bid multiplier</text>
-  <text x="140" y="377" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Underspending → boost participation</text>
+  <text x="140" y="362" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Overspending ? reduce bid multiplier</text>
+  <text x="140" y="377" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Underspending ? boost participation</text>
   <text x="140" y="392" text-anchor="middle" fill="var(--muted)" font-size="5">distributed counters (Redis/Spanner)</text>
   <text x="140" y="407" text-anchor="middle" fill="var(--muted)" font-size="5">throttle/boost updated every 15min</text>
   <text x="140" y="422" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">prevents budget exhaustion by noon</text>
@@ -143,18 +154,18 @@
   <!-- CTR Model Retraining -->
   <rect x="275" y="315" width="240" height="120" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
   <text x="395" y="332" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">CTR Model Retraining</text>
-  <text x="395" y="347" text-anchor="middle" fill="var(--muted)" font-size="5.5">click/conversion data → feature pipeline</text>
+  <text x="395" y="347" text-anchor="middle" fill="var(--muted)" font-size="5.5">click/conversion data ? feature pipeline</text>
   <text x="395" y="362" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">retrain model hourly</text>
-  <text x="395" y="377" text-anchor="middle" fill="var(--muted)" font-size="5">impression logs + click logs → join</text>
+  <text x="395" y="377" text-anchor="middle" fill="var(--muted)" font-size="5">impression logs + click logs ? join</text>
   <text x="395" y="392" text-anchor="middle" fill="var(--muted)" font-size="5">A/B test new model vs current</text>
-  <text x="395" y="407" text-anchor="middle" fill="var(--muted)" font-size="5">canary deploy → full rollout</text>
+  <text x="395" y="407" text-anchor="middle" fill="var(--muted)" font-size="5">canary deploy ? full rollout</text>
   <text x="395" y="422" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">continuous improvement loop</text>
 
   <!-- Impression/Click Tracking -->
   <rect x="535" y="315" width="225" height="120" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1.2"/>
   <text x="647" y="332" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Impression/Click Tracking</text>
-  <text x="647" y="347" text-anchor="middle" fill="var(--muted)" font-size="5.5">impression beacon → Kafka</text>
-  <text x="647" y="362" text-anchor="middle" fill="var(--muted)" font-size="5.5">click redirect → Kafka</text>
+  <text x="647" y="347" text-anchor="middle" fill="var(--muted)" font-size="5.5">impression beacon ? Kafka</text>
+  <text x="647" y="362" text-anchor="middle" fill="var(--muted)" font-size="5.5">click redirect ? Kafka</text>
   <text x="647" y="377" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">real-time analytics pipeline</text>
   <text x="647" y="392" text-anchor="middle" fill="var(--muted)" font-size="5">conversion attribution (30-day)</text>
   <text x="647" y="407" text-anchor="middle" fill="var(--muted)" font-size="5">fraud detection (invalid clicks)</text>
@@ -164,32 +175,32 @@
   <path d="M 647 315 L 647 280 L 677 130" fill="none" stroke="var(--c)" stroke-width=".7" stroke-dasharray="3,2" marker-end="url(#ad-arr)"/>
   <path d="M 395 315 L 145 275" fill="none" stroke="var(--a2)" stroke-width=".7" stroke-dasharray="3,2" marker-end="url(#ad-arr)"/>
 
-  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <!-- --- BOTTOM INSIGHT --- -->
   <rect x="10" y="455" width="760" height="38" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
-  <text x="390" y="470" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Ad Rank = pCTR × bid × quality_score | Funnel: 10M→10K→100→10→1 in &lt;100ms | Budget: if overspending → reduce bid multiplier</text>
+  <text x="390" y="470" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Ad Rank = pCTR &middot; bid &middot; quality_score | Funnel: 10M?10K?100?10?1 in &lt;100ms | Budget: if overspending ? reduce bid multiplier</text>
   <text x="390" y="486" text-anchor="middle" fill="var(--muted)" font-size="5.5">10B requests/day | 2nd-price auction (winner pays just enough to beat #2) | CTR model retrained hourly | Kafka for real-time event streaming</text>
 </svg>
 
-<div class="b bg"><span class="hi">Funnel architecture:</span> Retrieval (inverted index, 10M→10K in ~10ms) → Pre-scoring (lightweight model, 10K→100 in ~20ms) → Deep ranking (neural net, 100→10 in ~50ms) → Auction (top 10→winner in ~5ms). <span class="hg">Total &lt;100ms</span> end-to-end.</div>
-<div class="b by"><span class="hi">Ad Rank formula:</span> <span class="hg">pCTR × bid × quality_score</span>. Predicted CTR from deep learning model (user features + ad features + context). Quality score penalizes low-relevance ads. Advertiser pays <span class="hg">second-price</span> (just enough to beat next ad).</div>
-<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Score all 10M ads with heavy model</span> — impossible in 100ms. <span class="hr">No budget pacing</span> — budget exhausted by noon, no evening impressions. <span class="hr">First-price auction</span> — advertisers game bids, revenue drops. <span class="hr">Stale CTR predictions</span> — revenue loss from poor ranking.</div>
-<div class="b bb"><span class="hi">Budget pacing:</span> Each campaign has daily budget. Pacing controller adjusts participation rate throughout the day. <span class="hg">Spend evenly</span> — if 50% budget spent by noon with 50% day remaining, maintain rate. If overspending, throttle. Distributed counters track spend in near-real-time.</div>
+<div class="b bg"><span class="hi">Funnel architecture:</span> Retrieval (inverted index, 10M?10K in ~10ms) ? Pre-scoring (lightweight model, 10K?100 in ~20ms) ? Deep ranking (neural net, 100?10 in ~50ms) ? Auction (top 10?winner in ~5ms). <span class="hg">Total &lt;100ms</span> end-to-end.</div>
+<div class="b by"><span class="hi">Ad Rank formula:</span> <span class="hg">pCTR &middot; bid &middot; quality_score</span>. Predicted CTR from deep learning model (user features + ad features + context). Quality score penalizes low-relevance ads. Advertiser pays <span class="hg">second-price</span> (just enough to beat next ad).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Score all 10M ads with heavy model</span> &middot; impossible in 100ms. <span class="hr">No budget pacing</span> &middot; budget exhausted by noon, no evening impressions. <span class="hr">First-price auction</span> &middot; advertisers game bids, revenue drops. <span class="hr">Stale CTR predictions</span> &middot; revenue loss from poor ranking.</div>
+<div class="b bb"><span class="hi">Budget pacing:</span> Each campaign has daily budget. Pacing controller adjusts participation rate throughout the day. <span class="hg">Spend evenly</span> &middot; if 50% budget spent by noon with 50% day remaining, maintain rate. If overspending, throttle. Distributed counters track spend in near-real-time.</div>
 </div>
 
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Funnel approach</strong> — retrieval → pre-scoring → deep ranking → auction (10M→10K→100→10→1)<br>
-<span class="hg">2.</span> <strong>Ad Rank</strong> — pCTR × bid × quality_score, second-price auction for pricing<br>
-<span class="hg">3.</span> <strong>Budget pacing</strong> — spend evenly across day, throttle/boost participation rate<br>
-<span class="hg">4.</span> <strong>CTR prediction</strong> — deep neural net with user/ad/context features, updated hourly<br>
-<span class="hg">5.</span> <strong>Latency budget</strong> — retrieval 10ms + pre-score 20ms + deep rank 50ms + auction 5ms = &lt;100ms<br>
-<span class="hg">6.</span> <strong>Feedback loop</strong> — click/conversion data feeds back to retrain CTR model continuously
+<span class="hg">1.</span> <strong>Funnel approach</strong> &middot; retrieval ? pre-scoring ? deep ranking ? auction (10M?10K?100?10?1)<br>
+<span class="hg">2.</span> <strong>Ad Rank</strong> &middot; pCTR &middot; bid &middot; quality_score, second-price auction for pricing<br>
+<span class="hg">3.</span> <strong>Budget pacing</strong> &middot; spend evenly across day, throttle/boost participation rate<br>
+<span class="hg">4.</span> <strong>CTR prediction</strong> &middot; deep neural net with user/ad/context features, updated hourly<br>
+<span class="hg">5.</span> <strong>Latency budget</strong> &middot; retrieval 10ms + pre-score 20ms + deep rank 50ms + auction 5ms = &lt;100ms<br>
+<span class="hg">6.</span> <strong>Feedback loop</strong> &middot; click/conversion data feeds back to retrain CTR model continuously
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

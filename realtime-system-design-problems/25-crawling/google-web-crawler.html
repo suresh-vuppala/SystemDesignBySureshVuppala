@@ -3,14 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Google crawl 10B+ pages across the internet? — System Design</title>
+<title>How does Google crawl 10B+ pages across the internet? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google crawl 10B+ pages across the internet?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">🕷️</span> Design a web crawler: 10B+ pages, politeness, priority by PageRank, content deduplication</div>
+<div class="sd sd-5"><span class="e">???</span> Design a web crawler: 10B+ pages, politeness, priority by PageRank, content deduplication</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#bloom-filters">Bloom Filters</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a>
+<a href="../../system-design-cheatsheet/02-networking.html#dns">DNS</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
@@ -44,7 +55,7 @@
 
   <!-- LAYER 1: FRONTIER -->
   <rect x="10" y="10" width="760" height="145" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="28" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 1 — FRONTIER (Two-Level Queue: Priority + Politeness)</text>
+  <text x="390" y="28" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 1 &middot; FRONTIER (Two-Level Queue: Priority + Politeness)</text>
 
   <rect x="30" y="42" width="120" height="100" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
   <text x="90" y="58" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Seed URLs</text>
@@ -64,7 +75,7 @@
   <rect x="195" y="62" width="135" height="72" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width=".8"/>
   <text x="262" y="77" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Front Queues</text>
   <text x="262" y="91" text-anchor="middle" fill="var(--muted)" font-size="5.5">Priority by PageRank</text>
-  <text x="262" y="104" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">× freshness × change_freq</text>
+  <text x="262" y="104" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">&middot; freshness &middot; change_freq</text>
   <text x="262" y="117" text-anchor="middle" fill="var(--muted)" font-size="5">High-value pages first</text>
   <text x="262" y="130" text-anchor="middle" fill="var(--muted)" font-size="4.5">Multiple priority levels</text>
 
@@ -88,12 +99,12 @@
   <text x="640" y="124" text-anchor="middle" fill="var(--muted)" font-size="5.5">URL normalization before check</text>
   <text x="640" y="137" text-anchor="middle" fill="var(--muted)" font-size="5">(strip params, lowercase, resolve redirects)</text>
 
-  <!-- Arrow Layer 1 → Layer 2 -->
+  <!-- Arrow Layer 1 ? Layer 2 -->
   <line x1="390" y1="155" x2="390" y2="173" stroke="var(--y)" stroke-width="1.2" marker-end="url(#cr-arr)"/>
 
   <!-- LAYER 2: FETCHING -->
   <rect x="10" y="175" width="760" height="130" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="193" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 — FETCHING (Distributed Workers → Content Processing)</text>
+  <text x="390" y="193" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 &middot; FETCHING (Distributed Workers ? Content Processing)</text>
 
   <rect x="30" y="205" width="280" height="88" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="170" y="221" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Fetcher Pool (1000s Workers)</text>
@@ -108,28 +119,28 @@
   <rect x="340" y="205" width="420" height="88" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="550" y="221" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Content Processor</text>
   <text x="550" y="235" text-anchor="middle" fill="var(--muted)" font-size="5.5">1. Parse HTML (extract text, metadata, structured data)</text>
-  <text x="550" y="248" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Extract outlinks → normalize → check Bloom → add to frontier</text>
+  <text x="550" y="248" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Extract outlinks ? normalize ? check Bloom ? add to frontier</text>
   <text x="550" y="261" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">3. SimHash fingerprint (near-duplicate detection)</text>
   <text x="550" y="274" text-anchor="middle" fill="var(--muted)" font-size="5.5">4. Spider trap detection (max depth, URL pattern, domain budget)</text>
   <text x="550" y="287" text-anchor="middle" fill="var(--muted)" font-size="5.5">5. Language detection + content classification</text>
 
-  <!-- Arrow Layer 2 → Layer 3 -->
+  <!-- Arrow Layer 2 ? Layer 3 -->
   <line x1="390" y1="305" x2="390" y2="323" stroke="var(--r)" stroke-width="1.2" marker-end="url(#cr-arr)"/>
 
   <!-- LAYER 3: OUTPUT -->
   <rect x="10" y="325" width="760" height="120" rx="8" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="343" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="700">LAYER 3 — OUTPUT (Index Pipeline + URL Store + Content Dedup)</text>
+  <text x="390" y="343" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="700">LAYER 3 &middot; OUTPUT (Index Pipeline + URL Store + Content Dedup)</text>
 
   <rect x="30" y="355" width="220" height="78" rx="6" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="140" y="371" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Index Pipeline</text>
   <text x="140" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">Build inverted index (MapReduce)</text>
-  <text x="140" y="398" text-anchor="middle" fill="var(--muted)" font-size="5.5">term → [doc_id, position, freq]</text>
+  <text x="140" y="398" text-anchor="middle" fill="var(--muted)" font-size="5.5">term ? [doc_id, position, freq]</text>
   <text x="140" y="411" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Feeds search engine</text>
   <text x="140" y="424" text-anchor="middle" fill="var(--muted)" font-size="5">PageRank computed offline</text>
 
   <rect x="270" y="355" width="230" height="78" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
-  <text x="385" y="371" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">URL Store (→ Back to Frontier)</text>
-  <text x="385" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">New URLs extracted → add to frontier</text>
+  <text x="385" y="371" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">URL Store (? Back to Frontier)</text>
+  <text x="385" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">New URLs extracted ? add to frontier</text>
   <text x="385" y="398" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">BFS expansion of the web graph</text>
   <text x="385" y="411" text-anchor="middle" fill="var(--muted)" font-size="5.5">Track last-crawled time per URL</text>
   <text x="385" y="424" text-anchor="middle" fill="var(--muted)" font-size="5">Schedule re-crawl by change frequency</text>
@@ -143,34 +154,34 @@
 
   <!-- Feedback: URLs back to frontier -->
   <path d="M 385 433 L 385 445 L 90 445 L 90 155" fill="none" stroke="var(--y)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#cr-arr)"/>
-  <text x="240" y="442" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">new URLs → back to frontier (BFS expansion)</text>
+  <text x="240" y="442" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">new URLs ? back to frontier (BFS expansion)</text>
 
   <!-- BOTTOM INSIGHT -->
   <rect x="10" y="458" width="760" height="34" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="390" y="474" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Politeness: 1 req/sec/host | Priority: PageRank × freshness × change_frequency | Traps: max depth + URL pattern + domain budget</text>
+  <text x="390" y="474" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Politeness: 1 req/sec/host | Priority: PageRank &middot; freshness &middot; change_frequency | Traps: max depth + URL pattern + domain budget</text>
   <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="6">Breaking news: real-time crawl pipeline (bypass normal queue) | Bloom filter: 10B URLs in 1.2GB | SimHash: 30%+ web is duped</text>
 </svg>
 
-<div class="b bg"><span class="hi">URL Frontier design:</span> Two-level queue: <span class="hg">front queues</span> (priority-based, sorted by PageRank × freshness) feed into <span class="hg">back queues</span> (per-host, enforce politeness). Each host gets its own queue with minimum delay between requests.</div>
-<div class="b by"><span class="hi">Content deduplication:</span> SimHash (locality-sensitive hashing) detects near-duplicate pages. Exact duplicates caught by content hash (MD5/SHA). <span class="hg">30%+ of web content is duplicated</span> — dedup saves massive storage and avoids indexing redundant pages.</div>
-<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No politeness enforcement</span> — get IP-banned, harm small sites. <span class="hr">BFS without priority</span> — waste budget on low-value pages. <span class="hr">No trap detection</span> — infinite calendars/session URLs exhaust crawler. <span class="hr">Single DNS resolver</span> — becomes bottleneck.</div>
+<div class="b bg"><span class="hi">URL Frontier design:</span> Two-level queue: <span class="hg">front queues</span> (priority-based, sorted by PageRank &middot; freshness) feed into <span class="hg">back queues</span> (per-host, enforce politeness). Each host gets its own queue with minimum delay between requests.</div>
+<div class="b by"><span class="hi">Content deduplication:</span> SimHash (locality-sensitive hashing) detects near-duplicate pages. Exact duplicates caught by content hash (MD5/SHA). <span class="hg">30%+ of web content is duplicated</span> &middot; dedup saves massive storage and avoids indexing redundant pages.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No politeness enforcement</span> &middot; get IP-banned, harm small sites. <span class="hr">BFS without priority</span> &middot; waste budget on low-value pages. <span class="hr">No trap detection</span> &middot; infinite calendars/session URLs exhaust crawler. <span class="hr">Single DNS resolver</span> &middot; becomes bottleneck.</div>
 <div class="b bb"><span class="hi">Robots.txt + traps:</span> Always fetch and cache robots.txt before crawling a domain. Detect spider traps: URLs with ever-increasing depth, calendar pages generating infinite dates, session IDs creating infinite URL space. <span class="hg">Max depth + URL pattern detection</span> as safeguards.</div>
 </div>
 
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>URL Frontier</strong> — priority queues (PageRank) + per-host back queues (politeness)<br>
-<span class="hg">2.</span> <strong>Politeness</strong> — respect robots.txt crawl-delay, 1 req/sec/host default, distributed across workers<br>
-<span class="hg">3.</span> <strong>Deduplication</strong> — URL-level (Bloom filter) + content-level (SimHash for near-duplicates)<br>
-<span class="hg">4.</span> <strong>Priority scheduling</strong> — PageRank × change_frequency × freshness for crawl budget allocation<br>
-<span class="hg">5.</span> <strong>Trap detection</strong> — max URL depth, pattern recognition, domain-level crawl budgets<br>
-<span class="hg">6.</span> <strong>DNS caching</strong> — local DNS cache to avoid resolver bottleneck at billions of lookups
+<span class="hg">1.</span> <strong>URL Frontier</strong> &middot; priority queues (PageRank) + per-host back queues (politeness)<br>
+<span class="hg">2.</span> <strong>Politeness</strong> &middot; respect robots.txt crawl-delay, 1 req/sec/host default, distributed across workers<br>
+<span class="hg">3.</span> <strong>Deduplication</strong> &middot; URL-level (Bloom filter) + content-level (SimHash for near-duplicates)<br>
+<span class="hg">4.</span> <strong>Priority scheduling</strong> &middot; PageRank &middot; change_frequency &middot; freshness for crawl budget allocation<br>
+<span class="hg">5.</span> <strong>Trap detection</strong> &middot; max URL depth, pattern recognition, domain-level crawl budgets<br>
+<span class="hg">6.</span> <strong>DNS caching</strong> &middot; local DNS cache to avoid resolver bottleneck at billions of lookups
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

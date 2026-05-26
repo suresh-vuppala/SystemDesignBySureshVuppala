@@ -62,11 +62,16 @@ const navHTML = `
   <div class="nc"><h3 style="color:var(--c)">13. Observability</h3><div class="lk">
     <a href="13-observability.html#logging">Logging</a><a href="13-observability.html#metrics">Metrics</a><a href="13-observability.html#tracing">Tracing</a><a href="13-observability.html#monitoring">Monitoring</a>
   </div></div>
-  <div class="nc"><h3 style="color:var(--y)">14. Key Numbers</h3><div class="lk">
-    <a href="14-key-numbers.html#latency-numbers">Latency</a><a href="14-key-numbers.html#throughput-numbers">Throughput</a><a href="14-key-numbers.html#estimation">Estimation</a>
+  <div class="nc"><h3 style="color:var(--o)">14. AI Systems</h3>
+    <div class="sg"><a href="14-ai-systems.html#llm-serving">LLM Serving</a><a href="14-ai-systems.html#rag">RAG</a><a href="14-ai-systems.html#embeddings">Embeddings</a></div>
+    <div class="sg"><a href="14-ai-systems.html#ai-gateway">AI Gateway</a><a href="14-ai-systems.html#agents">Agents</a><a href="14-ai-systems.html#feature-stores">Feature Stores</a></div>
+    <div class="sg"><a href="14-ai-systems.html#ml-training">Training Infra</a><a href="14-ai-systems.html#guardrails">Guardrails</a></div>
+  </div>
+  <div class="nc"><h3 style="color:var(--y)">15. Key Numbers</h3><div class="lk">
+    <a href="15-key-numbers.html#latency-numbers">Latency</a><a href="15-key-numbers.html#throughput-numbers">Throughput</a><a href="15-key-numbers.html#estimation">Estimation</a>
   </div></div>
-  <div class="nc"><h3 style="color:var(--t)">15. Decision Flowcharts</h3>
-    <div class="sg"><a href="15-decision-flowcharts.html#api-choice">API</a><a href="15-decision-flowcharts.html#db-choice">Database</a><a href="15-decision-flowcharts.html#messaging-choice">Messaging</a><a href="15-decision-flowcharts.html#cache-choice">Cache</a><a href="15-decision-flowcharts.html#realtime-choice">Real-time</a></div>
+  <div class="nc"><h3 style="color:var(--t)">16. Decision Flowcharts</h3>
+    <div class="sg"><a href="16-decision-flowcharts.html#api-choice">API</a><a href="16-decision-flowcharts.html#db-choice">Database</a><a href="16-decision-flowcharts.html#messaging-choice">Messaging</a><a href="16-decision-flowcharts.html#cache-choice">Cache</a><a href="16-decision-flowcharts.html#realtime-choice">Real-time</a></div>
   </div>
 </div>`;
 
@@ -159,17 +164,27 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
     const h2 = sec.querySelector('h2');
     return { id: sec.id, label: h2 ? h2.textContent.trim() : sec.id, el: sec };
   });
-  const rail = document.createElement('aside');
+  var rail = document.createElement('aside');
   rail.id = 'pageRail';
   rail.setAttribute('aria-label','On this page');
-  rail.innerHTML = '<h4><span class="pr-dot"></span>On this page</h4>' +
+  // Use module name from filename (e.g. "09-consistency.html" → "9. Consistency")
+  var pageTitle = document.title.split('—')[0].trim();
+  var moduleMatch = page.match(/^(\d+)-(.+)\.html$/);
+  if(moduleMatch){
+    pageTitle = parseInt(moduleMatch[1]) + '. ' + moduleMatch[2].replace(/-/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+  // Hide the inline .sd module title to avoid duplication with rail title
+  var sdDiv = document.querySelector('.sd');
+  if(sdDiv) sdDiv.style.display = 'none';
+
+  rail.innerHTML = '<h4><span class="pr-dot"></span>' + pageTitle + '</h4>' +
     '<ol>' + items.map(it => '<li><a href="#' + it.id + '" data-id="' + it.id + '">' + it.label + '</a></li>').join('') + '</ol>';
   document.body.appendChild(rail);
 
   const toggle = document.createElement('button');
   toggle.id = 'pr-toggle';
   toggle.type = 'button';
-  toggle.innerHTML = '<span class="pr-tog-ic">☰</span><span class="pr-tog-lbl">Sections</span>';
+  toggle.innerHTML = '<span class="pr-tog-ic">☰</span><span class="pr-tog-lbl">' + pageTitle + '</span>';
   document.body.appendChild(toggle);
 
   function setOpen(open){
@@ -196,4 +211,80 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
   items.forEach(it => io.observe(it.el));
   if(location.hash){ const id = location.hash.slice(1); if(linkById[id]) setActive(id); }
 })();
+})();
+
+/* ═══ Prev / Next Page Navigation ═══ */
+(function(){
+  var pages = [
+    {file:'01-foundations.html', title:'Foundations'},
+    {file:'02-networking.html', title:'Networking'},
+    {file:'03-security.html', title:'Security'},
+    {file:'04-apis.html', title:'APIs & Communication'},
+    {file:'05-infrastructure.html', title:'Infrastructure'},
+    {file:'06-storage.html', title:'Storage Systems'},
+    {file:'07-caching.html', title:'Caching'},
+    {file:'08-messaging.html', title:'Messaging'},
+    {file:'09-consistency.html', title:'Consistency'},
+    {file:'10-scalability.html', title:'Scalability'},
+    {file:'11-data-pipelines.html', title:'Data Pipelines'},
+    {file:'12-distributed-systems.html', title:'Distributed Systems'},
+    {file:'13-observability.html', title:'Observability'},
+    {file:'14-ai-systems.html', title:'AI Systems'},
+    {file:'15-key-numbers.html', title:'Key Numbers'},
+    {file:'16-decision-flowcharts.html', title:'Decision Flowcharts'}
+  ];
+
+  var currentPage = location.pathname.split('/').pop() || 'index.html';
+  var idx = -1;
+  for(var i = 0; i < pages.length; i++){
+    if(pages[i].file === currentPage){ idx = i; break; }
+  }
+  if(idx === -1) return; // Not a concept page (e.g., index.html)
+
+  var prev = idx > 0 ? pages[idx - 1] : null;
+  var next = idx < pages.length - 1 ? pages[idx + 1] : null;
+
+  var nav = document.createElement('nav');
+  nav.className = 'page-nav';
+  nav.setAttribute('aria-label', 'Page navigation');
+
+  var html = '';
+  if(prev){
+    html += '<a href="' + prev.file + '" class="page-nav-btn page-nav-prev">'
+      + '<span class="page-nav-dir">←</span>'
+      + '<span class="page-nav-title">' + prev.title + '</span>'
+      + '</a>';
+  } else {
+    html += '<span></span>';
+  }
+
+  // Center slot for premium CTA
+  html += '<div class="page-nav-cta" id="pageNavCta"></div>';
+  if(next){
+    html += '<a href="' + next.file + '" class="page-nav-btn page-nav-next">'
+      + '<span class="page-nav-title">' + next.title + '</span>'
+      + '<span class="page-nav-dir">→</span>'
+      + '</a>';
+  } else {
+    html += '<span></span>';
+  }
+
+  nav.innerHTML = html;
+
+  // Insert before the footer
+  var footer = document.querySelector('.site-footer');
+  if(footer){
+    footer.parentNode.insertBefore(nav, footer);
+  } else {
+    document.body.appendChild(nav);
+  }
+
+  // Show premium CTA in center after auth resolves
+  setTimeout(function(){
+    if(localStorage.getItem('hellosde_premium') === 'true') return;
+    if(typeof CONFIG !== 'undefined' && CONFIG.admin) return;
+    var ctaSlot = document.getElementById('pageNavCta');
+    if(!ctaSlot) return;
+    ctaSlot.innerHTML = '<span class="page-nav-cta-label">Enjoying this lesson?</span><button class="page-nav-cta-btn" onclick="window.HelloSDE ? (window.HelloSDE.state && window.HelloSDE.state.user ? window.HelloSDE.startPayment() : window.HelloSDE.signIn()) : alert(\'Loading...\')">Premium</button><span class="page-nav-cta-label">to access full content</span>';
+  }, 1500);
 })();

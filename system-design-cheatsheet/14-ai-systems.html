@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Systems &amp; ML Infrastructure — System Design</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>AI Systems &amp; ML Infrastructure</span></h1><p>Staff / Sr SWE — LLM Serving, RAG, Embeddings, Feature Stores, Agent Systems</p></div>
+<div class="ct">
+<div class="sd sd-1"><span class="e">🤖</span> 14 · AI SYSTEMS &amp; ML INFRASTRUCTURE</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 1: LLM SERVING & INFERENCE
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="llm-serving">
+<h2>LLM Serving &amp; Inference Optimization</h2>
+<p class="su">Serving large language models at scale requires careful management of GPU memory, batching strategies, and latency optimization. Key metrics: <span class="hg">tokens/sec</span>, <span class="hg">TTFT</span> (time to first token), and <span class="hg">cost per 1M tokens</span>.</p>
+
+<!-- ═══ LLM Serving Pipeline SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> LLM Serving Pipeline</div>
+<svg width="100%" viewBox="0 0 740 140" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ai1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ai1g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>LLM Serving: Request → Tokenizer → GPU Cluster (KV Cache) → Detokenizer → Response</title>
+  <!-- Request -->
+  <rect data-dp-step="1" x="10" y="45" width="90" height="50" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="55" y="65" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">Request</text>
+  <text x="55" y="80" text-anchor="middle" fill="var(--muted)" font-size="7">Prompt + Params</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="2" x1="100" y1="70" x2="148" y2="70" stroke="var(--muted)" stroke-width="1" marker-end="url(#ai1)"/>
+
+  <!-- Tokenizer -->
+  <rect data-dp-step="3" x="150" y="45" width="100" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="200" y="65" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Tokenizer</text>
+  <text x="200" y="80" text-anchor="middle" fill="var(--muted)" font-size="7">BPE / SentencePiece</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="4" x1="250" y1="70" x2="298" y2="70" stroke="var(--muted)" stroke-width="1" marker-end="url(#ai1)"/>
+
+  <!-- GPU Cluster -->
+  <rect data-dp-step="5" x="300" y="25" width="180" height="90" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="390" y="45" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">GPU Cluster</text>
+  <rect x="315" y="55" width="70" height="20" rx="3" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="350" y="68" text-anchor="middle" fill="var(--o)" font-size="7">Model Weights</text>
+  <rect x="395" y="55" width="70" height="20" rx="3" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="430" y="68" text-anchor="middle" fill="var(--y)" font-size="7">KV Cache</text>
+  <text x="390" y="100" text-anchor="middle" fill="var(--muted)" font-size="6.5">Tensor Parallel · Pipeline Parallel</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="6" x1="480" y1="70" x2="528" y2="70" stroke="var(--muted)" stroke-width="1" marker-end="url(#ai1)"/>
+  <!-- Detokenizer -->
+  <rect data-dp-step="7" x="530" y="45" width="100" height="50" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="580" y="65" text-anchor="middle" fill="var(--p)" font-size="9" font-weight="700">Detokenizer</text>
+  <text x="580" y="80" text-anchor="middle" fill="var(--muted)" font-size="7">Token → Text</text>
+
+  <!-- Arrow -->
+  <line data-dp-step="8" x1="630" y1="70" x2="648" y2="70" stroke="var(--muted)" stroke-width="1" marker-end="url(#ai1)"/>
+
+  <!-- Response -->
+  <rect data-dp-step="9" x="650" y="45" width="80" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="690" y="65" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Response</text>
+  <text x="690" y="80" text-anchor="middle" fill="var(--muted)" font-size="7">Streaming SSE</text>
+
+  <!-- Bottom label -->
+  <text x="370" y="132" text-anchor="middle" fill="var(--muted)" font-size="7.5">Continuous batching + KV-cache paging enables 3-5x throughput improvement</text>
+</svg>
+
+<div class="b bg"><span class="hi">KV-Cache Management:</span> Stores computed key-value pairs for previous tokens. <span class="hg">PagedAttention</span> (vLLM) manages KV-cache like virtual memory — pages allocated on demand, reducing waste from 60-80% to &lt;4%. Enables serving 2-4x more concurrent requests on same GPU.</div>
+
+<div class="b bb"><span class="hi">Continuous Batching:</span> Unlike static batching (wait for all sequences to finish), continuous batching inserts new requests as soon as any sequence completes. Result: <span class="ha">23x throughput improvement</span> over naive batching. Implemented in vLLM, TensorRT-LLM, and TGI.</div>
+
+<div class="b bp"><span class="hi">Speculative Decoding:</span> Use a small "draft" model to generate N candidate tokens, then verify all N in a single forward pass of the large model. Accepts correct prefixes, rejects wrong ones. Achieves <span class="ha">2-3x speedup</span> with zero quality loss. Used by Medusa, SpecInfer.</div>
+
+<table>
+<tr><th>Technique</th><th>Benefit</th><th>Tradeoff</th></tr>
+<tr><td><span class="hg">Tensor Parallelism</span></td><td>Split layers across GPUs, low latency</td><td>High inter-GPU bandwidth needed (NVLink)</td></tr>
+<tr><td><span class="hg">Pipeline Parallelism</span></td><td>Split model stages across GPUs</td><td>Pipeline bubbles reduce efficiency</td></tr>
+<tr><td><span class="hg">INT8 Quantization</span></td><td>2x memory reduction, ~1% quality loss</td><td>Slight accuracy degradation</td></tr>
+<tr><td><span class="hg">INT4 (GPTQ/AWQ)</span></td><td>4x memory reduction</td><td>2-5% quality loss, not for all tasks</td></tr>
+<tr><td><span class="hg">Flash Attention</span></td><td>2-4x faster attention, O(1) memory</td><td>Custom CUDA kernels required</td></tr>
+</table>
+
+<div class="b bb"><span class="hi">Key Numbers:</span> GPT-4 ~100 tokens/sec output. Llama-70B needs ~140GB VRAM (FP16). Batch size 32 = ~3x throughput vs batch=1. A100 80GB can serve Llama-13B at ~1500 tokens/sec. TTFT target: &lt;500ms for interactive, &lt;2s acceptable for batch.</div>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">OpenAI</span> — custom infra with speculative decoding + continuous batching. <span class="ha">vLLM</span> — PagedAttention, open-source. <span class="ha">TensorRT-LLM</span> — NVIDIA optimized runtime. <span class="ha">Anyscale</span> — Ray-based distributed serving.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Always discuss three metrics: <span class="hg">tokens/sec</span> (throughput), <span class="hg">TTFT</span> (time to first token — user-perceived latency), and <span class="hg">cost per 1M tokens</span> (economics). Mention KV-cache as the primary memory bottleneck and continuous batching as the key optimization.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 2: RAG ARCHITECTURE
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="rag">
+<h2>RAG (Retrieval-Augmented Generation)</h2>
+<p class="su">Combines retrieval from external knowledge with LLM generation. Solves <span class="hr">hallucination</span>, <span class="hr">stale knowledge</span>, and <span class="hr">domain specificity</span> without fine-tuning. The dominant pattern for enterprise AI applications.</p>
+
+<!-- ═══ RAG Pipeline SVG ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> RAG Pipeline Architecture</div>
+<svg width="100%" viewBox="0 0 740 200" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="rag1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="rag1g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>RAG Pipeline: Documents → Chunker → Embedder → Vector DB → Query → Top-K → LLM + Context → Answer</title>
+
+  <!-- Ingestion Pipeline (top row) -->
+  <text x="370" y="15" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="600">INGESTION PIPELINE</text>
+
+  <!-- Documents -->
+  <rect data-dp-step="1" x="10" y="25" width="80" height="45" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="50" y="45" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Documents</text>
+  <text x="50" y="60" text-anchor="middle" fill="var(--muted)" font-size="6.5">PDF, HTML, DB</text>
+
+  <line x1="90" y1="47" x2="118" y2="47" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Chunker -->
+  <rect data-dp-step="2" x="120" y="25" width="80" height="45" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="160" y="45" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Chunker</text>
+  <text x="160" y="60" text-anchor="middle" fill="var(--muted)" font-size="6.5">512-1024 tokens</text>
+
+  <line x1="200" y1="47" x2="228" y2="47" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Embedder -->
+  <rect data-dp-step="3" x="230" y="25" width="80" height="45" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="270" y="45" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Embedder</text>
+  <text x="270" y="60" text-anchor="middle" fill="var(--muted)" font-size="6.5">ada-002 / E5</text>
+
+  <line x1="310" y1="47" x2="338" y2="47" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Vector DB -->
+  <rect data-dp-step="4" x="340" y="25" width="90" height="45" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="385" y="45" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="700">Vector DB</text>
+  <text x="385" y="60" text-anchor="middle" fill="var(--muted)" font-size="6.5">Pinecone / Weaviate</text>
+
+  <!-- Query Pipeline (bottom row) -->
+  <text x="370" y="100" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="600">QUERY PIPELINE</text>
+
+  <!-- User Query -->
+  <rect data-dp-step="5" x="10" y="110" width="80" height="45" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="50" y="130" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">User Query</text>
+  <text x="50" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Natural language</text>
+
+  <line x1="90" y1="132" x2="118" y2="132" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Embed Query -->
+  <rect data-dp-step="6" x="120" y="110" width="80" height="45" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="160" y="130" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Embed Query</text>
+  <text x="160" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Same model</text>
+
+  <line x1="200" y1="132" x2="228" y2="132" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Top-K Retrieval -->
+  <rect data-dp-step="7" x="230" y="110" width="100" height="45" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="280" y="130" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="700">Top-K Retrieval</text>
+  <text x="280" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">k=5-20 chunks</text>
+
+  <line x1="330" y1="132" x2="358" y2="132" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Reranker -->
+  <rect data-dp-step="8" x="360" y="110" width="80" height="45" rx="6" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="400" y="130" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Reranker</text>
+  <text x="400" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Cross-encoder</text>
+
+  <line x1="440" y1="132" x2="468" y2="132" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- LLM + Context -->
+  <rect data-dp-step="9" x="470" y="110" width="110" height="45" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="525" y="130" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">LLM + Context</text>
+  <text x="525" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Prompt + Retrieved</text>
+
+  <line x1="580" y1="132" x2="608" y2="132" stroke="var(--muted)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <!-- Answer -->
+  <rect data-dp-step="10" x="610" y="110" width="80" height="45" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="650" y="130" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Answer</text>
+  <text x="650" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Grounded response</text>
+
+  <!-- Connection from Vector DB to Top-K -->
+  <line x1="385" y1="70" x2="385" y2="85" stroke="var(--p)" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="385" y1="85" x2="280" y2="85" stroke="var(--p)" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="280" y1="85" x2="280" y2="110" stroke="var(--p)" stroke-width="1" marker-end="url(#rag1)"/>
+
+  <text x="370" y="190" text-anchor="middle" fill="var(--muted)" font-size="7.5">RAG reduces hallucination by 40-70% and enables real-time knowledge updates without retraining</text>
+</svg>
+
+<div class="b bg"><span class="hi">Chunking Strategies:</span> <span class="hg">Fixed-size</span> (512 tokens, 50 token overlap — simple, fast). <span class="hg">Semantic</span> (split at topic boundaries using embeddings). <span class="hg">Recursive</span> (split by paragraphs → sentences → words). <span class="hg">Sentence-based</span> (preserve complete sentences). Optimal chunk size: 256-1024 tokens depending on use case.</div>
+
+<div class="b bb"><span class="hi">Retrieval Methods:</span> <span class="hg">Dense retrieval</span> — embedding cosine similarity, great for semantic matching. <span class="hg">Sparse retrieval</span> — BM25/TF-IDF, great for keyword/exact match. <span class="hg">Hybrid</span> — combine both with Reciprocal Rank Fusion (RRF). Hybrid outperforms either alone by 5-15% on most benchmarks.</div>
+
+<div class="b bp"><span class="hi">Reranking:</span> Initial retrieval (bi-encoder) is fast but approximate. Cross-encoder reranking scores query-document pairs jointly — 10-20x slower but significantly more accurate. Typical pattern: retrieve top-50 with bi-encoder, rerank to top-5 with cross-encoder. Models: Cohere Rerank, BGE-reranker, ColBERT.</div>
+
+<table>
+<tr><th>Component</th><th>Options</th><th>Latency</th><th>When to Use</th></tr>
+<tr><td>Chunking</td><td>Fixed 512 / Semantic / Recursive</td><td>Offline</td><td>Fixed for speed, semantic for quality</td></tr>
+<tr><td>Embedding</td><td>ada-002 / E5-large / BGE</td><td>5-50ms/chunk</td><td>ada-002 for general, E5 for cost</td></tr>
+<tr><td>Vector Search</td><td>HNSW / IVF / Flat</td><td>1-10ms</td><td>HNSW for speed, IVF for memory</td></tr>
+<tr><td>Reranker</td><td>Cross-encoder / ColBERT</td><td>50-200ms</td><td>Always use for top-K refinement</td></tr>
+</table>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">Perplexity</span> — real-time web RAG with citation. <span class="ha">ChatGPT Browsing</span> — retrieval from live web. <span class="ha">Enterprise KB</span> — internal docs + Confluence + Slack indexed for employee Q&A. <span class="ha">GitHub Copilot</span> — code context retrieval from repo.</div>
+
+<div class="b br"><span class="hi">Pitfalls:</span> <span class="hr">Chunk too small</span> → loses context, incoherent answers. <span class="hr">Chunk too large</span> → dilutes relevance, wastes context window. <span class="hr">Wrong embedding model</span> → poor retrieval quality. <span class="hr">No reranking</span> → irrelevant chunks pollute context. <span class="hr">Stale index</span> → outdated answers.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Discuss the full pipeline end-to-end. Mention hybrid retrieval (dense + sparse) as the production standard. Know the tradeoff: larger chunks = better context but lower precision. Always mention reranking as a critical quality improvement step.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 3: EMBEDDING PIPELINES & VECTOR SEARCH
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="embeddings">
+<h2>Embedding Pipelines &amp; Vector Search</h2>
+<p class="su">Convert unstructured data (text, images, code) into dense vector representations for similarity search. The backbone of RAG, recommendations, and semantic search at scale.</p>
+
+<div class="b bg"><span class="hi">Embedding Generation:</span> <span class="hg">Batch pipeline</span> — process millions of documents offline, store in vector DB. <span class="hg">Real-time pipeline</span> — embed new documents/queries on-the-fly with &lt;50ms latency. Models: OpenAI ada-002 (1536d), Cohere embed-v3 (1024d), E5-large (1024d), BGE-large (1024d).</div>
+
+<div class="b bb"><span class="hi">ANN Algorithms:</span> Approximate Nearest Neighbor search trades perfect recall for speed:
+<br>• <span class="hg">HNSW</span> (Hierarchical Navigable Small World) — graph-based, O(log N) search, 95-99% recall, memory-heavy (stores full graph)
+<br>• <span class="hg">IVF</span> (Inverted File Index) — partition-based, less memory, slower search, good for disk-based indices
+<br>• <span class="hg">ScaNN</span> (Google) — quantization + anisotropic scoring, best throughput at high recall
+<br>• <span class="hg">DiskANN</span> (Microsoft) — SSD-optimized, billion-scale on commodity hardware</div>
+
+<table>
+<tr><th>Algorithm</th><th>Recall@10</th><th>QPS (1M vectors)</th><th>Memory</th><th>Best For</th></tr>
+<tr><td><span class="hg">HNSW</span></td><td>98-99%</td><td>5,000-10,000</td><td>High (graph + vectors)</td><td>Low-latency serving</td></tr>
+<tr><td><span class="hg">IVF-PQ</span></td><td>90-95%</td><td>10,000-50,000</td><td>Low (compressed)</td><td>Memory-constrained</td></tr>
+<tr><td><span class="hg">ScaNN</span></td><td>95-98%</td><td>20,000-100,000</td><td>Medium</td><td>High throughput</td></tr>
+<tr><td><span class="hg">Flat (Brute)</span></td><td>100%</td><td>100-500</td><td>Vectors only</td><td>&lt;100K vectors, exact</td></tr>
+</table>
+
+<div class="b bb"><span class="hi">Key Numbers:</span> OpenAI ada-002 = 1536 dimensions, ~$0.0001/1K tokens. Cohere embed-v3 = 1024 dims. Search latency: <span class="hg">&lt;10ms at 1B vectors</span> with HNSW. Index build time: ~1 hour for 100M vectors. Storage: 1B vectors × 1536d × 4 bytes = ~6TB raw (compressed to ~1.5TB with PQ).</div>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">Pinecone</span> — managed, serverless vector DB. <span class="ha">Weaviate</span> — open-source, hybrid search built-in. <span class="ha">Milvus</span> — distributed, billion-scale. <span class="ha">pgvector</span> — PostgreSQL extension, simple integration. <span class="ha">Qdrant</span> — Rust-based, filtering + vector search.</div>
+
+<div class="b br"><span class="hi">Tradeoffs:</span> <span class="hr">High recall vs latency</span> — more graph connections = better recall but slower. <span class="hr">Memory vs accuracy</span> — Product Quantization saves 8-32x memory but loses 2-5% recall. <span class="hr">Build time vs search quality</span> — larger HNSW ef_construction = better graph but hours to build.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Know HNSW internals (navigable small-world graph with hierarchical layers). Discuss the recall-latency-memory triangle. Mention that most production systems use HNSW with PQ compression for the best balance. Filtering (metadata + vector) is a key production requirement.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 4: AI GATEWAY & LLM ROUTING
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="ai-gateway">
+<h2>AI Gateway &amp; LLM Routing</h2>
+<p class="su">A centralized proxy layer between applications and LLM providers. Handles <span class="hg">model routing</span>, <span class="hg">fallback chains</span>, <span class="hg">cost optimization</span>, <span class="hg">semantic caching</span>, and <span class="hg">observability</span> for all AI calls.</p>
+
+<!-- ═══ AI Gateway SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> AI Gateway Architecture</div>
+<svg width="100%" viewBox="0 0 740 160" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="gw1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="gw1r" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--r)"/></marker>
+  </defs>
+  <title>AI Gateway: Client → Gateway → Router → Model A / Model B / Model C</title>
+
+  <!-- Client -->
+  <rect data-dp-step="1" x="10" y="55" width="80" height="50" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="50" y="75" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">Client</text>
+  <text x="50" y="90" text-anchor="middle" fill="var(--muted)" font-size="6.5">App / Service</text>
+
+  <line x1="90" y1="80" x2="128" y2="80" stroke="var(--muted)" stroke-width="1" marker-end="url(#gw1)"/>
+
+  <!-- AI Gateway -->
+  <rect data-dp-step="2" x="130" y="30" width="200" height="100" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="230" y="48" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">AI Gateway</text>
+  <rect x="145" y="55" width="75" height="18" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="182" y="67" text-anchor="middle" fill="var(--g)" font-size="6.5">Rate Limiter</text>
+  <rect x="230" y="55" width="85" height="18" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="272" y="67" text-anchor="middle" fill="var(--y)" font-size="6.5">Semantic Cache</text>
+  <rect x="145" y="80" width="75" height="18" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--p)" stroke-width=".6"/>
+  <text x="182" y="92" text-anchor="middle" fill="var(--p)" font-size="6.5">Router</text>
+  <rect x="230" y="80" width="85" height="18" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
+  <text x="272" y="92" text-anchor="middle" fill="var(--a)" font-size="6.5">Cost Tracker</text>
+  <text x="230" y="120" text-anchor="middle" fill="var(--muted)" font-size="6">Logging · Metrics · Prompt Mgmt</text>
+
+  <!-- Arrow to models -->
+  <line x1="330" y1="60" x2="378" y2="40" stroke="var(--muted)" stroke-width="1" marker-end="url(#gw1)"/>
+  <line x1="330" y1="80" x2="378" y2="80" stroke="var(--muted)" stroke-width="1" marker-end="url(#gw1)"/>
+  <line x1="330" y1="100" x2="378" y2="120" stroke="var(--muted)" stroke-width="1" marker-end="url(#gw1)"/>
+
+  <!-- Model A (GPT-4) -->
+  <rect data-dp-step="3" x="380" y="20" width="110" height="35" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="435" y="35" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="700">GPT-4o</text>
+  <text x="435" y="48" text-anchor="middle" fill="var(--muted)" font-size="6">Complex reasoning</text>
+
+  <!-- Model B (GPT-3.5) -->
+  <rect data-dp-step="4" x="380" y="63" width="110" height="35" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="435" y="78" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">GPT-4o-mini</text>
+  <text x="435" y="91" text-anchor="middle" fill="var(--muted)" font-size="6">Simple tasks, fast</text>
+
+  <!-- Model C (Claude) -->
+  <rect data-dp-step="5" x="380" y="106" width="110" height="35" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="435" y="121" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Claude / Llama</text>
+  <text x="435" y="134" text-anchor="middle" fill="var(--muted)" font-size="6">Fallback / Cost opt</text>
+
+  <!-- Fallback arrows -->
+  <path d="M490,37 Q510,37 510,60 Q510,78 490,78" fill="none" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#gw1r)"/>
+  <text x="520" y="58" fill="var(--r)" font-size="6">fallback</text>
+  <path d="M490,80 Q510,80 510,103 Q510,121 490,121" fill="none" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#gw1r)"/>
+  <text x="520" y="101" fill="var(--r)" font-size="6">fallback</text>
+
+  <text x="370" y="155" text-anchor="middle" fill="var(--muted)" font-size="7.5">Semantic caching can reduce LLM costs by 30-60% for repetitive queries</text>
+</svg>
+
+<div class="b bg"><span class="hi">Routing Strategies:</span> <span class="hg">Complexity-based</span> — classify query complexity, route simple→cheap model, complex→powerful model. <span class="hg">Cost-based</span> — route to cheapest model that meets quality threshold. <span class="hg">Latency-based</span> — route to fastest available model. <span class="hg">Capability-based</span> — code tasks→Codex, reasoning→GPT-4, creative→Claude.</div>
+
+<div class="b bb"><span class="hi">Semantic Caching:</span> Hash similar prompts (not exact match — use embedding similarity with threshold ~0.95). Serve cached responses for semantically equivalent queries. Cache hit rates of 20-40% typical for customer support, FAQ-style workloads. Invalidation: TTL-based + manual flush for updated knowledge.</div>
+
+<div class="b bp"><span class="hi">Cost Control:</span> Token budgets per user/team/project. Model tiering: GPT-4o for premium users, GPT-4o-mini for free tier. Prompt compression (LLMLingua) reduces tokens by 2-5x. Response length limits. Batch non-urgent requests for off-peak pricing.</div>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">LiteLLM</span> — unified API for 100+ LLM providers. <span class="ha">Portkey</span> — AI gateway with caching + fallbacks. <span class="ha">Helicone</span> — observability + cost tracking. <span class="ha">AWS Bedrock</span> — managed multi-model access. <span class="ha">Azure AI Gateway</span> — enterprise routing with APIM.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Frame the AI Gateway as an "API Gateway for LLMs." Discuss the three pillars: reliability (fallbacks, retries), cost (caching, routing, budgets), and observability (token tracking, latency percentiles, quality scoring).</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 5: AGENT SYSTEMS & ORCHESTRATION
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="agents">
+<h2>Agent Systems &amp; Orchestration</h2>
+<p class="su">Autonomous AI systems that <span class="hg">reason</span>, <span class="hg">plan</span>, <span class="hg">use tools</span>, and <span class="hg">iterate</span> to accomplish complex tasks. The ReAct pattern (Reason + Act) is the foundation of modern agent architectures.</p>
+
+<!-- ═══ Agent System SVG ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Agent System Architecture</div>
+<svg width="100%" viewBox="0 0 740 170" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="ag1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="ag1g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>Agent: User → Agent (Plan → Act → Observe loop) → Tools</title>
+
+  <!-- User -->
+  <rect data-dp-step="1" x="10" y="60" width="80" height="50" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="50" y="80" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">User</text>
+  <text x="50" y="95" text-anchor="middle" fill="var(--muted)" font-size="6.5">Task / Goal</text>
+
+  <line x1="90" y1="85" x2="128" y2="85" stroke="var(--muted)" stroke-width="1" marker-end="url(#ag1)"/>
+
+  <!-- Agent Core (with loop) -->
+  <rect data-dp-step="2" x="130" y="30" width="240" height="110" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="250" y="48" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Agent (LLM Core)</text>
+
+  <!-- Plan -->
+  <rect x="145" y="58" width="65" height="28" rx="4" fill="rgba(167,139,250,.1)" stroke="var(--p)" stroke-width=".8"/>
+  <text x="177" y="76" text-anchor="middle" fill="var(--p)" font-size="7.5" font-weight="600">Plan</text>
+
+  <!-- Act -->
+  <rect x="220" y="58" width="65" height="28" rx="4" fill="rgba(251,146,60,.1)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="252" y="76" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="600">Act</text>
+
+  <!-- Observe -->
+  <rect x="295" y="58" width="65" height="28" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="327" y="76" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="600">Observe</text>
+
+  <!-- Loop arrows -->
+  <path d="M210,72 L220,72" fill="none" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ag1)"/>
+  <path d="M285,72 L295,72" fill="none" stroke="var(--muted)" stroke-width=".8" marker-end="url(#ag1)"/>
+  <path d="M327,86 Q327,105 250,105 Q177,105 177,86" fill="none" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#ag1g)"/>
+  <text x="250" y="118" text-anchor="middle" fill="var(--g)" font-size="6.5">Loop until task complete</text>
+
+  <!-- Memory -->
+  <rect x="145" y="95" width="90" height="18" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="190" y="107" text-anchor="middle" fill="var(--y)" font-size="6.5">Memory (Short + Long)</text>
+
+  <!-- Arrow to Tools -->
+  <line x1="370" y1="72" x2="408" y2="72" stroke="var(--muted)" stroke-width="1" marker-end="url(#ag1)"/>
+  <text x="389" y="64" text-anchor="middle" fill="var(--muted)" font-size="6.5">tool call</text>
+
+  <!-- Tools -->
+  <rect data-dp-step="3" x="410" y="25" width="160" height="120" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="490" y="43" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="700">Tools</text>
+  <rect x="420" y="50" width="65" height="18" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="452" y="62" text-anchor="middle" fill="var(--o)" font-size="6.5">Web Search</text>
+  <rect x="495" y="50" width="65" height="18" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="527" y="62" text-anchor="middle" fill="var(--o)" font-size="6.5">Code Exec</text>
+  <rect x="420" y="75" width="65" height="18" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="452" y="87" text-anchor="middle" fill="var(--o)" font-size="6.5">Database</text>
+  <rect x="495" y="75" width="65" height="18" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="527" y="87" text-anchor="middle" fill="var(--o)" font-size="6.5">APIs</text>
+  <rect x="420" y="100" width="65" height="18" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="452" y="112" text-anchor="middle" fill="var(--o)" font-size="6.5">File System</text>
+  <rect x="495" y="100" width="65" height="18" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="527" y="112" text-anchor="middle" fill="var(--o)" font-size="6.5">Calculator</text>
+
+  <!-- Result -->
+  <rect data-dp-step="4" x="610" y="55" width="80" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="650" y="75" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Result</text>
+  <text x="650" y="90" text-anchor="middle" fill="var(--muted)" font-size="6.5">Final answer</text>
+
+  <line x1="570" y1="80" x2="608" y2="80" stroke="var(--muted)" stroke-width="1" marker-end="url(#ag1)"/>
+
+  <text x="370" y="162" text-anchor="middle" fill="var(--muted)" font-size="7.5">ReAct loop: Thought → Action → Observation → repeat until task solved</text>
+</svg>
+
+<div class="b bg"><span class="hi">Agent Patterns:</span>
+<br>• <span class="hg">Single Agent</span> — one LLM with tools, simplest pattern, good for focused tasks
+<br>• <span class="hg">Multi-Agent (Supervisor)</span> — supervisor agent delegates to specialist workers (researcher, coder, reviewer)
+<br>• <span class="hg">Hierarchical</span> — tree of agents, each level handles different abstraction
+<br>• <span class="hg">Debate/Consensus</span> — multiple agents propose solutions, vote on best answer</div>
+
+<div class="b bb"><span class="hi">Memory Systems:</span>
+<br>• <span class="hg">Conversation Buffer</span> — full chat history in context window (limited by token count)
+<br>• <span class="hg">Summary Memory</span> — LLM summarizes older messages, keeps recent ones verbatim
+<br>• <span class="hg">Vector Memory</span> — embed all interactions, retrieve relevant past context via similarity search
+<br>• <span class="hg">Entity Memory</span> — extract and track entities (people, projects, preferences) across sessions</div>
+
+<div class="b bp"><span class="hi">Tool Calling:</span> Modern LLMs support structured tool calling (function calling). Agent describes available tools with JSON schemas. LLM outputs structured tool invocations. Runtime executes tools and feeds results back. Key: tool descriptions are critical for routing accuracy. Limit to 10-20 tools per agent for best performance.</div>
+
+<div class="b br"><span class="hi">Pitfalls:</span> <span class="hr">Infinite loops</span> — agent gets stuck repeating actions (need max iterations). <span class="hr">Tool misuse</span> — wrong tool selection wastes tokens and time. <span class="hr">Context overflow</span> — long conversations exceed context window. <span class="hr">Hallucinated actions</span> — agent invents non-existent tools. <span class="hr">Cost explosion</span> — complex tasks can use 100K+ tokens.</div>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">LangChain/LangGraph</span> — most popular agent framework, graph-based orchestration. <span class="ha">CrewAI</span> — role-based multi-agent. <span class="ha">AutoGen</span> (Microsoft) — conversational multi-agent. <span class="ha">OpenAI Assistants API</span> — managed agent with tools + retrieval. <span class="ha">Amazon Bedrock Agents</span> — enterprise agent orchestration.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Describe the ReAct loop clearly. Discuss memory strategies for long-running agents. Know when to use single vs multi-agent (single for focused tasks, multi for complex workflows). Mention guardrails: max iterations, token budgets, human-in-the-loop for high-stakes actions.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 6: FEATURE STORES
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="feature-stores">
+<h2>Feature Stores (Online + Offline)</h2>
+<p class="su">Centralized platform for managing ML features across training and serving. Solves <span class="hr">training-serving skew</span>, enables <span class="hg">feature reuse</span>, and ensures <span class="hg">point-in-time correctness</span> for model training.</p>
+
+<!-- ═══ Feature Store SVG ═══ -->
+<div class="d-title"><span class="num d-cyan">▸</span> Feature Store Architecture</div>
+<svg width="100%" viewBox="0 0 740 180" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="fs1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="fs1g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>Feature Store: Batch Pipeline → Offline Store ← Training | Online Store → Model Serving</title>
+
+  <!-- Batch Pipeline -->
+  <rect data-dp-step="1" x="10" y="20" width="110" height="50" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="65" y="40" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Batch Pipeline</text>
+  <text x="65" y="55" text-anchor="middle" fill="var(--muted)" font-size="6.5">Spark / Flink (daily)</text>
+
+  <!-- Streaming Pipeline -->
+  <rect data-dp-step="2" x="10" y="110" width="110" height="50" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="65" y="130" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Stream Pipeline</text>
+  <text x="65" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Kafka / Flink (real-time)</text>
+
+  <!-- Arrows from pipelines -->
+  <line x1="120" y1="45" x2="178" y2="45" stroke="var(--muted)" stroke-width="1" marker-end="url(#fs1)"/>
+  <line x1="120" y1="135" x2="178" y2="135" stroke="var(--muted)" stroke-width="1" marker-end="url(#fs1)"/>
+
+  <!-- Offline Store -->
+  <rect data-dp-step="3" x="180" y="20" width="130" height="50" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="245" y="40" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="700">Offline Store</text>
+  <text x="245" y="55" text-anchor="middle" fill="var(--muted)" font-size="6.5">S3 / BigQuery / Hive</text>
+
+  <!-- Online Store -->
+  <rect data-dp-step="4" x="180" y="110" width="130" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="245" y="130" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Online Store</text>
+  <text x="245" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">Redis / DynamoDB</text>
+
+  <!-- Materialization arrow (offline → online) -->
+  <line x1="245" y1="70" x2="245" y2="108" stroke="var(--y)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#fs1)"/>
+  <text x="270" y="92" fill="var(--y)" font-size="6.5">materialize</text>
+
+  <!-- Training -->
+  <rect data-dp-step="5" x="380" y="20" width="120" height="50" rx="6" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1.2"/>
+  <text x="440" y="40" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">Model Training</text>
+  <text x="440" y="55" text-anchor="middle" fill="var(--muted)" font-size="6.5">Point-in-time features</text>
+
+  <!-- Model Serving -->
+  <rect data-dp-step="6" x="380" y="110" width="120" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="440" y="130" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Model Serving</text>
+  <text x="440" y="145" text-anchor="middle" fill="var(--muted)" font-size="6.5">p99 &lt; 10ms lookup</text>
+
+  <!-- Arrows -->
+  <line x1="310" y1="45" x2="378" y2="45" stroke="var(--muted)" stroke-width="1" marker-end="url(#fs1)"/>
+  <line x1="310" y1="135" x2="378" y2="135" stroke="var(--muted)" stroke-width="1" marker-end="url(#fs1)"/>
+
+  <!-- Feature Registry -->
+  <rect data-dp-step="7" x="560" y="60" width="130" height="60" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="625" y="80" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Feature Registry</text>
+  <text x="625" y="95" text-anchor="middle" fill="var(--muted)" font-size="6.5">Schema · Lineage · Docs</text>
+  <text x="625" y="108" text-anchor="middle" fill="var(--muted)" font-size="6.5">Discovery · Monitoring</text>
+
+  <line x1="500" y1="45" x2="558" y2="75" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#fs1)"/>
+  <line x1="500" y1="135" x2="558" y2="105" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#fs1)"/>
+
+  <text x="370" y="175" text-anchor="middle" fill="var(--muted)" font-size="7.5">Feature stores eliminate training-serving skew by using the same feature computation for both</text>
+</svg>
+
+<div class="b bg"><span class="hi">Core Concepts:</span>
+<br>• <span class="hg">Offline features</span> — batch computed (daily/hourly), stored in data warehouse, used for training
+<br>• <span class="hg">Online features</span> — real-time, served from Redis/DynamoDB with p99 &lt;10ms, used for inference
+<br>• <span class="hg">Point-in-time correctness</span> — training uses only features available at prediction time (no future leakage)
+<br>• <span class="hg">Feature freshness</span> — how stale features can be before model quality degrades
+<br>• <span class="hg">Training-serving skew</span> — mismatch between training and serving feature computation</div>
+
+<table>
+<tr><th>Store Type</th><th>Storage</th><th>Latency</th><th>Freshness</th><th>Use Case</th></tr>
+<tr><td><span class="hg">Offline</span></td><td>S3 / BigQuery / Hive</td><td>Seconds-minutes</td><td>Hours-days</td><td>Training, batch prediction</td></tr>
+<tr><td><span class="hg">Online</span></td><td>Redis / DynamoDB</td><td>&lt;10ms p99</td><td>Seconds-minutes</td><td>Real-time inference</td></tr>
+<tr><td><span class="hg">Streaming</span></td><td>Kafka → Online store</td><td>Sub-second</td><td>Real-time</td><td>Fraud detection, recommendations</td></tr>
+</table>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">Feast</span> — open-source, Kubernetes-native. <span class="ha">Tecton</span> — managed, real-time features. <span class="ha">Hopsworks</span> — full ML platform with feature store. <span class="ha">Uber Michelangelo</span> — pioneered feature stores at scale (trillions of features). <span class="ha">Spotify</span> — custom feature store for music recommendations.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Emphasize training-serving skew as the #1 problem feature stores solve. Discuss the dual-write pattern (batch → offline, stream → online). Know that point-in-time joins prevent data leakage in training. Feature stores are critical for any ML system serving real-time predictions.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 7: ML TRAINING INFRASTRUCTURE
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="ml-training">
+<h2>Distributed Training Infrastructure</h2>
+<p class="su">Training large models requires distributing computation across hundreds or thousands of GPUs. Key challenges: <span class="hg">communication overhead</span>, <span class="hg">memory management</span>, <span class="hg">fault tolerance</span>, and <span class="hg">efficient data loading</span>.</p>
+
+<div class="b bg"><span class="hi">Parallelism Strategies:</span>
+<br>• <span class="hg">Data Parallelism</span> — replicate model on each GPU, split data batches. All-reduce gradients after each step. Simple, scales to 100s of GPUs. Limited by model size fitting in single GPU.
+<br>• <span class="hg">Model/Tensor Parallelism</span> — split individual layers across GPUs (e.g., split attention heads). Requires high-bandwidth interconnect (NVLink 600GB/s). Used for layers too large for one GPU.
+<br>• <span class="hg">Pipeline Parallelism</span> — split model into stages, each stage on different GPU(s). Micro-batching reduces pipeline bubbles. GPipe, PipeDream patterns.
+<br>• <span class="hg">Expert Parallelism</span> — for Mixture-of-Experts models, route tokens to different GPU groups.</div>
+
+<div class="b bb"><span class="hi">Memory Optimization:</span>
+<br>• <span class="hg">Gradient Accumulation</span> — accumulate gradients over N micro-batches before update, simulates larger batch size
+<br>• <span class="hg">Activation Checkpointing</span> — recompute activations during backward pass instead of storing (trades compute for memory, ~30% memory savings)
+<br>• <span class="hg">ZeRO (DeepSpeed)</span> — partition optimizer states (Stage 1), gradients (Stage 2), and parameters (Stage 3) across GPUs
+<br>• <span class="hg">Mixed Precision (FP16/BF16)</span> — 2x memory reduction, 2-3x faster compute on tensor cores</div>
+
+<table>
+<tr><th>Strategy</th><th>Communication</th><th>Memory Efficiency</th><th>Scaling</th></tr>
+<tr><td><span class="hg">Data Parallel (DDP)</span></td><td>All-reduce gradients</td><td>Model must fit 1 GPU</td><td>Near-linear to 1000 GPUs</td></tr>
+<tr><td><span class="hg">ZeRO Stage 3</span></td><td>All-gather params on demand</td><td>Partitions everything</td><td>Trillion-param models</td></tr>
+<tr><td><span class="hg">Tensor Parallel</span></td><td>All-reduce per layer</td><td>Split layers across GPUs</td><td>8-16 GPUs (NVLink)</td></tr>
+<tr><td><span class="hg">Pipeline Parallel</span></td><td>Point-to-point activations</td><td>Split stages</td><td>Across nodes</td></tr>
+<tr><td><span class="hg">FSDP (PyTorch)</span></td><td>All-gather + reduce-scatter</td><td>Shards like ZeRO-3</td><td>Native PyTorch scaling</td></tr>
+</table>
+
+<div class="b bp"><span class="hi">Fault Tolerance:</span> At 10K+ GPU scale, hardware failures are frequent (mean time between failures ~hours). Solutions: <span class="ha">Periodic checkpointing</span> (every 10-30 min to distributed storage). <span class="ha">Elastic training</span> — continue with fewer nodes. <span class="ha">Redundant computation</span> — duplicate critical stages. <span class="ha">Fast recovery</span> — resume from latest checkpoint in &lt;5 min.</div>
+
+<div class="b bb"><span class="hi">Key Numbers:</span> GPT-4 training estimated at <span class="ha">~$100M</span>, ~25,000 A100 GPUs for ~90 days, 13T tokens. Llama-2 70B: 1.7M GPU-hours on A100-80GB. A100 80GB: ~$2/hr cloud, 312 TFLOPS FP16. H100: 2-3x faster than A100. Network: 400Gbps InfiniBand between nodes, 900GB/s NVLink within node.</div>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">Meta RSC</span> — 16K A100 GPUs, custom InfiniBand fabric. <span class="ha">Google TPU pods</span> — v4 pods with 4096 chips, custom interconnect. <span class="ha">NVIDIA DGX SuperPOD</span> — turnkey GPU clusters. <span class="ha">DeepSpeed</span> (Microsoft) — ZeRO optimizer, most popular training library. <span class="ha">Megatron-LM</span> (NVIDIA) — tensor + pipeline parallelism.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Know the three types of parallelism and when to combine them (3D parallelism = data + tensor + pipeline). Discuss checkpointing strategy for fault tolerance. Mention that communication overhead is the main bottleneck — all-reduce scales as O(model_size), not O(num_GPUs).</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 8: GUARDRAILS & AI SAFETY
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="T" id="guardrails">
+<h2>Guardrails &amp; AI Safety in Production</h2>
+<p class="su">Production AI systems need multiple layers of protection: <span class="hg">input validation</span> (block malicious prompts), <span class="hg">output validation</span> (catch hallucinations, toxicity), and <span class="hg">human escalation</span> for high-stakes decisions.</p>
+
+<!-- ═══ Guardrails Pipeline SVG ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Guardrails Pipeline</div>
+<svg width="100%" viewBox="0 0 740 160" style="max-width:740px;display:block;margin:4px auto 10px">
+  <defs>
+    <marker id="gr1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--muted)"/></marker>
+    <marker id="gr1r" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--r)"/></marker>
+    <marker id="gr1g" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+  <title>Guardrails: Input → Input Guard → LLM → Output Guard → Response (with reject/escalate paths)</title>
+
+  <!-- User Input -->
+  <rect data-dp-step="1" x="10" y="50" width="80" height="50" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="50" y="70" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">Input</text>
+  <text x="50" y="85" text-anchor="middle" fill="var(--muted)" font-size="6.5">User prompt</text>
+
+  <line x1="90" y1="75" x2="128" y2="75" stroke="var(--muted)" stroke-width="1" marker-end="url(#gr1)"/>
+
+  <!-- Input Guard -->
+  <rect data-dp-step="2" x="130" y="40" width="120" height="70" rx="6" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="190" y="57" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Input Guard</text>
+  <rect x="140" y="63" width="100" height="14" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="190" y="73" text-anchor="middle" fill="var(--o)" font-size="6.5">Injection Detection</text>
+  <rect x="140" y="80" width="100" height="14" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
+  <text x="190" y="90" text-anchor="middle" fill="var(--o)" font-size="6.5">PII Filtering</text>
+  <text x="190" y="105" text-anchor="middle" fill="var(--muted)" font-size="6">Topic restriction</text>
+
+  <!-- Reject path from Input Guard -->
+  <line x1="190" y1="40" x2="190" y2="18" stroke="var(--r)" stroke-width="1" marker-end="url(#gr1r)"/>
+  <text x="190" y="12" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">REJECT</text>
+
+  <line x1="250" y1="75" x2="288" y2="75" stroke="var(--muted)" stroke-width="1" marker-end="url(#gr1)"/>
+
+  <!-- LLM -->
+  <rect data-dp-step="3" x="290" y="50" width="100" height="50" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--p)" stroke-width="1.2"/>
+  <text x="340" y="70" text-anchor="middle" fill="var(--p)" font-size="9" font-weight="700">LLM</text>
+  <text x="340" y="85" text-anchor="middle" fill="var(--muted)" font-size="6.5">Generate response</text>
+
+  <line x1="390" y1="75" x2="428" y2="75" stroke="var(--muted)" stroke-width="1" marker-end="url(#gr1)"/>
+
+  <!-- Output Guard -->
+  <rect data-dp-step="4" x="430" y="40" width="120" height="70" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="490" y="57" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Output Guard</text>
+  <rect x="440" y="63" width="100" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="490" y="73" text-anchor="middle" fill="var(--g)" font-size="6.5">Toxicity Scoring</text>
+  <rect x="440" y="80" width="100" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="490" y="90" text-anchor="middle" fill="var(--g)" font-size="6.5">Hallucination Check</text>
+  <text x="490" y="105" text-anchor="middle" fill="var(--muted)" font-size="6">Format enforcement</text>
+
+  <!-- Reject/Escalate from Output Guard -->
+  <line x1="490" y1="40" x2="490" y2="18" stroke="var(--r)" stroke-width="1" marker-end="url(#gr1r)"/>
+  <text x="490" y="12" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">ESCALATE</text>
+
+  <line x1="550" y1="75" x2="588" y2="75" stroke="var(--g)" stroke-width="1" marker-end="url(#gr1g)"/>
+
+  <!-- Response -->
+  <rect data-dp-step="5" x="590" y="50" width="90" height="50" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="635" y="70" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">Response</text>
+  <text x="635" y="85" text-anchor="middle" fill="var(--muted)" font-size="6.5">Safe output</text>
+
+  <!-- Human review -->
+  <rect x="560" y="120" width="110" height="30" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="615" y="139" text-anchor="middle" fill="var(--y)" font-size="7">Human Review Queue</text>
+  <line x1="490" y1="110" x2="490" y2="135" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <line x1="490" y1="135" x2="558" y2="135" stroke="var(--y)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#gr1)"/>
+
+  <text x="370" y="155" text-anchor="middle" fill="var(--muted)" font-size="7.5">Multi-layer defense: input filtering + output validation + human escalation for edge cases</text>
+</svg>
+
+<div class="b bg"><span class="hi">Input Validation:</span>
+<br>• <span class="hg">Prompt Injection Detection</span> — classify inputs for injection attempts (jailbreaks, role-play attacks, instruction override). Use fine-tuned classifiers + rule-based patterns.
+<br>• <span class="hg">PII Filtering</span> — detect and redact SSN, credit cards, emails, phone numbers before sending to LLM. Use NER models + regex patterns.
+<br>• <span class="hg">Topic Restriction</span> — block off-topic queries (e.g., medical advice in a coding assistant). Embedding-based topic classifiers.
+<br>• <span class="hg">Token Limits</span> — enforce max input length to prevent resource exhaustion attacks.</div>
+
+<div class="b bb"><span class="hi">Output Validation:</span>
+<br>• <span class="hg">Toxicity Scoring</span> — score output for harmful content (Perspective API, custom classifiers). Block if score &gt; threshold.
+<br>• <span class="hg">Hallucination Detection</span> — cross-reference claims against retrieved sources. Flag unsupported statements. Use NLI (Natural Language Inference) models.
+<br>• <span class="hg">Format Enforcement</span> — validate JSON schema, check required fields, ensure structured output matches spec. Retry with feedback if invalid.
+<br>• <span class="hg">Factual Grounding</span> — verify output is supported by provided context (for RAG systems).</div>
+
+<div class="b bp"><span class="hi">Advanced Patterns:</span>
+<br>• <span class="hg">Constitutional AI</span> — self-critique: generate → evaluate against principles → revise
+<br>• <span class="hg">Red-teaming</span> — adversarial testing with automated attack generation
+<br>• <span class="hg">Canary tokens</span> — embed markers in system prompts to detect extraction attempts
+<br>• <span class="hg">Output diversity</span> — detect repetitive/degenerate outputs
+<br>• <span class="hg">Confidence scoring</span> — LLM self-reports confidence, escalate low-confidence responses</div>
+
+<div class="b br"><span class="hi">Pitfalls:</span> <span class="hr">Over-filtering</span> — too aggressive guards block legitimate queries (false positives). <span class="hr">Latency overhead</span> — each guard adds 50-200ms. <span class="hr">Evolving attacks</span> — new jailbreak techniques emerge weekly. <span class="hr">Multilingual gaps</span> — guards trained on English miss attacks in other languages. <span class="hr">Context-dependent safety</span> — same content may be safe/unsafe depending on context.</div>
+
+<div class="b by"><span class="hi">Real-World:</span> <span class="ha">Guardrails AI</span> — open-source, programmable guardrails with validators. <span class="ha">NeMo Guardrails</span> (NVIDIA) — dialog management + safety rails. <span class="ha">Lakera Guard</span> — prompt injection detection API. <span class="ha">Azure AI Content Safety</span> — multi-modal content filtering. Custom classifiers fine-tuned on domain-specific attack patterns.</div>
+
+<div class="b by"><span class="hi">🎯 Interview Tip:</span> Frame guardrails as a pipeline (not a single check). Discuss the tradeoff between safety and user experience (over-filtering frustrates users). Mention that guardrails should be independently deployable and versioned. Know that prompt injection is an unsolved problem — defense in depth is the only approach.</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../css/dp-engine.css">
+<script src="../js/dp-engine.js"></script>
+<script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/live-course.js"></script>
+<script src="../js/auth.js"></script>
+</body>
+</html>

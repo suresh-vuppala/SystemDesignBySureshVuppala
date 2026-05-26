@@ -11,15 +11,18 @@
 
 (function(){
 
-// ═══ CONFIGURATION — Replace with your actual keys ═══
+// ═══ CONFIGURATION ═══
 var CONFIG = {
+  admin: false, // Set to true to bypass premium gates (for local testing). Set false for production.
   firebase: {
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
+    apiKey: "AIzaSyAbwqzKR-23IPRJy_S4JbQ-_EYWb8mTAzo",
+    authDomain: "varaq-gif.firebaseapp.com",
+    databaseURL: "https://varaq-gif-default-rtdb.firebaseio.com",
+    projectId: "varaq-gif",
+    storageBucket: "varaq-gif.appspot.com",
+    messagingSenderId: "350573799970",
+    appId: "1:350573799970:web:c68e797081eb3818aa787b",
+    measurementId: "G-RZ951SNE5G"
   },
   razorpay: {
     key: "rzp_live_YOUR_KEY",  // or rzp_test_ for testing
@@ -31,6 +34,11 @@ var CONFIG = {
   }
 };
 
+// ═══ FIREBASE INITIALIZATION ═══
+if(typeof firebase !== 'undefined' && !firebase.apps.length){
+  firebase.initializeApp(CONFIG.firebase);
+}
+
 // ═══ STATE ═══
 var state = {
   user: null,
@@ -39,7 +47,7 @@ var state = {
 };
 
 // ═══ PREMIUM CONTENT DEFINITION ═══
-// Pages/sections that require premium
+// Pages/sections that require premium (section IDs within concept pages)
 var PREMIUM_SECTIONS = {
   // Concepts: topics 10-15 are premium
   'scalability': ['consistent-hashing','bloom-filters','rate-limiting','backpressure','auto-scaling'],
@@ -50,8 +58,57 @@ var PREMIUM_SECTIONS = {
   'decision-flowcharts': ['more-decisions']
 };
 
+// Concept PAGES that are premium (topics 10-15)
+var PREMIUM_CONCEPT_PAGES = [
+  '10-scalability.html',
+  '11-data-pipelines.html',
+  '12-distributed-systems.html',
+  '13-observability.html',
+  '14-ai-systems.html',
+  '15-key-numbers.html',
+  '16-decision-flowcharts.html'
+];
+
 // Problem pages: problems 6+ in each module are premium
 var PREMIUM_PROBLEM_INDEX = 5; // 0-indexed: first 5 free, rest premium
+
+// Free problem pages (first 5 in module 1, first problem in other modules)
+var FREE_PROBLEM_PAGES = [
+  // Module 1: first 5
+  'slack-real-time-messaging.html',
+  'whatsapp-offline-delivery.html',
+  'discord-websocket-infra.html',
+  'multi-region-ordering.html',
+  'telegram-large-group-fanout.html',
+  // Modules 2-29: first problem only (the ones with full HTML)
+  'google-docs-collaborative-editing.html',
+  'netflix-adaptive-streaming.html',
+  'zoom-300-person-meeting.html',
+  'bookmyshow-concert-booking.html',
+  'meta-tao-cache-invalidation.html',
+  'uber-kafka-ride-events.html',
+  'twitter-timeline-fanout.html',
+  'uber-driver-matching.html',
+  'stripe-idempotent-payments.html',
+  'cloudflare-rate-limiting.html',
+  'slack-vitess-sharding.html',
+  'etcd-raft-consensus.html',
+  'cricbuzz-live-scoring.html',
+  'dropbox-sync-engine.html',
+  'google-web-search.html',
+  'google-calendar-recurrence.html',
+  'uber-jaeger-distributed-tracing.html',
+  'uber-michelangelo-ml-serving.html',
+  'google-session-management.html',
+  'bitly-url-shortener.html',
+  'sendgrid-email-delivery.html',
+  'meta-content-moderation.html',
+  'launchdarkly-feature-flags.html',
+  'google-web-crawler.html',
+  'twitter-snowflake-ids.html',
+  'google-ads-ranking.html',
+  'github-actions-build-system.html'
+];
 
 // ═══ UI INJECTION ═══
 function injectAuthUI(){
@@ -60,7 +117,7 @@ function injectAuthUI(){
 
   var authContainer = document.createElement('div');
   authContainer.id = 'auth-container';
-  authContainer.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto;';
+  authContainer.style.cssText = 'display:flex;align-items:center;gap:8px;';
 
   if(state.user){
     var isPro = state.isPremium;
@@ -75,56 +132,266 @@ function injectAuthUI(){
       + 'Sign in</button>';
   }
 
-  // Insert before the toggle button or at end of header
-  var toggle = header.querySelector('.sh-toggle');
-  if(toggle){
-    header.insertBefore(authContainer, toggle);
+  // Insert into the .sh-right container
+  var shRight = header.querySelector('.sh-right');
+  if(shRight){
+    shRight.appendChild(authContainer);
   } else {
-    header.appendChild(authContainer);
+    var toggle = header.querySelector('.sh-toggle');
+    if(toggle){
+      header.insertBefore(authContainer, toggle);
+    } else {
+      header.appendChild(authContainer);
+    }
+  }
+
+  // Show/hide Premium button in header
+  var premBtn = document.getElementById('sh-premium-btn');
+  if(premBtn){
+    if(!state.isPremium && !CONFIG.admin){
+      premBtn.style.display = '';
+      premBtn.onclick = function(){ showPremiumPopup(); };
+    } else {
+      premBtn.style.display = 'none';
+    }
   }
 }
 
-// ═══ PREMIUM GATE UI ═══
+// ═══ PREMIUM GATE UI — Lock + Popup ═══
 function gatePremiumContent(){
-  if(state.isPremium) return; // Premium user sees everything
+  if(state.isPremium || CONFIG.admin) return; // Premium user or admin sees everything
 
   var page = location.pathname.split('/').pop() || 'index.html';
   
-  // Gate sections within cheatsheet pages
+  // Gate sections within cheatsheet pages — hide content completely with a lock
   Object.keys(PREMIUM_SECTIONS).forEach(function(pageKey){
     PREMIUM_SECTIONS[pageKey].forEach(function(sectionId){
       var section = document.getElementById(sectionId);
       if(!section) return;
       
+      // Hide the section content and show a locked placeholder
       section.style.position = 'relative';
+      section.style.minHeight = '120px';
       section.style.overflow = 'hidden';
-      section.style.maxHeight = '200px';
       
+      // Hide all children
+      Array.from(section.children).forEach(function(child){
+        if(!child.classList.contains('premium-locked-overlay')){
+          child.style.display = 'none';
+        }
+      });
+      
+      // Add locked overlay
       var overlay = document.createElement('div');
-      overlay.className = 'premium-gate';
+      overlay.className = 'premium-locked-overlay';
       overlay.innerHTML = 
-        '<div class="premium-gate-inner">'
-        + '<div class="premium-lock">🔒</div>'
-        + '<div class="premium-title">Premium Content</div>'
-        + '<div class="premium-desc">Unlock full access to all 201 problems, advanced topics, and interview cheat sheets</div>'
-        + (state.user 
-          ? '<button class="premium-buy-btn" onclick="window.HelloSDE.startPayment()">Unlock for ₹2,500</button>'
-          : '<button class="premium-buy-btn" onclick="window.HelloSDE.signIn()">Sign in to Unlock</button>')
-        + '</div>';
+        '<div class="premium-locked-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Premium</div>';
+      overlay.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        showPremiumPopup();
+      });
       section.appendChild(overlay);
     });
   });
 
-  // Gate problems in index (problems 6+ in each module table)
+  // Gate problems in index (problems 6+ in each module table) — lock rows
   if(page === 'index.html' && location.pathname.indexOf('realtime-system-design-problems') !== -1){
     var tables = document.querySelectorAll('.T table');
     tables.forEach(function(table){
       var rows = table.querySelectorAll('tr');
-      for(var i = PREMIUM_PROBLEM_INDEX + 1; i < rows.length; i++){ // +1 for header row
-        rows[i].style.filter = 'blur(3px)';
-        rows[i].style.pointerEvents = 'none';
-        rows[i].style.userSelect = 'none';
+      for(var i = PREMIUM_PROBLEM_INDEX + 1; i < rows.length; i++){
+        var row = rows[i];
+        
+        // Skip topic rows and header rows
+        if(row.classList.contains('prob-topics-row') || row.querySelector('th')) continue;
+
+        row.classList.add('premium-locked-row');
+        row.classList.remove('prob-expand'); // disable expand behavior
+        row.style.cursor = 'pointer';
+
+        // Remove links
+        var links = row.querySelectorAll('a');
+        links.forEach(function(a){
+          a.removeAttribute('href');
+          a.style.pointerEvents = 'none';
+          a.style.color = 'var(--muted)';
+        });
+
+        // Hide the concepts row below it
+        var nextRow = row.nextElementSibling;
+        if(nextRow && nextRow.classList.contains('prob-topics-row')){
+          nextRow.style.display = 'none';
+        }
+
+        // Replace # cell content with lock icon
+        var firstCell = row.querySelector('td');
+        if(firstCell && !firstCell.querySelector('.row-lock-icon')){
+          firstCell.innerHTML = '<span class="row-lock-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>';
+        }
+
+        // Click to show premium popup
+        (function(r){
+          r.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            showPremiumPopup();
+          });
+        })(row);
       }
+    });
+  }
+
+  // Gate concept navigation links (topics 10-15) in the cheatsheet nav
+  gatePremiumConceptLinks();
+
+  // Gate individual premium problem pages (direct URL access)
+  gatePremiumProblemPage();
+
+  // Gate individual premium concept pages (direct URL access)
+  gatePremiumConceptPage();
+}
+
+// ═══ GATE INDIVIDUAL PROBLEM PAGES ═══
+function gatePremiumProblemPage(){
+  var page = location.pathname.split('/').pop() || '';
+  // Only applies to problem HTML pages (not index)
+  if(page === 'index.html' || page === '' || !page.endsWith('.html')) return;
+  // Only in realtime-system-design-problems folder
+  if(location.pathname.indexOf('realtime-system-design-problems') === -1) return;
+  // Check if this page is in the free list
+  if(FREE_PROBLEM_PAGES.indexOf(page) !== -1) return;
+  // This is a premium problem page — block it
+  blockPageContent();
+}
+
+// ═══ GATE INDIVIDUAL CONCEPT PAGES ═══
+function gatePremiumConceptPage(){
+  var page = location.pathname.split('/').pop() || '';
+  if(location.pathname.indexOf('system-design-cheatsheet') === -1) return;
+  if(PREMIUM_CONCEPT_PAGES.indexOf(page) === -1) return;
+  // This is a premium concept page — block it
+  blockPageContent();
+}
+
+// ═══ BLOCK PAGE CONTENT ═══
+function blockPageContent(){
+  // Hide the main content
+  var ct = document.querySelector('.ct');
+  if(ct) ct.style.display = 'none';
+
+  // Create a full-page premium gate
+  var gate = document.createElement('div');
+  gate.className = 'premium-page-gate';
+  gate.innerHTML = 
+    '<div class="premium-page-gate-inner">'
+    + '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--a);margin-bottom:16px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+    + '<h2 style="font-size:1.3rem;font-weight:700;color:var(--text);margin:0 0 8px">Premium Content</h2>'
+    + '<p style="font-size:.85rem;color:var(--muted);margin:0 0 20px;max-width:360px;line-height:1.5">This content is available for premium members. Unlock access to all 201 problems, 16 concept topics, and interview cheat sheets.</p>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">'
+    + (state.user 
+      ? '<button onclick="window.HelloSDE.startPayment()" style="padding:12px 28px;border-radius:8px;border:none;background:var(--a);color:#fff;font-size:.85rem;font-weight:600;cursor:pointer">Unlock for ₹2,500</button>'
+      : '<button onclick="window.HelloSDE.signIn()" style="padding:12px 28px;border-radius:8px;border:none;background:var(--a);color:#fff;font-size:.85rem;font-weight:600;cursor:pointer">Sign in to Unlock</button>')
+    + '<a href="javascript:history.back()" style="padding:12px 28px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:.85rem;font-weight:500;text-decoration:none">Go Back</a>'
+    + '</div>'
+    + '</div>';
+
+  // Insert after hero
+  var hero = document.querySelector('.hero');
+  if(hero){
+    hero.insertAdjacentElement('afterend', gate);
+  } else {
+    document.body.insertAdjacentElement('afterbegin', gate);
+  }
+}
+
+// ═══ LOCK CONCEPT NAV LINKS (Topics 10-15) ═══
+function gatePremiumConceptLinks(){
+  var navCards = document.querySelectorAll('#topicNav .nc');
+  if(!navCards.length) return;
+
+  navCards.forEach(function(card){
+    var h3 = card.querySelector('h3');
+    if(!h3) return;
+    var title = h3.textContent.trim();
+    
+    // Check if this is a premium topic (10-15)
+    var isPremiumTopic = false;
+    PREMIUM_CONCEPT_PAGES.forEach(function(pageName){
+      var num = pageName.split('-')[0]; // "10", "11", etc.
+      if(title.indexOf(num + '.') === 0) isPremiumTopic = true;
+    });
+    
+    if(!isPremiumTopic) return;
+
+    // Add lock badge to the heading
+    if(!h3.querySelector('.nav-lock-badge')){
+      var badge = document.createElement('span');
+      badge.className = 'nav-lock-badge';
+      badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+      h3.appendChild(badge);
+    }
+
+    // Intercept all links in this card
+    var links = card.querySelectorAll('a');
+    links.forEach(function(a){
+      a.classList.add('premium-nav-link');
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        showPremiumPopup();
+      });
+    });
+  });
+}
+
+// ═══ PREMIUM POPUP ═══
+function showPremiumPopup(){
+  // Remove existing popup if any
+  var existing = document.getElementById('premium-popup-overlay');
+  if(existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'premium-popup-overlay';
+  overlay.innerHTML = 
+    '<div class="premium-popup">'
+    + '<button class="premium-popup-close" id="premium-popup-close">&times;</button>'
+    + '<div class="premium-popup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
+    + '<h3 class="premium-popup-title">Premium Content</h3>'
+    + '<p class="premium-popup-desc">This content is available exclusively for Premium members. Unlock access to:</p>'
+    + '<ul class="premium-popup-features">'
+    + '<li>✓ All 201 system design problems</li>'
+    + '<li>✓ Advanced topics (Scalability, Data Pipelines, Distributed Systems, Observability)</li>'
+    + '<li>✓ Key Numbers & Decision Flowcharts</li>'
+    + '<li>✓ Interview cheat sheets & SVG animations</li>'
+    + '<li>✓ All future updates included</li>'
+    + '</ul>'
+    + '<div class="premium-popup-price">₹2,500 <span>one-time payment</span></div>'
+    + (state.user 
+      ? '<button class="premium-popup-btn" id="premium-popup-buy">Unlock Premium Access</button>'
+      : '<button class="premium-popup-btn" id="premium-popup-signin">Sign in with Google to Unlock</button>')
+    + '</div>';
+  
+  document.body.appendChild(overlay);
+
+  // Close handlers
+  document.getElementById('premium-popup-close').addEventListener('click', function(){
+    overlay.remove();
+  });
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) overlay.remove();
+  });
+
+  // Action button
+  if(state.user){
+    document.getElementById('premium-popup-buy').addEventListener('click', function(){
+      overlay.remove();
+      window.HelloSDE.startPayment();
+    });
+  } else {
+    document.getElementById('premium-popup-signin').addEventListener('click', function(){
+      overlay.remove();
+      window.HelloSDE.signIn();
     });
   }
 }
@@ -166,14 +433,48 @@ function setupAuthMenu(){
 function injectStyles(){
   var style = document.createElement('style');
   style.textContent = 
-    '.premium-gate{position:absolute;bottom:0;left:0;right:0;height:100%;display:flex;align-items:flex-end;justify-content:center;background:linear-gradient(to bottom,transparent 0%,var(--bg) 60%);z-index:10;padding-bottom:20px}'
-    + '.premium-gate-inner{text-align:center;padding:16px}'
-    + '.premium-lock{font-size:1.5rem;margin-bottom:6px}'
-    + '.premium-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:4px}'
-    + '.premium-desc{font-size:.75rem;color:var(--muted);margin-bottom:12px;max-width:300px}'
-    + '.premium-buy-btn{padding:10px 24px;border-radius:8px;border:none;background:var(--a);color:#fff;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .15s}'
-    + '.premium-buy-btn:hover{background:var(--a2);transform:translateY(-1px)}'
-    + '#google-signin-btn:hover{background:rgba(255,255,255,.08);border-color:var(--a)}';
+    // Locked section overlay
+    '.premium-locked-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(15,17,21,.92);border:1px dashed rgba(108,140,255,.3);border-radius:8px;cursor:pointer;transition:all .2s;z-index:10}'
+    + '.premium-locked-overlay:hover{background:rgba(15,17,21,.85);border-color:var(--a)}'
+    + '.premium-locked-badge{display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:600;color:var(--muted);padding:10px 20px;border-radius:8px;background:rgba(108,140,255,.08)}'
+    + '.premium-locked-overlay:hover .premium-locked-badge{color:var(--a);background:rgba(108,140,255,.12)}'
+    
+    // Locked table rows
+    + '.premium-locked-row{opacity:.45;cursor:pointer !important;transition:all .2s;position:relative}'
+    + '.premium-locked-row:hover{opacity:.65;background:rgba(108,140,255,.03)}'
+    + '.premium-locked-row td{position:relative}'
+    + '.premium-locked-row td:first-child{text-align:center}'
+    + '.row-lock-icon{color:var(--muted,#888);display:inline-flex;align-items:center;opacity:.7}'
+    + '.premium-locked-row:hover .row-lock-icon{color:var(--a);opacity:1}'
+    
+    // Nav lock badge
+    + '.nav-lock-badge{margin-left:6px;vertical-align:middle;color:var(--muted,#888);display:inline-flex}'
+    + '.premium-nav-link{opacity:.6;cursor:pointer !important;position:relative}'
+    + '.premium-nav-link:hover{opacity:.8}'
+    
+    // Popup overlay
+    + '#premium-popup-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;backdrop-filter:blur(4px)}'
+    + '.premium-popup{position:relative;background:var(--card,#1a1d23);border:1px solid var(--border,#2a2d35);border-radius:16px;padding:40px 32px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:popupIn .2s ease-out}'
+    + '@keyframes popupIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}'
+    + '.premium-popup-close{position:absolute;top:12px;right:16px;background:none;border:none;color:var(--muted,#888);font-size:1.5rem;cursor:pointer;padding:4px 8px;border-radius:4px;transition:color .15s}'
+    + '.premium-popup-close:hover{color:var(--text,#fff)}'
+    + '.premium-popup-icon{margin-bottom:12px;color:var(--muted,#888)}'
+    + '.premium-popup-title{font-size:1.3rem;font-weight:700;color:var(--text,#fff);margin:0 0 8px}'
+    + '.premium-popup-desc{font-size:.85rem;color:var(--muted,#888);line-height:1.5;margin:0 0 16px}'
+    + '.premium-popup-features{list-style:none;padding:0;margin:0 0 20px;text-align:left}'
+    + '.premium-popup-features li{font-size:.8rem;color:var(--text-2,#ccc);padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}'
+    + '.premium-popup-features li:last-child{border-bottom:none}'
+    + '.premium-popup-price{font-size:1.4rem;font-weight:800;color:var(--a,#6c8cff);margin-bottom:20px}'
+    + '.premium-popup-price span{font-size:.75rem;font-weight:400;color:var(--muted,#888);margin-left:4px}'
+    + '.premium-popup-btn{width:100%;padding:14px 24px;border-radius:10px;border:none;background:var(--a,#6c8cff);color:#fff;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s}'
+    + '.premium-popup-btn:hover{background:var(--a2,#8ba4ff);transform:translateY(-1px)}'
+    
+    // Sign-in button hover
+    + '#google-signin-btn:hover{background:rgba(255,255,255,.08);border-color:var(--a)}'
+    
+    // Full page premium gate
+    + '.premium-page-gate{display:flex;align-items:center;justify-content:center;min-height:60vh;padding:48px 24px;text-align:center}'
+    + '.premium-page-gate-inner{max-width:440px}';
   document.head.appendChild(style);
 }
 
@@ -188,7 +489,11 @@ window.HelloSDE = {
     var provider = new firebase.auth.GoogleAuthProvider();
     firebase.auth().signInWithPopup(provider).then(function(result){
       console.log('Signed in:', result.user.email);
-      location.reload();
+      // Set session cookie for Vercel middleware
+      result.user.getIdToken().then(function(token){
+        document.cookie = 'hellosde_session=' + token + ';path=/;max-age=3600;SameSite=Lax';
+        location.reload();
+      });
     }).catch(function(err){
       console.error('Sign-in error:', err);
       alert('Sign-in failed: ' + err.message);
@@ -199,6 +504,7 @@ window.HelloSDE = {
     if(typeof firebase !== 'undefined'){
       firebase.auth().signOut().then(function(){
         localStorage.removeItem('hellosde_premium');
+        document.cookie = 'hellosde_session=;path=/;max-age=0';
         location.reload();
       });
     }
@@ -224,6 +530,9 @@ window.HelloSDE = {
       prefill: {
         email: state.user.email,
         name: state.user.displayName
+      },
+      notes: {
+        uid: state.user.uid
       },
       theme: CONFIG.razorpay.theme,
       handler: function(response){
@@ -287,6 +596,10 @@ function init(){
     firebase.auth().onAuthStateChanged(function(user){
       state.user = user;
       if(user){
+        // Refresh session cookie for Vercel middleware
+        user.getIdToken().then(function(token){
+          document.cookie = 'hellosde_session=' + token + ';path=/;max-age=3600;SameSite=Lax';
+        });
         window.HelloSDE.checkPremium(user).then(function(){
           injectAuthUI();
           setupAuthMenu();

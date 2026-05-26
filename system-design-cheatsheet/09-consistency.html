@@ -887,7 +887,8 @@
 <div style="font-size:.74rem;line-height:1.4;margin-top:4px">
   <span class="tg">Pro</span> Safe — no race condition, no retry needed<br>
   <span class="tr">Con</span> Deadlock risk, throughput bottleneck (others wait)<br>
-  <span class="hi">Use:</span> high contention — flash sales, seat booking, inventory
+  <span class="hi">Use:</span> high contention — flash sales, seat booking, inventory<br>
+  <span style="color:var(--muted);font-size:.7rem">↳ Many users hit same row simultaneously — conflicts are certain, so lock upfront to prevent overselling/double-booking</span>
 </div>
 </div>
 
@@ -956,7 +957,8 @@
 <div style="font-size:.74rem;line-height:1.4;margin-top:4px">
   <span class="tg">Pro</span> High throughput, no blocking, deadlock-free<br>
   <span class="tr">Con</span> Retry overhead under high contention<br>
-  <span class="hi">Use:</span> low contention — profile edits, wiki pages, config updates
+  <span class="hi">Use:</span> low contention — profile edits, wiki pages, config updates<br>
+  <span style="color:var(--muted);font-size:.7rem">↳ Conflicts are rare, so skipping locks boosts concurrency — if a conflict does happen, just retry cheaply</span>
 </div>
 </div>
 </div>
@@ -1438,6 +1440,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/live-course.js"></script>
 <script src="../js/auth.js"></script>
 
 </body>

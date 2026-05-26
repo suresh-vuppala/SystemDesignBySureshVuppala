@@ -3,14 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Google Calendar handle recurring events across timezones? — System Design</title>
+<title>How does Google Calendar handle recurring events across timezones? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google Calendar handle recurring events across timezones?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">📅</span> Design a calendar recurrence engine: timezone-aware, exception handling, on-the-fly generation</div>
+<div class="sd sd-5"><span class="e">??</span> Design a calendar recurrence engine: timezone-aware, exception handling, on-the-fly generation</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/06-storage.html#nosql">NoSQL</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#consistency-models">Consistency</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#multi-region">Multi-Region</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
@@ -42,15 +53,15 @@
 </div>
 
 <div class="T" id="architecture">
-<h2>Architecture — RRULE Engine + Exception Handling</h2>
+<h2>Architecture &middot; RRULE Engine + Exception Handling</h2>
 
-<!-- ═══ Calendar SVG ═══ -->
+<!-- --- Calendar SVG --- -->
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Calendar recurrence engine end-to-end: storage, RRULE expansion engine, generated occurrences, and this-and-future split">
   <defs><marker id="cal-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="var(--muted)"/></marker></defs>
 
-  <!-- ═══ LAYER 1: STORAGE ═══ -->
+  <!-- --- LAYER 1: STORAGE --- -->
   <rect x="10" y="10" width="760" height="120" rx="8" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 — STORAGE (Stored Event: 1 Row per Recurring Series)</text>
+  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 &middot; STORAGE (Stored Event: 1 Row per Recurring Series)</text>
 
   <rect x="30" y="40" width="200" height="80" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
   <text x="130" y="56" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">RRULE + DTSTART</text>
@@ -76,17 +87,17 @@
   <rect x="610" y="40" width="150" height="80" rx="6" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1"/>
   <text x="685" y="56" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Overrides</text>
   <text x="685" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">RECURRENCE-ID: Mar 26</text>
-  <text x="685" y="83" text-anchor="middle" fill="var(--muted)" font-size="5.5">→ moved to 11:00, new title</text>
+  <text x="685" y="83" text-anchor="middle" fill="var(--muted)" font-size="5.5">? moved to 11:00, new title</text>
   <text x="685" y="96" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Modified single instance</text>
   <text x="685" y="112" text-anchor="middle" fill="var(--muted)" font-size="5">Separate row, linked to parent</text>
 
-  <!-- Arrow Layer 1 → Layer 2 -->
+  <!-- Arrow Layer 1 ? Layer 2 -->
   <line x1="390" y1="130" x2="390" y2="148" stroke="var(--a)" stroke-width="1.2" marker-end="url(#cal-arr)"/>
   <text x="420" y="142" fill="var(--muted)" font-size="5.5">query window (e.g., March 2024)</text>
 
-  <!-- ═══ LAYER 2: ENGINE ═══ -->
+  <!-- --- LAYER 2: ENGINE --- -->
   <rect x="10" y="150" width="760" height="120" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="168" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 2 — ENGINE (RRULE Expansion Engine)</text>
+  <text x="390" y="168" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 2 &middot; ENGINE (RRULE Expansion Engine)</text>
 
   <rect x="30" y="178" width="135" height="80" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width="1"/>
   <text x="97" y="194" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Expand Window</text>
@@ -119,40 +130,40 @@
   <text x="556" y="194" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Handle DST</text>
   <text x="556" y="208" text-anchor="middle" fill="var(--muted)" font-size="5.5">Detect DST boundary</text>
   <text x="556" y="220" text-anchor="middle" fill="var(--muted)" font-size="5.5">Keep wall-clock time</text>
-  <text x="556" y="234" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">10am EST → 10am EDT</text>
+  <text x="556" y="234" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">10am EST ? 10am EDT</text>
   <text x="556" y="248" text-anchor="middle" fill="var(--muted)" font-size="5">UTC offset changes</text>
 
   <line x1="619" y1="218" x2="639" y2="218" stroke="var(--o)" stroke-width="1" marker-end="url(#cal-arr)"/>
 
   <rect x="642" y="178" width="118" height="80" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
-  <text x="701" y="194" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Convert TZID→UTC</text>
+  <text x="701" y="194" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Convert TZID?UTC</text>
   <text x="701" y="208" text-anchor="middle" fill="var(--muted)" font-size="5.5">For cross-TZ display</text>
   <text x="701" y="220" text-anchor="middle" fill="var(--muted)" font-size="5.5">Use latest IANA tzdata</text>
   <text x="701" y="234" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Compute at query time</text>
   <text x="701" y="248" text-anchor="middle" fill="var(--muted)" font-size="5">Not pre-stored</text>
 
-  <!-- Arrow Layer 2 → Layer 3 -->
+  <!-- Arrow Layer 2 ? Layer 3 -->
   <line x1="390" y1="270" x2="390" y2="288" stroke="var(--y)" stroke-width="1.2" marker-end="url(#cal-arr)"/>
 
-  <!-- ═══ LAYER 3: OUTPUT ═══ -->
+  <!-- --- LAYER 3: OUTPUT --- -->
   <rect x="10" y="290" width="760" height="145" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="308" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 3 — OUTPUT (Generated Occurrences + "This and Future" Split)</text>
+  <text x="390" y="308" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 3 &middot; OUTPUT (Generated Occurrences + "This and Future" Split)</text>
 
   <!-- Generated Occurrences list -->
   <rect x="30" y="318" width="320" height="105" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
   <text x="190" y="334" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Generated Occurrences (March 2024)</text>
 
   <rect x="42" y="340" width="296" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".5"/>
-  <text x="190" y="352" text-anchor="middle" fill="var(--g)" font-size="5.5">✓ Mar 5 (Tue) 10:00 EST — normal instance</text>
+  <text x="190" y="352" text-anchor="middle" fill="var(--g)" font-size="5.5">? Mar 5 (Tue) 10:00 EST &middot; normal instance</text>
 
   <rect x="42" y="360" width="296" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".5"/>
-  <text x="190" y="372" text-anchor="middle" fill="var(--y)" font-size="5.5">⚡ Mar 12 (Tue) 10:00 EDT — DST changed (UTC-5→UTC-4)</text>
+  <text x="190" y="372" text-anchor="middle" fill="var(--y)" font-size="5.5">? Mar 12 (Tue) 10:00 EDT &middot; DST changed (UTC-5?UTC-4)</text>
 
   <rect x="42" y="380" width="296" height="16" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".5"/>
-  <text x="190" y="392" text-anchor="middle" fill="var(--r)" font-size="5.5">✗ Mar 19 (Tue) — SKIPPED / EXDATE</text>
+  <text x="190" y="392" text-anchor="middle" fill="var(--r)" font-size="5.5">? Mar 19 (Tue) &middot; SKIPPED / EXDATE</text>
 
   <rect x="42" y="400" width="296" height="16" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".5"/>
-  <text x="190" y="412" text-anchor="middle" fill="var(--a2)" font-size="5.5">✎ Mar 26 (Tue) 11:00 EDT — overridden (moved to 11:00)</text>
+  <text x="190" y="412" text-anchor="middle" fill="var(--a2)" font-size="5.5">? Mar 26 (Tue) 11:00 EDT &middot; overridden (moved to 11:00)</text>
 
   <!-- "This and Future" split -->
   <rect x="370" y="318" width="390" height="105" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
@@ -162,7 +173,7 @@
   <text x="467" y="358" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Original Series</text>
   <text x="467" y="372" text-anchor="middle" fill="var(--muted)" font-size="5.5">RRULE: WEEKLY;BYDAY=TU</text>
   <text x="467" y="385" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">+ UNTIL=2024-04-15</text>
-  <text x="467" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">Jan 2 → Apr 9 (ends)</text>
+  <text x="467" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">Jan 2 ? Apr 9 (ends)</text>
   <text x="467" y="410" text-anchor="middle" fill="var(--muted)" font-size="4.5">10:00 AM unchanged</text>
 
   <line x1="552" y1="377" x2="578" y2="377" stroke="var(--r)" stroke-width="1.5" marker-end="url(#cal-arr)"/>
@@ -172,46 +183,46 @@
   <text x="665" y="358" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">New Series</text>
   <text x="665" y="372" text-anchor="middle" fill="var(--muted)" font-size="5.5">DTSTART: 2024-04-16 11:00</text>
   <text x="665" y="385" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">RRULE: WEEKLY;BYDAY=TU</text>
-  <text x="665" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">Apr 16 → forever</text>
+  <text x="665" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">Apr 16 ? forever</text>
   <text x="665" y="410" text-anchor="middle" fill="var(--muted)" font-size="4.5">New time: 11:00 AM</text>
 
-  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <!-- --- BOTTOM INSIGHT --- -->
   <rect x="10" y="448" width="760" height="44" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="390" y="465" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Store local time + TZID NOT UTC | DST: 10am EST → 10am EDT (same local, different UTC)</text>
-  <text x="390" y="482" text-anchor="middle" fill="var(--muted)" font-size="6">Never unbounded expansion | IANA tzdata updated yearly — countries change DST rules | Cache materialized windows (next 6 months)</text>
+  <text x="390" y="465" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Store local time + TZID NOT UTC | DST: 10am EST ? 10am EDT (same local, different UTC)</text>
+  <text x="390" y="482" text-anchor="middle" fill="var(--muted)" font-size="6">Never unbounded expansion | IANA tzdata updated yearly &middot; countries change DST rules | Cache materialized windows (next 6 months)</text>
 </svg>
 <table>
 <tr><th>Concept</th><th>Storage</th><th>How It Works</th></tr>
-<tr><td><span class="hi">Recurring Event</span></td><td>1 row: RRULE + DTSTART + TZID</td><td><code>RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20251231</code> — generate occurrences on query</td></tr>
-<tr><td><span class="hi">Exception (delete one)</span></td><td>EXDATE list on parent</td><td><code>EXDATE:20240319T100000</code> — skip this occurrence during generation</td></tr>
+<tr><td><span class="hi">Recurring Event</span></td><td>1 row: RRULE + DTSTART + TZID</td><td><code>RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20251231</code> &middot; generate occurrences on query</td></tr>
+<tr><td><span class="hi">Exception (delete one)</span></td><td>EXDATE list on parent</td><td><code>EXDATE:20240319T100000</code> &middot; skip this occurrence during generation</td></tr>
 <tr><td><span class="hi">Exception (modify one)</span></td><td>Separate event with RECURRENCE-ID</td><td>Override instance: different time/title but linked to parent series</td></tr>
 <tr><td><span class="hi">"This and future"</span></td><td>Split into 2 series</td><td>Original gets UNTIL before split. New series starts from split point with new RRULE.</td></tr>
-<tr><td><span class="hi">Timezone</span></td><td>Store as local time + TZID</td><td>"10:00 America/New_York" — compute UTC at query time using current TZ rules</td></tr>
-<tr><td><span class="hi">DST transition</span></td><td>TZID handles automatically</td><td>10am EST → 10am EDT (same local time, different UTC offset). Wall-clock time preserved.</td></tr>
+<tr><td><span class="hi">Timezone</span></td><td>Store as local time + TZID</td><td>"10:00 America/New_York" &middot; compute UTC at query time using current TZ rules</td></tr>
+<tr><td><span class="hi">DST transition</span></td><td>TZID handles automatically</td><td>10am EST ? 10am EDT (same local time, different UTC offset). Wall-clock time preserved.</td></tr>
 </table>
 
 <div class="b bg"><span class="hi">Why not store all instances?</span> "Every weekday forever" = infinite instances. Even "every day for 5 years" = 1,825 rows per event. With 1B recurring events, that's <span class="hr">trillions of rows</span>. Instead: store 1 RRULE, generate occurrences for the requested date range on-the-fly. Cache materialized windows (e.g., next 6 months).</div>
-<div class="b by"><span class="hi">Query pattern:</span> "Show me events for March 2025" → ① Fetch all non-recurring events in range ② Fetch all recurring events whose DTSTART ≤ end AND (no UNTIL or UNTIL ≥ start) ③ Expand RRULEs within range ④ Apply EXDATEs ⑤ Merge overridden instances ⑥ Sort by time.</div>
-<div class="b br"><span class="hi">Pitfalls:</span> <span class="hr">Storing in UTC</span> — "10am meeting" shifts when DST changes (store local + TZID instead). <span class="hr">Unbounded RRULE expansion</span> — always limit to requested window. <span class="hr">TZ rule changes</span> — countries change DST rules; must use latest IANA tzdata. <span class="hr">Floating time</span> — "all-day events" have no timezone (date only).</div>
-<div class="b bb"><span class="hi">Real-world:</span> <strong>Google Calendar</strong> — RFC 5545 RRULE engine, stores local time + TZID. <strong>Outlook</strong> — similar, with Exchange-specific extensions. <strong>Apple Calendar</strong> — CalDAV + RRULE. <strong>Temporal</strong> — cron-based scheduling for distributed systems (different problem, same timezone challenges).</div>
+<div class="b by"><span class="hi">Query pattern:</span> "Show me events for March 2025" ? ? Fetch all non-recurring events in range ? Fetch all recurring events whose DTSTART = end AND (no UNTIL or UNTIL = start) ? Expand RRULEs within range ? Apply EXDATEs ? Merge overridden instances ? Sort by time.</div>
+<div class="b br"><span class="hi">Pitfalls:</span> <span class="hr">Storing in UTC</span> &middot; "10am meeting" shifts when DST changes (store local + TZID instead). <span class="hr">Unbounded RRULE expansion</span> &middot; always limit to requested window. <span class="hr">TZ rule changes</span> &middot; countries change DST rules; must use latest IANA tzdata. <span class="hr">Floating time</span> &middot; "all-day events" have no timezone (date only).</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Google Calendar</strong> &middot; RFC 5545 RRULE engine, stores local time + TZID. <strong>Outlook</strong> &middot; similar, with Exchange-specific extensions. <strong>Apple Calendar</strong> &middot; CalDAV + RRULE. <strong>Temporal</strong> &middot; cron-based scheduling for distributed systems (different problem, same timezone challenges).</div>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 6 things to say for calendar/scheduling design</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Store RRULE, not instances</strong> — "every Tuesday" = 1 row, generate occurrences on-the-fly<br>
-<span class="hg">2.</span> <strong>Store local time + TZID</strong> — never store UTC for recurring events (DST breaks it)<br>
-<span class="hg">3.</span> <strong>EXDATE for exceptions</strong> — delete one occurrence without breaking the series<br>
-<span class="hg">4.</span> <strong>"This and future" = split series</strong> — original gets UNTIL, new series starts from split point<br>
-<span class="hg">5.</span> <strong>Query: expand RRULEs within requested window</strong> — never unbounded expansion<br>
-<span class="hg">6.</span> <strong>IANA tzdata updates</strong> — countries change DST rules; must use latest timezone database
+<span class="hg">1.</span> <strong>Store RRULE, not instances</strong> &middot; "every Tuesday" = 1 row, generate occurrences on-the-fly<br>
+<span class="hg">2.</span> <strong>Store local time + TZID</strong> &middot; never store UTC for recurring events (DST breaks it)<br>
+<span class="hg">3.</span> <strong>EXDATE for exceptions</strong> &middot; delete one occurrence without breaking the series<br>
+<span class="hg">4.</span> <strong>"This and future" = split series</strong> &middot; original gets UNTIL, new series starts from split point<br>
+<span class="hg">5.</span> <strong>Query: expand RRULEs within requested window</strong> &middot; never unbounded expansion<br>
+<span class="hg">6.</span> <strong>IANA tzdata updates</strong> &middot; countries change DST rules; must use latest timezone database
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

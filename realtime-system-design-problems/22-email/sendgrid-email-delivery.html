@@ -3,19 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does SendGrid deliver 500M+ emails/day with high deliverability? — System Design</title>
+<title>How does SendGrid deliver 500M+ emails/day with high deliverability? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does SendGrid deliver 500M+ emails/day with 99%+ deliverability?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">📧</span> Design an email delivery system: 500M emails/day, 99%+ deliverability, IP warm-up, bounce handling</div>
+<div class="sd sd-5"><span class="e">??</span> Design an email delivery system: 500M emails/day, 99%+ deliverability, IP warm-up, bounce handling</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#dlq">DLQ</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/02-networking.html#dns">DNS</a>
+<a href="../../system-design-cheatsheet/04-apis.html#idempotent-apis">Idempotency</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does an email delivery platform send 500M+ emails/day while maintaining 99%+ deliverability through IP reputation management, authentication (DKIM/SPF/DMARC), intelligent bounce handling, and per-domain throttling?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Email deliverability depends on <span class="hg">IP reputation</span> — one bad actor can poison an entire IP pool. Must balance throughput with per-ISP rate limits (Gmail accepts ~500/hr from new IPs), handle bounces instantly, and authenticate every message.</div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Email deliverability depends on <span class="hg">IP reputation</span> &middot; one bad actor can poison an entire IP pool. Must balance throughput with per-ISP rate limits (Gmail accepts ~500/hr from new IPs), handle bounces instantly, and authenticate every message.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -44,7 +55,7 @@
 
   <!-- LAYER 1: INGESTION -->
   <rect x="10" y="10" width="760" height="130" rx="8" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 — INGESTION (API → Validation → Per-Domain Queue)</text>
+  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 &middot; INGESTION (API ? Validation ? Per-Domain Queue)</text>
 
   <rect x="30" y="42" width="130" height="85" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
   <text x="95" y="58" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">API Ingestion</text>
@@ -58,7 +69,7 @@
 
   <rect x="190" y="42" width="175" height="85" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="277" y="58" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Validation</text>
-  <text x="277" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">DKIM sign (private key → body+headers)</text>
+  <text x="277" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">DKIM sign (private key ? body+headers)</text>
   <text x="277" y="85" text-anchor="middle" fill="var(--muted)" font-size="5.5">SPF check (authorized sending IP?)</text>
   <text x="277" y="98" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Suppression list check (Bloom ~1B)</text>
   <text x="277" y="111" text-anchor="middle" fill="var(--muted)" font-size="5.5">Reject if suppressed/invalid</text>
@@ -84,18 +95,18 @@
   <text x="680" y="111" text-anchor="middle" fill="var(--muted)" font-size="5.5">Priority: transactional > marketing</text>
   <text x="680" y="122" text-anchor="middle" fill="var(--muted)" font-size="5">Queue depth monitoring</text>
 
-  <!-- Arrow Layer 1 → Layer 2 -->
+  <!-- Arrow Layer 1 ? Layer 2 -->
   <line x1="390" y1="140" x2="390" y2="158" stroke="var(--a)" stroke-width="1.2" marker-end="url(#em-arr)"/>
 
   <!-- LAYER 2: DELIVERY -->
   <rect x="10" y="160" width="760" height="125" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="178" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 — DELIVERY (MTA Pool → ISP Mailbox → Inbox)</text>
+  <text x="390" y="178" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 &middot; DELIVERY (MTA Pool ? ISP Mailbox ? Inbox)</text>
 
   <rect x="30" y="190" width="250" height="82" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="155" y="206" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">MTA Pool (300 IPs)</text>
   <text x="155" y="220" text-anchor="middle" fill="var(--muted)" font-size="5.5">IP rotation by reputation score</text>
-  <text x="155" y="233" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Warm IPs → more traffic allocated</text>
-  <text x="155" y="246" text-anchor="middle" fill="var(--muted)" font-size="5.5">Cold IPs → ramp slowly (100→200→400/day)</text>
+  <text x="155" y="233" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Warm IPs ? more traffic allocated</text>
+  <text x="155" y="246" text-anchor="middle" fill="var(--muted)" font-size="5.5">Cold IPs ? ramp slowly (100?200?400/day)</text>
   <text x="155" y="259" text-anchor="middle" fill="var(--muted)" font-size="5.5">Bad sender isolation (dedicated pools)</text>
   <text x="155" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">Full warm-up: 4-6 weeks</text>
 
@@ -112,23 +123,23 @@
   <line x1="532" y1="235" x2="562" y2="235" stroke="var(--r)" stroke-width="1.2" marker-end="url(#em-arr)"/>
 
   <rect x="564" y="195" width="195" height="72" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="661" y="215" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">📬 Inbox</text>
+  <text x="661" y="215" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">?? Inbox</text>
   <text x="661" y="232" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Delivered successfully!</text>
   <text x="661" y="246" text-anchor="middle" fill="var(--muted)" font-size="5.5">DKIM+SPF+DMARC aligned</text>
   <text x="661" y="259" text-anchor="middle" fill="var(--muted)" font-size="5.5">= inbox placement (not spam)</text>
 
-  <!-- Arrow Layer 2 → Layer 3 -->
+  <!-- Arrow Layer 2 ? Layer 3 -->
   <line x1="390" y1="285" x2="390" y2="303" stroke="var(--g)" stroke-width="1.2" marker-end="url(#em-arr)"/>
 
   <!-- LAYER 3: FEEDBACK -->
   <rect x="10" y="305" width="760" height="140" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="323" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 3 — FEEDBACK (Bounce Handling + Reputation + Suppression)</text>
+  <text x="390" y="323" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 3 &middot; FEEDBACK (Bounce Handling + Reputation + Suppression)</text>
 
   <rect x="30" y="335" width="135" height="95" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1"/>
   <text x="97" y="351" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Hard Bounce</text>
   <text x="97" y="365" text-anchor="middle" fill="var(--muted)" font-size="5.5">Invalid address (550)</text>
   <text x="97" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">Domain doesn't exist</text>
-  <text x="97" y="393" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">→ Suppress immediately</text>
+  <text x="97" y="393" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">? Suppress immediately</text>
   <text x="97" y="406" text-anchor="middle" fill="var(--muted)" font-size="5.5">Never send again</text>
   <text x="97" y="420" text-anchor="middle" fill="var(--muted)" font-size="5">Add to suppression list</text>
 
@@ -136,7 +147,7 @@
   <text x="247" y="351" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Soft Bounce</text>
   <text x="247" y="365" text-anchor="middle" fill="var(--muted)" font-size="5.5">Mailbox full (452)</text>
   <text x="247" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">Temp server issue</text>
-  <text x="247" y="393" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">→ Retry 3× over 72h</text>
+  <text x="247" y="393" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">? Retry 3&middot; over 72h</text>
   <text x="247" y="406" text-anchor="middle" fill="var(--muted)" font-size="5.5">Exponential backoff</text>
   <text x="247" y="420" text-anchor="middle" fill="var(--muted)" font-size="5">Suppress after 3 fails</text>
 
@@ -144,7 +155,7 @@
   <text x="397" y="351" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Spam Complaint</text>
   <text x="397" y="365" text-anchor="middle" fill="var(--muted)" font-size="5.5">FBL report from ISP</text>
   <text x="397" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">User marked as spam</text>
-  <text x="397" y="393" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">→ Auto-unsubscribe</text>
+  <text x="397" y="393" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">? Auto-unsubscribe</text>
   <text x="397" y="406" text-anchor="middle" fill="var(--muted)" font-size="5.5">Target: &lt;0.1% rate</text>
   <text x="397" y="420" text-anchor="middle" fill="var(--muted)" font-size="5">Exceeding = IP blacklist</text>
 
@@ -154,7 +165,7 @@
   <text x="550" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">Bounce rate &lt;2%</text>
   <text x="550" y="393" text-anchor="middle" fill="var(--muted)" font-size="5.5">Complaint &lt;0.1%</text>
   <text x="550" y="406" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Score drives IP allocation</text>
-  <text x="550" y="420" text-anchor="middle" fill="var(--muted)" font-size="5">Low score → less traffic</text>
+  <text x="550" y="420" text-anchor="middle" fill="var(--muted)" font-size="5">Low score ? less traffic</text>
 
   <rect x="635" y="335" width="125" height="95" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
   <text x="697" y="351" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Suppression List</text>
@@ -166,30 +177,30 @@
 
   <!-- BOTTOM INSIGHT -->
   <rect x="10" y="455" width="760" height="38" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">DKIM + SPF + DMARC = inbox placement | IP Warm-up: 100→200→400/day over 4-6 weeks</text>
+  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">DKIM + SPF + DMARC = inbox placement | IP Warm-up: 100?200?400/day over 4-6 weeks</text>
   <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="6">Bounce &lt;2%, complaint &lt;0.1% | Per-domain throttling | Bad sender isolation | Suppression Bloom filter ~1B addresses</text>
 </svg>
 
-<div class="b bg"><span class="hi">IP reputation management:</span> Dedicated IP pools per customer segment. New IPs warm up gradually (100→200→400/day). <span class="hg">Reputation score</span> tracks bounces, spam complaints, and engagement. Bad senders isolated to prevent pool contamination.</div>
-<div class="b by"><span class="hi">Per-domain throttling:</span> Each ISP has different rate limits. Gmail ~500/hr for new IPs, Outlook ~1000/hr. The scheduler maintains <span class="hg">per-domain queues</span> with adaptive rate limiting — backs off on 4xx responses, pauses on 5xx.</div>
-<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Blast all at once</span> — ISPs throttle/block. <span class="hr">Shared IPs without isolation</span> — one spammer ruins everyone. <span class="hr">Ignoring bounces</span> — reputation tanks within hours. <span class="hr">No DKIM/SPF</span> — straight to spam folder.</div>
-<div class="b bb"><span class="hi">Bounce handling:</span> Hard bounces (invalid address) → immediately suppress. Soft bounces (mailbox full) → retry 3x over 72hrs. Complaint feedback loops (FBL) → auto-unsubscribe. Keep bounce rate <span class="hg">&lt;2%</span> or risk IP blacklisting.</div>
+<div class="b bg"><span class="hi">IP reputation management:</span> Dedicated IP pools per customer segment. New IPs warm up gradually (100?200?400/day). <span class="hg">Reputation score</span> tracks bounces, spam complaints, and engagement. Bad senders isolated to prevent pool contamination.</div>
+<div class="b by"><span class="hi">Per-domain throttling:</span> Each ISP has different rate limits. Gmail ~500/hr for new IPs, Outlook ~1000/hr. The scheduler maintains <span class="hg">per-domain queues</span> with adaptive rate limiting &middot; backs off on 4xx responses, pauses on 5xx.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Blast all at once</span> &middot; ISPs throttle/block. <span class="hr">Shared IPs without isolation</span> &middot; one spammer ruins everyone. <span class="hr">Ignoring bounces</span> &middot; reputation tanks within hours. <span class="hr">No DKIM/SPF</span> &middot; straight to spam folder.</div>
+<div class="b bb"><span class="hi">Bounce handling:</span> Hard bounces (invalid address) ? immediately suppress. Soft bounces (mailbox full) ? retry 3x over 72hrs. Complaint feedback loops (FBL) ? auto-unsubscribe. Keep bounce rate <span class="hg">&lt;2%</span> or risk IP blacklisting.</div>
 </div>
 
-<!-- ═══ SCALE ESTIMATION ═══ -->
+<!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
 <table>
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
-<tr><td><span class="hi">1</span></td><td>Emails/sec: 500M ÷ 86400</td><td><span class="hg">~5,800 emails/sec avg</span></td><td>Moderate throughput — throttling per domain is the constraint</td></tr>
-<tr><td><span class="hi">2</span></td><td>Peak: 5,800 × 5× (marketing blast)</td><td><span class="hg">~29K emails/sec peak</span></td><td>Queue absorbs bursts, MTA pool drains at ISP-allowed rate</td></tr>
-<tr><td><span class="hi">3</span></td><td>IP pool: 29K/sec ÷ ~100 emails/sec/IP</td><td><span class="hg">~300 sending IPs</span></td><td>Warm IPs get more traffic, cold IPs ramp slowly</td></tr>
+<tr><td><span class="hi">1</span></td><td>Emails/sec: 500M &middot; 86400</td><td><span class="hg">~5,800 emails/sec avg</span></td><td>Moderate throughput &middot; throttling per domain is the constraint</td></tr>
+<tr><td><span class="hi">2</span></td><td>Peak: 5,800 &middot; 5&middot; (marketing blast)</td><td><span class="hg">~29K emails/sec peak</span></td><td>Queue absorbs bursts, MTA pool drains at ISP-allowed rate</td></tr>
+<tr><td><span class="hi">3</span></td><td>IP pool: 29K/sec &middot; ~100 emails/sec/IP</td><td><span class="hg">~300 sending IPs</span></td><td>Warm IPs get more traffic, cold IPs ramp slowly</td></tr>
 <tr><td><span class="hi">4</span></td><td>Bounce processing: 2% of 500M</td><td><span class="hg">~10M bounces/day</span></td><td>Real-time suppression list update (Redis set)</td></tr>
-<tr><td><span class="hi">5</span></td><td>Suppression list: 10M/day × 365 days accumulated</td><td><span class="hg">~1B suppressed addresses</span></td><td>Bloom filter for fast "should I send?" check</td></tr>
+<tr><td><span class="hi">5</span></td><td>Suppression list: 10M/day &middot; 365 days accumulated</td><td><span class="hg">~1B suppressed addresses</span></td><td>Bloom filter for fast "should I send?" check</td></tr>
 </table>
 </div>
 
-<!-- ═══ RESILIENCE ═══ -->
+<!-- --- RESILIENCE --- -->
 <div class="T" id="resilience">
 <h2>Resilience &amp; Edge Cases</h2>
 <table>
@@ -197,7 +208,7 @@
 <tr><td><span class="hr">IP blacklisted</span></td><td>All emails from that IP go to spam</td><td>Rotate to warm backup IP. Investigate cause (bad sender). Apply for delisting. Isolate offending customer.</td></tr>
 <tr><td><span class="hr">ISP rate-limits (4xx)</span></td><td>Emails queued, delivery delayed</td><td>Exponential backoff per domain. Spread load across more IPs. Respect Retry-After header.</td></tr>
 <tr><td><span class="hr">DKIM key compromised</span></td><td>Attacker can forge emails from your domain</td><td>Rotate DKIM keys immediately. Publish new key in DNS. Old signatures invalid within TTL.</td></tr>
-<tr><td><span class="hr">Bulk sender sends to purchased list</span></td><td>High bounce rate → IP reputation tanks</td><td>Pre-send validation (check MX records). Rate-limit new senders. Suspend accounts exceeding bounce threshold.</td></tr>
+<tr><td><span class="hr">Bulk sender sends to purchased list</span></td><td>High bounce rate ? IP reputation tanks</td><td>Pre-send validation (check MX records). Rate-limit new senders. Suspend accounts exceeding bounce threshold.</td></tr>
 <tr><td><span class="hr">Email queue backlog</span></td><td>Delivery delayed hours</td><td>Priority queues (transactional > marketing). Auto-scale MTA workers. Alert on queue depth > 1M.</td></tr>
 </table>
 </div>
@@ -205,17 +216,17 @@
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>DKIM/SPF/DMARC</strong> — cryptographic signing + IP authorization + policy alignment for inbox placement<br>
-<span class="hg">2.</span> <strong>IP warm-up</strong> — gradual volume increase over 4-6 weeks to build reputation with ISPs<br>
-<span class="hg">3.</span> <strong>Per-domain throttling</strong> — respect ISP rate limits (Gmail ≠ Outlook ≠ Yahoo)<br>
-<span class="hg">4.</span> <strong>Bounce classification</strong> — hard (suppress immediately) vs soft (retry with backoff)<br>
-<span class="hg">5.</span> <strong>IP pool isolation</strong> — separate bad senders to protect shared reputation<br>
-<span class="hg">6.</span> <strong>Feedback loops</strong> — process spam complaints in real-time, auto-suppress complainers
+<span class="hg">1.</span> <strong>DKIM/SPF/DMARC</strong> &middot; cryptographic signing + IP authorization + policy alignment for inbox placement<br>
+<span class="hg">2.</span> <strong>IP warm-up</strong> &middot; gradual volume increase over 4-6 weeks to build reputation with ISPs<br>
+<span class="hg">3.</span> <strong>Per-domain throttling</strong> &middot; respect ISP rate limits (Gmail ? Outlook ? Yahoo)<br>
+<span class="hg">4.</span> <strong>Bounce classification</strong> &middot; hard (suppress immediately) vs soft (retry with backoff)<br>
+<span class="hg">5.</span> <strong>IP pool isolation</strong> &middot; separate bad senders to protect shared reputation<br>
+<span class="hg">6.</span> <strong>Feedback loops</strong> &middot; process spam complaints in real-time, auto-suppress complainers
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

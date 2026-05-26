@@ -1,22 +1,34 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WhatsApp Offline Delivery & E2E Encryption — System Design</title>
+<title>WhatsApp Offline Delivery & E2E Encryption &middot; System Design</title>
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does WhatsApp guarantee message delivery to 2B+ users who go offline — with end-to-end encryption?</p></div>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does WhatsApp guarantee message delivery to 2B+ users who go offline &middot; with end-to-end encryption?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">📱</span> Design a messaging system that guarantees zero message loss for 2B+ users who go offline for hours/days, with E2E encryption where the server never sees plaintext</div>
+<div class="sd sd-5"><span class="e">??</span> Design a messaging system that guarantees zero message loss for 2B+ users who go offline for hours/days, with E2E encryption where the server never sees plaintext</div>
 
-<!-- ═══ PROBLEM STATEMENT ═══ -->
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/03-security.html#encryption">Encryption (E2E)</a>
+<a href="../../system-design-cheatsheet/06-storage.html#nosql">NoSQL</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#consistency-models">Ordering &amp; Consistency</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#multi-region">Multi-Region</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <p class="su">How does a messaging system guarantee delivery to 2B+ users who go offline for hours/days, ensuring zero message loss, correct ordering on reconnect, and end-to-end encryption without the server ever seeing plaintext?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Key difference from Slack:</span> Slack assumes users are mostly online (WebSocket push). WhatsApp must handle the <span class="hr">offline-first</span> case — users may be offline for days, on unreliable mobile networks, with intermittent connectivity. See <a href="slack-real-time-messaging.html">Slack Real-Time Messaging</a> for the online delivery path.</div>
+<div class="b br" style="margin:4px 0"><span class="hi">Key difference from Slack:</span> Slack assumes users are mostly online (WebSocket push). WhatsApp must handle the <span class="hr">offline-first</span> case &middot; users may be offline for days, on unreliable mobile networks, with intermittent connectivity. See <a href="slack-real-time-messaging.html">Slack Real-Time Messaging</a> for the online delivery path.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -38,18 +50,18 @@
 </div>
 </div>
 
-<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
 <div class="T" id="functional-requirements">
 <h2>Functional Requirements</h2>
-<p class="su">What the system must do — focused on offline delivery and encryption</p>
+<p class="su">What the system must do &middot; focused on offline delivery and encryption</p>
 <div class="d-grid" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--g)">Must Have (Core)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hg">1.</span> Messages <strong>never lost</strong> after sender gets delivery ACK (✓✓)<br>
-  <span class="hg">2.</span> Offline users receive <strong>all missed messages</strong> on reconnect — in correct order<br>
-  <span class="hg">3.</span> <strong>End-to-end encryption</strong> — server stores only ciphertext, never plaintext<br>
-  <span class="hg">4.</span> <strong>Delivery receipts</strong>: single tick (sent) → double tick (delivered) → blue tick (read)<br>
+  <span class="hg">1.</span> Messages <strong>never lost</strong> after sender gets delivery ACK (??)<br>
+  <span class="hg">2.</span> Offline users receive <strong>all missed messages</strong> on reconnect &middot; in correct order<br>
+  <span class="hg">3.</span> <strong>End-to-end encryption</strong> &middot; server stores only ciphertext, never plaintext<br>
+  <span class="hg">4.</span> <strong>Delivery receipts</strong>: single tick (sent) ? double tick (delivered) ? blue tick (read)<br>
   <span class="hg">5.</span> Messages <strong>expire from server</strong> after delivery (30-day TTL for undelivered)<br>
   <span class="hg">6.</span> Support <strong>media messages</strong> (photos, video, documents) with same guarantees
 </div>
@@ -57,17 +69,17 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">✗</span> Group messaging fan-out (see <a href="slack-real-time-messaging.html#fanout">Slack Fan-out Strategy</a>)<br>
-  <span class="hr">✗</span> Real-time online delivery path (see <a href="slack-real-time-messaging.html#architecture">Slack Architecture</a>)<br>
-  <span class="hr">✗</span> Voice/video calling signaling<br>
-  <span class="hr">✗</span> Status/Stories feature<br>
-  <span class="hr">✗</span> Business API and chatbots
+  <span class="hr">?</span> Group messaging fan-out (see <a href="slack-real-time-messaging.html#fanout">Slack Fan-out Strategy</a>)<br>
+  <span class="hr">?</span> Real-time online delivery path (see <a href="slack-real-time-messaging.html#architecture">Slack Architecture</a>)<br>
+  <span class="hr">?</span> Voice/video calling signaling<br>
+  <span class="hr">?</span> Status/Stories feature<br>
+  <span class="hr">?</span> Business API and chatbots
 </div>
 </div>
 </div>
 </div>
 
-<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
 <div class="T" id="nonfunctional-requirements">
 <h2>Non-Functional Requirements</h2>
 <p class="su">Constraints shaped by mobile-first, offline-heavy usage patterns</p>
@@ -76,38 +88,38 @@
 <tr><td><span class="hi">Durability</span></td><td><span class="hg">Zero message loss</span> after sender ACK</td><td>Write-ahead log + synchronous replication before ACK. Messages stored until recipient confirms delivery.</td></tr>
 <tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;300ms</span> when both online</td><td>Direct push via persistent connection when recipient is online. No store-and-forward delay.</td></tr>
 <tr><td><span class="hi">Offline tolerance</span></td><td>Up to <span class="hg">30 days</span> offline</td><td>Server queues messages per recipient. TTL-based expiry after 30 days. Recipient pulls on reconnect.</td></tr>
-<tr><td><span class="hi">Security</span></td><td><span class="hg">E2E encrypted</span> — server is zero-knowledge</td><td>Signal Protocol (Double Ratchet). Server stores ciphertext only. Key exchange happens client-to-client.</td></tr>
+<tr><td><span class="hi">Security</span></td><td><span class="hg">E2E encrypted</span> &middot; server is zero-knowledge</td><td>Signal Protocol (Double Ratchet). Server stores ciphertext only. Key exchange happens client-to-client.</td></tr>
 <tr><td><span class="hi">Ordering</span></td><td><span class="hg">Per-conversation</span> ordering preserved</td><td>Sender-assigned sequence numbers. Recipient reorders on delivery. No global ordering needed.</td></tr>
-<tr><td><span class="hi">Bandwidth</span></td><td>Minimal — <span class="hg">2G/3G friendly</span></td><td>Binary protocol (not JSON). Compressed payloads. Resumable media uploads. Delta sync on reconnect.</td></tr>
+<tr><td><span class="hi">Bandwidth</span></td><td>Minimal &middot; <span class="hg">2G/3G friendly</span></td><td>Binary protocol (not JSON). Compressed payloads. Resumable media uploads. Delta sync on reconnect.</td></tr>
 <tr><td><span class="hi">Scale</span></td><td><span class="hg">2B+ users</span>, 100B+ msg/day</td><td>Shard by user_id. Each user's queue is independent. Horizontal scale with no cross-shard coordination.</td></tr>
 </table>
 </div>
 
-<!-- ═══ SCALE ESTIMATION ═══ -->
+<!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
 <p class="su">Derive infrastructure sizing from the given numbers</p>
 <table>
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Decision</th></tr>
-<tr><td><span class="hi">1</span></td><td>100B msgs/day ÷ 86,400s</td><td><span class="hg">~1.15M msg/sec</span></td><td>10× Slack's throughput — need sharded message queues</td></tr>
-<tr><td><span class="hi">2</span></td><td>2B users × ~30% online at any time</td><td><span class="hg">~600M concurrent connections</span></td><td>~1.2M connection servers (500K conn each)</td></tr>
-<tr><td><span class="hi">3</span></td><td>Avg user offline 8-16 hrs/day → ~50 msgs queued</td><td><span class="hg">~100B queued msgs at peak</span></td><td>Need efficient per-user message queue storage</td></tr>
-<tr><td><span class="hi">4</span></td><td>Avg message 1KB (encrypted) × 100B queued</td><td><span class="hg">~100TB queued storage</span></td><td>Distributed KV store sharded by recipient_id</td></tr>
+<tr><td><span class="hi">1</span></td><td>100B msgs/day &middot; 86,400s</td><td><span class="hg">~1.15M msg/sec</span></td><td>10&middot; Slack's throughput &middot; need sharded message queues</td></tr>
+<tr><td><span class="hi">2</span></td><td>2B users &middot; ~30% online at any time</td><td><span class="hg">~600M concurrent connections</span></td><td>~1.2M connection servers (500K conn each)</td></tr>
+<tr><td><span class="hi">3</span></td><td>Avg user offline 8-16 hrs/day ? ~50 msgs queued</td><td><span class="hg">~100B queued msgs at peak</span></td><td>Need efficient per-user message queue storage</td></tr>
+<tr><td><span class="hi">4</span></td><td>Avg message 1KB (encrypted) &middot; 100B queued</td><td><span class="hg">~100TB queued storage</span></td><td>Distributed KV store sharded by recipient_id</td></tr>
 <tr><td><span class="hi">5</span></td><td>Media: 10% of msgs have media, avg 500KB</td><td><span class="hg">~5PB media/day</span></td><td>Blob storage with CDN. Encrypted client-side before upload.</td></tr>
 <tr><td><span class="hi">6</span></td><td>Reconnect storm: 100M users come online in 1 hour (morning)</td><td><span class="hg">~28K reconnects/sec</span></td><td>Queue drain must handle burst. Stagger delivery over seconds.</td></tr>
 </table>
 </div>
 
-<!-- ═══ ARCHITECTURE ═══ -->
+<!-- --- ARCHITECTURE --- -->
 <div class="T" id="architecture">
 <h2>Architecture Overview</h2>
-<p class="su">Store-and-forward with E2E encryption — server is a dumb encrypted mailbox</p>
+<p class="su">Store-and-forward with E2E encryption &middot; server is a dumb encrypted mailbox</p>
 
 <svg width="100%" viewBox="0 0 740 300" style="max-width:740px;display:block;margin:6px auto">
 <defs><marker id="wa1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
 <!-- Title -->
-<text x="370" y="14" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">WhatsApp Message Flow — Store-and-Forward with E2E Encryption</text>
+<text x="370" y="14" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">WhatsApp Message Flow &middot; Store-and-Forward with E2E Encryption</text>
 
 <!-- Sender -->
 <rect x="10" y="30" width="100" height="50" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
@@ -138,23 +150,23 @@
 
 <!-- Online path -->
 <rect x="462" y="22" width="120" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-<text x="522" y="36" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Bob ONLINE → push immediately</text>
+<text x="522" y="36" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Bob ONLINE ? push immediately</text>
 <text x="522" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">via Bob's TCP connection</text>
 
 <!-- Offline path -->
 <rect x="462" y="62" width="120" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
-<text x="522" y="76" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Bob OFFLINE → store in queue</text>
+<text x="522" y="76" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Bob OFFLINE ? store in queue</text>
 <text x="522" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">+ send push notification (FCM)</text>
 
 <!-- Recipient online -->
 <line x1="582" y1="37" x2="616" y2="37" stroke="var(--g)" stroke-width="1" marker-end="url(#wa1)"/>
 <rect x="618" y="22" width="100" height="30" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
 <text x="668" y="36" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob decrypts</text>
-<text x="668" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">with private key → ✓✓</text>
+<text x="668" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">with private key ? ??</text>
 
 <!-- Reconnect flow -->
 <rect x="10" y="110" width="720" height="80" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
-<text x="370" y="126" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="800">RECONNECT FLOW — Bob comes back online after 8 hours</text>
+<text x="370" y="126" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="800">RECONNECT FLOW &middot; Bob comes back online after 8 hours</text>
 
 <rect x="24" y="136" width="100" height="24" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
 <text x="74" y="151" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob connects</text>
@@ -167,28 +179,28 @@
 <line x1="270" y1="148" x2="294" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="296" y="136" width="130" height="24" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
-<text x="361" y="151" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Drain queue → push all pending</text>
+<text x="361" y="151" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Drain queue ? push all pending</text>
 
 <line x1="426" y1="148" x2="450" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="452" y="136" width="120" height="24" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
-<text x="512" y="151" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob ACKs each msg → ✓✓</text>
+<text x="512" y="151" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob ACKs each msg ? ??</text>
 
 <line x1="572" y1="148" x2="596" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="598" y="136" width="120" height="24" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
 <text x="658" y="151" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Server deletes from queue</text>
 
-<text x="370" y="180" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Result: Bob receives all 50 missed messages in order. Server queue is now empty. Alice sees ✓✓ for each.</text>
+<text x="370" y="180" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Result: Bob receives all 50 missed messages in order. Server queue is now empty. Alice sees ?? for each.</text>
 
 <!-- E2E Encryption -->
 <rect x="10" y="200" width="720" height="90" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
-<text x="370" y="216" text-anchor="middle" fill="var(--a2)" font-size="7.5" font-weight="800">E2E ENCRYPTION — Signal Protocol (Double Ratchet)</text>
+<text x="370" y="216" text-anchor="middle" fill="var(--a2)" font-size="7.5" font-weight="800">E2E ENCRYPTION &middot; Signal Protocol (Double Ratchet)</text>
 
 <rect x="24" y="228" width="140" height="50" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
 <text x="94" y="242" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Key Exchange (X3DH)</text>
 <text x="94" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">Identity key + signed prekey</text>
-<text x="94" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">+ one-time prekey → shared secret</text>
+<text x="94" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">+ one-time prekey ? shared secret</text>
 <text x="94" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">Happens once per conversation</text>
 
 <line x1="164" y1="253" x2="188" y2="253" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
@@ -197,14 +209,14 @@
 <text x="270" y="242" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Double Ratchet (per message)</text>
 <text x="270" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">Each msg gets unique key</text>
 <text x="270" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">Forward secrecy: compromise 1 key</text>
-<text x="270" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">→ can't decrypt past/future msgs</text>
+<text x="270" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">? can't decrypt past/future msgs</text>
 
 <line x1="350" y1="253" x2="374" y2="253" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="376" y="228" width="160" height="50" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
 <text x="456" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Server sees ONLY ciphertext</text>
 <text x="456" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">Cannot decrypt even with court order</text>
-<text x="456" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">Metadata visible: who → whom, when</text>
+<text x="456" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">Metadata visible: who ? whom, when</text>
 <text x="456" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">Content: fully opaque to server</text>
 
 <line x1="536" y1="253" x2="560" y2="253" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
@@ -217,15 +229,15 @@
 </svg>
 </div>
 
-<!-- ═══ MESSAGE QUEUE DESIGN ═══ -->
+<!-- --- MESSAGE QUEUE DESIGN --- -->
 <div class="T" id="queue-design">
 <h2>Per-User Message Queue</h2>
-<p class="su">Each user has an independent queue — no cross-user coordination needed. Sharded by <code>recipient_id</code>.</p>
+<p class="su">Each user has an independent queue &middot; no cross-user coordination needed. Sharded by <code>recipient_id</code>.</p>
 
 <svg width="100%" viewBox="0 0 720 160" style="max-width:720px;display:block;margin:6px auto">
 <defs><marker id="wa2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-<text x="360" y="14" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Per-User Queue — Append-Only Log with ACK-Based Deletion</text>
+<text x="360" y="14" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">Per-User Queue &middot; Append-Only Log with ACK-Based Deletion</text>
 
 <!-- Queue structure -->
 <rect x="10" y="28" width="340" height="120" rx="5" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
@@ -242,13 +254,13 @@
 <rect x="288" y="54" width="50" height="20" rx="3" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".5"/>
 <text x="313" y="67" text-anchor="middle" fill="var(--y)" font-size="5">seq=5</text>
 
-<text x="120" y="88" fill="var(--g)" font-size="5.5" font-weight="600">✓ Delivered (ACKed) — will be deleted</text>
-<text x="252" y="88" fill="var(--y)" font-size="5.5" font-weight="600">⏳ Pending delivery</text>
+<text x="120" y="88" fill="var(--g)" font-size="5.5" font-weight="600">? Delivered (ACKed) &middot; will be deleted</text>
+<text x="252" y="88" fill="var(--y)" font-size="5.5" font-weight="600">? Pending delivery</text>
 
-<text x="24" y="106" fill="var(--muted)" font-size="5">• Append-only: new messages added at tail</text>
-<text x="24" y="118" fill="var(--muted)" font-size="5">• Bob's last_ack_seq = 3 → server knows to deliver from seq=4</text>
-<text x="24" y="130" fill="var(--muted)" font-size="5">• After Bob ACKs seq=4,5 → those entries deleted (or marked)</text>
-<text x="24" y="142" fill="var(--muted)" font-size="5">• TTL: undelivered msgs expire after 30 days</text>
+<text x="24" y="106" fill="var(--muted)" font-size="5">&middot; Append-only: new messages added at tail</text>
+<text x="24" y="118" fill="var(--muted)" font-size="5">&middot; Bob's last_ack_seq = 3 ? server knows to deliver from seq=4</text>
+<text x="24" y="130" fill="var(--muted)" font-size="5">&middot; After Bob ACKs seq=4,5 ? those entries deleted (or marked)</text>
+<text x="24" y="142" fill="var(--muted)" font-size="5">&middot; TTL: undelivered msgs expire after 30 days</text>
 
 <!-- Storage details -->
 <rect x="370" y="28" width="340" height="120" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
@@ -267,36 +279,36 @@
 <text x="450" y="114" fill="var(--text)" font-size="5.5">3 replicas across AZs (sync write to 2)</text>
 
 <text x="384" y="130" fill="var(--y)" font-size="5.5" font-weight="600">Deletion:</text>
-<text x="440" y="130" fill="var(--text)" font-size="5.5">On recipient ACK → hard delete (privacy)</text>
+<text x="440" y="130" fill="var(--text)" font-size="5.5">On recipient ACK ? hard delete (privacy)</text>
 
 <text x="384" y="146" fill="var(--y)" font-size="5.5" font-weight="600">Capacity:</text>
 <text x="440" y="146" fill="var(--text)" font-size="5.5">~100TB total queued msgs across all users</text>
 </svg>
 
-<div class="b bb"><span class="hi">Key difference from Slack:</span> Slack stores messages <em>permanently</em> in Vitess (they're the system of record). WhatsApp <em>deletes messages from the server</em> after delivery — the server is just a temporary mailbox. The phone is the system of record. See <a href="slack-real-time-messaging.html#data-model">Slack Data Model</a> for the permanent storage approach.</div>
+<div class="b bb"><span class="hi">Key difference from Slack:</span> Slack stores messages <em>permanently</em> in Vitess (they're the system of record). WhatsApp <em>deletes messages from the server</em> after delivery &middot; the server is just a temporary mailbox. The phone is the system of record. See <a href="slack-real-time-messaging.html#data-model">Slack Data Model</a> for the permanent storage approach.</div>
 </div>
 
-<!-- ═══ DELIVERY RECEIPTS ═══ -->
+<!-- --- DELIVERY RECEIPTS --- -->
 <div class="T" id="receipts">
 <h2>Delivery Receipts (Tick System)</h2>
-<p class="su">Three states: ✓ sent (server received) → ✓✓ delivered (recipient got it) → <span style="color:var(--a)">✓✓</span> read (recipient opened)</p>
+<p class="su">Three states: ? sent (server received) ? ?? delivered (recipient got it) ? <span style="color:var(--a)">??</span> read (recipient opened)</p>
 
 <svg width="100%" viewBox="0 0 720 120" style="max-width:720px;display:block;margin:6px auto">
 <defs><marker id="wa3" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-<text x="360" y="14" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Message Lifecycle — Receipt State Machine</text>
+<text x="360" y="14" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">Message Lifecycle &middot; Receipt State Machine</text>
 
 <!-- States -->
 <rect x="10" y="40" width="100" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
 <text x="60" y="56" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">PENDING</text>
 <text x="60" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">clock icon</text>
-<text x="60" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">client → server in-flight</text>
+<text x="60" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">client ? server in-flight</text>
 
 <line x1="110" y1="60" x2="154" y2="60" stroke="var(--y)" stroke-width="1" marker-end="url(#wa3)"/>
 <text x="132" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">server ACK</text>
 
 <rect x="156" y="40" width="100" height="40" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
-<text x="206" y="56" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">SENT ✓</text>
+<text x="206" y="56" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">SENT ?</text>
 <text x="206" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">single grey tick</text>
 <text x="206" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">stored in recipient queue</text>
 
@@ -304,7 +316,7 @@
 <text x="278" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">recipient ACK</text>
 
 <rect x="302" y="40" width="110" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-<text x="357" y="56" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERED ✓✓</text>
+<text x="357" y="56" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERED ??</text>
 <text x="357" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">double grey ticks</text>
 <text x="357" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">msg reached device, decrypted</text>
 
@@ -312,7 +324,7 @@
 <text x="434" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">read receipt</text>
 
 <rect x="458" y="40" width="100" height="40" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
-<text x="508" y="56" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">READ ✓✓</text>
+<text x="508" y="56" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">READ ??</text>
 <text x="508" y="68" text-anchor="middle" fill="var(--a)" font-size="5">double blue ticks</text>
 <text x="508" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">user opened conversation</text>
 
@@ -325,7 +337,7 @@
 <text x="654" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">only exists on devices</text>
 
 <!-- Timing annotations -->
-<text x="360" y="104" text-anchor="middle" fill="var(--muted)" font-size="5.5">Timing: PENDING→SENT: ~100ms | SENT→DELIVERED: instant (online) or hours/days (offline) | DELIVERED→DELETED: immediate after ACK</text>
+<text x="360" y="104" text-anchor="middle" fill="var(--muted)" font-size="5.5">Timing: PENDING?SENT: ~100ms | SENT?DELIVERED: instant (online) or hours/days (offline) | DELIVERED?DELETED: immediate after ACK</text>
 </svg>
 
 <div class="d-grid tri" style="margin:6px 0">
@@ -359,10 +371,10 @@
 </div>
 </div>
 
-<!-- ═══ ORDERING ═══ -->
+<!-- --- ORDERING --- -->
 <div class="T" id="ordering">
 <h2>Ordering &amp; Consistency</h2>
-<p class="su">Per-conversation ordering via sender-assigned sequence numbers — no global ordering needed</p>
+<p class="su">Per-conversation ordering via sender-assigned sequence numbers &middot; no global ordering needed</p>
 
 <div class="d-grid" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:left">
@@ -370,7 +382,7 @@
 <div style="font-size:.75rem;line-height:1.55">
 <span class="hi">1.</span> Sender assigns <code>msg_seq</code> per conversation (monotonic on sender device)<br>
 <span class="hi">2.</span> Server appends to recipient queue preserving sender order<br>
-<span class="hi">3.</span> Recipient receives in queue order — reorders by timestamp if needed<br>
+<span class="hi">3.</span> Recipient receives in queue order &middot; reorders by timestamp if needed<br>
 <span class="hi">4.</span> Cross-conversation: no ordering guarantee (different queues)<br>
 <span class="hi">5.</span> Group messages: server assigns group_seq (single writer per group)
 </div>
@@ -379,25 +391,25 @@
 <h4 style="color:var(--y)">Difference from Slack</h4>
 <div style="font-size:.75rem;line-height:1.55">
 <span class="hi">Slack:</span> Server assigns <code>channel_seq</code> via Kafka partition (centralized)<br>
-<span class="hi">WhatsApp:</span> Sender assigns seq (decentralized) — works offline<br>
+<span class="hi">WhatsApp:</span> Sender assigns seq (decentralized) &middot; works offline<br>
 <span class="hi">Why:</span> WhatsApp sender may be offline when server processes msg<br>
 <span class="hi">Tradeoff:</span> Slightly weaker ordering guarantee but works without server<br>
 See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the centralized approach
 </div>
 </div>
 </div>
-<div class="b by"><span class="hi">Key insight:</span> WhatsApp uses <span class="hg">sender-assigned timestamps + per-conversation sequence</span> because the sender might be on a flaky mobile connection. Slack uses <span class="hg">server-assigned sequence</span> because all senders are connected to the same Kafka partition. Different connectivity assumptions → different ordering strategies.</div>
+<div class="b by"><span class="hi">Key insight:</span> WhatsApp uses <span class="hg">sender-assigned timestamps + per-conversation sequence</span> because the sender might be on a flaky mobile connection. Slack uses <span class="hg">server-assigned sequence</span> because all senders are connected to the same Kafka partition. Different connectivity assumptions ? different ordering strategies.</div>
 </div>
 
-<!-- ═══ MEDIA HANDLING ═══ -->
+<!-- --- MEDIA HANDLING --- -->
 <div class="T" id="media">
 <h2>Media Message Handling</h2>
-<p class="su">Photos, videos, documents — encrypted client-side, uploaded to blob storage, link sent in message</p>
+<p class="su">Photos, videos, documents &middot; encrypted client-side, uploaded to blob storage, link sent in message</p>
 
 <svg width="100%" viewBox="0 0 720 100" style="max-width:720px;display:block;margin:6px auto">
 <defs><marker id="wa4" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-<text x="360" y="14" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="800">Media Upload Flow — Client-Side Encryption</text>
+<text x="360" y="14" text-anchor="middle" fill="var(--p)" font-size="8" font-weight="800">Media Upload Flow &middot; Client-Side Encryption</text>
 
 <rect x="10" y="28" width="100" height="30" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
 <text x="60" y="40" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Alice generates</text>
@@ -425,30 +437,30 @@ See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the
 
 <rect x="564" y="28" width="140" height="30" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
 <text x="634" y="40" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob downloads + decrypts</text>
-<text x="634" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">verify HMAC → decrypt with key</text>
+<text x="634" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">verify HMAC ? decrypt with key</text>
 
 <text x="360" y="80" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Server stores encrypted blob but CANNOT decrypt it (no key). Blob deleted after recipient downloads.</text>
 <text x="360" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">Resumable upload: chunked with per-chunk checksum. Works on 2G/3G with intermittent connectivity.</text>
 </svg>
 </div>
 
-<!-- ═══ TECH STACK ═══ -->
+<!-- --- TECH STACK --- -->
 <div class="T" id="stack">
 <h2>Tech Stack &amp; Tradeoffs</h2>
-<p class="su">Erlang/BEAM for massive concurrency — each user connection is a lightweight process</p>
+<p class="su">Erlang/BEAM for massive concurrency &middot; each user connection is a lightweight process</p>
 <table>
 <tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
 <tr><td><span class="hi">Connection Server</span></td><td>Erlang/BEAM</td><td>2M+ connections per server. Lightweight processes (2KB each). Hot code reload. Built for telecom reliability.</td><td>Go/Java: heavier per-connection overhead. Can't match Erlang's process density.</td></tr>
-<tr><td><span class="hi">Message Queue</span></td><td>Mnesia (Erlang built-in)</td><td>Distributed, replicated, in-memory with disk persistence. Co-located with connection server — no network hop.</td><td>Kafka: overkill for per-user queues. Redis: no built-in replication at this scale.</td></tr>
+<tr><td><span class="hi">Message Queue</span></td><td>Mnesia (Erlang built-in)</td><td>Distributed, replicated, in-memory with disk persistence. Co-located with connection server &middot; no network hop.</td><td>Kafka: overkill for per-user queues. Redis: no built-in replication at this scale.</td></tr>
 <tr><td><span class="hi">Media Storage</span></td><td>Custom blob store + CDN</td><td>Encrypted blobs. Geo-distributed. Auto-delete after download. Resumable uploads.</td><td>S3: vendor lock-in. Cost at 5PB/day would be enormous.</td></tr>
 <tr><td><span class="hi">Encryption</span></td><td>Signal Protocol (libsignal)</td><td>Forward secrecy. Post-compromise security. Well-audited. Open source.</td><td>PGP: no forward secrecy. TLS: only transport-level, server can read.</td></tr>
-<tr><td><span class="hi">Push Notifications</span></td><td>FCM / APNs</td><td>Wake device when offline. "You have a new message" (no content — E2E).</td><td>Custom push: can't wake iOS apps without APNs. Platform requirement.</td></tr>
+<tr><td><span class="hi">Push Notifications</span></td><td>FCM / APNs</td><td>Wake device when offline. "You have a new message" (no content &middot; E2E).</td><td>Custom push: can't wake iOS apps without APNs. Platform requirement.</td></tr>
 <tr><td><span class="hi">Protocol</span></td><td>Custom binary (XMPP-derived)</td><td>Minimal bandwidth. Binary framing. Compression. 2G-friendly.</td><td>JSON/HTTP: too verbose for mobile. gRPC: protobuf overhead unnecessary.</td></tr>
 </table>
-<div class="b by"><span class="hi">Real-world validation:</span> WhatsApp famously handled 2B users with ~50 engineers and ~1000 servers using Erlang. The BEAM VM's actor model maps perfectly to "one process per user connection" — each process holds the user's state, mailbox, and connection.</div>
+<div class="b by"><span class="hi">Real-world validation:</span> WhatsApp famously handled 2B users with ~50 engineers and ~1000 servers using Erlang. The BEAM VM's actor model maps perfectly to "one process per user connection" &middot; each process holds the user's state, mailbox, and connection.</div>
 </div>
 
-<!-- ═══ CHALLENGES ═══ -->
+<!-- --- CHALLENGES --- -->
 <div class="T" id="challenges">
 <h2>Resilience &amp; Edge Cases</h2>
 <p class="su">Mobile-first challenges that don't exist in desktop-first systems like Slack</p>
@@ -461,32 +473,32 @@ See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the
 <tr><td><span class="hi">5</span></td><td><span class="hr">Key mismatch (new device)</span></td><td>Can't decrypt messages encrypted with old key</td><td>Sender re-encrypts pending messages with new key. "Security code changed" notification shown to contacts.</td></tr>
 <tr><td><span class="hi">6</span></td><td><span class="hr">Group key distribution</span></td><td>N members need the same message, each with different key</td><td>Sender encrypts once per recipient (fan-out at encryption layer). Server stores N ciphertexts for N members.</td></tr>
 </table>
-<div class="b bg"><span class="hi">Key insight:</span> WhatsApp's architecture is fundamentally <span class="hg">store-and-forward</span> — the server is a temporary encrypted mailbox. This is the opposite of Slack's <span class="hg">persistent log</span> approach. The tradeoff: WhatsApp can't offer server-side search (content is encrypted), but provides stronger privacy guarantees.</div>
+<div class="b bg"><span class="hi">Key insight:</span> WhatsApp's architecture is fundamentally <span class="hg">store-and-forward</span> &middot; the server is a temporary encrypted mailbox. This is the opposite of Slack's <span class="hg">persistent log</span> approach. The tradeoff: WhatsApp can't offer server-side search (content is encrypted), but provides stronger privacy guarantees.</div>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 5 things an interviewer wants to hear for this problem</p>
 <div class="d-grid" style="margin:6px 0">
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--a)">
-<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">① Store-and-forward with per-user queues</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each user has an independent message queue sharded by recipient_id. Messages stored as ciphertext until recipient ACKs delivery. Server deletes after ACK — it's a temporary mailbox, not permanent storage.</div>
+<div style="font-size:.72rem;font-weight:700;color:var(--a);margin-bottom:4px">? Store-and-forward with per-user queues</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each user has an independent message queue sharded by recipient_id. Messages stored as ciphertext until recipient ACKs delivery. Server deletes after ACK &middot; it's a temporary mailbox, not permanent storage.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
-<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">② E2E encryption via Signal Protocol</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">X3DH key exchange + Double Ratchet. Each message gets a unique key. Forward secrecy: compromising one key doesn't expose past/future messages. Server sees only ciphertext — can't decrypt even with a court order.</div>
+<div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">? E2E encryption via Signal Protocol</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">X3DH key exchange + Double Ratchet. Each message gets a unique key. Forward secrecy: compromising one key doesn't expose past/future messages. Server sees only ciphertext &middot; can't decrypt even with a court order.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
-<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">③ Delivery receipts as state machine</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">PENDING → SENT (✓) → DELIVERED (✓✓) → READ (blue ✓✓) → DELETED from server. Each transition triggered by an ACK from the next hop. Server cleanup happens immediately after delivery confirmation.</div>
+<div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">? Delivery receipts as state machine</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">PENDING ? SENT (?) ? DELIVERED (??) ? READ (blue ??) ? DELETED from server. Each transition triggered by an ACK from the next hop. Server cleanup happens immediately after delivery confirmation.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
-<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">④ Reconnect = drain queue from last_ack_seq</div>
+<div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">? Reconnect = drain queue from last_ack_seq</div>
 <div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">On reconnect, client sends last_ack_seq. Server delivers all messages with seq > last_ack_seq. Client ACKs each batch. Deduplication by msg_seq handles retries. Morning storm handled by staggered delivery.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
-<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">⑤ Erlang/BEAM for 2M connections per server</div>
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">? Erlang/BEAM for 2M connections per server</div>
 <div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each user connection is a lightweight Erlang process (2KB). Mnesia for co-located message queues. Hot code reload for zero-downtime deploys. 50 engineers, ~1000 servers for 2B users.</div>
 </div>
 </div>
@@ -501,6 +513,7 @@ See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
 <script src="../../js/auth.js"></script>
 
 </body>

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -39,9 +39,22 @@
 .fr-nfr-header.h-fr{color:var(--a);text-align:right;justify-content:flex-end}
 .fr-nfr-header.h-sketch{color:var(--muted);text-align:center;justify-content:center}
 .fr-nfr-header.h-nfr{color:var(--g);text-align:left;justify-content:flex-start}
+
+@media(max-width:700px){
+  .fr-nfr-grid{grid-template-columns:1fr;gap:0}
+  .fr-nfr-header.h-sketch,.fr-nfr-header.h-nfr{display:none}
+  .fr-nfr-header.h-fr{text-align:center;justify-content:center;color:var(--muted);font-size:.7rem}
+  .fr-nfr-row{display:flex;flex-direction:column;align-items:stretch;padding:14px 0;border-bottom:1px solid var(--border)}
+  .fr-nfr-row:last-child{border-bottom:none}
+  .fr-nfr-row>div{border-bottom:none;padding:6px 14px}
+  .fr-col-fr{justify-content:flex-start;text-align:left;font-size:.82rem;font-weight:600}
+  .fr-col-sketch{justify-content:center;padding:8px 14px}
+  .fr-col-sketch svg{width:48px;height:36px}
+  .fr-col-nfr{justify-content:flex-start;text-align:left;font-size:.8rem;color:var(--muted)}
+}
 </style>
 
-<div class="fr-nfr-grid">
+<div class="fr-nfr-grid dp-panel" style="border:none;background:none;padding:0">
   <!-- Header row -->
   <div class="fr-nfr-header h-fr">Functional (What)</div>
   <div class="fr-nfr-header h-sketch">Visual</div>
@@ -494,10 +507,13 @@
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../css/dp-engine.css">
+<script src="../js/dp-engine.js"></script>
 <script src="../js/header.js"></script><script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../js/live-course.js"></script>
 <script src="../js/auth.js"></script>
 
 </body>

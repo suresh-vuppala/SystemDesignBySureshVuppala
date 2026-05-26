@@ -3,18 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Stripe guarantee no double-charging? — System Design</title>
+<title>How does Stripe guarantee no double-charging? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Stripe process millions of charges without double-charging?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">💳</span> Design an idempotent payment system: millions of charges, zero double-charge, two-phase state machine</div>
+<div class="sd sd-5"><span class="e">??</span> Design an idempotent payment system: millions of charges, zero double-charge, two-phase state machine</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/04-apis.html#idempotent-apis">Idempotency</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#transactions">Transactions</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#consistency-models">Consistency</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#dlq">DLQ</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
-<p class="su">How does a payment platform process millions of charges without double-charging, ensuring idempotent request handling, two-phase state transitions (pending→captured→settled), and at-least-once delivery with server-side deduplication?</p>
+<p class="su">How does a payment platform process millions of charges without double-charging, ensuring idempotent request handling, two-phase state transitions (pending?captured?settled), and at-least-once delivery with server-side deduplication?</p>
 <div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Network is unreliable. Client sends charge request, server processes it, but the response is lost. Client retries. Without idempotency, <span class="hr">the customer is charged twice</span>. At millions of transactions/day, even 0.01% duplicates = thousands of angry customers.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
@@ -31,7 +42,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">2-Phase</div>
 <div style="font-size:.72rem;color:var(--muted)">state machine</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">pending → captured → settled</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">pending ? captured ? settled</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--g)">99.999%</div>
@@ -48,21 +59,21 @@
 <h4 style="color:var(--g)">Must Have</h4>
 <div style="font-size:.78rem;line-height:1.7">
   <span class="hg">1.</span> Accept charge request with <strong>idempotency key</strong> (client-generated UUID)<br>
-  <span class="hg">2.</span> <strong>Deduplicate retries</strong> — same key returns same result without re-processing<br>
-  <span class="hg">3.</span> <strong>Two-phase capture</strong>: authorize (hold funds) → capture (charge) → settle (transfer)<br>
-  <span class="hg">4.</span> <strong>Atomic state transitions</strong> — no partial states visible<br>
+  <span class="hg">2.</span> <strong>Deduplicate retries</strong> &middot; same key returns same result without re-processing<br>
+  <span class="hg">3.</span> <strong>Two-phase capture</strong>: authorize (hold funds) ? capture (charge) ? settle (transfer)<br>
+  <span class="hg">4.</span> <strong>Atomic state transitions</strong> &middot; no partial states visible<br>
   <span class="hg">5.</span> Support <strong>refunds</strong> as compensating transactions<br>
-  <span class="hg">6.</span> <strong>Audit trail</strong> — every state change logged immutably
+  <span class="hg">6.</span> <strong>Audit trail</strong> &middot; every state change logged immutably
 </div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">✗</span> Fraud detection and risk scoring<br>
-  <span class="hr">✗</span> Multi-currency and FX<br>
-  <span class="hr">✗</span> Merchant onboarding and KYC<br>
-  <span class="hr">✗</span> Subscription billing and invoicing<br>
-  <span class="hr">✗</span> PCI-DSS card tokenization
+  <span class="hr">?</span> Fraud detection and risk scoring<br>
+  <span class="hr">?</span> Multi-currency and FX<br>
+  <span class="hr">?</span> Merchant onboarding and KYC<br>
+  <span class="hr">?</span> Subscription billing and invoicing<br>
+  <span class="hr">?</span> PCI-DSS card tokenization
 </div>
 </div>
 </div>
@@ -83,17 +94,17 @@
 
 <div class="T" id="architecture">
 <h2>High-Level Architecture</h2>
-<p class="su">Idempotency key → dedup check → state machine → double-entry ledger</p>
+<p class="su">Idempotency key ? dedup check ? state machine ? double-entry ledger</p>
 
-<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stripe Idempotent Payments — End-to-End Architecture">
+<svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stripe Idempotent Payments &middot; End-to-End Architecture">
   <defs><marker id="pay-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
   <!-- TITLE -->
-  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Stripe Idempotent Payments — End-to-End Architecture</text>
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Stripe Idempotent Payments &middot; End-to-End Architecture</text>
 
   <!-- LAYER 1: REQUEST LAYER -->
   <rect x="10" y="25" width="560" height="110" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
-  <text x="290" y="38" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">REQUEST LAYER — Idempotency Check</text>
+  <text x="290" y="38" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">REQUEST LAYER &middot; Idempotency Check</text>
 
   <!-- Client -->
   <rect x="25" y="50" width="130" height="45" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
@@ -116,12 +127,12 @@
   <!-- Idempotency Check -->
   <rect x="330" y="48" width="225" height="50" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="442" y="63" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Idempotency Check</text>
-  <text x="442" y="76" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Key EXISTS? → return cached response (no reprocess)</text>
-  <text x="442" y="89" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Key NEW? → INSERT key + lock → proceed to processing</text>
+  <text x="442" y="76" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Key EXISTS? ? return cached response (no reprocess)</text>
+  <text x="442" y="89" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Key NEW? ? INSERT key + lock ? proceed to processing</text>
 
   <!-- Request layer config -->
-  <text x="290" y="112" text-anchor="middle" fill="var(--muted)" font-size="5">INSERT ... ON CONFLICT DO NOTHING (atomic) | request_hash check: different body + same key → 422 | TTL: 24h</text>
-  <text x="290" y="124" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Stored: {key → request_hash + response_code + response_body + created_at + expires_at}</text>
+  <text x="290" y="112" text-anchor="middle" fill="var(--muted)" font-size="5">INSERT ... ON CONFLICT DO NOTHING (atomic) | request_hash check: different body + same key ? 422 | TTL: 24h</text>
+  <text x="290" y="124" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Stored: {key ? request_hash + response_code + response_body + created_at + expires_at}</text>
 
   <!-- Idempotency Key Store side panel -->
   <rect x="580" y="25" width="190" height="110" rx="5" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
@@ -130,7 +141,7 @@
   <text x="675" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">~10M active keys (24h TTL)</text>
   <text x="675" y="81" text-anchor="middle" fill="var(--muted)" font-size="5">Unique index on key</text>
   <text x="675" y="94" text-anchor="middle" fill="var(--muted)" font-size="5">Hourly cleanup cron</text>
-  <text x="675" y="107" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Fits in memory (~10M × 1KB)</text>
+  <text x="675" y="107" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Fits in memory (~10M &middot; 1KB)</text>
   <text x="675" y="120" text-anchor="middle" fill="var(--muted)" font-size="4.5">Multi-region replicated</text>
 
   <!-- Arrow down -->
@@ -138,7 +149,7 @@
 
   <!-- LAYER 2: PROCESSING LAYER -->
   <rect x="10" y="145" width="560" height="130" rx="8" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="290" y="160" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">PROCESSING LAYER — Payment State Machine</text>
+  <text x="290" y="160" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">PROCESSING LAYER &middot; Payment State Machine</text>
 
   <!-- State Machine -->
   <rect x="25" y="170" width="80" height="28" rx="4" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".8"/>
@@ -166,21 +177,21 @@
   <rect x="470" y="170" width="80" height="28" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width=".8"/>
   <text x="510" y="188" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">FAILED</text>
   <path d="M65 198 C65 215, 510 215, 510 198" fill="none" stroke="var(--r)" stroke-width=".7" stroke-dasharray="3,2"/>
-  <text x="290" y="222" text-anchor="middle" fill="var(--r)" font-size="4.5">timeout/decline → void</text>
+  <text x="290" y="222" text-anchor="middle" fill="var(--r)" font-size="4.5">timeout/decline ? void</text>
 
   <!-- Timeout handlers -->
-  <text x="290" y="238" text-anchor="middle" fill="var(--muted)" font-size="5">Timeout: PENDING &gt; 30min → auto-void | Each transition is atomic DB transaction (forward-only)</text>
+  <text x="290" y="238" text-anchor="middle" fill="var(--muted)" font-size="5">Timeout: PENDING &gt; 30min ? auto-void | Each transition is atomic DB transaction (forward-only)</text>
   <text x="290" y="250" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Compensating actions: refund creates reverse ledger entries | Async reconciliation for network timeouts</text>
 
   <!-- Card Network side panel -->
   <rect x="580" y="145" width="190" height="130" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
   <text x="675" y="160" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Card Network (External)</text>
   <text x="675" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">Visa / Mastercard / Amex</text>
-  <text x="675" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">authorize → capture flow</text>
+  <text x="675" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">authorize ? capture flow</text>
   <text x="675" y="208" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">External, unreliable (~1s RTT)</text>
-  <text x="675" y="224" text-anchor="middle" fill="var(--muted)" font-size="5">Timeout → store PENDING</text>
+  <text x="675" y="224" text-anchor="middle" fill="var(--muted)" font-size="5">Timeout ? store PENDING</text>
   <text x="675" y="240" text-anchor="middle" fill="var(--muted)" font-size="5">Async reconciliation resolves</text>
-  <text x="675" y="256" text-anchor="middle" fill="var(--muted)" font-size="4.5">Duplicate webhook → state</text>
+  <text x="675" y="256" text-anchor="middle" fill="var(--muted)" font-size="4.5">Duplicate webhook ? state</text>
   <text x="675" y="266" text-anchor="middle" fill="var(--muted)" font-size="4.5">machine ignores (idempotent)</text>
 
   <!-- Arrow to card network -->
@@ -191,7 +202,7 @@
 
   <!-- LAYER 3: LEDGER LAYER -->
   <rect x="10" y="280" width="760" height="110" rx="8" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width="1.2" stroke-dasharray="4,3"/>
-  <text x="390" y="295" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">LEDGER LAYER — Double-Entry Accounting &amp; Delivery</text>
+  <text x="390" y="295" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">LEDGER LAYER &middot; Double-Entry Accounting &amp; Delivery</text>
 
   <!-- Double-Entry Ledger -->
   <rect x="25" y="305" width="250" height="70" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1"/>
@@ -223,42 +234,42 @@
 
   <!-- BOTTOM: Idempotency Example -->
   <rect x="10" y="400" width="760" height="92" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
-  <text x="390" y="416" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Idempotency in Action — Why Retries Are Safe</text>
+  <text x="390" y="416" text-anchor="middle" fill="var(--muted)" font-size="7.5" font-weight="700">Idempotency in Action &middot; Why Retries Are Safe</text>
 
-  <text x="390" y="434" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">① Request: POST /charges {key: "abc-123", amount: $100} → server processes → charges customer → stores response</text>
-  <text x="390" y="449" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">② Response LOST (network timeout) — client doesn't know if charge succeeded or failed</text>
-  <text x="390" y="464" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">③ Retry: POST /charges {key: "abc-123", amount: $100} → key exists → return CACHED {id: "ch_xyz", status: "captured"}</text>
-  <text x="390" y="479" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">✓ Customer charged exactly once. Retry is safe. Response is identical. Zero double-charges.</text>
+  <text x="390" y="434" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">? Request: POST /charges {key: "abc-123", amount: $100} ? server processes ? charges customer ? stores response</text>
+  <text x="390" y="449" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">? Response LOST (network timeout) &middot; client doesn't know if charge succeeded or failed</text>
+  <text x="390" y="464" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">? Retry: POST /charges {key: "abc-123", amount: $100} ? key exists ? return CACHED {id: "ch_xyz", status: "captured"}</text>
+  <text x="390" y="479" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">? Customer charged exactly once. Retry is safe. Response is identical. Zero double-charges.</text>
 </svg>
 
-<div class="b bg"><span class="hi">Idempotency key design:</span> Client generates UUID before first attempt. Server stores <code>{key → request_hash + response + created_at}</code>. On retry: if key exists AND request matches → return stored response. If key exists but request differs → return 422 (misuse). Key expires after 24h.</div>
-<div class="b by"><span class="hi">State machine guarantees:</span> Each transition is <span class="hg">atomic</span> (DB transaction). <span class="hg">Forward-only</span> — can't go from CAPTURED back to PENDING. <span class="hg">Timeout handlers</span> — PENDING &gt; 30min → auto-void. <span class="hg">Compensating actions</span> — refund creates reverse ledger entries.</div>
-<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Network timeout to card network</span> → store as PENDING, async reconciliation resolves. <span class="hr">DB crash mid-transaction</span> → idempotency key not committed → retry is safe. <span class="hr">Duplicate webhook from card network</span> → idempotent state machine ignores duplicate transitions.</div>
-<div class="b bb"><span class="hi">Real-world:</span> <strong>Stripe</strong> — Idempotency-Key header on all mutating APIs. <strong>PayPal</strong> — request_id for deduplication. <strong>Square</strong> — idempotency_key with 24h window. <strong>Adyen</strong> — reference field for merchant-side dedup. All major payment processors implement this pattern.</div>
+<div class="b bg"><span class="hi">Idempotency key design:</span> Client generates UUID before first attempt. Server stores <code>{key ? request_hash + response + created_at}</code>. On retry: if key exists AND request matches ? return stored response. If key exists but request differs ? return 422 (misuse). Key expires after 24h.</div>
+<div class="b by"><span class="hi">State machine guarantees:</span> Each transition is <span class="hg">atomic</span> (DB transaction). <span class="hg">Forward-only</span> &middot; can't go from CAPTURED back to PENDING. <span class="hg">Timeout handlers</span> &middot; PENDING &gt; 30min ? auto-void. <span class="hg">Compensating actions</span> &middot; refund creates reverse ledger entries.</div>
+<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Network timeout to card network</span> ? store as PENDING, async reconciliation resolves. <span class="hr">DB crash mid-transaction</span> ? idempotency key not committed ? retry is safe. <span class="hr">Duplicate webhook from card network</span> ? idempotent state machine ignores duplicate transitions.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Stripe</strong> &middot; Idempotency-Key header on all mutating APIs. <strong>PayPal</strong> &middot; request_id for deduplication. <strong>Square</strong> &middot; idempotency_key with 24h window. <strong>Adyen</strong> &middot; reference field for merchant-side dedup. All major payment processors implement this pattern.</div>
 </div>
 
-<!-- ═══ SCALE ESTIMATION ═══ -->
+<!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
 <p class="su">Back-of-envelope math for a payment platform</p>
-<div class="b bb" style="margin-bottom:10px"><span class="hi">Given:</span> <strong>Millions of charges/day</strong> · <strong>3M+ merchants</strong> · <strong>99.999% uptime</strong> · <strong>Zero double-charges</strong></div>
+<div class="b bb" style="margin-bottom:10px"><span class="hi">Given:</span> <strong>Millions of charges/day</strong> &middot; <strong>3M+ merchants</strong> &middot; <strong>99.999% uptime</strong> &middot; <strong>Zero double-charges</strong></div>
 <table>
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
-<tr><td><span class="hi">1</span></td><td>Charges/sec: 10M charges/day ÷ 86400</td><td><span class="hg">~115 charges/sec avg</span></td><td>Not high throughput — correctness matters more than speed</td></tr>
-<tr><td><span class="hi">2</span></td><td>Peak: 115 × 10× (Black Friday)</td><td><span class="hg">~1,150 charges/sec peak</span></td><td>Must handle 10× burst without dropping transactions</td></tr>
-<tr><td><span class="hi">3</span></td><td>Idempotency keys stored: 10M/day × 24h TTL</td><td><span class="hg">~10M active keys</span></td><td>Redis or DB index — fits in memory easily</td></tr>
-<tr><td><span class="hi">4</span></td><td>Ledger entries: 10M charges × 3 entries each</td><td><span class="hg">~30M ledger rows/day</span></td><td>Append-only, partitioned by merchant_id</td></tr>
-<tr><td><span class="hi">5</span></td><td>Webhook deliveries: 10M charges × 3 events each</td><td><span class="hg">~30M webhooks/day</span></td><td>Async delivery with retry queue (exponential backoff)</td></tr>
-<tr><td><span class="hi">6</span></td><td>Uptime: 99.999% = 5.26 min downtime/year</td><td><span class="hg">Multi-region active-active</span></td><td>Can't have single region — payment must always work</td></tr>
+<tr><td><span class="hi">1</span></td><td>Charges/sec: 10M charges/day &middot; 86400</td><td><span class="hg">~115 charges/sec avg</span></td><td>Not high throughput &middot; correctness matters more than speed</td></tr>
+<tr><td><span class="hi">2</span></td><td>Peak: 115 &middot; 10&middot; (Black Friday)</td><td><span class="hg">~1,150 charges/sec peak</span></td><td>Must handle 10&middot; burst without dropping transactions</td></tr>
+<tr><td><span class="hi">3</span></td><td>Idempotency keys stored: 10M/day &middot; 24h TTL</td><td><span class="hg">~10M active keys</span></td><td>Redis or DB index &middot; fits in memory easily</td></tr>
+<tr><td><span class="hi">4</span></td><td>Ledger entries: 10M charges &middot; 3 entries each</td><td><span class="hg">~30M ledger rows/day</span></td><td>Append-only, partitioned by merchant_id</td></tr>
+<tr><td><span class="hi">5</span></td><td>Webhook deliveries: 10M charges &middot; 3 events each</td><td><span class="hg">~30M webhooks/day</span></td><td>Async delivery with retry queue (exponential backoff)</td></tr>
+<tr><td><span class="hi">6</span></td><td>Uptime: 99.999% = 5.26 min downtime/year</td><td><span class="hg">Multi-region active-active</span></td><td>Can't have single region &middot; payment must always work</td></tr>
 </table>
 </div>
 
-<!-- ═══ DATA MODEL ═══ -->
+<!-- --- DATA MODEL --- -->
 <div class="T" id="data-model">
 <h2>Data Model</h2>
 <p class="su">Double-entry ledger + state machine + idempotency store</p>
 
-<!-- ═══ Payment State Machine SVG ═══ -->
+<!-- --- Payment State Machine SVG --- -->
 <svg width="100%" viewBox="0 0 680 120" style="max-width:680px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Payment state machine showing transitions from pending to settled">
   <defs><marker id="ps-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
   <!-- States -->
@@ -294,10 +305,10 @@
   <text x="117" y="100" fill="var(--r)" font-size="4.5">timeout/decline</text>
 
   <!-- Key rule -->
-  <text x="340" y="115" text-anchor="middle" fill="var(--muted)" font-size="5.5">Forward-only: PENDING → AUTHORIZED → CAPTURED → SETTLED (never backward). Each transition is atomic DB transaction.</text>
+  <text x="340" y="115" text-anchor="middle" fill="var(--muted)" font-size="5.5">Forward-only: PENDING ? AUTHORIZED ? CAPTURED ? SETTLED (never backward). Each transition is atomic DB transaction.</text>
 </svg>
 
-<pre><code>// ═══ Charges Table ═══
+<pre><code>// --- Charges Table ---
 charges {
   id:              UUID (ch_xxx)        -- primary key
   idempotency_key: VARCHAR(255)         -- unique index, client-provided
@@ -305,14 +316,14 @@ charges {
   amount:          BIGINT               -- in smallest currency unit (cents)
   currency:        CHAR(3)              -- ISO 4217 (usd, eur, gbp)
   status:          ENUM(pending, authorized, captured, settled, failed, refunded)
-  payment_method:  UUID → payment_methods table
+  payment_method:  UUID ? payment_methods table
   created_at:      TIMESTAMP
   captured_at:     TIMESTAMP NULL
   settled_at:      TIMESTAMP NULL
   metadata:        JSONB                -- merchant-provided key-value
 }
 
-// ═══ Idempotency Keys Table ═══
+// --- Idempotency Keys Table ---
 idempotency_keys {
   key:             VARCHAR(255)         -- primary key (client UUID)
   merchant_id:     UUID
@@ -325,10 +336,10 @@ idempotency_keys {
 -- Index: (key) UNIQUE
 -- Cleanup: DELETE WHERE expires_at < NOW() (cron every hour)
 
-// ═══ Ledger Entries (Double-Entry) ═══
+// --- Ledger Entries (Double-Entry) ---
 ledger_entries {
   id:              BIGSERIAL
-  charge_id:       UUID → charges
+  charge_id:       UUID ? charges
   account_id:      UUID                -- debit or credit account
   entry_type:      ENUM(debit, credit)
   amount:          BIGINT
@@ -339,39 +350,39 @@ ledger_entries {
 <div class="b bg"><span class="hi">Double-entry guarantee:</span> Every charge creates exactly 2+ ledger entries that sum to zero. Debit customer $100, credit merchant $97, credit platform $3. If any entry fails, the transaction rolls back. <span class="hg">Auditors can verify: total debits = total credits across entire system.</span></div>
 </div>
 
-<!-- ═══ RESILIENCE ═══ -->
+<!-- --- RESILIENCE --- -->
 <div class="T" id="resilience">
 <h2>Resilience &amp; Edge Cases</h2>
-<p class="su">Payment systems must handle every failure mode gracefully — money can never be lost or duplicated</p>
+<p class="su">Payment systems must handle every failure mode gracefully &middot; money can never be lost or duplicated</p>
 <table>
 <tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
 <tr><td><span class="hr">Network timeout to card network</span></td><td>Don't know if charge succeeded</td><td>Store as PENDING. Async reconciliation query to card network. Resolve within minutes.</td></tr>
-<tr><td><span class="hr">DB crash mid-transaction</span></td><td>Idempotency key not committed</td><td>Client retries → key doesn't exist → safe to reprocess. No double-charge.</td></tr>
-<tr><td><span class="hr">Client retries after success</span></td><td>Could double-charge</td><td>Idempotency key exists → return cached response. Identical result.</td></tr>
-<tr><td><span class="hr">Card network sends duplicate webhook</span></td><td>Could process settlement twice</td><td>State machine: CAPTURED → SETTLED is idempotent. Second attempt is no-op.</td></tr>
-<tr><td><span class="hr">Merchant sends different body with same key</span></td><td>Ambiguous intent</td><td>Compare request_hash. If different → return 422 (idempotency key reuse error).</td></tr>
+<tr><td><span class="hr">DB crash mid-transaction</span></td><td>Idempotency key not committed</td><td>Client retries ? key doesn't exist ? safe to reprocess. No double-charge.</td></tr>
+<tr><td><span class="hr">Client retries after success</span></td><td>Could double-charge</td><td>Idempotency key exists ? return cached response. Identical result.</td></tr>
+<tr><td><span class="hr">Card network sends duplicate webhook</span></td><td>Could process settlement twice</td><td>State machine: CAPTURED ? SETTLED is idempotent. Second attempt is no-op.</td></tr>
+<tr><td><span class="hr">Merchant sends different body with same key</span></td><td>Ambiguous intent</td><td>Compare request_hash. If different ? return 422 (idempotency key reuse error).</td></tr>
 <tr><td><span class="hr">Region failure</span></td><td>All charges in that region fail</td><td>Active-active: route to other region. Reconcile ledgers after recovery.</td></tr>
 </table>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 8 things to say for payment system design</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Idempotency key</strong> — client-generated UUID, server deduplicates retries, 24h TTL<br>
-<span class="hg">2.</span> <strong>Two-phase state machine</strong> — PENDING → AUTHORIZED → CAPTURED → SETTLED (forward-only)<br>
-<span class="hg">3.</span> <strong>Double-entry ledger</strong> — every charge = balanced debit + credit entries (auditable)<br>
-<span class="hg">4.</span> <strong>Atomic state transitions</strong> — DB transaction wraps state change + ledger entries<br>
-<span class="hg">5.</span> <strong>Timeout handling</strong> — PENDING &gt; 30min → auto-void. Never leave money in limbo.<br>
-<span class="hg">6.</span> <strong>Reconciliation</strong> — daily batch compares our ledger vs card network settlements<br>
-<span class="hg">7.</span> <strong>Webhooks with retry</strong> — notify merchant of state changes, exponential backoff, DLQ<br>
-<span class="hg">8.</span> <strong>Multi-region active-active</strong> — payments can't go down. Route to healthy region on failure.
+<span class="hg">1.</span> <strong>Idempotency key</strong> &middot; client-generated UUID, server deduplicates retries, 24h TTL<br>
+<span class="hg">2.</span> <strong>Two-phase state machine</strong> &middot; PENDING ? AUTHORIZED ? CAPTURED ? SETTLED (forward-only)<br>
+<span class="hg">3.</span> <strong>Double-entry ledger</strong> &middot; every charge = balanced debit + credit entries (auditable)<br>
+<span class="hg">4.</span> <strong>Atomic state transitions</strong> &middot; DB transaction wraps state change + ledger entries<br>
+<span class="hg">5.</span> <strong>Timeout handling</strong> &middot; PENDING &gt; 30min ? auto-void. Never leave money in limbo.<br>
+<span class="hg">6.</span> <strong>Reconciliation</strong> &middot; daily batch compares our ledger vs card network settlements<br>
+<span class="hg">7.</span> <strong>Webhooks with retry</strong> &middot; notify merchant of state changes, exponential backoff, DLQ<br>
+<span class="hg">8.</span> <strong>Multi-region active-active</strong> &middot; payments can't go down. Route to healthy region on failure.
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

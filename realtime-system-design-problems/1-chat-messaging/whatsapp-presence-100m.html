@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Presence at 100M Concurrent Users — System Design</title>
+<title>Presence at 100M Concurrent Users &middot; System Design</title>
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
@@ -11,13 +11,24 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a presence system track online/offline status for 100M+ concurrent users in real-time?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">🟢</span> Design a presence system that tracks online/offline status for 100M+ concurrent users, delivering status changes to relevant contacts within seconds</div>
+<div class="sd sd-5"><span class="e">??</span> Design a presence system that tracks online/offline status for 100M+ concurrent users, delivering status changes to relevant contacts within seconds</div>
 
-<!-- ═══ PROBLEM STATEMENT ═══ -->
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis (TTL)</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#pubsub">Pub/Sub</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#consistent-hashing">Consistent Hashing</a>
+<a href="../../system-design-cheatsheet/04-apis.html#realtime">WebSocket</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a presence system track online/offline status for 100M+ concurrent users in real-time, delivering status changes to relevant contacts within seconds without flooding the network with unnecessary updates?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Presence tracking and propagation only — not messaging, media, or call signaling. The hard question: <span class="hr">how do you fan-out status changes to hundreds of contacts per user without creating a thundering herd of 27.5M updates/sec?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Presence tracking and propagation only &middot; not messaging, media, or call signaling. The hard question: <span class="hr">how do you fan-out status changes to hundreds of contacts per user without creating a thundering herd of 27.5M updates/sec?</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -42,13 +53,13 @@
 </div>
 </div>
 
-<div class="b by" style="margin:6px 0"><span class="hi">Cross-reference:</span> <a href="slack-real-time-messaging.html#presence">Slack's Presence Protocol</a> handles 10M users with centralized Redis — this problem is 10× that scale requiring distributed presence. A single Redis cluster cannot handle 27.5M presence updates/sec fan-out.</div>
+<div class="b by" style="margin:6px 0"><span class="hi">Cross-reference:</span> <a href="slack-real-time-messaging.html#presence">Slack's Presence Protocol</a> handles 10M users with centralized Redis &middot; this problem is 10&middot; that scale requiring distributed presence. A single Redis cluster cannot handle 27.5M presence updates/sec fan-out.</div>
 </div>
 
-<!-- ═══ FUNCTIONAL REQUIREMENTS ═══ -->
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
 <div class="T" id="functional-requirements">
 <h2>Functional Requirements</h2>
-<p class="su">What the system must do — the core user-facing behaviours for presence</p>
+<p class="su">What the system must do &middot; the core user-facing behaviours for presence</p>
 <div class="d-grid" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--g)">Must Have (Core)</h4>
@@ -56,7 +67,7 @@
   <span class="hg">1.</span> Track user <strong>online/offline status</strong> based on active connection<br>
   <span class="hg">2.</span> Propagate status changes to <strong>relevant contacts</strong> within &lt;5 seconds<br>
   <span class="hg">3.</span> Show <strong>"last seen"</strong> timestamp when a user goes offline<br>
-  <span class="hg">4.</span> Support <strong>privacy controls</strong> — user can hide presence from specific contacts<br>
+  <span class="hg">4.</span> Support <strong>privacy controls</strong> &middot; user can hide presence from specific contacts<br>
   <span class="hg">5.</span> On app open, fetch <strong>bulk presence</strong> for visible contacts (chat list)<br>
   <span class="hg">6.</span> Detect <strong>network disconnects</strong> vs intentional close (grace period before marking offline)
 </div>
@@ -64,43 +75,43 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">✗</span> <strong>Typing indicators</strong> (separate ephemeral event system)<br>
-  <span class="hr">✗</span> <strong>Message delivery</strong> (separate messaging pipeline)<br>
-  <span class="hr">✗</span> <strong>Read receipts</strong> (separate aggregation problem)<br>
-  <span class="hr">✗</span> <strong>Group presence</strong> aggregation (e.g., "5 members online")<br>
-  <span class="hr">✗</span> <strong>Custom status</strong> messages ("In a meeting")<br>
-  <span class="hr">✗</span> <strong>Push notifications</strong> for presence changes
+  <span class="hr">?</span> <strong>Typing indicators</strong> (separate ephemeral event system)<br>
+  <span class="hr">?</span> <strong>Message delivery</strong> (separate messaging pipeline)<br>
+  <span class="hr">?</span> <strong>Read receipts</strong> (separate aggregation problem)<br>
+  <span class="hr">?</span> <strong>Group presence</strong> aggregation (e.g., "5 members online")<br>
+  <span class="hr">?</span> <strong>Custom status</strong> messages ("In a meeting")<br>
+  <span class="hr">?</span> <strong>Push notifications</strong> for presence changes
 </div>
 </div>
 </div>
 </div>
 
-<!-- ═══ NON-FUNCTIONAL REQUIREMENTS ═══ -->
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
 <div class="T" id="nonfunctional-requirements">
 <h2>Non-Functional Requirements</h2>
 <p class="su">The quality constraints that shape every architectural decision</p>
 <table>
 <tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
 <tr><td><span class="hi">Latency</span></td><td><span class="hg">P99 &lt;5s</span> status propagation</td><td>Users expect near-instant presence. Drives push-based delivery over polling.</td></tr>
-<tr><td><span class="hi">Throughput</span></td><td><span class="hg">55K status changes/sec</span> ingress · <span class="hg">27.5M updates/sec</span> fan-out</td><td>Requires sharded presence servers and subscription-based delivery to avoid broadcast storms.</td></tr>
-<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.9%</span> (&lt;8.7 hrs/year)</td><td>Presence is best-effort — brief inconsistency is acceptable. Availability over strict consistency.</td></tr>
-<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Eventual</span> — converge within 10s</td><td>Stale presence for a few seconds is acceptable. No need for strong consistency.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">55K status changes/sec</span> ingress &middot; <span class="hg">27.5M updates/sec</span> fan-out</td><td>Requires sharded presence servers and subscription-based delivery to avoid broadcast storms.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.9%</span> (&lt;8.7 hrs/year)</td><td>Presence is best-effort &middot; brief inconsistency is acceptable. Availability over strict consistency.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Eventual</span> &middot; converge within 10s</td><td>Stale presence for a few seconds is acceptable. No need for strong consistency.</td></tr>
 <tr><td><span class="hi">Scalability</span></td><td>Linear scale to <span class="hg">100M+ concurrent</span></td><td>Shard by user_id. Each shard independently manages presence for its user subset.</td></tr>
 <tr><td><span class="hi">Efficiency</span></td><td><span class="hg">Minimize unnecessary updates</span></td><td>Only notify online subscribers. Suppress flapping. Batch where possible.</td></tr>
 <tr><td><span class="hi">Fault tolerance</span></td><td>Survive <span class="hg">shard failures</span> gracefully</td><td>Shard failure = users on that shard appear "unknown" briefly. No cascading failures.</td></tr>
 <tr><td><span class="hi">Privacy</span></td><td>Respect <span class="hg">per-user visibility</span> settings</td><td>Privacy checks at fan-out time. Never leak presence to blocked contacts.</td></tr>
 </table>
-<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Freshness vs. Efficiency</span>. Pushing every heartbeat to 500 contacts would be fresh but wasteful. The system trades a few seconds of staleness for 100× reduction in network traffic via subscription-based delivery and flap suppression.</div>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Freshness vs. Efficiency</span>. Pushing every heartbeat to 500 contacts would be fresh but wasteful. The system trades a few seconds of staleness for 100&middot; reduction in network traffic via subscription-based delivery and flap suppression.</div>
 </div>
 
-<!-- ═══ SCALE ESTIMATION ═══ -->
+<!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
-<p class="su">Given numbers → derive infrastructure sizing. Show this reasoning in an interview.</p>
+<p class="su">Given numbers ? derive infrastructure sizing. Show this reasoning in an interview.</p>
 
 <div class="b bb" style="margin-bottom:10px">
   <span class="hi">Given (from question):</span>
-  <strong>100M concurrent users</strong> · <strong>2B total users</strong> · <strong>&lt;5s status propagation</strong> · <strong>~500 contacts per user</strong>
+  <strong>100M concurrent users</strong> &middot; <strong>2B total users</strong> &middot; <strong>&lt;5s status propagation</strong> &middot; <strong>~500 contacts per user</strong>
 </div>
 
 <table>
@@ -108,65 +119,65 @@
 <tr>
   <td><span class="hi">1</span></td>
   <td>Status changes/sec</td>
-  <td>100M users × 1 change per 30min avg = 100M ÷ 1800</td>
+  <td>100M users &middot; 1 change per 30min avg = 100M &middot; 1800</td>
   <td><span class="hg">~55K changes/sec</span></td>
-  <td>Ingress rate — manageable for sharded presence servers</td>
+  <td>Ingress rate &middot; manageable for sharded presence servers</td>
 </tr>
 <tr>
   <td><span class="hi">2</span></td>
   <td>Fan-out updates/sec</td>
-  <td>55K changes/sec × 500 contacts per user</td>
+  <td>55K changes/sec &middot; 500 contacts per user</td>
   <td><span class="hr">27.5M updates/sec</span></td>
-  <td>Naive broadcast is impossible — must filter to online subscribers only</td>
+  <td>Naive broadcast is impossible &middot; must filter to online subscribers only</td>
 </tr>
 <tr>
   <td><span class="hi">3</span></td>
   <td>Online contacts (filtered)</td>
-  <td>500 contacts × 5% online rate = 25 online contacts avg</td>
-  <td><span class="hg">55K × 25 = 1.37M updates/sec</span></td>
-  <td>Subscription model reduces fan-out by 20× — now feasible</td>
+  <td>500 contacts &middot; 5% online rate = 25 online contacts avg</td>
+  <td><span class="hg">55K &middot; 25 = 1.37M updates/sec</span></td>
+  <td>Subscription model reduces fan-out by 20&middot; &middot; now feasible</td>
 </tr>
 <tr>
   <td><span class="hi">4</span></td>
   <td>Presence server shards</td>
-  <td>100M users ÷ 1M users/shard (memory + CPU budget)</td>
+  <td>100M users &middot; 1M users/shard (memory + CPU budget)</td>
   <td><span class="hg">~100 shards</span></td>
   <td>Each shard holds 1M user states in-memory (~50MB RAM per shard)</td>
 </tr>
 <tr>
   <td><span class="hi">5</span></td>
   <td>Memory per shard</td>
-  <td>1M users × 50 bytes (user_id + status + timestamp)</td>
+  <td>1M users &middot; 50 bytes (user_id + status + timestamp)</td>
   <td><span class="hg">~50MB per shard</span></td>
   <td>Fits easily in RAM. Subscription lists add ~200MB more per shard.</td>
 </tr>
 <tr>
   <td><span class="hi">6</span></td>
   <td>Cross-shard routing</td>
-  <td>User A on shard-7, contact B on shard-42 → internal pub/sub</td>
+  <td>User A on shard-7, contact B on shard-42 ? internal pub/sub</td>
   <td><span class="hg">~80% cross-shard</span></td>
   <td>Internal message bus (Kafka/NATS) for cross-shard subscription routing</td>
 </tr>
 <tr>
   <td><span class="hi">7</span></td>
   <td>Why centralized Redis breaks</td>
-  <td>27.5M ops/sec ÷ ~300K ops/sec per Redis node</td>
+  <td>27.5M ops/sec &middot; ~300K ops/sec per Redis node</td>
   <td><span class="hr">~92 Redis nodes just for fan-out</span></td>
-  <td>Redis cluster can't handle subscription routing — need purpose-built sharding</td>
+  <td>Redis cluster can't handle subscription routing &middot; need purpose-built sharding</td>
 </tr>
 <tr>
   <td><span class="hi">8</span></td>
   <td>Network bandwidth</td>
-  <td>1.37M updates/sec × 64 bytes per update</td>
+  <td>1.37M updates/sec &middot; 64 bytes per update</td>
   <td><span class="hg">~88 MB/s outbound</span></td>
-  <td>Distributed across 100 shards = ~880 KB/s per shard — trivial</td>
+  <td>Distributed across 100 shards = ~880 KB/s per shard &middot; trivial</td>
 </tr>
 </table>
 
-<div class="b by"><span class="hi">Interview tip:</span> Start with step 1–2 (the naive fan-out math) to show the problem is hard. Then step 3 (subscription filtering) is the key insight that makes it tractable. The 27.5M → 1.37M reduction is what drives the entire architecture.</div>
+<div class="b by"><span class="hi">Interview tip:</span> Start with step 1&middot;2 (the naive fan-out math) to show the problem is hard. Then step 3 (subscription filtering) is the key insight that makes it tractable. The 27.5M ? 1.37M reduction is what drives the entire architecture.</div>
 </div>
 
-<!-- ═══ ARCHITECTURE ═══ -->
+<!-- --- ARCHITECTURE --- -->
 <div class="T" id="architecture">
 <h2>Architecture Overview</h2>
 <p class="su">Sharded presence servers with subscription-based delivery and hierarchical aggregation</p>
@@ -174,9 +185,9 @@
 <svg width="100%" viewBox="0 0 760 340" style="max-width:760px;display:block;margin:4px auto 8px">
 <defs><marker id="ps1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
 
-<!-- ═══ CLIENT LAYER ═══ -->
+<!-- --- CLIENT LAYER --- -->
 <rect data-dp-step="1" x="4" y="4" width="752" height="56" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
-<text data-dp-step="1" x="380" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">CLIENT LAYER — 100M Concurrent Connections</text>
+<text data-dp-step="1" x="380" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">CLIENT LAYER &middot; 100M Concurrent Connections</text>
 
 <rect data-dp-step="2" x="14" y="26" width="80" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
 <text data-dp-step="2" x="54" y="38" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">User A</text>
@@ -194,9 +205,9 @@
 <text data-dp-step="2" x="663" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Key Insight</text>
 <text data-dp-step="2" x="663" y="47" text-anchor="middle" fill="var(--g)" font-size="5">Only push to ONLINE subscribers</text>
 
-<!-- ═══ GATEWAY LAYER ═══ -->
+<!-- --- GATEWAY LAYER --- -->
 <rect data-dp-step="3" x="4" y="68" width="752" height="50" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
-<text data-dp-step="3" x="380" y="82" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">GATEWAY LAYER — WebSocket Termination</text>
+<text data-dp-step="3" x="380" y="82" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">GATEWAY LAYER &middot; WebSocket Termination</text>
 
 <rect data-dp-step="4" x="14" y="90" width="110" height="20" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
 <text data-dp-step="4" x="69" y="103" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-1 (500K conn)</text>
@@ -210,25 +221,25 @@
 <line data-dp-step="5" x1="195" y1="110" x2="195" y2="128" stroke="var(--y)" stroke-width="1" marker-end="url(#ps1)"/>
 <line data-dp-step="5" x1="321" y1="110" x2="321" y2="128" stroke="var(--y)" stroke-width="1" marker-end="url(#ps1)"/>
 
-<!-- ═══ PRESENCE SERVER LAYER ═══ -->
+<!-- --- PRESENCE SERVER LAYER --- -->
 <rect data-dp-step="6" x="4" y="130" width="752" height="80" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
-<text data-dp-step="6" x="380" y="144" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">PRESENCE SERVER LAYER — Sharded by user_id (100 shards)</text>
+<text data-dp-step="6" x="380" y="144" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">PRESENCE SERVER LAYER &middot; Sharded by user_id (100 shards)</text>
 
 <rect data-dp-step="7" x="14" y="152" width="140" height="48" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
 <text data-dp-step="7" x="84" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Presence Shard 1</text>
-<text data-dp-step="7" x="84" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">Users 0–999,999</text>
+<text data-dp-step="7" x="84" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">Users 0&middot;999,999</text>
 <text data-dp-step="7" x="84" y="184" text-anchor="middle" fill="var(--muted)" font-size="5">State + Subscriptions</text>
 <text data-dp-step="7" x="84" y="194" text-anchor="middle" fill="var(--g)" font-size="5">In-memory: ~250MB</text>
 
 <rect data-dp-step="7" x="170" y="152" width="140" height="48" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
 <text data-dp-step="7" x="240" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Presence Shard 2</text>
-<text data-dp-step="7" x="240" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">Users 1M–1,999,999</text>
+<text data-dp-step="7" x="240" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">Users 1M&middot;1,999,999</text>
 <text data-dp-step="7" x="240" y="184" text-anchor="middle" fill="var(--muted)" font-size="5">State + Subscriptions</text>
 <text data-dp-step="7" x="240" y="194" text-anchor="middle" fill="var(--g)" font-size="5">In-memory: ~250MB</text>
 
 <rect data-dp-step="7" x="326" y="152" width="140" height="48" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
 <text data-dp-step="7" x="396" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Presence Shard N</text>
-<text data-dp-step="7" x="396" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">Users 99M–99,999,999</text>
+<text data-dp-step="7" x="396" y="174" text-anchor="middle" fill="var(--muted)" font-size="5">Users 99M&middot;99,999,999</text>
 <text data-dp-step="7" x="396" y="184" text-anchor="middle" fill="var(--muted)" font-size="5">State + Subscriptions</text>
 <text data-dp-step="7" x="396" y="194" text-anchor="middle" fill="var(--g)" font-size="5">In-memory: ~250MB</text>
 
@@ -236,17 +247,17 @@
 <rect data-dp-step="8" x="500" y="152" width="246" height="48" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
 <text data-dp-step="8" x="623" y="164" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Internal Pub/Sub (NATS/Kafka)</text>
 <text data-dp-step="8" x="623" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">Cross-shard subscription routing</text>
-<text data-dp-step="8" x="623" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">User A on shard-7 changes → notify</text>
+<text data-dp-step="8" x="623" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">User A on shard-7 changes ? notify</text>
 <text data-dp-step="8" x="623" y="196" text-anchor="middle" fill="var(--muted)" font-size="5">subscribers on shard-42, shard-15, etc.</text>
 
 <line data-dp-step="8" x1="466" y1="176" x2="498" y2="176" stroke="var(--o)" stroke-width="1" marker-end="url(#ps1)"/>
 
-<!-- ═══ DELIVERY FLOW ═══ -->
+<!-- --- DELIVERY FLOW --- -->
 <rect data-dp-step="9" x="4" y="218" width="752" height="56" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
-<text data-dp-step="9" x="380" y="232" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">DELIVERY FLOW — User A goes online</text>
+<text data-dp-step="9" x="380" y="232" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">DELIVERY FLOW &middot; User A goes online</text>
 
 <rect data-dp-step="10" x="14" y="240" width="100" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
-<text data-dp-step="10" x="64" y="252" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">1. A connects → shard</text>
+<text data-dp-step="10" x="64" y="252" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">1. A connects ? shard</text>
 <text data-dp-step="10" x="64" y="261" text-anchor="middle" fill="var(--muted)" font-size="5">marks A = online</text>
 <line data-dp-step="10" x1="114" y1="253" x2="130" y2="253" stroke="var(--a)" stroke-width=".8" marker-end="url(#ps1)"/>
 
@@ -257,7 +268,7 @@
 
 <rect data-dp-step="10" x="270" y="240" width="130" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
 <text data-dp-step="10" x="335" y="252" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">3. Filter: only online subscribers</text>
-<text data-dp-step="10" x="335" y="261" text-anchor="middle" fill="var(--muted)" font-size="5">B online ✓, C offline ✗</text>
+<text data-dp-step="10" x="335" y="261" text-anchor="middle" fill="var(--muted)" font-size="5">B online ?, C offline ?</text>
 <line data-dp-step="10" x1="400" y1="253" x2="416" y2="253" stroke="var(--y)" stroke-width=".8" marker-end="url(#ps1)"/>
 
 <rect data-dp-step="10" x="418" y="240" width="120" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".6"/>
@@ -267,19 +278,19 @@
 
 <rect data-dp-step="10" x="556" y="240" width="100" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
 <text data-dp-step="10" x="606" y="252" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">5. B sees "A is online"</text>
-<text data-dp-step="10" x="606" y="261" text-anchor="middle" fill="var(--g)" font-size="5">✓ &lt;5s total</text>
+<text data-dp-step="10" x="606" y="261" text-anchor="middle" fill="var(--g)" font-size="5">? &lt;5s total</text>
 
 <!-- Comparison note -->
 <rect data-dp-step="11" x="4" y="282" width="752" height="50" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
 <text data-dp-step="11" x="380" y="296" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">WHY SLACK'S APPROACH DOESN'T WORK AT 100M</text>
-<text data-dp-step="11" x="380" y="310" text-anchor="middle" fill="var(--muted)" font-size="5.5">Slack: Single Redis cluster → channel:{id}:online SET → works at 10M users, ~300K ops/sec per node</text>
-<text data-dp-step="11" x="380" y="322" text-anchor="middle" fill="var(--muted)" font-size="5.5">WhatsApp scale: 27.5M fan-out ops/sec → needs ~92 Redis nodes just for presence. Solution: purpose-built sharded presence servers with in-memory subscription lists.</text>
+<text data-dp-step="11" x="380" y="310" text-anchor="middle" fill="var(--muted)" font-size="5.5">Slack: Single Redis cluster ? channel:{id}:online SET ? works at 10M users, ~300K ops/sec per node</text>
+<text data-dp-step="11" x="380" y="322" text-anchor="middle" fill="var(--muted)" font-size="5.5">WhatsApp scale: 27.5M fan-out ops/sec ? needs ~92 Redis nodes just for presence. Solution: purpose-built sharded presence servers with in-memory subscription lists.</text>
 </svg>
 
-<div class="b bg"><span class="hi">Architecture principle:</span> Each presence shard is a <span class="hg">self-contained unit</span> — it owns the state for its users AND the subscription list of who wants to know about those users. Cross-shard communication happens via internal pub/sub, not shared state.</div>
+<div class="b bg"><span class="hi">Architecture principle:</span> Each presence shard is a <span class="hg">self-contained unit</span> &middot; it owns the state for its users AND the subscription list of who wants to know about those users. Cross-shard communication happens via internal pub/sub, not shared state.</div>
 </div>
 
-<!-- ═══ SUBSCRIPTION MODEL ═══ -->
+<!-- --- SUBSCRIPTION MODEL --- -->
 <div class="T" id="subscriptions">
 <h2>Subscription Model</h2>
 <p class="su">User subscribes to contacts' presence on connect. Server only pushes changes to online subscribers. Unsubscribe on disconnect.</p>
@@ -289,7 +300,7 @@
 
 <!-- Subscribe flow -->
 <rect data-dp-step="1" x="4" y="4" width="672" height="60" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
-<text data-dp-step="1" x="340" y="18" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">ON CONNECT — Subscribe to contacts' presence</text>
+<text data-dp-step="1" x="340" y="18" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">ON CONNECT &middot; Subscribe to contacts' presence</text>
 
 <rect data-dp-step="2" x="14" y="26" width="90" height="30" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
 <text data-dp-step="2" x="59" y="38" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">User B connects</text>
@@ -312,7 +323,7 @@
 
 <!-- Unsubscribe flow -->
 <rect data-dp-step="6" x="4" y="72" width="672" height="50" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
-<text data-dp-step="6" x="340" y="86" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">ON DISCONNECT — Unsubscribe + notify contacts</text>
+<text data-dp-step="6" x="340" y="86" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">ON DISCONNECT &middot; Unsubscribe + notify contacts</text>
 
 <rect data-dp-step="7" x="14" y="94" width="90" height="22" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
 <text data-dp-step="7" x="59" y="108" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">B disconnects</text>
@@ -335,27 +346,27 @@
 
 <rect data-dp-step="9" x="14" y="152" width="200" height="52" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text data-dp-step="9" x="114" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Without Subscriptions</text>
-<text data-dp-step="9" x="114" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes → push to ALL 500 contacts</text>
-<text data-dp-step="9" x="114" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">475 are offline → 95% wasted work</text>
-<text data-dp-step="9" x="114" y="196" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">27.5M updates/sec — impossible</text>
+<text data-dp-step="9" x="114" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes ? push to ALL 500 contacts</text>
+<text data-dp-step="9" x="114" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">475 are offline ? 95% wasted work</text>
+<text data-dp-step="9" x="114" y="196" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">27.5M updates/sec &middot; impossible</text>
 
 <rect data-dp-step="9" x="230" y="152" width="200" height="52" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text data-dp-step="9" x="330" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">With Subscriptions</text>
-<text data-dp-step="9" x="330" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes → push to 25 online subscribers</text>
-<text data-dp-step="9" x="330" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">0% wasted — every push is useful</text>
-<text data-dp-step="9" x="330" y="196" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1.37M updates/sec — feasible ✓</text>
+<text data-dp-step="9" x="330" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes ? push to 25 online subscribers</text>
+<text data-dp-step="9" x="330" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">0% wasted &middot; every push is useful</text>
+<text data-dp-step="9" x="330" y="196" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1.37M updates/sec &middot; feasible ?</text>
 
 <rect data-dp-step="9" x="446" y="152" width="220" height="52" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".6"/>
 <text data-dp-step="9" x="556" y="164" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Tradeoff</text>
 <text data-dp-step="9" x="556" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">Cost: subscribe/unsubscribe on connect/disconnect</text>
 <text data-dp-step="9" x="556" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">~500 subscribe ops per user connect</text>
-<text data-dp-step="9" x="556" y="196" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">55K connects/sec × 500 = 27.5M sub ops/sec</text>
+<text data-dp-step="9" x="556" y="196" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">55K connects/sec &middot; 500 = 27.5M sub ops/sec</text>
 </svg>
 
-<div class="b bb"><span class="hi">Key optimization:</span> Batch subscribe operations. When User B connects, send one message per shard containing all contacts on that shard — not 500 individual subscribe requests. This reduces 500 ops to ~100 ops (one per shard that has B's contacts).</div>
+<div class="b bb"><span class="hi">Key optimization:</span> Batch subscribe operations. When User B connects, send one message per shard containing all contacts on that shard &middot; not 500 individual subscribe requests. This reduces 500 ops to ~100 ops (one per shard that has B's contacts).</div>
 </div>
 
-<!-- ═══ DISTRIBUTED PRESENCE SHARDING ═══ -->
+<!-- --- DISTRIBUTED PRESENCE SHARDING --- -->
 <div class="T" id="sharding">
 <h2>Distributed Presence Sharding</h2>
 <p class="su">Shard by user_id. Each shard owns presence state for a subset of users. Cross-shard subscription routing via internal pub/sub.</p>
@@ -365,7 +376,7 @@
 
 <!-- Shard assignment -->
 <rect data-dp-step="1" x="4" y="4" width="672" height="50" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
-<text data-dp-step="1" x="340" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">SHARD ASSIGNMENT — Consistent Hashing on user_id</text>
+<text data-dp-step="1" x="340" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">SHARD ASSIGNMENT &middot; Consistent Hashing on user_id</text>
 
 <rect data-dp-step="2" x="14" y="26" width="100" height="22" rx="3" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".6"/>
 <text data-dp-step="2" x="64" y="40" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">hash(user_id) % N</text>
@@ -388,17 +399,17 @@
 
 <rect data-dp-step="4" x="14" y="84" width="200" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
 <text data-dp-step="4" x="114" y="96" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Presence Map</text>
-<text data-dp-step="4" x="114" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id → {status, last_seen, gateway_id}</text>
-<text data-dp-step="4" x="114" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">HashMap&lt;u64, PresenceEntry&gt; — O(1) lookup</text>
+<text data-dp-step="4" x="114" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id ? {status, last_seen, gateway_id}</text>
+<text data-dp-step="4" x="114" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">HashMap&lt;u64, PresenceEntry&gt; &middot; O(1) lookup</text>
 
 <rect data-dp-step="4" x="230" y="84" width="210" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
 <text data-dp-step="4" x="335" y="96" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Subscriber Lists</text>
-<text data-dp-step="4" x="335" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id → Set&lt;subscriber_id&gt; (online contacts watching)</text>
+<text data-dp-step="4" x="335" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id ? Set&lt;subscriber_id&gt; (online contacts watching)</text>
 <text data-dp-step="4" x="335" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">Avg 25 subscribers per user (only online ones)</text>
 
 <rect data-dp-step="4" x="456" y="84" width="210" height="40" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".6"/>
 <text data-dp-step="4" x="561" y="96" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Reverse Index</text>
-<text data-dp-step="4" x="561" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">subscriber_id → Set&lt;watched_user_ids&gt;</text>
+<text data-dp-step="4" x="561" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">subscriber_id ? Set&lt;watched_user_ids&gt;</text>
 <text data-dp-step="4" x="561" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">For fast cleanup on disconnect</text>
 
 <!-- Cross-shard routing -->
@@ -415,7 +426,7 @@
 <rect data-dp-step="7" x="202" y="168" width="140" height="50" rx="4" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
 <text data-dp-step="7" x="272" y="182" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Internal Pub/Sub Bus</text>
 <text data-dp-step="7" x="272" y="194" text-anchor="middle" fill="var(--muted)" font-size="5">NATS / Kafka internal topic</text>
-<text data-dp-step="7" x="272" y="204" text-anchor="middle" fill="var(--muted)" font-size="5">Route: "A online" → gateways of B, D, E</text>
+<text data-dp-step="7" x="272" y="204" text-anchor="middle" fill="var(--muted)" font-size="5">Route: "A online" ? gateways of B, D, E</text>
 <line data-dp-step="7" x1="342" y1="185" x2="380" y2="178" stroke="var(--o)" stroke-width=".8" marker-end="url(#ps3)"/>
 <line data-dp-step="7" x1="342" y1="198" x2="380" y2="205" stroke="var(--o)" stroke-width=".8" marker-end="url(#ps3)"/>
 
@@ -430,37 +441,37 @@
 <rect data-dp-step="9" x="530" y="162" width="136" height="60" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
 <text data-dp-step="9" x="598" y="176" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Optimization</text>
 <text data-dp-step="9" x="598" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Group by gateway before sending</text>
-<text data-dp-step="9" x="598" y="200" text-anchor="middle" fill="var(--muted)" font-size="5">If B and E on same gateway →</text>
+<text data-dp-step="9" x="598" y="200" text-anchor="middle" fill="var(--muted)" font-size="5">If B and E on same gateway ?</text>
 <text data-dp-step="9" x="598" y="212" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1 gRPC call, not 2</text>
 </svg>
 
-<div class="b by"><span class="hi">Shard rebalancing:</span> Use consistent hashing with virtual nodes. Adding a shard moves only ~1% of users. During migration, old shard forwards requests to new shard for a brief window. Presence is ephemeral — worst case is a few seconds of stale data during rebalance.</div>
+<div class="b by"><span class="hi">Shard rebalancing:</span> Use consistent hashing with virtual nodes. Adding a shard moves only ~1% of users. During migration, old shard forwards requests to new shard for a brief window. Presence is ephemeral &middot; worst case is a few seconds of stale data during rebalance.</div>
 </div>
 
-<!-- ═══ OPTIMIZATION TECHNIQUES ═══ -->
+<!-- --- OPTIMIZATION TECHNIQUES --- -->
 <div class="T" id="optimizations">
 <h2>Optimization Techniques</h2>
 <p class="su">Batch updates, suppress flapping, lazy propagation, and presence priority to minimize network load</p>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:10px;text-align:left">
-<h4 style="color:var(--g);font-size:.82rem">🔄 Batch Updates</h4>
+<h4 style="color:var(--g);font-size:.82rem">?? Batch Updates</h4>
 <div style="font-size:.76rem;line-height:1.6;color:var(--muted)">
   Collect presence changes over a <strong style="color:var(--text)">500ms window</strong> before fanning out.<br>
   If 10 users on the same shard change status within 500ms, send <strong style="color:var(--text)">one batch notification</strong> to each gateway instead of 10 individual pushes.<br>
-  <span style="color:var(--g)">Reduces gRPC calls by ~5×</span> during peak hours.
+  <span style="color:var(--g)">Reduces gRPC calls by ~5&middot;</span> during peak hours.
 </div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left">
-<h4 style="color:var(--r);font-size:.82rem">⚡ Flap Suppression</h4>
+<h4 style="color:var(--r);font-size:.82rem">? Flap Suppression</h4>
 <div style="font-size:.76rem;line-height:1.6;color:var(--muted)">
-  If user goes <strong style="color:var(--text)">online→offline→online within 30s</strong>, suppress the offline notification entirely.<br>
-  Common cause: network switch (WiFi→cellular), brief tunnel, app backgrounded momentarily.<br>
+  If user goes <strong style="color:var(--text)">online?offline?online within 30s</strong>, suppress the offline notification entirely.<br>
+  Common cause: network switch (WiFi?cellular), brief tunnel, app backgrounded momentarily.<br>
   <span style="color:var(--g)">Eliminates ~40% of status changes</span> that would confuse contacts.
 </div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left">
-<h4 style="color:var(--y);font-size:.82rem">🕐 Lazy "Last Seen" Propagation</h4>
+<h4 style="color:var(--y);font-size:.82rem">?? Lazy "Last Seen" Propagation</h4>
 <div style="font-size:.76rem;line-height:1.6;color:var(--muted)">
   "Last seen" timestamps are <strong style="color:var(--text)">NOT pushed in real-time</strong>. They're stored on the shard and fetched on-demand when a contact opens a chat.<br>
   Only the <strong style="color:var(--text)">online/offline transition</strong> is pushed. Timestamp is pulled lazily.<br>
@@ -468,22 +479,22 @@
 </div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left">
-<h4 style="color:var(--a);font-size:.82rem">⭐ Presence Priority</h4>
+<h4 style="color:var(--a);font-size:.82rem">? Presence Priority</h4>
 <div style="font-size:.76rem;line-height:1.6;color:var(--muted)">
   Not all contacts are equal. <strong style="color:var(--text)">Close contacts</strong> (frequent chat partners) get presence updates first.<br>
   Under load shedding, <strong style="color:var(--text)">deprioritize</strong> updates to contacts you haven't chatted with in 30+ days.<br>
-  <span style="color:var(--g)">Graceful degradation</span> — important contacts always get fresh presence.
+  <span style="color:var(--g)">Graceful degradation</span> &middot; important contacts always get fresh presence.
 </div>
 </div>
 </div>
 
-<div class="b bg"><span class="hi">Combined effect:</span> Batching (5×) + flap suppression (40% reduction) + subscription filtering (20×) = the system handles <span class="hg">~100× less traffic</span> than naive broadcast. This is what makes 100M scale feasible on ~100 presence servers.</div>
+<div class="b bg"><span class="hi">Combined effect:</span> Batching (5&middot;) + flap suppression (40% reduction) + subscription filtering (20&middot;) = the system handles <span class="hg">~100&middot; less traffic</span> than naive broadcast. This is what makes 100M scale feasible on ~100 presence servers.</div>
 </div>
 
-<!-- ═══ RESILIENCE & EDGE CASES ═══ -->
+<!-- --- RESILIENCE & EDGE CASES --- -->
 <div class="T" id="challenges">
 <h2>Resilience &amp; Edge Cases</h2>
-<p class="su">What happens when things go wrong — and how the system recovers gracefully</p>
+<p class="su">What happens when things go wrong &middot; and how the system recovers gracefully</p>
 <table>
 <tr><th>Scenario</th><th>Impact</th><th>Mitigation</th></tr>
 <tr><td><span class="hi">Presence shard crash</span></td><td>1M users' presence becomes unknown for ~10s</td><td>Standby replica takes over. Clients re-subscribe on reconnect. Presence rebuilds from gateway heartbeats within seconds.</td></tr>
@@ -492,13 +503,13 @@
 <tr><td><span class="hi">Thundering herd (mass reconnect)</span></td><td>Millions subscribe simultaneously after outage</td><td>Rate-limit subscribe operations. Stagger reconnects with exponential backoff + jitter on client. Serve cached presence (possibly stale) during recovery.</td></tr>
 <tr><td><span class="hi">Celebrity user (10K+ contacts online)</span></td><td>Single status change fans out to 10K+ subscribers</td><td>Cap subscriber list at 1000. Beyond that, use pull-based presence (contacts fetch on chat open). Tiered delivery: close contacts first.</td></tr>
 <tr><td><span class="hi">Stale subscriber entries</span></td><td>Push to users who already disconnected</td><td>Gateway returns "not_found" for disconnected users. Presence shard removes stale entries. Periodic sweep every 60s as safety net.</td></tr>
-<tr><td><span class="hi">Privacy setting change</span></td><td>User blocks contact — must stop presence immediately</td><td>Privacy change triggers immediate unsubscribe on the relevant shard. Blocked contact sees "last seen: unavailable" from that point.</td></tr>
-<tr><td><span class="hi">Clock skew across shards</span></td><td>"Last seen" timestamps inconsistent</td><td>Use logical timestamps (Lamport clocks) for ordering. Physical timestamps only for display — minor skew (seconds) is acceptable for "last seen".</td></tr>
+<tr><td><span class="hi">Privacy setting change</span></td><td>User blocks contact &middot; must stop presence immediately</td><td>Privacy change triggers immediate unsubscribe on the relevant shard. Blocked contact sees "last seen: unavailable" from that point.</td></tr>
+<tr><td><span class="hi">Clock skew across shards</span></td><td>"Last seen" timestamps inconsistent</td><td>Use logical timestamps (Lamport clocks) for ordering. Physical timestamps only for display &middot; minor skew (seconds) is acceptable for "last seen".</td></tr>
 </table>
 <div class="b br"><span class="hi">Design philosophy:</span> Presence is <span class="hg">best-effort, not mission-critical</span>. A few seconds of stale data is acceptable. The system optimizes for availability and efficiency over strict consistency. No user action depends on presence being perfectly accurate.</div>
 </div>
 
-<!-- ═══ TECH STACK ═══ -->
+<!-- --- TECH STACK --- -->
 <div class="T" id="stack">
 <h2>Tech Stack</h2>
 <p class="su">Purpose-built components optimized for presence at 100M scale</p>
@@ -508,14 +519,14 @@
 <tr><td><span class="hi">Gateway (WS termination)</span></td><td><span class="hg">Custom C++/Rust with epoll</span></td><td>500K+ connections per server. Minimal per-connection overhead. Protocol-aware routing to presence shards.</td></tr>
 <tr><td><span class="hi">Internal Pub/Sub</span></td><td><span class="hg">NATS JetStream</span></td><td>Low-latency cross-shard messaging. Subject-based routing (presence.shard.{N}). At-most-once delivery is fine for presence.</td></tr>
 <tr><td><span class="hi">Shard Discovery</span></td><td><span class="hg">ZooKeeper / etcd</span></td><td>Consistent hashing ring management. Shard assignment and leader election for replicas.</td></tr>
-<tr><td><span class="hi">Persistent Storage</span></td><td><span class="hg">Cassandra / ScyllaDB</span></td><td>"Last seen" timestamps persisted for offline queries. Write-heavy, eventually consistent — perfect fit.</td></tr>
+<tr><td><span class="hi">Persistent Storage</span></td><td><span class="hg">Cassandra / ScyllaDB</span></td><td>"Last seen" timestamps persisted for offline queries. Write-heavy, eventually consistent &middot; perfect fit.</td></tr>
 <tr><td><span class="hi">Privacy/Contact Store</span></td><td><span class="hg">MySQL/Vitess (sharded)</span></td><td>Contact lists and privacy settings. Read on connect, cached in presence shard memory.</td></tr>
 <tr><td><span class="hi">Monitoring</span></td><td><span class="hg">Prometheus + Grafana</span></td><td>Per-shard metrics: subscriber count, fan-out latency, flap rate, cross-shard message lag.</td></tr>
 <tr><td><span class="hi">Load Balancing</span></td><td><span class="hg">Envoy / HAProxy (L4)</span></td><td>TCP-level load balancing for WebSocket connections. Consistent hashing for presence shard routing.</td></tr>
 </table>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">5 key points to nail the presence system design interview</p>
@@ -523,19 +534,19 @@
 <div class="d-grid" style="margin:6px 0">
 <div class="d-panel" style="padding:10px;text-align:left">
 <div style="font-size:.82rem;line-height:1.8">
-  <span class="hg" style="font-weight:700">1. Start with the math — show the problem is hard.</span><br>
-  <span style="color:var(--muted)">100M users × status change every 30min = 55K changes/sec. Each change × 500 contacts = 27.5M updates/sec. This is why naive broadcast fails and why you need subscription-based delivery.</span><br><br>
+  <span class="hg" style="font-weight:700">1. Start with the math &middot; show the problem is hard.</span><br>
+  <span style="color:var(--muted)">100M users &middot; status change every 30min = 55K changes/sec. Each change &middot; 500 contacts = 27.5M updates/sec. This is why naive broadcast fails and why you need subscription-based delivery.</span><br><br>
 
   <span class="hg" style="font-weight:700">2. Subscription model is the key insight.</span><br>
-  <span style="color:var(--muted)">Only push to online subscribers (not all contacts). 500 contacts → ~25 online subscribers = 20× reduction. Subscribe on connect, unsubscribe on disconnect. This single decision makes the system feasible.</span><br><br>
+  <span style="color:var(--muted)">Only push to online subscribers (not all contacts). 500 contacts ? ~25 online subscribers = 20&middot; reduction. Subscribe on connect, unsubscribe on disconnect. This single decision makes the system feasible.</span><br><br>
 
   <span class="hg" style="font-weight:700">3. Shard by user_id, not by "channel" or "group".</span><br>
   <span style="color:var(--muted)">Each shard owns presence state + subscriber lists for its users. Cross-shard routing via internal pub/sub. ~100 shards for 100M users. Each shard is an independent failure domain with its own replica.</span><br><br>
 
   <span class="hg" style="font-weight:700">4. Flap suppression + batching for efficiency.</span><br>
-  <span style="color:var(--muted)">30s grace period before marking offline (handles WiFi→cellular switches). Batch updates in 500ms windows. Combined with subscriptions, total traffic is ~100× less than naive approach.</span><br><br>
+  <span style="color:var(--muted)">30s grace period before marking offline (handles WiFi?cellular switches). Batch updates in 500ms windows. Combined with subscriptions, total traffic is ~100&middot; less than naive approach.</span><br><br>
 
-  <span class="hg" style="font-weight:700">5. Presence is best-effort — design for availability over consistency.</span><br>
+  <span class="hg" style="font-weight:700">5. Presence is best-effort &middot; design for availability over consistency.</span><br>
   <span style="color:var(--muted)">A few seconds of stale presence is acceptable. No user action depends on it being perfectly accurate. This relaxation allows eventual consistency, simpler failure handling, and graceful degradation under load.</span>
 </div>
 </div>
@@ -550,6 +561,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
 <script src="../../js/auth.js"></script>
 
 </body>

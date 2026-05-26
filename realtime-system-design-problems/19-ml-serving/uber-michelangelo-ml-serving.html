@@ -3,14 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Uber serve ML predictions at 1M+ req/sec with &lt;10ms? — System Design</title>
+<title>How does Uber serve ML predictions at 1M+ req/sec with &lt;10ms? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Uber serve ML predictions at 1M+ requests/sec with P99 &lt;10ms?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">🤖</span> Design an ML serving platform: 1M+ req/sec, 100+ models, &lt;10ms P99, version rollouts</div>
+<div class="sd sd-5"><span class="e">??</span> Design an ML serving platform: 1M+ req/sec, 100+ models, &lt;10ms P99, version rollouts</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/07-caching.html#caching">Caching</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#docker-k8s">Docker/K8s</a>
+<a href="../../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Stream Processing</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
@@ -42,15 +53,15 @@
 </div>
 
 <div class="T" id="architecture">
-<h2>Architecture — ML Serving Platform</h2>
+<h2>Architecture &middot; ML Serving Platform</h2>
 
-<!-- ═══ ML Serving SVG ═══ -->
+<!-- --- ML Serving SVG --- -->
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ML serving platform end-to-end: feature store, model serving with canary, and lifecycle monitoring">
   <defs><marker id="ml-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="var(--muted)"/></marker></defs>
 
-  <!-- ═══ LAYER 1: FEATURE ═══ -->
+  <!-- --- LAYER 1: FEATURE --- -->
   <rect x="10" y="10" width="760" height="135" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="28" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 1 — FEATURE (Feature Store: Same Logic in Training + Serving)</text>
+  <text x="390" y="28" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 1 &middot; FEATURE (Feature Store: Same Logic in Training + Serving)</text>
 
   <!-- Request -->
   <rect x="30" y="45" width="90" height="85" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
@@ -78,13 +89,13 @@
   <rect x="355" y="42" width="195" height="40" rx="5" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1"/>
   <text x="452" y="57" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Streaming: Flink (Real-time)</text>
   <text x="452" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rolling windows: surge in last 5 min, demand</text>
-  <text x="452" y="80" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Continuous computation → Redis</text>
+  <text x="452" y="80" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Continuous computation ? Redis</text>
 
   <!-- Feature consistency note -->
   <rect x="355" y="86" width="195" height="40" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
   <text x="452" y="101" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Train-Serve Consistency</text>
   <text x="452" y="114" text-anchor="middle" fill="var(--muted)" font-size="5.5">Same feature logic in training + serving</text>
-  <text x="452" y="124" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">No skew → no silent accuracy loss</text>
+  <text x="452" y="124" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">No skew ? no silent accuracy loss</text>
 
   <!-- Feature vector output -->
   <rect x="580" y="55" width="180" height="70" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
@@ -95,13 +106,13 @@
 
   <line x1="550" y1="85" x2="578" y2="85" stroke="var(--g)" stroke-width="1" marker-end="url(#ml-arr)"/>
 
-  <!-- Arrow Layer 1 → Layer 2 -->
+  <!-- Arrow Layer 1 ? Layer 2 -->
   <line x1="670" y1="125" x2="670" y2="158" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ml-arr)"/>
   <line x1="390" y1="145" x2="390" y2="158" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ml-arr)"/>
 
-  <!-- ═══ LAYER 2: SERVING ═══ -->
+  <!-- --- LAYER 2: SERVING --- -->
   <rect x="10" y="160" width="760" height="130" rx="8" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="178" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="700">LAYER 2 — SERVING (Model Inference → Canary Router → Response)</text>
+  <text x="390" y="178" text-anchor="middle" fill="var(--a2)" font-size="9" font-weight="700">LAYER 2 &middot; SERVING (Model Inference ? Canary Router ? Response)</text>
 
   <!-- Model Serving -->
   <rect x="30" y="190" width="240" height="88" rx="6" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1.2"/>
@@ -119,10 +130,10 @@
   <text x="410" y="206" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Canary Router</text>
 
   <rect x="312" y="212" width="196" height="22" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".7"/>
-  <text x="410" y="226" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">95% → Model v2 (production, stable)</text>
+  <text x="410" y="226" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">95% ? Model v2 (production, stable)</text>
 
   <rect x="312" y="238" width="196" height="22" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".7"/>
-  <text x="410" y="252" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">5% → Model v3 (canary, monitoring)</text>
+  <text x="410" y="252" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">5% ? Model v3 (canary, monitoring)</text>
 
   <text x="410" y="272" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Deterministic: hash(user_id) % 100</text>
 
@@ -137,12 +148,12 @@
   <text x="655" y="264" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Total latency: &lt;10ms P99</text>
   <text x="655" y="276" text-anchor="middle" fill="var(--muted)" font-size="5">Includes feature fetch + inference</text>
 
-  <!-- Arrow Layer 2 → Layer 3 -->
+  <!-- Arrow Layer 2 ? Layer 3 -->
   <line x1="390" y1="290" x2="390" y2="308" stroke="var(--a2)" stroke-width="1.2" marker-end="url(#ml-arr)"/>
 
-  <!-- ═══ LAYER 3: LIFECYCLE ═══ -->
+  <!-- --- LAYER 3: LIFECYCLE --- -->
   <rect x="10" y="310" width="760" height="135" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="328" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 3 — LIFECYCLE (Registry + Monitoring + Fallback)</text>
+  <text x="390" y="328" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 3 &middot; LIFECYCLE (Registry + Monitoring + Fallback)</text>
 
   <!-- Model Registry -->
   <rect x="30" y="340" width="220" height="95" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
@@ -151,14 +162,14 @@
   <text x="140" y="383" text-anchor="middle" fill="var(--muted)" font-size="5.5">Metadata: accuracy, lineage, owner</text>
   <text x="140" y="396" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Approval workflow before deploy</text>
   <text x="140" y="409" text-anchor="middle" fill="var(--muted)" font-size="5.5">Rollback: instant revert to prev version</text>
-  <text x="140" y="425" text-anchor="middle" fill="var(--muted)" font-size="5">train → validate → shadow → canary → full</text>
+  <text x="140" y="425" text-anchor="middle" fill="var(--muted)" font-size="5">train ? validate ? shadow ? canary ? full</text>
 
   <!-- Monitoring -->
   <rect x="270" y="340" width="250" height="95" rx="6" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
   <text x="395" y="356" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Monitoring + Auto-Rollback</text>
-  <text x="395" y="370" text-anchor="middle" fill="var(--muted)" font-size="5.5">Accuracy drift &gt;2% → auto-rollback canary</text>
-  <text x="395" y="383" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Feature drift detected → retrain trigger</text>
-  <text x="395" y="396" text-anchor="middle" fill="var(--muted)" font-size="5.5">Latency P99 &gt;10ms → alert + scale-up</text>
+  <text x="395" y="370" text-anchor="middle" fill="var(--muted)" font-size="5.5">Accuracy drift &gt;2% ? auto-rollback canary</text>
+  <text x="395" y="383" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Feature drift detected ? retrain trigger</text>
+  <text x="395" y="396" text-anchor="middle" fill="var(--muted)" font-size="5.5">Latency P99 &gt;10ms ? alert + scale-up</text>
   <text x="395" y="409" text-anchor="middle" fill="var(--muted)" font-size="5.5">Compare canary vs production metrics</text>
   <text x="395" y="425" text-anchor="middle" fill="var(--muted)" font-size="5">Dashboard: accuracy, latency, throughput</text>
 
@@ -171,9 +182,9 @@
   <text x="650" y="409" text-anchor="middle" fill="var(--muted)" font-size="5.5">Full failure unacceptable</text>
   <text x="650" y="425" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Never block the ride request</text>
 
-  <!-- ═══ BOTTOM INSIGHT ═══ -->
+  <!-- --- BOTTOM INSIGHT --- -->
   <rect x="10" y="455" width="760" height="38" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Rollout: train → validate offline → shadow mode → canary 5% → monitor 24h → full rollout</text>
+  <text x="390" y="472" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Rollout: train ? validate offline ? shadow mode ? canary 5% ? monitor 24h ? full rollout</text>
   <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="6">Auto-rollback: accuracy regression &gt;2% | Feature store ensures train-serve consistency | Fallback: rule-based heuristic if model timeout</text>
 </svg>
 <table>
@@ -182,33 +193,33 @@
 <tr><td><span class="hi">Model Registry</span></td><td>Versioned model artifacts (S3 + metadata DB)</td><td>Store trained models with metrics, lineage, approval status. Immutable versions.</td></tr>
 <tr><td><span class="hi">Serving Layer</span></td><td>TensorFlow Serving / Triton / custom</td><td>Load model into GPU/CPU memory. Batch inference requests. Auto-scale by QPS.</td></tr>
 <tr><td><span class="hi">Router</span></td><td>Traffic splitting + canary</td><td>Route 5% to new model version, 95% to current. Compare metrics. Auto-promote or rollback.</td></tr>
-<tr><td><span class="hi">Fallback</span></td><td>Rule-based system</td><td>If model times out or errors → use heuristic (e.g., historical average ETA). Never block the ride.</td></tr>
+<tr><td><span class="hi">Fallback</span></td><td>Rule-based system</td><td>If model times out or errors ? use heuristic (e.g., historical average ETA). Never block the ride.</td></tr>
 <tr><td><span class="hi">Monitoring</span></td><td>Prediction quality metrics</td><td>Track accuracy, latency, feature drift. Alert on degradation. Auto-rollback trigger.</td></tr>
 </table>
 
-<div class="b bg"><span class="hi">Feature serving:</span> ML models need features at prediction time. <span class="hg">Online features</span> (user's last 5 rides, current location) served from Redis (&lt;2ms). <span class="hg">Batch features</span> (user lifetime stats, driver rating) pre-computed hourly. <span class="hg">Real-time features</span> (surge in last 5 min) computed by Flink, written to Redis. Feature store ensures <span class="hg">training-serving consistency</span> — same feature logic in both paths.</div>
-<div class="b by"><span class="hi">Model rollout:</span> ① Train new model ② Validate offline (A/B metrics on historical data) ③ Shadow mode (run alongside prod, compare outputs, no user impact) ④ Canary (5% traffic) ⑤ Monitor for 24h ⑥ Full rollout or auto-rollback. <span class="hg">Key metric:</span> ETA accuracy (predicted vs actual). Regression &gt; 2% → auto-rollback.</div>
-<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Model timeout</span> → fallback to rules (never block ride request). <span class="hr">Feature store down</span> → use default/cached features (degraded accuracy, not failure). <span class="hr">Bad model deployed</span> → canary catches within minutes, auto-rollback. <span class="hr">Training-serving skew</span> → feature store ensures same computation in both paths.</div>
-<div class="b bb"><span class="hi">Real-world:</span> <strong>Uber</strong> — Michelangelo (end-to-end ML platform). <strong>Netflix</strong> — Metaflow for ML pipelines. <strong>Google</strong> — TFX (TensorFlow Extended). <strong>Meta</strong> — FBLearner for model training + serving. <strong>Spotify</strong> — ML for Discover Weekly recommendations.</div>
+<div class="b bg"><span class="hi">Feature serving:</span> ML models need features at prediction time. <span class="hg">Online features</span> (user's last 5 rides, current location) served from Redis (&lt;2ms). <span class="hg">Batch features</span> (user lifetime stats, driver rating) pre-computed hourly. <span class="hg">Real-time features</span> (surge in last 5 min) computed by Flink, written to Redis. Feature store ensures <span class="hg">training-serving consistency</span> &middot; same feature logic in both paths.</div>
+<div class="b by"><span class="hi">Model rollout:</span> ? Train new model ? Validate offline (A/B metrics on historical data) ? Shadow mode (run alongside prod, compare outputs, no user impact) ? Canary (5% traffic) ? Monitor for 24h ? Full rollout or auto-rollback. <span class="hg">Key metric:</span> ETA accuracy (predicted vs actual). Regression &gt; 2% ? auto-rollback.</div>
+<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Model timeout</span> ? fallback to rules (never block ride request). <span class="hr">Feature store down</span> ? use default/cached features (degraded accuracy, not failure). <span class="hr">Bad model deployed</span> ? canary catches within minutes, auto-rollback. <span class="hr">Training-serving skew</span> ? feature store ensures same computation in both paths.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Uber</strong> &middot; Michelangelo (end-to-end ML platform). <strong>Netflix</strong> &middot; Metaflow for ML pipelines. <strong>Google</strong> &middot; TFX (TensorFlow Extended). <strong>Meta</strong> &middot; FBLearner for model training + serving. <strong>Spotify</strong> &middot; ML for Discover Weekly recommendations.</div>
 </div>
 
-<!-- ═══ INTERVIEW CHEAT SHEET ═══ -->
+<!-- --- INTERVIEW CHEAT SHEET --- -->
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 7 things to say for ML serving design</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Feature store (online + offline)</strong> — Redis for real-time features (&lt;5ms), Hive for batch features<br>
-<span class="hg">2.</span> <strong>Model registry with versioning</strong> — immutable artifacts, approval workflow, rollback capability<br>
-<span class="hg">3.</span> <strong>Canary rollout</strong> — 5% traffic to new model, monitor accuracy, auto-rollback on regression<br>
-<span class="hg">4.</span> <strong>Shadow mode</strong> — run new model alongside prod, compare outputs, no user impact<br>
-<span class="hg">5.</span> <strong>Fallback to rules</strong> — if model times out or errors, use heuristic (never block the request)<br>
-<span class="hg">6.</span> <strong>Training-serving consistency</strong> — feature store ensures same computation in both paths<br>
-<span class="hg">7.</span> <strong>Batch inference for request batching</strong> — group multiple predictions, amortize GPU overhead
+<span class="hg">1.</span> <strong>Feature store (online + offline)</strong> &middot; Redis for real-time features (&lt;5ms), Hive for batch features<br>
+<span class="hg">2.</span> <strong>Model registry with versioning</strong> &middot; immutable artifacts, approval workflow, rollback capability<br>
+<span class="hg">3.</span> <strong>Canary rollout</strong> &middot; 5% traffic to new model, monitor accuracy, auto-rollback on regression<br>
+<span class="hg">4.</span> <strong>Shadow mode</strong> &middot; run new model alongside prod, compare outputs, no user impact<br>
+<span class="hg">5.</span> <strong>Fallback to rules</strong> &middot; if model times out or errors, use heuristic (never block the request)<br>
+<span class="hg">6.</span> <strong>Training-serving consistency</strong> &middot; feature store ensures same computation in both paths<br>
+<span class="hg">7.</span> <strong>Batch inference for request batching</strong> &middot; group multiple predictions, amortize GPU overhead
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

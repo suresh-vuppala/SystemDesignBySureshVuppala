@@ -3,14 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>How does Meta classify 500M+ posts/day for policy violations? — System Design</title>
+<title>How does Meta classify 500M+ posts/day for policy violations? &middot; System Design</title>
 <link rel="stylesheet" href="../../css/style.css">
 <link rel="stylesheet" href="../../css/diagrams.css">
 </head>
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Meta classify 500M+ posts/day for policy violations?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">🛡️</span> Design a content moderation system: 500M posts/day, multi-modal ML, &lt;1% false positive, human review routing</div>
+<div class="sd sd-5"><span class="e">???</span> Design a content moderation system: 500M posts/day, multi-modal ML, &lt;1% false positive, human review routing</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a>
+<a href="../../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Stream Processing</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/07-caching.html#caching">Caching</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+</div>
+</details>
 
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
@@ -44,7 +55,7 @@
 
   <!-- LAYER 1: INGESTION + ML -->
   <rect x="10" y="10" width="760" height="145" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="28" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 1 — INGESTION + ML CLASSIFIERS (500M Posts/Day, 3 Parallel Pipelines)</text>
+  <text x="390" y="28" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 1 &middot; INGESTION + ML CLASSIFIERS (500M Posts/Day, 3 Parallel Pipelines)</text>
 
   <rect x="30" y="42" width="120" height="100" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
   <text x="90" y="58" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Post Ingestion</text>
@@ -71,14 +82,14 @@
   <!-- Frame Sampling -->
   <rect x="180" y="120" width="185" height="35" rx="5" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1"/>
   <text x="272" y="135" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Video: Frame Sampling</text>
-  <text x="272" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">Keyframes → per-frame CNN classification</text>
+  <text x="272" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">Keyframes ? per-frame CNN classification</text>
 
   <line x1="365" y1="90" x2="395" y2="90" stroke="var(--y)" stroke-width="1.2" marker-end="url(#mod-arr)"/>
 
   <!-- Confidence Score / Ensemble -->
   <rect x="397" y="42" width="175" height="108" rx="6" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1.2"/>
   <text x="484" y="58" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Confidence Score</text>
-  <text x="484" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">0.0 — 1.0 per category</text>
+  <text x="484" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">0.0 &middot; 1.0 per category</text>
   <text x="484" y="86" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Ensemble combines all</text>
   <text x="484" y="99" text-anchor="middle" fill="var(--muted)" font-size="5.5">modality signals together</text>
   <text x="484" y="113" text-anchor="middle" fill="var(--muted)" font-size="5.5">Multi-label: post can be</text>
@@ -91,24 +102,24 @@
   <rect x="602" y="42" width="158" height="108" rx="6" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
   <text x="681" y="58" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Threshold Routing</text>
   <rect x="612" y="64" width="138" height="20" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".5"/>
-  <text x="681" y="77" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">&gt;0.95 → Auto-Remove</text>
+  <text x="681" y="77" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">&gt;0.95 ? Auto-Remove</text>
   <rect x="612" y="88" width="138" height="20" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".5"/>
-  <text x="681" y="101" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">0.5-0.95 → Human Review</text>
+  <text x="681" y="101" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">0.5-0.95 ? Human Review</text>
   <rect x="612" y="112" width="138" height="20" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".5"/>
-  <text x="681" y="125" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&lt;0.5 → Allow (publish)</text>
+  <text x="681" y="125" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&lt;0.5 ? Allow (publish)</text>
   <text x="681" y="145" text-anchor="middle" fill="var(--muted)" font-size="5">Per-category thresholds</text>
 
-  <!-- Arrow Layer 1 → Layer 2 -->
+  <!-- Arrow Layer 1 ? Layer 2 -->
   <line x1="390" y1="155" x2="390" y2="173" stroke="var(--y)" stroke-width="1.2" marker-end="url(#mod-arr)"/>
 
   <!-- LAYER 2: DECISION -->
   <rect x="10" y="175" width="760" height="110" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="193" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 2 — DECISION (Routing by Confidence → Outcomes)</text>
+  <text x="390" y="193" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="700">LAYER 2 &middot; DECISION (Routing by Confidence ? Outcomes)</text>
 
   <rect x="30" y="205" width="230" height="68" rx="6" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="145" y="221" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Auto-Remove (&gt;0.95)</text>
   <text x="145" y="235" text-anchor="middle" fill="var(--muted)" font-size="5.5">Instant removal, no human needed</text>
-  <text x="145" y="248" text-anchor="middle" fill="var(--muted)" font-size="5.5">CSAM: hash-match → immediate + report</text>
+  <text x="145" y="248" text-anchor="middle" fill="var(--muted)" font-size="5.5">CSAM: hash-match ? immediate + report</text>
   <text x="145" y="261" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Appeal available post-removal</text>
   <text x="145" y="272" text-anchor="middle" fill="var(--muted)" font-size="5">~5% of all posts auto-removed</text>
 
@@ -126,36 +137,36 @@
   <text x="645" y="261" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">~85% of posts pass cleanly</text>
   <text x="645" y="272" text-anchor="middle" fill="var(--muted)" font-size="5">Continuous monitoring active</text>
 
-  <!-- Arrow Layer 2 → Layer 3 -->
+  <!-- Arrow Layer 2 ? Layer 3 -->
   <line x1="390" y1="285" x2="390" y2="303" stroke="var(--r)" stroke-width="1.2" marker-end="url(#mod-arr)"/>
 
   <!-- LAYER 3: REVIEW + FEEDBACK -->
   <rect x="10" y="305" width="760" height="140" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="323" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 3 — HUMAN REVIEW + FEEDBACK LOOP (Retrain Weekly)</text>
+  <text x="390" y="323" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 3 &middot; HUMAN REVIEW + FEEDBACK LOOP (Retrain Weekly)</text>
 
   <!-- Human Review Queue -->
   <rect x="30" y="335" width="340" height="98" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="200" y="351" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Human Review Queue (Priority-Based)</text>
 
   <rect x="42" y="358" width="155" height="20" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width=".6"/>
-  <text x="119" y="371" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">🚨 Child Safety (P0) — immediate</text>
+  <text x="119" y="371" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">?? Child Safety (P0) &middot; immediate</text>
 
   <rect x="42" y="382" width="155" height="20" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".6"/>
-  <text x="119" y="395" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">⚠️ Violence (P1) — minutes</text>
+  <text x="119" y="395" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">?? Violence (P1) &middot; minutes</text>
 
   <rect x="42" y="406" width="155" height="20" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".6"/>
-  <text x="119" y="419" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">📧 Spam (P2) — batch hourly</text>
+  <text x="119" y="419" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">?? Spam (P2) &middot; batch hourly</text>
 
   <text x="290" y="371" text-anchor="middle" fill="var(--muted)" font-size="5.5">15K+ human reviewers</text>
   <text x="290" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">Specialized by category</text>
   <text x="290" y="399" text-anchor="middle" fill="var(--muted)" font-size="5.5">Multi-reviewer for P0</text>
-  <text x="290" y="413" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Decision → remove or allow</text>
+  <text x="290" y="413" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Decision ? remove or allow</text>
   <text x="290" y="427" text-anchor="middle" fill="var(--muted)" font-size="5">+ appeal process for users</text>
 
   <!-- Feedback Loop -->
   <rect x="390" y="335" width="370" height="98" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="575" y="351" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Feedback Loop (Continuous Improvement)</text>
-  <text x="575" y="367" text-anchor="middle" fill="var(--muted)" font-size="5.5">Human decisions → retrain models weekly</text>
+  <text x="575" y="367" text-anchor="middle" fill="var(--muted)" font-size="5.5">Human decisions ? retrain models weekly</text>
   <text x="575" y="381" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Active learning: prioritize uncertain samples</text>
   <text x="575" y="395" text-anchor="middle" fill="var(--muted)" font-size="5.5">A/B test new models on shadow traffic</text>
   <text x="575" y="409" text-anchor="middle" fill="var(--muted)" font-size="5.5">Track FP/FN rates per category per region</text>
@@ -163,7 +174,7 @@
 
   <!-- Feedback arrow back to ML -->
   <path d="M 575 433 L 575 448 L 272 448 L 272 155" fill="none" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#mod-arr)"/>
-  <text x="420" y="445" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">retrain signal → updated models</text>
+  <text x="420" y="445" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">retrain signal ? updated models</text>
 
   <!-- BOTTOM INSIGHT -->
   <rect x="10" y="458" width="760" height="34" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
@@ -171,26 +182,26 @@
   <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="6">Child safety: lowest threshold (err on removal) | Ensemble scoring across modalities | Shadow testing before model promotion</text>
 </svg>
 
-<div class="b bg"><span class="hi">Multi-modal ML pipeline:</span> Text goes through NLP transformers, images through CNN + CLIP embeddings, video through keyframe extraction + per-frame classification. <span class="hg">Ensemble scoring</span> combines modality signals — a benign caption on a harmful image still gets flagged.</div>
-<div class="b by"><span class="hi">Threshold-based routing:</span> High confidence (&gt;0.95) → auto-remove. Medium (0.5-0.95) → human review queue prioritized by severity. Low (&lt;0.5) → allow but monitor. <span class="hg">Child safety content</span> has lowest threshold — err on side of removal.</div>
-<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Single threshold for all categories</span> — hate speech ≠ spam ≠ nudity. <span class="hr">No human-in-the-loop</span> — ML alone can't handle context/satire. <span class="hr">Batch retraining only</span> — adversarial content evolves daily.</div>
-<div class="b bb"><span class="hi">Feedback loop:</span> Human review decisions feed back into model training. Track false positive/negative rates per category. A/B test new models on shadow traffic before promotion. <span class="hg">Active learning</span> — prioritize uncertain samples for labeling.</div>
+<div class="b bg"><span class="hi">Multi-modal ML pipeline:</span> Text goes through NLP transformers, images through CNN + CLIP embeddings, video through keyframe extraction + per-frame classification. <span class="hg">Ensemble scoring</span> combines modality signals &middot; a benign caption on a harmful image still gets flagged.</div>
+<div class="b by"><span class="hi">Threshold-based routing:</span> High confidence (&gt;0.95) ? auto-remove. Medium (0.5-0.95) ? human review queue prioritized by severity. Low (&lt;0.5) ? allow but monitor. <span class="hg">Child safety content</span> has lowest threshold &middot; err on side of removal.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Single threshold for all categories</span> &middot; hate speech ? spam ? nudity. <span class="hr">No human-in-the-loop</span> &middot; ML alone can't handle context/satire. <span class="hr">Batch retraining only</span> &middot; adversarial content evolves daily.</div>
+<div class="b bb"><span class="hi">Feedback loop:</span> Human review decisions feed back into model training. Track false positive/negative rates per category. A/B test new models on shadow traffic before promotion. <span class="hg">Active learning</span> &middot; prioritize uncertain samples for labeling.</div>
 </div>
 
 <div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
 <h2>Interview Cheat Sheet</h2>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Multi-modal classifiers</strong> — separate models for text/image/video, ensemble for final score<br>
-<span class="hg">2.</span> <strong>Confidence thresholds</strong> — auto-action at high confidence, human review for borderline<br>
-<span class="hg">3.</span> <strong>Severity-based routing</strong> — child safety immediate, hate speech priority, spam batch<br>
-<span class="hg">4.</span> <strong>Feedback loop</strong> — human decisions retrain models, active learning on uncertain samples<br>
-<span class="hg">5.</span> <strong>False positive minimization</strong> — per-category thresholds, appeal process, shadow testing<br>
-<span class="hg">6.</span> <strong>Adversarial robustness</strong> — text obfuscation detection, steganography checks, rapid model updates
+<span class="hg">1.</span> <strong>Multi-modal classifiers</strong> &middot; separate models for text/image/video, ensemble for final score<br>
+<span class="hg">2.</span> <strong>Confidence thresholds</strong> &middot; auto-action at high confidence, human review for borderline<br>
+<span class="hg">3.</span> <strong>Severity-based routing</strong> &middot; child safety immediate, hate speech priority, spam batch<br>
+<span class="hg">4.</span> <strong>Feedback loop</strong> &middot; human decisions retrain models, active learning on uncertain samples<br>
+<span class="hg">5.</span> <strong>False positive minimization</strong> &middot; per-category thresholds, appeal process, shadow testing<br>
+<span class="hg">6.</span> <strong>Adversarial robustness</strong> &middot; text obfuscation detection, steganography checks, rapid model updates
 </div>
 </div>
 
 </div>
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../../css/dp-engine.css">
 <script src="../../js/dp-engine.js"></script>

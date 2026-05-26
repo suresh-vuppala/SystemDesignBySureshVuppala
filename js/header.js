@@ -35,6 +35,9 @@
     + '<svg class="sh-logo" width="22" height="22" viewBox="0 0 24 24" style="animation:shLogoSpin 8s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="var(--a)" stroke-width="2" stroke-dasharray="14 6" opacity=".7"/><circle cx="12" cy="12" r="5" fill="var(--a)" opacity=".9"/><circle cx="12" cy="12" r="2" fill="#fff"/></svg>'
     + '<span>HelloSDE<span style="font-size:.65em;color:#fff;font-weight:500">.</span><span style="font-size:.65em;opacity:.5;font-weight:500">com</span></span></a>'
     + '<nav class="sh-nav">'+navItems+'</nav>'
+    + '<div class="sh-right">'
+    + '<button class="sh-premium-btn" id="sh-premium-btn" style="display:none" title="Unlock Premium">Premium</button>'
+    + '</div>'
     + '<button class="sh-toggle" aria-label="Menu" aria-expanded="false">☰</button>'
     + '</header>';
 
@@ -50,4 +53,10 @@
       toggle.textContent = open ? '✕' : '☰';
     });
   }
+
+  // Footer (injected on all pages)
+  var footer = '<footer class="site-footer">'
+    + '<p><svg width="16" height="16" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px;animation:shLogoSpin 8s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="var(--a)" stroke-width="2" stroke-dasharray="14 6" opacity=".7"/><circle cx="12" cy="12" r="5" fill="var(--a)" opacity=".9"/><circle cx="12" cy="12" r="2" fill="#fff"/></svg><a href="'+prefix+'index.html">HelloSDE.com</a> · System Design for Senior Engineers</p>'
+    + '</footer>';
+  document.body.insertAdjacentHTML('beforeend', footer);
 })();

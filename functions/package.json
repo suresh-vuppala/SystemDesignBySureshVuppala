@@ -1,0 +1,13 @@
+{
+  "name": "hellosde-functions",
+  "version": "1.0.0",
+  "description": "Razorpay webhook for premium verification",
+  "main": "index.js",
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.0",
+    "firebase-functions": "^4.5.0"
+  }
+}
