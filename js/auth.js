@@ -13,7 +13,7 @@
 
 // ═══ CONFIGURATION ═══
 var CONFIG = {
-  admin: true, // Set to true to bypass premium gates (for local testing). Set false for production.
+  admin: false, // Set to true to bypass premium gates (for local testing). Set false for production.
   firebase: {
     apiKey: "AIzaSyAbwqzKR-23IPRJy_S4JbQ-_EYWb8mTAzo",
     authDomain: "varaq-gif.firebaseapp.com",
@@ -165,7 +165,10 @@ function injectAuthUI(){
   // Show/hide Premium button in header
   var premBtn = document.getElementById('sh-premium-btn');
   if(premBtn){
-    if(!state.isPremium && !CONFIG.admin){
+    if(!state.isPremium && !state.user){
+      premBtn.style.display = '';
+      premBtn.onclick = function(){ showPremiumPopup(); };
+    } else if(!state.isPremium && state.user && !CONFIG.admin){
       premBtn.style.display = '';
       premBtn.onclick = function(){ showPremiumPopup(); };
     } else {
@@ -414,6 +417,15 @@ function showPremiumPopup(){
 }
 
 // ═══ DROPDOWN MENU ═══
+function setupSignInButton(){
+  var btn = document.getElementById('google-signin-btn');
+  if(btn){
+    btn.addEventListener('click', function(){
+      window.HelloSDE.signIn();
+    });
+  }
+}
+
 function setupAuthMenu(){
   document.addEventListener('click', function(e){
     if(e.target.id === 'auth-menu-btn'){
@@ -629,6 +641,7 @@ function init(){
         localStorage.removeItem('hellosde_premium');
         state.isPremium = false;
         injectAuthUI();
+        setupSignInButton();
         gatePremiumContent();
       }
     });
