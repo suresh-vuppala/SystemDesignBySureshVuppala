@@ -35,8 +35,17 @@ var CONFIG = {
 };
 
 // ═══ FIREBASE INITIALIZATION ═══
-if(typeof firebase !== 'undefined' && !firebase.apps.length){
-  firebase.initializeApp(CONFIG.firebase);
+var firebaseReady = false;
+if(typeof firebase !== 'undefined'){
+  try {
+    if(!firebase.apps.length){
+      firebase.initializeApp(CONFIG.firebase);
+    }
+    firebaseReady = true;
+  } catch(e){
+    console.error('Firebase init failed:', e);
+    firebaseReady = false;
+  }
 }
 
 // ═══ STATE ═══
@@ -482,8 +491,8 @@ function injectStyles(){
 window.HelloSDE = {
   signIn: function(){
     // Firebase Google Sign-In
-    if(typeof firebase === 'undefined'){
-      alert('Firebase not loaded. Add Firebase SDK to your page.');
+    if(!firebaseReady){
+      alert('Firebase not loaded. Please refresh the page.');
       return;
     }
     var provider = new firebase.auth.GoogleAuthProvider();
@@ -591,8 +600,8 @@ window.HelloSDE = {
 function init(){
   injectStyles();
   
-  // Check if Firebase is loaded
-  if(typeof firebase !== 'undefined' && firebase.auth){
+  // Check if Firebase is loaded and initialized
+  if(firebaseReady && firebase.auth){
     firebase.auth().onAuthStateChanged(function(user){
       state.user = user;
       if(user){
