@@ -18,8 +18,6 @@ Thumbs.db
 # Node (if added later)
 node_modules/
 .npm
-package-lock.json
-yarn.lock
 
 # Python
 __pycache__/
