@@ -551,7 +551,7 @@ window.HelloSDE = {
       body: JSON.stringify({
         amount: CONFIG.razorpay.amount,
         currency: CONFIG.razorpay.currency,
-        receipt: 'hellosde_' + state.user.uid + '_' + Date.now(),
+        receipt: 'hsde_' + Date.now(),
         notes: { uid: state.user.uid, email: state.user.email }
       })
     })
