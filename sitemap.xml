@@ -1,21 +1,420 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Homepage -->
   <url>
-    <loc>https://yourdomain.com/</loc>
-    <lastmod>2025-01-01</lastmod>
+    <loc>https://hellosde.com/</loc>
+    <lastmod>2026-05-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
+
+  <!-- Concepts Index -->
   <url>
-    <loc>https://yourdomain.com/system-design-cheatsheet/index.html</loc>
-    <lastmod>2025-01-01</lastmod>
+    <loc>https://hellosde.com/system-design-cheatsheet/index.html</loc>
+    <lastmod>2026-05-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+
+  <!-- Concept Pages -->
   <url>
-    <loc>https://yourdomain.com/realtime-system-design-problems/index.html</loc>
-    <lastmod>2025-01-01</lastmod>
+    <loc>https://hellosde.com/system-design-cheatsheet/01-foundations.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/02-networking.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/03-security.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/04-apis.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/05-infrastructure.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/06-storage.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/07-caching.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/08-messaging.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/09-consistency.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/10-scalability.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/11-data-pipelines.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/12-distributed-systems.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/13-observability.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/14-ai-systems.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/15-key-numbers.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/16-decision-flowcharts.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/system-design-cheatsheet/engineering-blogs.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Problems Index -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/index.html</loc>
+    <lastmod>2026-05-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+  </url>
+
+  <!-- 1-chat-messaging -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/discord-websocket-infra.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/multi-region-ordering.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/slack-active-channels.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/slack-chat-search.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/slack-real-time-messaging.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/slack-typing-indicators.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/telegram-large-group-fanout.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/telegram-multi-device-sync.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/whatsapp-offline-delivery.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/whatsapp-presence-100m.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/1-chat-messaging/whatsapp-push-notifications.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 2-collaboration -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/2-collaboration/google-docs-collaborative-editing.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 3-video-streaming -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/3-video-streaming/netflix-adaptive-streaming.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 4-video-calling -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/4-video-calling/zoom-300-person-meeting.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/4-video-calling/zoom-large-meetings.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 5-ticket-booking -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/5-ticket-booking/bookmyshow-concert-booking.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 6-cache-cdn -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/6-cache-cdn/meta-tao-cache-invalidation.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 7-queues-events -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/7-queues-events/uber-kafka-ride-events.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 8-social-media -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/8-social-media/twitter-timeline-fanout.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 9-geo-rideshare -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/9-geo-rideshare/uber-driver-matching.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 10-payments -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/10-payments/stripe-idempotent-payments.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 11-api-gateway -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/11-api-gateway/cloudflare-rate-limiting.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 12-database-storage -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/12-database-storage/slack-vitess-sharding.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 13-distributed-systems -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/13-distributed-systems/etcd-raft-consensus.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 14-live-sports -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/14-live-sports/cricbuzz-live-scoring.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 15-file-upload -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/15-file-upload/dropbox-sync-engine.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 16-search-systems -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/16-search-systems/google-web-search.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 17-calendar -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/17-calendar/google-calendar-recurrence.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 18-observability -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/18-observability/uber-jaeger-distributed-tracing.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 19-ml-serving -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/19-ml-serving/uber-michelangelo-ml-serving.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 20-security -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/20-security/google-session-management.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 21-url-shortening -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/21-url-shortening/bitly-url-shortener.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 22-email -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/22-email/sendgrid-email-delivery.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 23-moderation -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/23-moderation/meta-content-moderation.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 24-feature-flags -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/24-feature-flags/launchdarkly-feature-flags.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 25-crawling -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/25-crawling/google-web-crawler.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 26-id-generation -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/26-id-generation/twitter-snowflake-ids.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 27-ad-serving -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/27-ad-serving/google-ads-ranking.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 28-cicd -->
+  <url>
+    <loc>https://hellosde.com/realtime-system-design-problems/28-cicd/github-actions-build-system.html</loc>
+    <lastmod>2026-05-27</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

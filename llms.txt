@@ -1,0 +1,38 @@
+# HelloSDE — System Design Mastery
+
+## About
+HelloSDE (hellosde.com) is a system design learning platform for senior/staff engineers preparing for FAANG interviews. It covers 16 modules, 201 real-time problems, and 300+ visual architecture diagrams.
+
+## Content Structure
+
+### Concepts (16 Modules)
+1. Foundations — FR vs NFR, scaling basics, serialization
+2. Networking — OSI, TCP/UDP, HTTP, DNS, firewalls
+3. Security — authentication, authorization, encryption
+4. APIs & Communication — REST, gRPC, GraphQL, WebSocket, idempotency
+5. Infrastructure — load balancers, API gateways, Docker/K8s, service mesh
+6. Storage Systems — SQL, NoSQL, Elasticsearch, vector databases
+7. Caching — Redis, CDN, cache invalidation, thundering herd
+8. Messaging — Kafka, message queues, event sourcing, CQRS
+9. Consistency — CAP theorem, consensus, sagas, conflict resolution
+10. Scalability — sharding, consistent hashing, rate limiting, backpressure
+11. Data Pipelines — CDC, ETL, stream processing, data warehouses
+12. Distributed Systems — fault tolerance, leader election, ZooKeeper
+13. Observability — logging, metrics, tracing, monitoring
+14. AI Systems — LLM serving, RAG, embeddings, AI gateway, agents, guardrails
+15. Key Numbers — latency, throughput, back-of-envelope estimation
+16. Decision Flowcharts — choosing APIs, databases, messaging, caching
+
+### Problems (201 across 29 systems)
+Real-world scale problems from: Slack, WhatsApp, Discord, Netflix, Uber, Google, Meta, Amazon, Stripe, Kafka, Redis, Elasticsearch, and more.
+
+## URL Structure
+- Homepage: https://hellosde.com/
+- Concepts: https://hellosde.com/system-design-cheatsheet/
+- Problems: https://hellosde.com/realtime-system-design-problems/
+- Individual concept: https://hellosde.com/system-design-cheatsheet/[number]-[topic].html
+- Individual problem: https://hellosde.com/realtime-system-design-problems/[module]/[problem].html
+
+## Contact
+Author: Suresh Vuppala
+Website: https://hellosde.com
