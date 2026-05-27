@@ -79,18 +79,17 @@ var PREMIUM_CONCEPT_PAGES = [
   '16-decision-flowcharts.html'
 ];
 
-// Problem pages: problems 6+ in each module are premium
-var PREMIUM_PROBLEM_INDEX = 5; // 0-indexed: first 5 free, rest premium
-
-// Free problem pages (first 5 in module 1, first problem in other modules)
+// Free problem pages — only pages that have actually been created (file exists on disk)
 var FREE_PROBLEM_PAGES = [
-  // Module 1: first 5
+  // Module 1: Chat & Messaging (first 7 free)
   'slack-real-time-messaging.html',
   'whatsapp-offline-delivery.html',
   'discord-websocket-infra.html',
   'multi-region-ordering.html',
   'telegram-large-group-fanout.html',
-  // Modules 2-29: first problem only (the ones with full HTML)
+  'whatsapp-presence-100m.html',
+  'slack-typing-indicators.html',
+  // Modules 2-28: first problem only (the ones with full HTML)
   'google-docs-collaborative-editing.html',
   'netflix-adaptive-streaming.html',
   'zoom-300-person-meeting.html',
@@ -208,19 +207,28 @@ function gatePremiumContent(){
     });
   });
 
-  // Gate problems in index (problems 6+ in each module table) — lock rows
+  // Gate problems in index — lock rows whose links point to non-existent placeholder pages
   if(page === 'index.html' && location.pathname.indexOf('realtime-system-design-problems') !== -1){
     var tables = document.querySelectorAll('.T table');
     tables.forEach(function(table){
       var rows = table.querySelectorAll('tr');
-      for(var i = PREMIUM_PROBLEM_INDEX + 1; i < rows.length; i++){
+      for(var i = 0; i < rows.length; i++){
         var row = rows[i];
         
         // Skip topic rows and header rows
         if(row.classList.contains('prob-topics-row') || row.querySelector('th')) continue;
 
+        // Check if this row's link points to a free problem page
+        var link = row.querySelector('td a');
+        if(!link) continue;
+        var href = link.getAttribute('href') || '';
+        
+        // Extract just the filename from the href for checking against FREE_PROBLEM_PAGES
+        var filename = href.split('/').pop();
+        var isFree = FREE_PROBLEM_PAGES.indexOf(filename) !== -1;
+        if(isFree) continue;
+
         row.classList.add('premium-locked-row');
-        row.classList.remove('prob-expand'); // disable expand behavior
         row.style.cursor = 'pointer';
 
         // Remove links
@@ -466,6 +474,7 @@ function injectStyles(){
     + '.premium-locked-row:hover{opacity:.65;background:rgba(108,140,255,.03)}'
     + '.premium-locked-row td{position:relative}'
     + '.premium-locked-row td:first-child{text-align:center}'
+    + '.premium-locked-row td:first-child::before{content:none !important}'
     + '.row-lock-icon{color:var(--muted,#888);display:inline-flex;align-items:center;opacity:.7}'
     + '.premium-locked-row:hover .row-lock-icon{color:var(--a);opacity:1}'
     

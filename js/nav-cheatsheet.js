@@ -150,6 +150,16 @@ input.addEventListener('keydown', e => {
 // Highlight active module
 document.querySelectorAll('#topicNav .nc').forEach(card => {
   const links = card.querySelectorAll('a');
+  const h3 = card.querySelector('h3');
+  // Make h3 clickable on mobile by wrapping it in a link to the module page
+  if(h3 && links.length > 0){
+    var firstHref = links[0].getAttribute('href') || '';
+    var pageHref = firstHref.split('#')[0]; // e.g. "01-foundations.html"
+    if(pageHref){
+      h3.style.cursor = 'pointer';
+      h3.addEventListener('click', function(){ window.location.href = pageHref; });
+    }
+  }
   for(const a of links){
     const href = a.getAttribute('href') || '';
     if(href.split('#')[0] === page){ card.classList.add('active'); break; }

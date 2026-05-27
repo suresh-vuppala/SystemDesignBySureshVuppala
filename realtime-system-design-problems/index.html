@@ -28,19 +28,21 @@
 .concepts-filter-header span{font-size:.78rem;font-weight:600;color:var(--text)}
 .concepts-filter-clear{font-size:.7rem;color:var(--a);cursor:pointer;background:none;border:none;padding:4px 8px;border-radius:4px;transition:all .15s}
 .concepts-filter-clear:hover{background:rgba(108,140,255,.1)}
-.concepts-filter-pills{display:flex;flex-wrap:wrap;gap:6px;max-height:64px;overflow-y:auto;scrollbar-width:thin;padding-right:4px}
+.concepts-filter-pills{display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto;scrollbar-width:thin;padding-right:4px}
 .concepts-filter-pills::-webkit-scrollbar{width:4px}
 .concepts-filter-pills::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-@media(max-width:600px){.concepts-filter{padding:10px 14px}.concepts-filter-pills{max-height:56px}}
+@media(max-width:600px){.concepts-filter{padding:10px 14px}.concepts-filter-pills{max-height:120px}}
 .cf-pill{font-size:.68rem;padding:4px 10px;border-radius:5px;background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none}
 .cf-pill:hover{border-color:var(--a);color:var(--text)}
 .cf-pill.active{background:rgba(108,140,255,.12);color:var(--a);border-color:var(--a);font-weight:600}
 .cf-count{font-size:.6rem;margin-left:3px;opacity:.6}
-.prob-expand.cf-hidden,.prob-topics-row.cf-hidden{display:none}
+.prob-expand.cf-hidden,.prob-topics-row.cf-hidden,tr.cf-hidden{display:none}
+.typed-cursor{color:var(--a);font-weight:300;animation:blink .8s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 </style>
 </head>
 <body>
-<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p>201 problems, real company scale — practice what interviewers actually ask</p></div>
+<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p><span id="hero-typed"></span><span class="typed-cursor">|</span></p></div>
 <div class="ct">
 
 <!-- Concepts Filter -->
@@ -659,6 +661,7 @@
 document.querySelectorAll('.prob-expand').forEach(function(row){
   row.addEventListener('click', function(e){
     if(e.target.closest('a')) return;
+    if(row.classList.contains('premium-locked-row')) return;
     var topicsRow = row.nextElementSibling;
     if(!topicsRow || !topicsRow.classList.contains('prob-topics-row')) return;
     var topicsDiv = topicsRow.querySelector('.prob-topics');
@@ -674,14 +677,23 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
   var clearBtn = document.getElementById('cfClear');
   if(!pillsContainer) return;
 
-  // Collect all unique concepts from prob-topic elements
-  var conceptMap = {}; // { label: count }
-  document.querySelectorAll('.prob-topic').forEach(function(el){
-    var label = el.textContent.trim();
-    // Normalize: strip parenthetical details for grouping
-    var key = label.replace(/\s*\(.*?\)\s*/g, '').trim();
-    if(!conceptMap[key]) conceptMap[key] = 0;
-    conceptMap[key]++;
+  // Collect all unique concepts — count = number of PROBLEMS that have this concept
+  var conceptMap = {}; // { label: problemCount }
+  var probRows = document.querySelectorAll('.prob-expand');
+  probRows.forEach(function(row){
+    var next = row.nextElementSibling;
+    if(!next || !next.classList.contains('prob-topics-row')) return;
+    var topics = next.querySelectorAll('.prob-topic');
+    var seen = {}; // dedupe within same problem
+    topics.forEach(function(el){
+      var label = el.textContent.trim();
+      var key = label.replace(/\s*\(.*?\)\s*/g, '').trim();
+      if(!seen[key]){
+        seen[key] = true;
+        if(!conceptMap[key]) conceptMap[key] = 0;
+        conceptMap[key]++;
+      }
+    });
   });
 
   // Sort by frequency
@@ -721,14 +733,25 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
         var next = row.nextElementSibling;
         if(next && next.classList.contains('prob-topics-row')) next.classList.remove('cf-hidden');
       });
+      // Show all non-prob-expand rows (premium rows without topics)
+      document.querySelectorAll('.T table tr:not(.prob-expand):not(.prob-topics-row)').forEach(function(row){
+        if(row.querySelector('th')) return; // skip header rows
+        row.classList.remove('cf-hidden');
+      });
       modules.forEach(function(mod){ mod.style.display = ''; });
       return;
     }
 
+    // Hide all non-prob-expand rows (they have no topics, can't match any filter)
+    document.querySelectorAll('.T table tr:not(.prob-expand):not(.prob-topics-row)').forEach(function(row){
+      if(row.querySelector('th')) return; // skip header rows
+      row.classList.add('cf-hidden');
+    });
+
     probRows.forEach(function(row){
       var next = row.nextElementSibling;
       if(!next || !next.classList.contains('prob-topics-row')){
-        // No topics row &middot; hide it
+        // No topics row — hide it
         row.classList.add('cf-hidden');
         return;
       }
@@ -757,7 +780,7 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
 
     // Hide modules that have no visible problems
     modules.forEach(function(mod){
-      var visibleProblems = mod.querySelectorAll('.prob-expand:not(.cf-hidden)');
+      var visibleProblems = mod.querySelectorAll('tr.prob-expand:not(.cf-hidden)');
       mod.style.display = visibleProblems.length === 0 ? 'none' : '';
     });
   }
@@ -767,6 +790,37 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
     pillsContainer.querySelectorAll('.cf-pill').forEach(function(p){ p.classList.remove('active'); });
     applyFilter();
   });
+})();
+</script>
+
+<script>
+// Typing effect for hero tagline
+(function(){
+  var phrases = [
+    '201 problems, real company scale — practice what interviewers actually ask.',
+    'No fluff, no long blogs — straight to the point, easy to grasp.',
+    'Real-world scale: Slack, WhatsApp, Netflix, Uber.',
+    'Interview-ready in days, not months.'
+  ];
+  var el = document.getElementById('hero-typed');
+  if(!el) return;
+  var phraseIdx = 0, charIdx = 0, deleting = false, pauseEnd = 0;
+  function tick(){
+    var phrase = phrases[phraseIdx];
+    var now = Date.now();
+    if(now < pauseEnd){ requestAnimationFrame(tick); return; }
+    if(!deleting){
+      charIdx++;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === phrase.length){ deleting = true; pauseEnd = now + 2000; }
+    } else {
+      charIdx--;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === 0){ deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; pauseEnd = now + 400; }
+    }
+    setTimeout(tick, deleting ? 30 : 50);
+  }
+  setTimeout(tick, 600);
 })();
 </script>
 

@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Reference</span></h1><p>No fluff, no long blogs — straight to the point, easy to grasp</p></div>
+<div class="hero" id="top"><h1><span>System Design Reference</span></h1><p><span id="hero-typed"></span><span class="typed-cursor" style="color:var(--a,#6c8cff);font-weight:300;animation:blink .8s step-end infinite">|</span></p></div>
 
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
@@ -19,6 +19,37 @@
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="../js/live-course.js"></script>
 <script src="../js/auth.js"></script>
+<script>
+// Typing effect for hero tagline
+(function(){
+  var phrases = [
+    'No fluff, no long blogs — straight to the point, easy to grasp.',
+    'Visual diagrams that make concepts click instantly.',
+    '16 modules covering everything from APIs to distributed systems.',
+    'Interview-ready in days, not months.'
+  ];
+  var el = document.getElementById('hero-typed');
+  if(!el) return;
+  var phraseIdx = 0, charIdx = 0, deleting = false, pauseEnd = 0;
+  function tick(){
+    var phrase = phrases[phraseIdx];
+    var now = Date.now();
+    if(now < pauseEnd){ requestAnimationFrame(tick); return; }
+    if(!deleting){
+      charIdx++;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === phrase.length){ deleting = true; pauseEnd = now + 2000; }
+    } else {
+      charIdx--;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === 0){ deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; pauseEnd = now + 400; }
+    }
+    setTimeout(tick, deleting ? 30 : 50);
+  }
+  setTimeout(tick, 600);
+})();
+</script>
+<style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}.typed-cursor{animation:blink .8s step-end infinite}</style>
 
 </body>
 </html>

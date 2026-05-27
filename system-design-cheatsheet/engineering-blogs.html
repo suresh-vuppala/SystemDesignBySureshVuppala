@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
-<div class="hero" id="top"><h1><span>Engineering Blogs</span></h1><p>Curated reading list — top tech blogs with must-read posts for system design interviews</p></div>
+<div class="hero" id="top"><h1><span>Engineering Blogs</span></h1><p><span id="hero-typed"></span><span class="typed-cursor">|</span></p></div>
 
 <div class="ng" id="topicNav">
   <div class="nc"><h3 style="color:var(--y)">1. Big Tech / FAANG</h3><div class="lk">
@@ -191,6 +191,37 @@
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="../js/live-course.js"></script>
 <script src="../js/auth.js"></script>
+<script>
+// Typing effect for hero tagline
+(function(){
+  var phrases = [
+    'Curated reading list — top tech blogs with must-read posts for system design interviews.',
+    'Learn from Meta, Google, Netflix, Uber engineering teams.',
+    'No fluff, no long blogs — straight to the point, easy to grasp.',
+    'Real architecture decisions from real production systems.'
+  ];
+  var el = document.getElementById('hero-typed');
+  if(!el) return;
+  var phraseIdx = 0, charIdx = 0, deleting = false, pauseEnd = 0;
+  function tick(){
+    var phrase = phrases[phraseIdx];
+    var now = Date.now();
+    if(now < pauseEnd){ requestAnimationFrame(tick); return; }
+    if(!deleting){
+      charIdx++;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === phrase.length){ deleting = true; pauseEnd = now + 2000; }
+    } else {
+      charIdx--;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === 0){ deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; pauseEnd = now + 400; }
+    }
+    setTimeout(tick, deleting ? 30 : 50);
+  }
+  setTimeout(tick, 600);
+})();
+</script>
+<style>.typed-cursor{color:var(--a);font-weight:300;animation:blink .8s step-end infinite}@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
 
 </body>
 </html>

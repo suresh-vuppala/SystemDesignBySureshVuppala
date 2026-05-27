@@ -7,57 +7,71 @@ var inSubfolder = pathParts.length > 2 && pathParts[pathParts.length - 2] !== 'r
 var prefix = inSubfolder ? '../' : '';
 
 var modules = [
-  {name:'1. Chat &amp; Messaging', href:'1-chat-messaging/', anchor:'#mod-chat', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
-  {name:'2. Real-Time Collaboration', href:'2-collaboration/', anchor:'#mod-collab', bg:'rgba(34,211,238,.08)', border:'rgba(34,211,238,.2)', color:'var(--c)'},
-  {name:'3. Video Streaming', href:'3-video-streaming/', anchor:'#mod-video-stream', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
-  {name:'4. Video Calling / WebRTC', href:'4-video-calling/', anchor:'#mod-video-call', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)', color:'var(--p)'},
-  {name:'5. Ticket Booking', href:'5-ticket-booking/', anchor:'#mod-tickets', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
-  {name:'6. Cache &amp; CDN', href:'6-cache-cdn/', anchor:'#mod-cache', bg:'rgba(108,140,255,.08)', border:'rgba(108,140,255,.2)', color:'var(--a)'},
-  {name:'7. Queues &amp; Events', href:'7-queues-events/', anchor:'#mod-queues', bg:'rgba(251,146,60,.08)', border:'rgba(251,146,60,.2)', color:'var(--o)'},
-  {name:'8. Feeds &amp; Recommendations', href:'8-social-media/', anchor:'#mod-social', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
-  {name:'9. Geo, Rides &amp; Delivery', href:'9-geo-rideshare/', anchor:'#mod-geo', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.2)', color:'var(--a2)'},
-  {name:'10. Payment Systems', href:'10-payments/', anchor:'#mod-payments', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
-  {name:'11. API Gateway &amp; Backend', href:'11-api-gateway/', anchor:'#mod-api', bg:'rgba(34,211,238,.08)', border:'rgba(34,211,238,.2)', color:'var(--c)'},
-  {name:'12. Database &amp; Storage', href:'12-database-storage/', anchor:'#mod-db', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
-  {name:'13. Distributed Systems', href:'13-distributed-systems/', anchor:'#mod-distributed', bg:'rgba(108,140,255,.08)', border:'rgba(108,140,255,.2)', color:'var(--a)'},
-  {name:'14. Live Sports &amp; Broadcasting', href:'14-live-sports/', anchor:'#mod-sports', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
-  {name:'15. File Upload &amp; Media', href:'15-file-upload/', anchor:'#mod-files', bg:'rgba(251,146,60,.08)', border:'rgba(251,146,60,.2)', color:'var(--o)'},
-  {name:'16. Search Systems', href:'16-search-systems/', anchor:'#mod-search', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
-  {name:'17. Scheduling &amp; Calendar', href:'17-calendar/', anchor:'#mod-calendar', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.2)', color:'var(--a2)'},
-  {name:'18. Observability &amp; Monitoring', href:'18-observability/', anchor:'#mod-observability', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)', color:'var(--p)'},
-  {name:'19. ML Model Serving', href:'19-ml-serving/', anchor:'#mod-ml', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
-  {name:'20. Security &amp; Auth', href:'20-security/', anchor:'#mod-security', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
-  {name:'21. URL Shortening', href:'21-url-shortening.html', anchor:'#mod-url', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
-  {name:'22. Email Systems', href:'22-email.html', anchor:'#mod-email', bg:'rgba(34,211,238,.08)', border:'rgba(34,211,238,.2)', color:'var(--c)'},
-  {name:'23. Content Moderation', href:'23-moderation.html', anchor:'#mod-moderation', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)', color:'var(--p)'},
-  {name:'24. Feature Flags', href:'24-feature-flags.html', anchor:'#mod-config', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
-  {name:'25. Web Crawling', href:'25-crawling.html', anchor:'#mod-crawling', bg:'rgba(108,140,255,.08)', border:'rgba(108,140,255,.2)', color:'var(--a)'},
-  {name:'26. ID Generation', href:'26-id-generation.html', anchor:'#mod-idgen', bg:'rgba(251,146,60,.08)', border:'rgba(251,146,60,.2)', color:'var(--o)'},
-  {name:'27. Ad Serving', href:'27-ad-serving.html', anchor:'#mod-ads', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.2)', color:'var(--a2)'},
-  {name:'28. CI/CD &amp; DevPlatform', href:'28-cicd.html', anchor:'#mod-cicd', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
-  {name:'29. AI &amp; LLM Systems', href:'29-ai-systems.html', anchor:'#mod-ai', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'}
+  {name:'Chat', full:'1. Chat &amp; Messaging', href:'1-chat-messaging/', anchor:'#mod-chat', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
+  {name:'Collab', full:'2. Real-Time Collaboration', href:'2-collaboration/', anchor:'#mod-collab', bg:'rgba(34,211,238,.08)', border:'rgba(34,211,238,.2)', color:'var(--c)'},
+  {name:'Video', full:'3. Video Streaming', href:'3-video-streaming/', anchor:'#mod-video-stream', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
+  {name:'WebRTC', full:'4. Video Calling / WebRTC', href:'4-video-calling/', anchor:'#mod-video-call', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)', color:'var(--p)'},
+  {name:'Tickets', full:'5. Ticket Booking', href:'5-ticket-booking/', anchor:'#mod-tickets', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
+  {name:'Cache', full:'6. Cache &amp; CDN', href:'6-cache-cdn/', anchor:'#mod-cache', bg:'rgba(108,140,255,.08)', border:'rgba(108,140,255,.2)', color:'var(--a)'},
+  {name:'Queues', full:'7. Queues &amp; Events', href:'7-queues-events/', anchor:'#mod-queues', bg:'rgba(251,146,60,.08)', border:'rgba(251,146,60,.2)', color:'var(--o)'},
+  {name:'Feeds', full:'8. Feeds &amp; Recommendations', href:'8-social-media/', anchor:'#mod-social', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
+  {name:'Geo', full:'9. Geo, Rides &amp; Delivery', href:'9-geo-rideshare/', anchor:'#mod-geo', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.2)', color:'var(--a2)'},
+  {name:'Payments', full:'10. Payment Systems', href:'10-payments/', anchor:'#mod-payments', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
+  {name:'API GW', full:'11. API Gateway &amp; Backend', href:'11-api-gateway/', anchor:'#mod-api', bg:'rgba(34,211,238,.08)', border:'rgba(34,211,238,.2)', color:'var(--c)'},
+  {name:'DB', full:'12. Database &amp; Storage', href:'12-database-storage/', anchor:'#mod-db', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
+  {name:'Distributed', full:'13. Distributed Systems', href:'13-distributed-systems/', anchor:'#mod-distributed', bg:'rgba(108,140,255,.08)', border:'rgba(108,140,255,.2)', color:'var(--a)'},
+  {name:'Sports', full:'14. Live Sports &amp; Broadcasting', href:'14-live-sports/', anchor:'#mod-sports', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
+  {name:'Upload', full:'15. File Upload &amp; Media', href:'15-file-upload/', anchor:'#mod-files', bg:'rgba(251,146,60,.08)', border:'rgba(251,146,60,.2)', color:'var(--o)'},
+  {name:'Search', full:'16. Search Systems', href:'16-search-systems/', anchor:'#mod-search', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
+  {name:'Calendar', full:'17. Scheduling &amp; Calendar', href:'17-calendar/', anchor:'#mod-calendar', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.2)', color:'var(--a2)'},
+  {name:'Observability', full:'18. Observability &amp; Monitoring', href:'18-observability/', anchor:'#mod-observability', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)', color:'var(--p)'},
+  {name:'ML', full:'19. ML Model Serving', href:'19-ml-serving/', anchor:'#mod-ml', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
+  {name:'Security', full:'20. Security &amp; Auth', href:'20-security/', anchor:'#mod-security', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
+  {name:'URL', full:'21. URL Shortening', href:'21-url-shortening.html', anchor:'#mod-url', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)', color:'var(--y)'},
+  {name:'Email', full:'22. Email Systems', href:'22-email.html', anchor:'#mod-email', bg:'rgba(34,211,238,.08)', border:'rgba(34,211,238,.2)', color:'var(--c)'},
+  {name:'Moderation', full:'23. Content Moderation', href:'23-moderation.html', anchor:'#mod-moderation', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)', color:'var(--p)'},
+  {name:'Flags', full:'24. Feature Flags', href:'24-feature-flags.html', anchor:'#mod-config', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'},
+  {name:'Crawling', full:'25. Web Crawling', href:'25-crawling.html', anchor:'#mod-crawling', bg:'rgba(108,140,255,.08)', border:'rgba(108,140,255,.2)', color:'var(--a)'},
+  {name:'IDs', full:'26. ID Generation', href:'26-id-generation.html', anchor:'#mod-idgen', bg:'rgba(251,146,60,.08)', border:'rgba(251,146,60,.2)', color:'var(--o)'},
+  {name:'Ads', full:'27. Ad Serving', href:'27-ad-serving.html', anchor:'#mod-ads', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.2)', color:'var(--a2)'},
+  {name:'CI/CD', full:'28. CI/CD &amp; DevPlatform', href:'28-cicd.html', anchor:'#mod-cicd', bg:'rgba(248,113,113,.08)', border:'rgba(248,113,113,.2)', color:'var(--r)'},
+  {name:'AI/LLM', full:'29. AI &amp; LLM Systems', href:'29-ai-systems.html', anchor:'#mod-ai', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'}
 ];
 
+// Inject styles
+var navStyle = document.createElement('style');
+navStyle.textContent = ''
+  + '.mod-nav{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 16px;padding:0 24px;justify-content:center}'
+  + '.mod-nav a{padding:3px 9px;border-radius:5px;font-size:.72rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .15s}'
+  + '.mod-nav a:hover{transform:translateY(-1px);filter:brightness(1.3)}'
+  + '.mod-nav .mn-short{display:none}'
+  + '@media(max-width:600px){.mod-nav{gap:4px;padding:0 10px;margin:6px 0 12px}'
+  + '.mod-nav a{padding:3px 7px;font-size:.62rem;border-radius:4px}'
+  + '.mod-nav .mn-full{display:none}.mod-nav .mn-short{display:inline}}';
+document.head.appendChild(navStyle);
+
+// Build pills
 var pills = modules.map(function(m){
   var link = isIndex ? m.anchor : (prefix + 'index.html' + m.anchor);
   var folderName = m.href.replace(/\/$/, '').replace(/\.html$/, '');
   var active = (!isIndex && (location.pathname.indexOf(folderName) !== -1 || m.href.indexOf(page) !== -1));
-  var style = 'padding:4px 10px;border-radius:5px;font-size:.75rem;font-weight:'+(active?'800':'600')+';text-decoration:none;'
-    + 'background:'+(active ? m.bg.replace('.08','.2') : m.bg)+';'
+  var style = 'background:'+(active ? m.bg.replace('.08','.2') : m.bg)+';'
     + 'border:1px solid '+(active ? m.color : m.border)+';'
-    + 'color:'+m.color;
-  return '<a href="'+link+'" style="'+style+'">'+m.name+'</a>';
+    + 'color:'+m.color+';'
+    + 'font-weight:'+(active?'700':'600');
+  return '<a href="'+link+'" style="'+style+'" title="'+m.full.replace(/&amp;/g,'&')+'"><span class="mn-full">'+m.full+'</span><span class="mn-short">'+m.name+'</span></a>';
 }).join('');
 
-var homeStyle = 'padding:4px 10px;border-radius:5px;font-size:.75rem;font-weight:'+(isIndex?'800':'600')+';text-decoration:none;'
-  + 'background:'+(isIndex?'rgba(255,255,255,.08)':'rgba(255,255,255,.04)')+';'
-  + 'border:1px solid var(--border);color:var(--muted)';
-var html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 16px;padding:0 24px;justify-content:center">'
-  + '<a href="'+(isIndex ? 'index.html' : prefix + 'index.html')+'" style="'+homeStyle+'">⚡ All Modules</a>'
-  + pills + '</div>';
+var homeLink = isIndex ? 'index.html' : prefix + 'index.html';
+var homeStyle = 'background:'+(isIndex?'rgba(255,255,255,.08)':'rgba(255,255,255,.04)')+';'
+  + 'border:1px solid var(--border);color:var(--muted);font-weight:'+(isIndex?'700':'600');
+
+var container = document.createElement('div');
+container.className = 'mod-nav';
+container.innerHTML = '<a href="'+homeLink+'" style="'+homeStyle+'"><span class="mn-full">⚡ All Modules</span><span class="mn-short">⚡ All</span></a>' + pills;
 
 var hero = document.querySelector('.hero');
-if(hero) hero.insertAdjacentHTML('afterend', html);
+if(hero) hero.insertAdjacentElement('afterend', container);
 
 /* ═══ Smooth scroll for anchor links on index page ═══ */
 if(isIndex){
@@ -82,7 +96,6 @@ if(isIndex){
     moduleSections.forEach(function(sec){
       var h2 = sec.querySelector('h2');
       if(h2){
-        // Extract just the number + name (e.g., "1. Chat & Messaging")
         var text = h2.childNodes[0].textContent.trim();
         items.push({id: sec.id, label: text, el: sec});
       }
@@ -148,12 +161,11 @@ if(isIndex){
   })();
 }
 
-/* ═══ Right Rail "On this page" (non-index pages only, no inline pills) ═══ */
+/* ═══ Right Rail "On this page" (non-index pages only) ═══ */
 if(!isIndex){
   var sections = document.querySelectorAll('.T[id]');
   if(sections.length > 2){
 
-    /* ── Right rail "On this page" ── */
     var items = [];
     sections.forEach(function(sec){
       var h2 = sec.querySelector('h2');
@@ -163,7 +175,6 @@ if(!isIndex){
     var rail = document.createElement('aside');
     rail.id = 'pageRail';
     rail.setAttribute('aria-label','On this page');
-    // Derive module title from parent folder name (e.g. "1-chat-messaging" → "1. Chat Messaging")
     var railTitle = 'On this page';
     var folderParts = location.pathname.split('/');
     var parentFolder = folderParts.length > 2 ? folderParts[folderParts.length - 2] : '';
@@ -171,13 +182,11 @@ if(!isIndex){
     if(folderMatch){
       railTitle = parseInt(folderMatch[1]) + '. ' + folderMatch[2].replace(/-/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
     } else {
-      // Try filename (e.g. "21-url-shortening.html")
       var fileMatch = page.match(/^(\d+)-(.+)\.html$/);
       if(fileMatch){
         railTitle = parseInt(fileMatch[1]) + '. ' + fileMatch[2].replace(/-/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
       }
     }
-    // Hide the inline .sd module title to avoid duplication with rail title
     var sdDiv = document.querySelector('.sd');
     if(sdDiv) sdDiv.style.display = 'none';
 
@@ -200,7 +209,6 @@ if(!isIndex){
       setOpen(!rail.classList.contains('pr-visible'));
     });
 
-    // Close rail when clicking outside
     document.addEventListener('mousedown', function(e){
       if(!rail.classList.contains('pr-visible')) return;
       if(rail.contains(e.target) || toggle.contains(e.target)) return;
@@ -241,7 +249,6 @@ if(!isIndex){
 /* ═══ Prev/Next + Premium CTA for problem pages ═══ */
 if(!isIndex){
   (function(){
-    // Build list of problems in this module from the modules array
     var currentFolder = '';
     var pathSegments = location.pathname.split('/');
     for(var si = 0; si < pathSegments.length; si++){
@@ -250,7 +257,6 @@ if(!isIndex){
       }
     }
 
-    // Find the module entry to get the folder
     var moduleEntry = null;
     for(var mi = 0; mi < modules.length; mi++){
       var mFolder = modules[mi].href.replace(/\/$/, '').replace(/\.html$/, '');
@@ -259,14 +265,9 @@ if(!isIndex){
       }
     }
 
-    // Get sibling problem files by scanning links on the page that point to same folder
-    // Better approach: use the "Related Deep Dives" section or scan all <a> in the module
-    // Most reliable: fetch the index page's module table — but that's async.
-    // Simplest: scan all links on current page that point to files in same directory
     var siblings = [];
     var currentFile = page;
     
-    // Collect from the page's own links that are in the same folder
     document.querySelectorAll('a[href]').forEach(function(a){
       var href = a.getAttribute('href');
       if(!href || href.startsWith('#') || href.startsWith('http') || href.indexOf('/') !== -1) return;
@@ -275,9 +276,6 @@ if(!isIndex){
       }
     });
 
-    // If we found siblings from the "Related Deep Dives" section, use those
-    // Otherwise fall back to a known order from the modules data
-    // For a robust solution, we'll use alphabetical order of known files
     var knownProblems = {
       '1-chat-messaging': ['slack-real-time-messaging.html','whatsapp-offline-delivery.html','discord-websocket-infra.html','multi-region-ordering.html','telegram-large-group-fanout.html','whatsapp-presence-100m.html','slack-typing-indicators.html','slack-chat-search.html','whatsapp-push-notifications.html','telegram-multi-device-sync.html','slack-active-channels.html']
     };
@@ -291,7 +289,6 @@ if(!isIndex){
     var prevProb = currentIdx > 0 ? problemList[currentIdx - 1] : null;
     var nextProb = currentIdx >= 0 && currentIdx < problemList.length - 1 ? problemList[currentIdx + 1] : null;
 
-    // Build nav bar
     var navBar = document.createElement('nav');
     navBar.className = 'page-nav';
     var html = '';
@@ -303,14 +300,12 @@ if(!isIndex){
         + '<span class="page-nav-title">' + prevTitle + '</span>'
         + '</a>';
     } else {
-      // First problem — link back to index
       html += '<a href="' + prefix + 'index.html" class="page-nav-btn page-nav-prev">'
         + '<span class="page-nav-dir">←</span>'
         + '<span class="page-nav-title">All Problems</span>'
         + '</a>';
     }
 
-    // Center CTA slot
     html += '<div class="page-nav-cta" id="pageNavCtaProb"></div>';
 
     if(nextProb){
@@ -320,7 +315,6 @@ if(!isIndex){
         + '<span class="page-nav-dir">→</span>'
         + '</a>';
     } else {
-      // Last problem — link to index
       html += '<a href="' + prefix + 'index.html" class="page-nav-btn page-nav-next">'
         + '<span class="page-nav-title">All Problems</span>'
         + '<span class="page-nav-dir">→</span>'
@@ -336,7 +330,6 @@ if(!isIndex){
       document.body.appendChild(navBar);
     }
 
-    // Premium CTA in center
     setTimeout(function(){
       if(localStorage.getItem('hellosde_premium') === 'true') return;
       if(typeof CONFIG !== 'undefined' && CONFIG.admin) return;
