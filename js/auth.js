@@ -25,7 +25,7 @@ var CONFIG = {
     measurementId: "G-RZ951SNE5G"
   },
   razorpay: {
-    key: "rzp_live_YOUR_KEY",  // or rzp_test_ for testing
+    key: "rzp_test_SuGvjQEQWWrIZ2",  // Razorpay Key ID (public, safe for frontend)
     amount: 250000,            // ₹2500 in paise
     currency: "INR",
     name: "HelloSDE",
@@ -36,25 +36,18 @@ var CONFIG = {
 
 // ═══ FIREBASE INITIALIZATION ═══
 var firebaseReady = false;
-console.log('[HelloSDE] auth.js loaded');
-console.log('[HelloSDE] typeof firebase:', typeof firebase);
 if(typeof firebase !== 'undefined'){
-  console.log('[HelloSDE] firebase.apps.length:', firebase.apps.length);
-  try {
+    try {
     if(!firebase.apps.length){
       firebase.initializeApp(CONFIG.firebase);
-      console.log('[HelloSDE] firebase.initializeApp() SUCCESS');
-    } else {
-      console.log('[HelloSDE] Firebase already initialized');
-    }
+          } else {
+          }
     firebaseReady = true;
   } catch(e){
-    console.error('[HelloSDE] Firebase init FAILED:', e.message);
-    firebaseReady = false;
+        firebaseReady = false;
   }
 } else {
-  console.warn('[HelloSDE] firebase is UNDEFINED — SDK not loaded');
-}
+  }
 
 // ═══ STATE ═══
 var state = {
@@ -524,7 +517,8 @@ window.HelloSDE = {
         location.reload();
       });
     }).catch(function(err){
-      console.error('Sign-in error:', err);
+      // Don't show alert if user just closed the popup
+      if(err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
       alert('Sign-in failed: ' + err.message);
     });
   },
@@ -532,7 +526,7 @@ window.HelloSDE = {
   signOut: function(){
     if(typeof firebase !== 'undefined'){
       firebase.auth().signOut().then(function(){
-        localStorage.removeItem('hellosde_premium');
+        localStorage.removeItem('hellosde_premium_cache');
         document.cookie = 'hellosde_session=;path=/;max-age=0';
         location.reload();
       });
@@ -546,71 +540,134 @@ window.HelloSDE = {
     }
     
     if(typeof Razorpay === 'undefined'){
-      alert('Razorpay not loaded. Add Razorpay script to your page.');
+      alert('Payment system not loaded. Please refresh the page.');
       return;
     }
 
-    var options = {
-      key: CONFIG.razorpay.key,
-      amount: CONFIG.razorpay.amount,
-      currency: CONFIG.razorpay.currency,
-      name: CONFIG.razorpay.name,
-      description: CONFIG.razorpay.description,
-      prefill: {
-        email: state.user.email,
-        name: state.user.displayName
-      },
-      notes: {
-        uid: state.user.uid
-      },
-      theme: CONFIG.razorpay.theme,
-      handler: function(response){
-        // Payment successful — mark user as premium
-        console.log('Payment success:', response.razorpay_payment_id);
-        
-        // Save to Firestore
-        if(typeof firebase !== 'undefined' && firebase.firestore){
-          firebase.firestore().collection('users').doc(state.user.uid).set({
-            email: state.user.email,
-            name: state.user.displayName,
-            isPremium: true,
-            purchasedAt: new Date().toISOString(),
-            razorpayPaymentId: response.razorpay_payment_id
-          }, {merge: true}).then(function(){
-            localStorage.setItem('hellosde_premium', 'true');
-            alert('🎉 Welcome to Premium! Refreshing...');
-            location.reload();
-          });
-        } else {
-          localStorage.setItem('hellosde_premium', 'true');
-          location.reload();
-        }
+    // Step 1: Create order via backend
+    fetch('/api/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: CONFIG.razorpay.amount,
+        currency: CONFIG.razorpay.currency,
+        receipt: 'hellosde_' + state.user.uid + '_' + Date.now(),
+        notes: { uid: state.user.uid, email: state.user.email }
+      })
+    })
+    .then(function(res){ return res.json(); })
+    .then(function(order){
+      if(!order.order_id){
+        alert('Failed to create order. Please try again.');
+        return;
       }
-    };
 
-    var rzp = new Razorpay(options);
-    rzp.open();
+      // Step 2: Open Razorpay checkout modal
+      var options = {
+        key: CONFIG.razorpay.key,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: CONFIG.razorpay.name,
+        description: CONFIG.razorpay.description,
+        prefill: {
+          email: state.user.email,
+          name: state.user.displayName
+        },
+        notes: { uid: state.user.uid },
+        theme: CONFIG.razorpay.theme,
+        handler: function(response){
+          // Step 3: Verify payment signature via backend
+          fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          })
+          .then(function(res){ return res.json(); })
+          .then(function(result){
+            if(result.verified){
+              // Payment verified — mark user as premium in Firestore
+              if(firebaseReady && firebase.firestore){
+                firebase.firestore().collection('users').doc(state.user.uid).set({
+                  email: state.user.email,
+                  name: state.user.displayName,
+                  isPremium: true,
+                  purchasedAt: new Date().toISOString(),
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpayOrderId: response.razorpay_order_id
+                }, {merge: true}).then(function(){
+                  localStorage.setItem('hellosde_premium_cache', JSON.stringify({uid:state.user.uid,v:true,ts:Date.now()}));
+                  alert('🎉 Welcome to Premium! Refreshing...');
+                  location.reload();
+                });
+              }
+            } else {
+              alert('Payment verification failed. Please contact support.');
+            }
+          })
+          .catch(function(){
+            alert('Payment verification error. Please contact support.');
+          });
+        },
+        modal: {
+          ondismiss: function(){
+            // User closed the modal without paying
+          }
+        }
+      };
+
+      var rzp = new Razorpay(options);
+      rzp.on('payment.failed', function(response){
+        alert('Payment failed: ' + response.error.description);
+      });
+      rzp.open();
+    })
+    .catch(function(err){
+      alert('Error starting payment. Please try again.');
+    });
   },
 
   // Check premium status
   checkPremium: function(user){
-    // Quick check from localStorage (for speed)
-    if(localStorage.getItem('hellosde_premium') === 'true'){
-      state.isPremium = true;
-      return Promise.resolve(true);
+    // Check localStorage cache (valid for 1 hour only, tied to user)
+    var cached = localStorage.getItem('hellosde_premium_cache');
+    if(cached){
+      try {
+        var data = JSON.parse(cached);
+        var age = Date.now() - data.ts;
+        if(data.uid === user.uid && data.v === true && age < 432000000){ // 5 days
+          state.isPremium = true;
+          return Promise.resolve(true);
+        }
+      } catch(e){}
+      // Expired or invalid — clear it
+      localStorage.removeItem('hellosde_premium_cache');
     }
     
-    // Verify from Firestore
-    if(typeof firebase !== 'undefined' && firebase.firestore && user){
+    // Always verify from Firestore
+    if(firebaseReady && firebase.firestore && user){
       return firebase.firestore().collection('users').doc(user.uid).get()
         .then(function(doc){
           if(doc.exists && doc.data().isPremium){
             state.isPremium = true;
-            localStorage.setItem('hellosde_premium', 'true');
+            // Cache for 1 hour, tied to this user's UID
+            localStorage.setItem('hellosde_premium_cache', JSON.stringify({
+              uid: user.uid,
+              v: true,
+              ts: Date.now()
+            }));
             return true;
           }
+          localStorage.removeItem('hellosde_premium_cache');
           return false;
-        }).catch(function(){ return false; });
+        }).catch(function(){
+          localStorage.removeItem('hellosde_premium_cache');
+          return false;
+        });
     }
     return Promise.resolve(false);
   }
@@ -618,15 +675,12 @@ window.HelloSDE = {
 
 // ═══ INITIALIZATION ═══
 function init(){
-  console.log('[HelloSDE] init() called, firebaseReady:', firebaseReady);
-  injectStyles();
+    injectStyles();
   
   // Check if Firebase is loaded and initialized
   if(firebaseReady && firebase.auth){
-    console.log('[HelloSDE] Calling firebase.auth().onAuthStateChanged');
-    firebase.auth().onAuthStateChanged(function(user){
-      console.log('[HelloSDE] onAuthStateChanged, user:', user ? user.email : 'null');
-      state.user = user;
+        firebase.auth().onAuthStateChanged(function(user){
+            state.user = user;
       if(user){
         // Refresh session cookie for Vercel middleware
         user.getIdToken().then(function(token){
@@ -638,7 +692,7 @@ function init(){
           gatePremiumContent();
         });
       } else {
-        localStorage.removeItem('hellosde_premium');
+        localStorage.removeItem('hellosde_premium_cache');
         state.isPremium = false;
         injectAuthUI();
         setupSignInButton();
@@ -647,8 +701,7 @@ function init(){
     });
   } else {
     // Firebase not loaded — use localStorage fallback
-    console.warn('[HelloSDE] Firebase NOT ready, using localStorage fallback');
-    state.isPremium = localStorage.getItem('hellosde_premium') === 'true';
+        state.isPremium = false /* always verify from Firestore */;
     injectAuthUI();
     setupAuthMenu();
     gatePremiumContent();

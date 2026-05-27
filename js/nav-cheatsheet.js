@@ -193,6 +193,13 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
   }
   toggle.addEventListener('click', () => setOpen(!rail.classList.contains('pr-visible')));
 
+  // Close rail when clicking outside
+  document.addEventListener('mousedown', function(e){
+    if(!rail.classList.contains('pr-visible')) return;
+    if(rail.contains(e.target) || toggle.contains(e.target)) return;
+    setOpen(false);
+  });
+
   const linkById = {};
   rail.querySelectorAll('a').forEach(a => { linkById[a.dataset.id] = a; });
   function setActive(id){
@@ -255,7 +262,10 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
       + '<span class="page-nav-title">' + prev.title + '</span>'
       + '</a>';
   } else {
-    html += '<span></span>';
+    html += '<a href="../index.html" class="page-nav-btn page-nav-prev">'
+      + '<span class="page-nav-dir">←</span>'
+      + '<span class="page-nav-title">Home</span>'
+      + '</a>';
   }
 
   // Center slot for premium CTA
@@ -266,7 +276,10 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
       + '<span class="page-nav-dir">→</span>'
       + '</a>';
   } else {
-    html += '<span></span>';
+    html += '<a href="../index.html" class="page-nav-btn page-nav-next">'
+      + '<span class="page-nav-title">Home</span>'
+      + '<span class="page-nav-dir">→</span>'
+      + '</a>';
   }
 
   nav.innerHTML = html;

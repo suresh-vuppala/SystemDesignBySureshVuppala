@@ -72,6 +72,80 @@ if(isIndex){
       history.pushState(null, '', '#' + targetId);
     }
   });
+
+  // Right rail with module list for index page
+  (function(){
+    var moduleSections = document.querySelectorAll('.T[id^="mod-"]');
+    if(moduleSections.length < 2) return;
+
+    var items = [];
+    moduleSections.forEach(function(sec){
+      var h2 = sec.querySelector('h2');
+      if(h2){
+        // Extract just the number + name (e.g., "1. Chat & Messaging")
+        var text = h2.childNodes[0].textContent.trim();
+        items.push({id: sec.id, label: text, el: sec});
+      }
+    });
+
+    var rail = document.createElement('aside');
+    rail.id = 'pageRail';
+    rail.setAttribute('aria-label','Modules');
+    rail.innerHTML = '<h4><span class="pr-dot"></span>Modules</h4>'
+      + '<ol style="max-height:calc(100vh - 140px);overflow-y:auto;scrollbar-width:thin">'
+      + items.map(function(it){ return '<li><a href="#'+it.id+'" data-id="'+it.id+'">'+it.label+'</a></li>'; }).join('')
+      + '</ol>';
+    document.body.appendChild(rail);
+
+    var toggle = document.createElement('button');
+    toggle.id = 'pr-toggle';
+    toggle.type = 'button';
+    toggle.innerHTML = '<span class="pr-tog-ic">☰</span><span class="pr-tog-lbl">Modules</span>';
+    document.body.appendChild(toggle);
+
+    function setOpen(open){
+      rail.classList.toggle('pr-visible', open);
+      toggle.classList.toggle('pr-tog-open', open);
+    }
+    toggle.addEventListener('click', function(e){
+      e.stopPropagation();
+      setOpen(!rail.classList.contains('pr-visible'));
+    });
+    document.addEventListener('mousedown', function(e){
+      if(!rail.classList.contains('pr-visible')) return;
+      if(rail.contains(e.target) || toggle.contains(e.target)) return;
+      setOpen(false);
+    });
+
+    // Track active module on scroll
+    var linkById = {};
+    rail.querySelectorAll('a').forEach(function(a){ linkById[a.dataset.id] = a; });
+    function setActive(id){
+      Object.values(linkById).forEach(function(a){ a.classList.remove('pr-active'); });
+      var a = linkById[id];
+      if(a){ a.classList.add('pr-active'); a.scrollIntoView({block:'nearest'}); }
+    }
+    var visible = new Map();
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting) visible.set(e.target.id, true);
+        else visible.delete(e.target.id);
+      });
+      var bestId = null, bestTop = Infinity;
+      items.forEach(function(it){
+        if(visible.has(it.id)){
+          var t = it.el.getBoundingClientRect().top;
+          if(t < bestTop){ bestTop = t; bestId = it.id; }
+        }
+      });
+      if(!bestId){
+        items.forEach(function(it){ if(it.el.getBoundingClientRect().top < 140) bestId = it.id; });
+      }
+      if(bestId) setActive(bestId);
+    }, {rootMargin:'-100px 0px -55% 0px', threshold:[0, 0.25]});
+    items.forEach(function(it){ io.observe(it.el); });
+    if(location.hash){ var id = location.hash.slice(1); if(linkById[id]) setActive(id); }
+  })();
 }
 
 /* ═══ Right Rail "On this page" (non-index pages only, no inline pills) ═══ */

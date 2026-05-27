@@ -1,6 +1,8 @@
 # Vercel
 .vercel/
+.env
 .env.local
+.env.production
 
 # Editor
 .vscode/

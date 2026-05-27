@@ -6,7 +6,7 @@
 <title>Real-Time System Design &middot; 201 Problems & Solutions</title>
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="stylesheet" href="../css/style.css">
-<style>.co-tags{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}.co-tag{font-size:.55rem;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.06);color:var(--muted);font-weight:500;border:1px solid rgba(255,255,255,.08)}
+<style>.co-tags{display:inline-flex;gap:10px;margin-left:10px;vertical-align:middle}.co-tag{font-size:.65rem;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.3px}
 /* Expandable concept topics per problem */
 .prob-topics{display:none;padding:4px 14px 8px;border-bottom:1px solid var(--border)}
 .prob-topics.open{display:block}
@@ -22,7 +22,10 @@
 .concepts-filter-header span{font-size:.78rem;font-weight:600;color:var(--text)}
 .concepts-filter-clear{font-size:.7rem;color:var(--a);cursor:pointer;background:none;border:none;padding:4px 8px;border-radius:4px;transition:all .15s}
 .concepts-filter-clear:hover{background:rgba(108,140,255,.1)}
-.concepts-filter-pills{display:flex;flex-wrap:wrap;gap:6px}
+.concepts-filter-pills{display:flex;flex-wrap:wrap;gap:6px;max-height:64px;overflow-y:auto;scrollbar-width:thin;padding-right:4px}
+.concepts-filter-pills::-webkit-scrollbar{width:4px}
+.concepts-filter-pills::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+@media(max-width:600px){.concepts-filter{padding:10px 14px}.concepts-filter-pills{max-height:56px}}
 .cf-pill{font-size:.68rem;padding:4px 10px;border-radius:5px;background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none}
 .cf-pill:hover{border-color:var(--a);color:var(--text)}
 .cf-pill.active{background:rgba(108,140,255,.12);color:var(--a);border-color:var(--a);font-weight:600}
@@ -31,14 +34,14 @@
 </style>
 </head>
 <body>
-<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p>201 Problems & Solutions &middot; Staff / Sr SWE Reference</p></div>
+<div class="hero" id="top"><h1><span>Real-Time System Design</span></h1><p>201 problems, real company scale — practice what interviewers actually ask</p></div>
 <div class="ct">
 
 <!-- Concepts Filter -->
 <div class="concepts-filter" id="conceptsFilter">
   <div class="concepts-filter-header">
-    <span>Filter by Concept</span>
-    <button class="concepts-filter-clear" id="cfClear">Clear All</button>
+    <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filter by Concept</span>
+    <button class="concepts-filter-clear" id="cfClear"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear All</button>
   </div>
   <div class="concepts-filter-pills" id="cfPills"></div>
 </div>

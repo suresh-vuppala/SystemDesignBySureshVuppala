@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>HelloSDE — System Design Mastery for Staff & Senior Engineers</title>
-<meta name="description" content="Master system design with 16 core topics, 201 real-time problems, and visual SVG diagrams. Built for FAANG/MAANG interview prep at Staff/Sr SWE level.">
+<meta name="description" content="Master system design with 16 modules, 201 real-time problems, 29 systems, and 300+ visual diagrams. Built for FAANG/MAANG interview prep at Staff/Sr SWE level.">
 <meta name="keywords" content="system design, distributed systems, scalability, staff engineer interview, FAANG interview prep, system architecture, HelloSDE">
 <meta name="author" content="Suresh Vuppala">
 <meta name="robots" content="index, follow">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://hellosde.com/">
 <meta property="og:title" content="HelloSDE — System Design Mastery">
-<meta property="og:description" content="16 core topics, 201 real-time problems, visual diagrams. Staff/Sr SWE interview prep.">
+<meta property="og:description" content="16 modules, 201 real-time problems, 29 systems, 300+ diagrams. Staff/Sr SWE interview prep.">
 <meta property="og:site_name" content="HelloSDE">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="HelloSDE — System Design Mastery">
@@ -30,9 +30,19 @@
 .hero-split{display:flex;align-items:center;justify-content:center;gap:0;max-width:1000px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.3)}
 .hero-left{flex:1;min-width:320px;padding:40px 36px}
 .hero-left h1{font-size:2.2rem;font-weight:800;letter-spacing:-.03em;color:#fff;margin:0;line-height:1.15;text-align:left}
-.hero-left h1 span{background:linear-gradient(135deg,var(--a),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-left h1 span{background:linear-gradient(135deg,var(--a),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;position:relative;display:inline-block}
+.hero-left h1 span::after{content:'';position:absolute;left:0;bottom:-4px;width:100%;height:8px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8'%3E%3Cpath d='M0,4 Q25,0 50,4 T100,4 T150,4 T200,4' fill='none' stroke='%236c8cff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;background-size:200px 8px;animation:heroUnderlineDraw .8s ease-out forwards,heroUnderlineShimmer 3s ease-in-out .8s infinite}
+@keyframes heroUnderlineDraw{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes heroUnderlineShimmer{0%,100%{opacity:.7}50%{opacity:1}}
 .hero-left .tagline{color:var(--muted);margin-top:14px;font-size:.88rem;line-height:1.7;text-align:left}
 .hero-left .tagline strong{color:var(--text)}
+.typed-cursor{color:var(--a);font-weight:300;animation:blink .8s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.hero-logos{margin-top:20px}
+.hero-logos-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:10px}
+.hero-logos-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.hero-logo-text{font-size:.75rem;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.3px;transition:color .2s}
+.hero-logo-text:hover{color:rgba(255,255,255,.8)}
 .hero-cta{display:flex;gap:12px;margin-top:24px}
 .hero-cta a{padding:11px 24px;border-radius:8px;font-size:.84rem;font-weight:600;text-decoration:none;transition:all .2s}
 .hero-cta .primary{background:var(--a);color:#fff}
@@ -123,9 +133,19 @@
     <div class="hero-left">
       <h1>Master <span>System Design</span><br>for Top Tech Interviews</h1>
       <p class="tagline">
-        <strong>16 core topics</strong> · <strong>201 real-time problems</strong> · Visual SVG diagrams<br>
-        Built for Staff & Senior SWE at Google · Meta · Uber · Netflix · Amazon
+        <span id="hero-typed"></span><span class="typed-cursor">|</span>
       </p>
+      <div class="hero-logos">
+        <span class="hero-logos-label">Built for Senior engineers at</span>
+        <div class="hero-logos-row">
+          <span class="hero-logo-text">Google</span>
+          <span class="hero-logo-text">Meta</span>
+          <span class="hero-logo-text">Amazon</span>
+          <span class="hero-logo-text">Netflix</span>
+          <span class="hero-logo-text">Uber</span>
+          <span class="hero-logo-text">Microsoft</span>
+        </div>
+      </div>
       <div class="hero-cta">
         <a href="system-design-cheatsheet/index.html" class="primary">Start Learning →</a>
         <a href="realtime-system-design-problems/index.html" class="secondary">Browse Problems →</a>
@@ -135,18 +155,18 @@
       <div class="fc-card">
         <div class="fc-badge">Premium Access</div>
         <h3 class="fc-title">Unlock Full System Design Content</h3>
-        <p class="fc-desc">All concepts, problems, cheat sheets, diagrams — one-time payment.</p>
         <div class="fc-pricing">
           <span class="fc-price">₹2,500</span>
-          <span class="fc-period">One-time enrollment</span>
+          <span class="fc-period">one-time</span>
         </div>
         <div class="fc-stats">
-          <div class="fc-stat"><span class="fc-stat-num">16</span><span class="fc-stat-label">Topics</span></div>
+          <div class="fc-stat"><span class="fc-stat-num">16</span><span class="fc-stat-label">Modules</span></div>
           <div class="fc-stat"><span class="fc-stat-num">201</span><span class="fc-stat-label">Problems</span></div>
-          <div class="fc-stat"><span class="fc-stat-num">29</span><span class="fc-stat-label">Modules</span></div>
-          <div class="fc-stat"><span class="fc-stat-num">100+</span><span class="fc-stat-label">Diagrams</span></div>
+          <div class="fc-stat"><span class="fc-stat-num">29</span><span class="fc-stat-label">Systems</span></div>
+          <div class="fc-stat"><span class="fc-stat-num">300+</span><span class="fc-stat-label">Diagrams</span></div>
         </div>
         <button class="fc-btn" onclick="window.HelloSDE ? (window.HelloSDE.state && window.HelloSDE.state.user ? window.HelloSDE.startPayment() : window.HelloSDE.signIn()) : alert('Loading...')">Enroll Now →</button>
+        <div style="margin-top:14px;font-size:.62rem;color:var(--muted);position:relative;letter-spacing:.2px">500+ engineers enrolled · Lifetime updates · No subscription</div>
       </div>
     </div>
   </div>
@@ -157,22 +177,12 @@
   <div class="content-grid">
     <div class="content-card">
       <h3>📖 System Design Concepts</h3>
-      <p>Complete reference — Foundations, Networking, Security, APIs, Infrastructure, Storage, Caching, Messaging, Consistency, Scalability, Data Pipelines, Distributed Systems, Observability, AI Systems, and more.</p>
-      <div class="meta">
-        <span>📄 16 topics</span>
-        <span>📊 100+ diagrams</span>
-        <span>⚡ Interview-ready</span>
-      </div>
+      <p>Foundations, Networking, Security, APIs, Infrastructure, Storage, Caching, Messaging, Consistency, Scalability, Data Pipelines, Distributed Systems, Observability, AI Systems — all in one place.</p>
       <a href="system-design-cheatsheet/index.html">Explore Concepts →</a>
     </div>
     <div class="content-card">
       <h3>🧩 Real-Time Design Problems</h3>
-      <p>201 problems across 29 modules — Chat, Video, Payments, Geo/Rides, Queues, Social Feeds, Search, AI/LLM, and more. Each with full architecture + interview cheat sheet.</p>
-      <div class="meta">
-        <span>🏗️ 201 problems</span>
-        <span>🏢 29 modules</span>
-        <span>🎯 FAANG-level</span>
-      </div>
+      <p>Chat, Video, Payments, Geo/Rides, Queues, Social Feeds, Search, AI/LLM, and more. Each problem with full architecture + interview cheat sheet.</p>
       <a href="realtime-system-design-problems/index.html">Browse Problems →</a>
     </div>
   </div>
@@ -241,5 +251,49 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="js/auth.js"></script>
+<script>
+// Typing effect for hero tagline
+(function(){
+  var phrases = [
+    'No fluff, no long blogs — straight to the point.',
+    'Visual diagrams that make concepts click instantly.',
+    'Real-world scale: Slack, WhatsApp, Netflix, Uber.',
+    'Interview-ready in days, not months.'
+  ];
+  var el = document.getElementById('hero-typed');
+  var cursor = document.querySelector('.typed-cursor');
+  if(!el) return;
+
+  var phraseIdx = 0, charIdx = 0, deleting = false, pauseEnd = 0;
+
+  function tick(){
+    var phrase = phrases[phraseIdx];
+    var now = Date.now();
+    if(now < pauseEnd){ requestAnimationFrame(tick); return; }
+
+    if(!deleting){
+      charIdx++;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === phrase.length){
+        deleting = true;
+        pauseEnd = now + 2000; // pause 2s before deleting
+      }
+    } else {
+      charIdx--;
+      el.textContent = phrase.substring(0, charIdx);
+      if(charIdx === 0){
+        deleting = false;
+        phraseIdx = (phraseIdx + 1) % phrases.length;
+        pauseEnd = now + 400; // short pause before next phrase
+      }
+    }
+
+    var speed = deleting ? 30 : 50;
+    setTimeout(tick, speed);
+  }
+
+  setTimeout(tick, 600); // start after page settles
+})();
+</script>
 </body>
 </html>
