@@ -21,7 +21,7 @@
   else if(inCheatsheet) prefix = '../';
 
   var links = [
-    {href: prefix+'system-design-cheatsheet/index.html', label:'Concepts', id:'concepts'},
+    {href: prefix+'system-design-cheatsheet/01-foundations.html', label:'Concepts', id:'concepts'},
     {href: prefix+'realtime-system-design-problems/index.html', label:'Problems', id:'realtime'},
     {href: prefix+'system-design-cheatsheet/engineering-blogs.html', label:'Blogs', id:'blogs'}
   ];
@@ -53,6 +53,13 @@
       toggle.textContent = open ? '✕' : '☰';
     });
   }
+
+  // Analytics (Umami)
+  var umami = document.createElement('script');
+  umami.defer = true;
+  umami.src = 'https://cloud.umami.is/script.js';
+  umami.setAttribute('data-website-id', 'be293e2f-a06e-4259-a351-c871c789893b');
+  document.head.appendChild(umami);
 
   // Footer (injected on all pages)
   var footer = '<footer class="site-footer">'
