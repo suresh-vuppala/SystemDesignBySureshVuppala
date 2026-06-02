@@ -20,7 +20,7 @@ var CONFIG = {
     databaseURL: "https://varaq-gif-default-rtdb.firebaseio.com",
     projectId: "varaq-gif",
     storageBucket: "varaq-gif.appspot.com",
-    messagingSenderId: "350573799970",
+    messagingSenderId: "350573799970",r
     appId: "1:350573799970:web:c68e797081eb3818aa787b",
     measurementId: "G-RZ951SNE5G"
   },

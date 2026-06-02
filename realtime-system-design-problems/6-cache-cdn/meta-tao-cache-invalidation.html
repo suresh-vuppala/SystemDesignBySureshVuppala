@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -37,7 +37,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;1s</div>
 <div style="font-size:.72rem;color:var(--muted)">invalidation latency</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">write ? all caches cleared</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">write &#x2192; all caches cleared</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">10B+</div>
@@ -70,10 +70,10 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> Full database design (focus on cache layer)<br>
-  <span class="hr">?</span> Application-level business logic<br>
-  <span class="hr">?</span> User authentication and authorization<br>
-  <span class="hr">?</span> CDN for static assets (separate system)
+  <span class="hr">&#x2717;</span> Full database design (focus on cache layer)<br>
+  <span class="hr">&#x2717;</span> Application-level business logic<br>
+  <span class="hr">&#x2717;</span> User authentication and authorization<br>
+  <span class="hr">&#x2717;</span> CDN for static assets (separate system)
 </div>
 </div>
 </div>
@@ -102,14 +102,14 @@
 
   <!-- --- LAYER 1: WRITE PATH --- -->
   <rect x="10" y="8" width="760" height="135" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: WRITE PATH &middot; App writes to DB ? Publish invalidation (DELETE key, not UPDATE) ? Invalidation Bus</text>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: WRITE PATH &middot; App writes to DB &#x2192; Publish invalidation (DELETE key, not UPDATE) &#x2192; Invalidation Bus</text>
 
   <rect x="25" y="35" width="120" height="90" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="85" y="52" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Client Write</text>
   <text x="85" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">update profile photo</text>
   <text x="85" y="80" text-anchor="middle" fill="var(--muted)" font-size="5">change relationship</text>
   <text x="85" y="93" text-anchor="middle" fill="var(--muted)" font-size="5">post new content</text>
-  <text x="85" y="106" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">write request ? leader</text>
+  <text x="85" y="106" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">write request &#x2192; leader</text>
 
   <line x1="145" y1="75" x2="175" y2="75" stroke="var(--a)" stroke-width="1.2" marker-end="url(#tao-arr)"/>
 
@@ -147,7 +147,7 @@
 
   <!-- --- LAYER 2: CACHE TOPOLOGY --- -->
   <rect x="10" y="150" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="165" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: CACHE TOPOLOGY &middot; Leader ? Followers (async &lt;1s) + Lease mechanism (prevents stale-set)</text>
+  <text x="390" y="165" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: CACHE TOPOLOGY &middot; Leader &#x2192; Followers (async &lt;1s) + Lease mechanism (prevents stale-set)</text>
 
   <!-- Leader -->
   <rect x="25" y="178" width="180" height="100" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.5"/>
@@ -180,15 +180,15 @@
   <!-- Lease mechanism -->
   <rect x="370" y="178" width="390" height="100" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="565" y="195" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="700">Lease Mechanism (Stale-Set Protection)</text>
-  <text x="565" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">1. On cache miss ? issue lease token (SETNX-like, ~10s TTL)</text>
+  <text x="565" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">1. On cache miss &#x2192; issue lease token (SETNX-like, ~10s TTL)</text>
   <text x="565" y="227" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Only lease holder can SET the value in cache</text>
-  <text x="565" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">3. If invalidation arrives ? lease REVOKED (prevents stale data)</text>
+  <text x="565" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">3. If invalidation arrives &#x2192; lease REVOKED (prevents stale data)</text>
   <text x="565" y="257" text-anchor="middle" fill="var(--muted)" font-size="5.5">4. Other requesters wait for lease result (no thundering herd)</text>
   <text x="565" y="272" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Result: 1 DB read per key per invalidation, not 1000</text>
 
   <!-- --- LAYER 3: READ PATH --- -->
   <rect x="10" y="302" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="317" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: READ PATH &middot; Cache hit ? serve | Cache miss ? Lease ? DB query ? SET ? Serve (thundering herd protected)</text>
+  <text x="390" y="317" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: READ PATH &middot; Cache hit &#x2192; serve | Cache miss &#x2192; Lease &#x2192; DB query &#x2192; SET &#x2192; Serve (thundering herd protected)</text>
 
   <rect x="25" y="330" width="110" height="55" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
   <text x="80" y="350" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Reader</text>
@@ -199,8 +199,8 @@
 
   <rect x="170" y="330" width="150" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="245" y="350" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Follower Cache</text>
-  <text x="245" y="365" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">HIT ? return immediately</text>
-  <text x="245" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">MISS ? request lease from leader</text>
+  <text x="245" y="365" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">HIT &#x2192; return immediately</text>
+  <text x="245" y="378" text-anchor="middle" fill="var(--muted)" font-size="5.5">MISS &#x2192; request lease from leader</text>
 
   <line x1="320" y1="357" x2="350" y2="357" stroke="var(--g)" stroke-width="1" marker-end="url(#tao-arr)"/>
   <text x="335" y="350" fill="var(--muted)" font-size="4.5">miss</text>
@@ -208,7 +208,7 @@
   <rect x="355" y="330" width="180" height="55" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="445" y="350" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Lease Issued</text>
   <text x="445" y="365" text-anchor="middle" fill="var(--muted)" font-size="5.5">holder fetches from DB</text>
-  <text x="445" y="378" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">SET with lease token ? serve</text>
+  <text x="445" y="378" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">SET with lease token &#x2192; serve</text>
 
   <line x1="535" y1="357" x2="565" y2="357" stroke="var(--y)" stroke-width="1" marker-end="url(#tao-arr)"/>
 
@@ -220,7 +220,7 @@
   <!-- Gutter pool -->
   <rect x="25" y="395" width="350" height="45" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
   <text x="200" y="412" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Gutter Pool (Failure Handling)</text>
-  <text x="200" y="427" text-anchor="middle" fill="var(--muted)" font-size="5.5">failed cache node ? traffic goes to backup pool (not DB) ? prevents cascade failure</text>
+  <text x="200" y="427" text-anchor="middle" fill="var(--muted)" font-size="5.5">failed cache node &#x2192; traffic goes to backup pool (not DB) &#x2192; prevents cascade failure</text>
 
   <!-- Why DELETE not UPDATE -->
   <rect x="395" y="395" width="365" height="45" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
@@ -261,7 +261,7 @@
 <span class="hg">1.</span> <strong>DELETE on write, not UPDATE</strong> &middot; commutative, order-independent, prevents stale-set races<br>
 <span class="hg">2.</span> <strong>Lease mechanism</strong> &middot; only lease holder can SET value, revoked on invalidation (prevents thundering herd + stale)<br>
 <span class="hg">3.</span> <strong>Leader/follower cache topology</strong> &middot; writes go to leader, async replicate to followers (&lt;1s)<br>
-<span class="hg">4.</span> <strong>Pub/Sub invalidation bus</strong> &middot; write triggers invalidation event ? all cache servers subscribe<br>
+<span class="hg">4.</span> <strong>Pub/Sub invalidation bus</strong> &middot; write triggers invalidation event &#x2192; all cache servers subscribe<br>
 <span class="hg">5.</span> <strong>Thundering herd protection</strong> &middot; on miss, only 1 request goes to DB (others wait for lease result)<br>
 <span class="hg">6.</span> <strong>Eventual consistency accepted</strong> &middot; followers may serve stale for ~1s (acceptable for social data)<br>
 <span class="hg">7.</span> <strong>Version/generation numbers</strong> &middot; detect stale writes (only accept SET if version matches)<br>

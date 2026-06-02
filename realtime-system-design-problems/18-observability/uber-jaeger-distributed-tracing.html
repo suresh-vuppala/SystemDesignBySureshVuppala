@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Uber trace requests across 1000+ microservices with Jaeger?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a distributed tracing system: 1000+ services, async boundaries, intelligent sampling</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a distributed tracing system: 1000+ services, async boundaries, intelligent sampling</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -26,7 +26,7 @@
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a distributed tracing system correlate requests across 1000+ microservices, propagating trace context through async boundaries (Kafka, queues) and sampling intelligently to keep storage under 1% of total traffic while capturing all error traces?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A single ride request touches 50+ services. When it fails, <span class="hr">which service caused it?</span> You need end-to-end visibility. But tracing every request at 1M+ RPS = petabytes/day. Intelligent sampling must capture errors while discarding boring successes.</div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A single ride request touches 50+ services. When it fails, <span class="hr">which service caused it&#x2717;</span> You need end-to-end visibility. But tracing every request at 1M+ RPS = petabytes/day. Intelligent sampling must capture errors while discarding boring successes.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -101,23 +101,23 @@
   <text x="666" y="108" text-anchor="middle" fill="var(--muted)" font-size="5">parent=Payment span</text>
   <text x="666" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">tags: db.statement, rows</text>
 
-  <!-- Arrow Layer 1 ? Layer 2 -->
+  <!-- Arrow Layer 1 &#x2192; Layer 2 -->
   <line x1="390" y1="140" x2="390" y2="158" stroke="var(--a)" stroke-width="1.2" marker-end="url(#tr-arr)"/>
   <text x="430" y="152" fill="var(--muted)" font-size="5.5">spans emitted</text>
 
   <!-- --- LAYER 2: COLLECTION --- -->
   <rect x="10" y="160" width="760" height="145" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="178" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 2 &middot; COLLECTION (Context Propagation ? Collector ? Storage)</text>
+  <text x="390" y="178" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="700">LAYER 2 &middot; COLLECTION (Context Propagation &#x2192; Collector &#x2192; Storage)</text>
 
   <!-- Context Propagation -->
   <rect x="30" y="188" width="200" height="100" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
   <text x="130" y="204" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Context Propagation</text>
   <text x="130" y="218" text-anchor="middle" fill="var(--muted)" font-size="5.5">W3C traceparent header</text>
   <text x="130" y="231" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">00-{trace_id}-{span_id}-01</text>
-  <text x="130" y="244" text-anchor="middle" fill="var(--muted)" font-size="5.5">HTTP ? header injection</text>
-  <text x="130" y="257" text-anchor="middle" fill="var(--muted)" font-size="5.5">Kafka ? message header</text>
-  <text x="130" y="270" text-anchor="middle" fill="var(--muted)" font-size="5.5">gRPC ? metadata field</text>
-  <text x="130" y="283" text-anchor="middle" fill="var(--muted)" font-size="5">Cron ? job metadata inject</text>
+  <text x="130" y="244" text-anchor="middle" fill="var(--muted)" font-size="5.5">HTTP &#x2192; header injection</text>
+  <text x="130" y="257" text-anchor="middle" fill="var(--muted)" font-size="5.5">Kafka &#x2192; message header</text>
+  <text x="130" y="270" text-anchor="middle" fill="var(--muted)" font-size="5.5">gRPC &#x2192; metadata field</text>
+  <text x="130" y="283" text-anchor="middle" fill="var(--muted)" font-size="5">Cron &#x2192; job metadata inject</text>
 
   <line x1="230" y1="238" x2="255" y2="238" stroke="var(--y)" stroke-width="1.2" marker-end="url(#tr-arr)"/>
 
@@ -143,7 +143,7 @@
   <text x="648" y="270" text-anchor="middle" fill="var(--muted)" font-size="5.5">Secondary index: service, operation</text>
   <text x="648" y="283" text-anchor="middle" fill="var(--muted)" font-size="5">Object store for cold traces</text>
 
-  <!-- Arrow Layer 2 ? Layer 3 -->
+  <!-- Arrow Layer 2 &#x2192; Layer 3 -->
   <line x1="390" y1="305" x2="390" y2="323" stroke="var(--g)" stroke-width="1.2" marker-end="url(#tr-arr)"/>
 
   <!-- --- LAYER 3: VISUALIZATION --- -->
@@ -162,7 +162,7 @@
   <rect x="90" y="411" width="40" height="8" rx="2" fill="rgba(167,139,250,.3)" stroke="var(--a2)" stroke-width=".4"/>
   <text x="145" y="418" fill="var(--a2)" font-size="5">DB 15ms</text>
   <rect x="170" y="422" width="80" height="8" rx="2" fill="rgba(248,113,113,.4)" stroke="var(--r)" stroke-width=".5"/>
-  <text x="265" y="429" fill="var(--r)" font-size="5" font-weight="600">? slow query!</text>
+  <text x="265" y="429" fill="var(--r)" font-size="5" font-weight="600">&#x2714; slow query!</text>
 
   <!-- Service Dependency Map -->
   <rect x="350" y="355" width="200" height="85" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
@@ -198,13 +198,13 @@
 <tr><td><span class="hi">Instrumentation</span></td><td>Generate spans at each service</td><td>OpenTelemetry SDK &middot; auto-instrument HTTP, gRPC, DB calls</td></tr>
 <tr><td><span class="hi">Context Propagation</span></td><td>Pass trace_id + span_id across boundaries</td><td>W3C Traceparent header (HTTP), Kafka header (async), baggage items</td></tr>
 <tr><td><span class="hi">Sampling</span></td><td>Decide which traces to keep</td><td>Head-based (decide at entry) + tail-based (decide after seeing outcome)</td></tr>
-<tr><td><span class="hi">Agent/Collector</span></td><td>Buffer and forward spans</td><td>OTel Collector sidecar ? central collector ? storage</td></tr>
+<tr><td><span class="hi">Agent/Collector</span></td><td>Buffer and forward spans</td><td>OTel Collector sidecar &#x2192; central collector &#x2192; storage</td></tr>
 <tr><td><span class="hi">Storage</span></td><td>Store spans for querying</td><td>Elasticsearch (Jaeger), Tempo (Grafana), X-Ray (AWS)</td></tr>
 <tr><td><span class="hi">Query/UI</span></td><td>Visualize traces, find bottlenecks</td><td>Jaeger UI &middot; waterfall view, service dependency graph, latency histograms</td></tr>
 </table>
 
 <div class="b bg"><span class="hi">Sampling strategies:</span> <span class="hg">Head-based (1%)</span> &middot; decide at ingress, propagate decision. Simple but misses rare errors. <span class="hg">Tail-based (100% errors)</span> &middot; buffer spans, decide after trace completes. Captures all errors + slow traces. <span class="hg">Adaptive</span> &middot; increase sampling for services with high error rates. Uber uses tail-based for errors + 1% probabilistic for baseline.</div>
-<div class="b by"><span class="hi">Async propagation:</span> Kafka message carries <code>traceparent</code> in headers. Consumer creates child span linked to producer's span. Same for SQS (message attributes), cron jobs (inject trace_id in job metadata). <span class="hg">Result:</span> full trace from HTTP request ? Kafka ? consumer ? DB &middot; all correlated.</div>
+<div class="b by"><span class="hi">Async propagation:</span> Kafka message carries <code>traceparent</code> in headers. Consumer creates child span linked to producer's span. Same for SQS (message attributes), cron jobs (inject trace_id in job metadata). <span class="hg">Result:</span> full trace from HTTP request &#x2192; Kafka &#x2192; consumer &#x2192; DB &middot; all correlated.</div>
 <div class="b br"><span class="hi">Challenges:</span> <span class="hr">Clock skew</span> &middot; spans from different hosts have different clocks (use NTP + accept &middot;10ms). <span class="hr">High cardinality</span> &middot; too many unique tag values explode storage. <span class="hr">Trace too large</span> &middot; fan-out to 1000 services = 1000 spans per trace (limit depth). <span class="hr">Overhead</span> &middot; must be &lt;5ms per span or developers disable it.</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Uber</strong> &middot; Jaeger (open-sourced, CNCF). <strong>Google</strong> &middot; Dapper (paper that started it all). <strong>AWS</strong> &middot; X-Ray. <strong>Datadog</strong> &middot; APM with distributed tracing. <strong>Grafana</strong> &middot; Tempo (cost-effective, object storage backend).</div>
 </div>
@@ -219,7 +219,7 @@
 <span class="hg">3.</span> <strong>Head-based sampling (1%)</strong> &middot; decide at ingress, propagate decision downstream<br>
 <span class="hg">4.</span> <strong>Tail-based sampling (100% errors)</strong> &middot; buffer spans, keep all error/slow traces<br>
 <span class="hg">5.</span> <strong>OpenTelemetry SDK</strong> &middot; auto-instrument HTTP, gRPC, DB calls (zero code changes)<br>
-<span class="hg">6.</span> <strong>Collector pipeline</strong> &middot; agent (sidecar) ? central collector ? storage (ES/Tempo)<br>
+<span class="hg">6.</span> <strong>Collector pipeline</strong> &middot; agent (sidecar) &#x2192; central collector &#x2192; storage (ES/Tempo)<br>
 <span class="hg">7.</span> <strong>&lt;5ms overhead per span</strong> &middot; must be invisible to application performance
 </div>
 </div>

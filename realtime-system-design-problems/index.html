@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -298,7 +298,7 @@
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#cdn">CDN</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#caching">Caching</a><a class="prob-topic" href="../system-design-cheatsheet/06-storage.html#blob">Blob Storage</a><a class="prob-topic" href="../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a></div></div></td></tr>
 <tr class="prob-expand"><td>9</td><td><a href="09-geo-rideshare.html">How does a food delivery platform calculate multi-leg ETA (restaurant prep + driver pickup + delivery) that updates in real-time, incorporating per-restaurant prep time models, live traffic, and Bayesian updates as each leg completes?</a></td><td>Uber Eats &middot; multi-leg ETA</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#redis">Redis</a><a class="prob-topic" href="../system-design-cheatsheet/09-consistency.html#consistency-models">Consistency</a></div></div></td></tr>
-<tr class="prob-expand"><td>10</td><td><a href="09-geo-rideshare.html">How does a food delivery platform manage the 3-party order lifecycle (customer ? restaurant ? driver) with state machine transitions (placed?accepted?preparing?ready?picked_up?delivered), timeout handlers per state, and compensating actions on cancellation?</a></td><td>Swiggy &middot; order lifecycle</td></tr>
+<tr class="prob-expand"><td>10</td><td><a href="09-geo-rideshare.html">How does a food delivery platform manage the 3-party order lifecycle (customer &#x2192; restaurant &#x2192; driver) with state machine transitions (placed?accepted?preparing?ready?picked_up?delivered), timeout handlers per state, and compensating actions on cancellation?</a></td><td>Swiggy &middot; order lifecycle</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/04-apis.html#realtime">WebSocket</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#redis">Redis</a><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#pubsub">Pub/Sub</a></div></div></td></tr>
 <tr class="prob-expand"><td>11</td><td><a href="09-geo-rideshare.html">How does a food delivery platform assign orders to drivers optimizing for delivery time, driver earnings, and restaurant wait, enforcing constraints (distance &lt; 3km, capacity = 2 orders) and re-assigning when a driver rejects within 30s?</a></td><td>DoorDash &middot; driver dispatch</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/06-storage.html#search">Elasticsearch</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#caching">Caching</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#redis">Redis</a><a class="prob-topic" href="../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a></div></div></td></tr>
@@ -515,7 +515,7 @@
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/06-storage.html#nosql">NoSQL</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#caching">Caching</a><a class="prob-topic" href="../system-design-cheatsheet/10-scalability.html#consistent-hashing">Consistent Hashing</a><a class="prob-topic" href="../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#cdn">CDN</a></div></div></td></tr>
 <tr><td>2</td><td><a href="21-url-shortening.html">How does a URL shortener handle 100K+ redirect requests/sec with P99 &lt;10ms latency, caching hot URLs at the edge while handling expired links, geo-targeted redirects, and A/B test routing?</a></td><td>TinyURL &middot; redirect at scale</td></tr>
 <tr><td>3</td><td><a href="21-url-shortening.html">How does a link analytics platform track clicks in real-time (referrer, geo, device, timestamp) for billions of redirects/day without adding latency to the redirect path, computing dashboards with &lt;1min freshness?</a></td><td>Bitly &middot; click analytics</td></tr>
-<tr><td>4</td><td><a href="21-url-shortening.html">How does a URL shortener handle hot keys (viral links getting 1M+ clicks/sec) without melting the cache layer, using consistent hashing, request coalescing, and tiered caching (L1 in-process ? L2 Redis ? L3 DB)?</a></td><td>t.co &middot; hot key caching</td></tr>
+<tr><td>4</td><td><a href="21-url-shortening.html">How does a URL shortener handle hot keys (viral links getting 1M+ clicks/sec) without melting the cache layer, using consistent hashing, request coalescing, and tiered caching (L1 in-process &#x2192; L2 Redis &#x2192; L3 DB)?</a></td><td>t.co &middot; hot key caching</td></tr>
 </table>
 </div>
 
@@ -556,7 +556,7 @@
 <tr class="prob-expand"><td>1</td><td><a href="24-feature-flags/launchdarkly-feature-flags.html">How does a feature flag platform evaluate 1M+ flag checks/sec with P99 &lt;5ms, supporting complex targeting rules (user segments, percentages, geo), and propagating flag changes to 100K+ servers within 10 seconds?</a></td><td>LaunchDarkly &middot; flag evaluation</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#caching">Caching</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#cdn">CDN</a><a class="prob-topic" href="../system-design-cheatsheet/04-apis.html#realtime">WebSocket</a><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#pubsub">Pub/Sub</a><a class="prob-topic" href="../system-design-cheatsheet/09-consistency.html#consistency-models">Consistency</a></div></div></td></tr>
 <tr><td>2</td><td><a href="24-feature-flags.html">How does a platform run 1000+ concurrent A/B experiments, assigning users to variants deterministically (hash-based), computing statistical significance in real-time, and auto-stopping experiments that degrade key metrics?</a></td><td>Netflix &middot; experimentation</td></tr>
-<tr><td>3</td><td><a href="24-feature-flags.html">How does a platform implement progressive rollouts (1% ? 5% ? 25% ? 100%) with automatic rollback on error rate spike, supporting canary deployments and dark launches without code deploys?</a></td><td>Facebook &middot; gradual rollout</td></tr>
+<tr><td>3</td><td><a href="24-feature-flags.html">How does a platform implement progressive rollouts (1% &#x2192; 5% &#x2192; 25% &#x2192; 100%) with automatic rollback on error rate spike, supporting canary deployments and dark launches without code deploys?</a></td><td>Facebook &middot; gradual rollout</td></tr>
 </table>
 </div>
 
@@ -608,7 +608,7 @@
 <tr><th>#</th><th>Problem</th><th>Company / Scale</th></tr>
 <tr class="prob-expand"><td>1</td><td><a href="28-cicd/github-actions-build-system.html">How does a CI platform execute 10M+ builds/day across a distributed fleet of workers, scheduling jobs by priority and resource requirements, caching build artifacts for 10&middot; speedup, and providing real-time build logs?</a></td><td>GitHub Actions &middot; build at scale</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a><a class="prob-topic" href="../system-design-cheatsheet/05-infrastructure.html#docker-k8s">Docker/K8s</a><a class="prob-topic" href="../system-design-cheatsheet/08-messaging.html#kafka">Kafka</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#caching">Caching</a><a class="prob-topic" href="../system-design-cheatsheet/10-scalability.html#auto-scaling">Auto-Scaling</a></div></div></td></tr>
-<tr><td>2</td><td><a href="28-cicd.html">How does a deployment platform orchestrate zero-downtime rollouts across 100K+ servers, supporting canary deployments (1% ? 10% ? 100%), automatic rollback on health check failure, and blue-green switching?</a></td><td>Spinnaker &middot; deployment orchestration</td></tr>
+<tr><td>2</td><td><a href="28-cicd.html">How does a deployment platform orchestrate zero-downtime rollouts across 100K+ servers, supporting canary deployments (1% &#x2192; 10% &#x2192; 100%), automatic rollback on health check failure, and blue-green switching?</a></td><td>Spinnaker &middot; deployment orchestration</td></tr>
 <tr><td>3</td><td><a href="28-cicd.html">How does an artifact registry store and serve 1PB+ of build artifacts (Docker images, npm packages, Maven JARs) with global replication, content-addressable deduplication, and vulnerability scanning on upload?</a></td><td>Artifactory &middot; artifact storage</td></tr>
 </table>
 </div>
@@ -637,7 +637,7 @@
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/14-ai-systems.html#agents">Agents</a><a class="prob-topic" href="../system-design-cheatsheet/14-ai-systems.html#embeddings">Embeddings</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#redis">Redis</a><a class="prob-topic" href="../system-design-cheatsheet/06-storage.html#nosql">NoSQL</a><a class="prob-topic" href="../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a></div></div></td></tr>
 <tr class="prob-expand"><td>9</td><td><a href="29-ai-systems.html">How does a real-time AI translation system serve 1B+ translation requests/day across 100+ language pairs with &lt;300ms latency, dynamically selecting between specialized models per language pair and falling back to general models for rare pairs?</a></td><td>Google Translate &middot; AI at scale</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/14-ai-systems.html#llm-serving">LLM Serving</a><a class="prob-topic" href="../system-design-cheatsheet/14-ai-systems.html#ai-gateway">AI Gateway</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#caching">Caching</a><a class="prob-topic" href="../system-design-cheatsheet/05-infrastructure.html#multi-region">Multi-Region</a><a class="prob-topic" href="../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a></div></div></td></tr>
-<tr class="prob-expand"><td>10</td><td><a href="29-ai-systems.html">How does an AI safety platform detect prompt injection attacks, jailbreak attempts, and PII leakage across 100M+ LLM requests/day in &lt;50ms per request, using layered classifiers (fast regex ? ML model ? LLM judge) with &lt;0.1% false positive rate on legitimate queries?</a></td><td>Lakera &middot; AI guardrails at scale</td></tr>
+<tr class="prob-expand"><td>10</td><td><a href="29-ai-systems.html">How does an AI safety platform detect prompt injection attacks, jailbreak attempts, and PII leakage across 100M+ LLM requests/day in &lt;50ms per request, using layered classifiers (fast regex &#x2192; ML model &#x2192; LLM judge) with &lt;0.1% false positive rate on legitimate queries?</a></td><td>Lakera &middot; AI guardrails at scale</td></tr>
 <tr class="prob-topics-row"><td colspan="3"><div class="prob-topics"><div class="prob-topics-pills"><a class="prob-topic" href="../system-design-cheatsheet/14-ai-systems.html#guardrails">Guardrails</a><a class="prob-topic" href="../system-design-cheatsheet/14-ai-systems.html#llm-serving">LLM Serving</a><a class="prob-topic" href="../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a><a class="prob-topic" href="../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Stream Processing</a><a class="prob-topic" href="../system-design-cheatsheet/07-caching.html#redis">Redis</a></div></div></td></tr>
 </table>
 </div>
@@ -781,7 +781,7 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
     // Hide modules that have no visible problems
     modules.forEach(function(mod){
       var visibleProblems = mod.querySelectorAll('tr.prob-expand:not(.cf-hidden)');
-      mod.style.display = visibleProblems.length === 0 ? 'none' : '';
+      mod.style.display = visibleProblems.length === 0 &#x2192; 'none' : '';
     });
   }
 
@@ -818,7 +818,7 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
       el.textContent = phrase.substring(0, charIdx);
       if(charIdx === 0){ deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; pauseEnd = now + 400; }
     }
-    setTimeout(tick, deleting ? 30 : 50);
+    setTimeout(tick, deleting &#x2192; 30 : 50);
   }
   setTimeout(tick, 600);
 })();

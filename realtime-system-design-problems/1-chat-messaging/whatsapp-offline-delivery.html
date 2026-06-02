@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does WhatsApp guarantee message delivery to 2B+ users who go offline &middot; with end-to-end encryption?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a messaging system that guarantees zero message loss for 2B+ users who go offline for hours/days, with E2E encryption where the server never sees plaintext</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a messaging system that guarantees zero message loss for 2B+ users who go offline for hours/days, with E2E encryption where the server never sees plaintext</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -58,10 +58,10 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--g)">Must Have (Core)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hg">1.</span> Messages <strong>never lost</strong> after sender gets delivery ACK (??)<br>
+  <span class="hg">1.</span> Messages <strong>never lost</strong> after sender gets delivery ACK (&#x2794;)<br>
   <span class="hg">2.</span> Offline users receive <strong>all missed messages</strong> on reconnect &middot; in correct order<br>
   <span class="hg">3.</span> <strong>End-to-end encryption</strong> &middot; server stores only ciphertext, never plaintext<br>
-  <span class="hg">4.</span> <strong>Delivery receipts</strong>: single tick (sent) ? double tick (delivered) ? blue tick (read)<br>
+  <span class="hg">4.</span> <strong>Delivery receipts</strong>: single tick (sent) &#x2192; double tick (delivered) &#x2192; blue tick (read)<br>
   <span class="hg">5.</span> Messages <strong>expire from server</strong> after delivery (30-day TTL for undelivered)<br>
   <span class="hg">6.</span> Support <strong>media messages</strong> (photos, video, documents) with same guarantees
 </div>
@@ -69,11 +69,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> Group messaging fan-out (see <a href="slack-real-time-messaging.html#fanout">Slack Fan-out Strategy</a>)<br>
-  <span class="hr">?</span> Real-time online delivery path (see <a href="slack-real-time-messaging.html#architecture">Slack Architecture</a>)<br>
-  <span class="hr">?</span> Voice/video calling signaling<br>
-  <span class="hr">?</span> Status/Stories feature<br>
-  <span class="hr">?</span> Business API and chatbots
+  <span class="hr">&#x2717;</span> Group messaging fan-out (see <a href="slack-real-time-messaging.html#fanout">Slack Fan-out Strategy</a>)<br>
+  <span class="hr">&#x2717;</span> Real-time online delivery path (see <a href="slack-real-time-messaging.html#architecture">Slack Architecture</a>)<br>
+  <span class="hr">&#x2717;</span> Voice/video calling signaling<br>
+  <span class="hr">&#x2717;</span> Status/Stories feature<br>
+  <span class="hr">&#x2717;</span> Business API and chatbots
 </div>
 </div>
 </div>
@@ -103,7 +103,7 @@
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Decision</th></tr>
 <tr><td><span class="hi">1</span></td><td>100B msgs/day &middot; 86,400s</td><td><span class="hg">~1.15M msg/sec</span></td><td>10&middot; Slack's throughput &middot; need sharded message queues</td></tr>
 <tr><td><span class="hi">2</span></td><td>2B users &middot; ~30% online at any time</td><td><span class="hg">~600M concurrent connections</span></td><td>~1.2M connection servers (500K conn each)</td></tr>
-<tr><td><span class="hi">3</span></td><td>Avg user offline 8-16 hrs/day ? ~50 msgs queued</td><td><span class="hg">~100B queued msgs at peak</span></td><td>Need efficient per-user message queue storage</td></tr>
+<tr><td><span class="hi">3</span></td><td>Avg user offline 8-16 hrs/day &#x2192; ~50 msgs queued</td><td><span class="hg">~100B queued msgs at peak</span></td><td>Need efficient per-user message queue storage</td></tr>
 <tr><td><span class="hi">4</span></td><td>Avg message 1KB (encrypted) &middot; 100B queued</td><td><span class="hg">~100TB queued storage</span></td><td>Distributed KV store sharded by recipient_id</td></tr>
 <tr><td><span class="hi">5</span></td><td>Media: 10% of msgs have media, avg 500KB</td><td><span class="hg">~5PB media/day</span></td><td>Blob storage with CDN. Encrypted client-side before upload.</td></tr>
 <tr><td><span class="hi">6</span></td><td>Reconnect storm: 100M users come online in 1 hour (morning)</td><td><span class="hg">~28K reconnects/sec</span></td><td>Queue drain must handle burst. Stagger delivery over seconds.</td></tr>
@@ -150,19 +150,19 @@
 
 <!-- Online path -->
 <rect x="462" y="22" width="120" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-<text x="522" y="36" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Bob ONLINE ? push immediately</text>
+<text x="522" y="36" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Bob ONLINE &#x2192; push immediately</text>
 <text x="522" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">via Bob's TCP connection</text>
 
 <!-- Offline path -->
 <rect x="462" y="62" width="120" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
-<text x="522" y="76" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Bob OFFLINE ? store in queue</text>
+<text x="522" y="76" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Bob OFFLINE &#x2192; store in queue</text>
 <text x="522" y="86" text-anchor="middle" fill="var(--muted)" font-size="4.5">+ send push notification (FCM)</text>
 
 <!-- Recipient online -->
 <line x1="582" y1="37" x2="616" y2="37" stroke="var(--g)" stroke-width="1" marker-end="url(#wa1)"/>
 <rect x="618" y="22" width="100" height="30" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
 <text x="668" y="36" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob decrypts</text>
-<text x="668" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">with private key ? ??</text>
+<text x="668" y="46" text-anchor="middle" fill="var(--muted)" font-size="4.5">with private key &#x2192; &#x2794;</text>
 
 <!-- Reconnect flow -->
 <rect x="10" y="110" width="720" height="80" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
@@ -179,19 +179,19 @@
 <line x1="270" y1="148" x2="294" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="296" y="136" width="130" height="24" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
-<text x="361" y="151" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Drain queue ? push all pending</text>
+<text x="361" y="151" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Drain queue &#x2192; push all pending</text>
 
 <line x1="426" y1="148" x2="450" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="452" y="136" width="120" height="24" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
-<text x="512" y="151" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob ACKs each msg ? ??</text>
+<text x="512" y="151" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob ACKs each msg &#x2192; &#x2794;</text>
 
 <line x1="572" y1="148" x2="596" y2="148" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="598" y="136" width="120" height="24" rx="3" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".6"/>
 <text x="658" y="151" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Server deletes from queue</text>
 
-<text x="370" y="180" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Result: Bob receives all 50 missed messages in order. Server queue is now empty. Alice sees ?? for each.</text>
+<text x="370" y="180" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Result: Bob receives all 50 missed messages in order. Server queue is now empty. Alice sees &#x2794; for each.</text>
 
 <!-- E2E Encryption -->
 <rect x="10" y="200" width="720" height="90" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
@@ -200,7 +200,7 @@
 <rect x="24" y="228" width="140" height="50" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
 <text x="94" y="242" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Key Exchange (X3DH)</text>
 <text x="94" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">Identity key + signed prekey</text>
-<text x="94" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">+ one-time prekey ? shared secret</text>
+<text x="94" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">+ one-time prekey &#x2192; shared secret</text>
 <text x="94" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">Happens once per conversation</text>
 
 <line x1="164" y1="253" x2="188" y2="253" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
@@ -209,14 +209,14 @@
 <text x="270" y="242" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Double Ratchet (per message)</text>
 <text x="270" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">Each msg gets unique key</text>
 <text x="270" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">Forward secrecy: compromise 1 key</text>
-<text x="270" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">? can't decrypt past/future msgs</text>
+<text x="270" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">&#x2714; can't decrypt past/future msgs</text>
 
 <line x1="350" y1="253" x2="374" y2="253" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
 
 <rect x="376" y="228" width="160" height="50" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
 <text x="456" y="242" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Server sees ONLY ciphertext</text>
 <text x="456" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">Cannot decrypt even with court order</text>
-<text x="456" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">Metadata visible: who ? whom, when</text>
+<text x="456" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">Metadata visible: who &#x2192; whom, when</text>
 <text x="456" y="274" text-anchor="middle" fill="var(--muted)" font-size="4.5">Content: fully opaque to server</text>
 
 <line x1="536" y1="253" x2="560" y2="253" stroke="var(--muted)" stroke-width=".8" marker-end="url(#wa1)"/>
@@ -254,12 +254,12 @@
 <rect x="288" y="54" width="50" height="20" rx="3" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width=".5"/>
 <text x="313" y="67" text-anchor="middle" fill="var(--y)" font-size="5">seq=5</text>
 
-<text x="120" y="88" fill="var(--g)" font-size="5.5" font-weight="600">? Delivered (ACKed) &middot; will be deleted</text>
-<text x="252" y="88" fill="var(--y)" font-size="5.5" font-weight="600">? Pending delivery</text>
+<text x="120" y="88" fill="var(--g)" font-size="5.5" font-weight="600">&#x2714; Delivered (ACKed) &middot; will be deleted</text>
+<text x="252" y="88" fill="var(--y)" font-size="5.5" font-weight="600">&#x2714; Pending delivery</text>
 
 <text x="24" y="106" fill="var(--muted)" font-size="5">&middot; Append-only: new messages added at tail</text>
-<text x="24" y="118" fill="var(--muted)" font-size="5">&middot; Bob's last_ack_seq = 3 ? server knows to deliver from seq=4</text>
-<text x="24" y="130" fill="var(--muted)" font-size="5">&middot; After Bob ACKs seq=4,5 ? those entries deleted (or marked)</text>
+<text x="24" y="118" fill="var(--muted)" font-size="5">&middot; Bob's last_ack_seq = 3 &#x2192; server knows to deliver from seq=4</text>
+<text x="24" y="130" fill="var(--muted)" font-size="5">&middot; After Bob ACKs seq=4,5 &#x2192; those entries deleted (or marked)</text>
 <text x="24" y="142" fill="var(--muted)" font-size="5">&middot; TTL: undelivered msgs expire after 30 days</text>
 
 <!-- Storage details -->
@@ -279,7 +279,7 @@
 <text x="450" y="114" fill="var(--text)" font-size="5.5">3 replicas across AZs (sync write to 2)</text>
 
 <text x="384" y="130" fill="var(--y)" font-size="5.5" font-weight="600">Deletion:</text>
-<text x="440" y="130" fill="var(--text)" font-size="5.5">On recipient ACK ? hard delete (privacy)</text>
+<text x="440" y="130" fill="var(--text)" font-size="5.5">On recipient ACK &#x2192; hard delete (privacy)</text>
 
 <text x="384" y="146" fill="var(--y)" font-size="5.5" font-weight="600">Capacity:</text>
 <text x="440" y="146" fill="var(--text)" font-size="5.5">~100TB total queued msgs across all users</text>
@@ -291,7 +291,7 @@
 <!-- --- DELIVERY RECEIPTS --- -->
 <div class="T" id="receipts">
 <h2>Delivery Receipts (Tick System)</h2>
-<p class="su">Three states: ? sent (server received) ? ?? delivered (recipient got it) ? <span style="color:var(--a)">??</span> read (recipient opened)</p>
+<p class="su">Three states: &#x2192; sent (server received) &#x2192; &#x2794; delivered (recipient got it) &#x2192; <span style="color:var(--a)">&#x2794;</span> read (recipient opened)</p>
 
 <svg width="100%" viewBox="0 0 720 120" style="max-width:720px;display:block;margin:6px auto">
 <defs><marker id="wa3" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
@@ -302,7 +302,7 @@
 <rect x="10" y="40" width="100" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
 <text x="60" y="56" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">PENDING</text>
 <text x="60" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">clock icon</text>
-<text x="60" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">client ? server in-flight</text>
+<text x="60" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">client &#x2192; server in-flight</text>
 
 <line x1="110" y1="60" x2="154" y2="60" stroke="var(--y)" stroke-width="1" marker-end="url(#wa3)"/>
 <text x="132" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">server ACK</text>
@@ -316,7 +316,7 @@
 <text x="278" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">recipient ACK</text>
 
 <rect x="302" y="40" width="110" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-<text x="357" y="56" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERED ??</text>
+<text x="357" y="56" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERED &#x2794;</text>
 <text x="357" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">double grey ticks</text>
 <text x="357" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">msg reached device, decrypted</text>
 
@@ -324,7 +324,7 @@
 <text x="434" y="54" text-anchor="middle" fill="var(--muted)" font-size="4.5">read receipt</text>
 
 <rect x="458" y="40" width="100" height="40" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1"/>
-<text x="508" y="56" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">READ ??</text>
+<text x="508" y="56" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">READ &#x2794;</text>
 <text x="508" y="68" text-anchor="middle" fill="var(--a)" font-size="5">double blue ticks</text>
 <text x="508" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">user opened conversation</text>
 
@@ -398,7 +398,7 @@ See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the
 </div>
 </div>
 </div>
-<div class="b by"><span class="hi">Key insight:</span> WhatsApp uses <span class="hg">sender-assigned timestamps + per-conversation sequence</span> because the sender might be on a flaky mobile connection. Slack uses <span class="hg">server-assigned sequence</span> because all senders are connected to the same Kafka partition. Different connectivity assumptions ? different ordering strategies.</div>
+<div class="b by"><span class="hi">Key insight:</span> WhatsApp uses <span class="hg">sender-assigned timestamps + per-conversation sequence</span> because the sender might be on a flaky mobile connection. Slack uses <span class="hg">server-assigned sequence</span> because all senders are connected to the same Kafka partition. Different connectivity assumptions &#x2192; different ordering strategies.</div>
 </div>
 
 <!-- --- MEDIA HANDLING --- -->
@@ -437,7 +437,7 @@ See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the
 
 <rect x="564" y="28" width="140" height="30" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
 <text x="634" y="40" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Bob downloads + decrypts</text>
-<text x="634" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">verify HMAC ? decrypt with key</text>
+<text x="634" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">verify HMAC &#x2192; decrypt with key</text>
 
 <text x="360" y="80" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Server stores encrypted blob but CANNOT decrypt it (no key). Blob deleted after recipient downloads.</text>
 <text x="360" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">Resumable upload: chunked with per-chunk checksum. Works on 2G/3G with intermittent connectivity.</text>
@@ -491,7 +491,7 @@ See <a href="slack-real-time-messaging.html#ordering">Slack Ordering</a> for the
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
 <div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">? Delivery receipts as state machine</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">PENDING ? SENT (?) ? DELIVERED (??) ? READ (blue ??) ? DELETED from server. Each transition triggered by an ACK from the next hop. Server cleanup happens immediately after delivery confirmation.</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">PENDING &#x2192; SENT (?) &#x2192; DELIVERED (&#x2794;) &#x2192; READ (blue &#x2794;) &#x2192; DELETED from server. Each transition triggered by an ACK from the next hop. Server cleanup happens immediately after delivery confirmation.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
 <div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">? Reconnect = drain queue from last_ack_seq</div>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Uber match riders to the nearest available driver within 3 seconds?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a geo-spatial matching system: millions of drivers, &lt;3s match, H3 indexing</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a geo-spatial matching system: millions of drivers, &lt;3s match, H3 indexing</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -37,7 +37,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;3s</div>
 <div style="font-size:.72rem;color:var(--muted)">match latency</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">request ? driver assigned</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">request &#x2192; driver assigned</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">~1.25M</div>
@@ -69,11 +69,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> Route calculation and navigation<br>
-  <span class="hr">?</span> Surge pricing computation<br>
-  <span class="hr">?</span> Payment processing<br>
-  <span class="hr">?</span> Driver onboarding and verification<br>
-  <span class="hr">?</span> Ride tracking after match
+  <span class="hr">&#x2717;</span> Route calculation and navigation<br>
+  <span class="hr">&#x2717;</span> Surge pricing computation<br>
+  <span class="hr">&#x2717;</span> Payment processing<br>
+  <span class="hr">&#x2717;</span> Driver onboarding and verification<br>
+  <span class="hr">&#x2717;</span> Ride tracking after match
 </div>
 </div>
 </div>
@@ -83,7 +83,7 @@
 <h2>Non-Functional Requirements</h2>
 <table>
 <tr><th>Property</th><th>Target</th><th>Design Impact</th></tr>
-<tr><td><span class="hi">Match Latency</span></td><td><span class="hg">&lt;3s</span> request ? driver assigned</td><td>Redis GEORADIUS (&lt;2ms) + scoring (&lt;5ms) + network to driver (&lt;50ms)</td></tr>
+<tr><td><span class="hi">Match Latency</span></td><td><span class="hg">&lt;3s</span> request &#x2192; driver assigned</td><td>Redis GEORADIUS (&lt;2ms) + scoring (&lt;5ms) + network to driver (&lt;50ms)</td></tr>
 <tr><td><span class="hi">GPS Ingestion</span></td><td><span class="hg">1.25M updates/sec</span></td><td>Redis GEOADD sharded by city, TTL=10s auto-expire</td></tr>
 <tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span> &middot; rides can't fail to match</td><td>Redis Sentinel per city, fallback to expand radius</td></tr>
 <tr><td><span class="hi">Consistency</span></td><td><span class="hg">Eventual</span> &middot; driver location 0-4s stale</td><td>Acceptable: GPS updates every 4s, matching uses latest available</td></tr>
@@ -118,7 +118,7 @@
   <!-- Location Service -->
   <rect x="178" y="50" width="160" height="40" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
   <text x="258" y="65" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Location Service</text>
-  <text x="258" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">lat,lng ? compute H3 cell</text>
+  <text x="258" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">lat,lng &#x2192; compute H3 cell</text>
   <text x="258" y="87" text-anchor="middle" fill="var(--muted)" font-size="4.5">resolution 7 (~5.16 km&middot;)</text>
 
   <!-- Arrow -->
@@ -131,7 +131,7 @@
   <text x="462" y="87" text-anchor="middle" fill="var(--muted)" font-size="4.5">TTL=10s auto-expire offline</text>
 
   <!-- Ingestion config -->
-  <text x="290" y="108" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Kafka buffer ? Location Service ? Redis | Sharded by city (600+ cities) | SET driver:{id} ? {status, rating, vehicle}</text>
+  <text x="290" y="108" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Kafka buffer &#x2192; Location Service &#x2192; Redis | Sharded by city (600+ cities) | SET driver:{id} &#x2192; {status, rating, vehicle}</text>
   <text x="290" y="120" text-anchor="middle" fill="var(--muted)" font-size="4.5">NYC: ~80K active drivers | GEORADIUS on 80K = ~2ms | ~500MB per city Redis node</text>
 
   <!-- H3 Hex Grid Side Panel -->
@@ -139,16 +139,16 @@
   <text x="675" y="40" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">H3 Hexagonal Grid</text>
   <!-- Mini hex visualization -->
   <polygon points="640,65 655,57 670,65 670,78 655,86 640,78" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width="1"/>
-  <text x="655" y="74" text-anchor="middle" fill="var(--a)" font-size="4.5">??</text>
+  <text x="655" y="74" text-anchor="middle" fill="var(--a)" font-size="4.5">&#x25CF;<\/text>
   <polygon points="670,57 685,49 700,57 700,70 685,78 670,70" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
-  <text x="685" y="65" text-anchor="middle" fill="var(--g)" font-size="4">??</text>
+  <text x="685" y="65" text-anchor="middle" fill="var(--g)" font-size="4">&#x25CF;<\/text>
   <polygon points="670,78 685,70 700,78 700,91 685,99 670,91" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
-  <text x="685" y="86" text-anchor="middle" fill="var(--g)" font-size="4">??</text>
+  <text x="685" y="86" text-anchor="middle" fill="var(--g)" font-size="4">&#x25CF;<\/text>
   <polygon points="610,65 625,57 640,65 640,78 625,86 610,78" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".6"/>
-  <text x="625" y="74" text-anchor="middle" fill="var(--g)" font-size="4">??</text>
+  <text x="625" y="74" text-anchor="middle" fill="var(--g)" font-size="4">&#x25CF;<\/text>
   <text x="675" y="110" text-anchor="middle" fill="var(--muted)" font-size="4.5">Uniform distance center?edge</text>
   <text x="675" y="120" text-anchor="middle" fill="var(--muted)" font-size="4.5">k-ring(1) = 7 cells &middot; 15km</text>
-  <text x="675" y="130" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">O(1) lat,lng ? H3 index</text>
+  <text x="675" y="130" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">O(1) lat,lng &#x2192; H3 index</text>
 
   <!-- Arrows down to matching -->
   <line x1="290" y1="130" x2="290" y2="148" stroke="var(--o)" stroke-width="1" marker-end="url(#geo-arr)"/>
@@ -169,7 +169,7 @@
   <!-- Compute H3 -->
   <rect x="172" y="170" width="100" height="45" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".8"/>
   <text x="222" y="186" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Compute H3</text>
-  <text x="222" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">lat,lng ? cell (1ms)</text>
+  <text x="222" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">lat,lng &#x2192; cell (1ms)</text>
   <text x="222" y="210" text-anchor="middle" fill="var(--muted)" font-size="4.5">+ k-ring neighbors</text>
 
   <!-- Arrow -->
@@ -228,7 +228,7 @@
   <rect x="218" y="320" width="160" height="55" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
   <text x="298" y="336" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">15s Timeout</text>
   <text x="298" y="350" text-anchor="middle" fill="var(--muted)" font-size="5">driver must accept/decline</text>
-  <text x="298" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">if no response ? auto-decline</text>
+  <text x="298" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">if no response &#x2192; auto-decline</text>
   <text x="298" y="373" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">DEL match_lock:driver_id</text>
 
   <!-- Arrow -->
@@ -236,15 +236,15 @@
 
   <!-- Accept / Cascade -->
   <rect x="410" y="320" width="170" height="55" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
-  <text x="495" y="336" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Accept ? Match!</text>
-  <text x="495" y="350" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">? Ride confirmed</text>
-  <text x="495" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Decline ? cascade to next</text>
+  <text x="495" y="336" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Accept &#x2192; Match!</text>
+  <text x="495" y="350" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">&#x2714; Ride confirmed</text>
+  <text x="495" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Decline &#x2192; cascade to next</text>
   <text x="495" y="373" text-anchor="middle" fill="var(--muted)" font-size="4.5">re-score remaining candidates</text>
 
   <!-- Expand radius fallback -->
   <rect x="600" y="320" width="155" height="55" rx="4" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".8"/>
   <text x="677" y="336" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Fallback: Expand</text>
-  <text x="677" y="350" text-anchor="middle" fill="var(--muted)" font-size="5">2km ? 5km ? 10km</text>
+  <text x="677" y="350" text-anchor="middle" fill="var(--muted)" font-size="5">2km &#x2192; 5km &#x2192; 10km</text>
   <text x="677" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">if all decline or none found</text>
   <text x="677" y="373" text-anchor="middle" fill="var(--o)" font-size="4.5" font-weight="600">show "searching..." to rider</text>
 
@@ -271,14 +271,14 @@
   <rect x="395" y="432" width="300" height="14" rx="2" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".5"/>
   <text x="545" y="442" text-anchor="middle" fill="var(--o)" font-size="4.5" font-weight="600">Driver Decision: 0-15s</text>
 
-  <text x="390" y="462" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Total: request ? first offer &lt;60ms | request ? confirmed match &lt;3s (avg driver accepts in ~2s)</text>
+  <text x="390" y="462" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Total: request &#x2192; first offer &lt;60ms | request &#x2192; confirmed match &lt;3s (avg driver accepts in ~2s)</text>
   <text x="390" y="476" text-anchor="middle" fill="var(--muted)" font-size="5">Concurrency: Redis SETNX lock prevents same driver offered to two riders | Cascade: up to 3 drivers before expanding radius</text>
-  <text x="390" y="488" text-anchor="middle" fill="var(--r)" font-size="5">Edge cases: GPS drift ? Kalman filter | City boundary ? k-ring query | No drivers ? expand + notify rider</text>
+  <text x="390" y="488" text-anchor="middle" fill="var(--r)" font-size="5">Edge cases: GPS drift &#x2192; Kalman filter | City boundary &#x2192; k-ring query | No drivers &#x2192; expand + notify rider</text>
 </svg>
 
 <div class="b bg"><span class="hi">Why H3 over Geohash?</span> Geohash cells are rectangles &middot; distance from center to edge varies. H3 hexagons have <span class="hg">uniform distance</span> from center to all edges. Neighbors are always equidistant. No "edge effects" where nearby points fall in distant cells. Uber open-sourced H3 specifically for this use case.</div>
 <div class="b by"><span class="hi">Scaling:</span> Redis sharded by city. Each city has its own geospatial index. <span class="hg">NYC alone: ~80K active drivers</span>. GEORADIUS on 80K entries = ~2ms. Global: 600+ cities, each independently scaled. Driver location TTL=10s auto-removes offline drivers.</div>
-<div class="b br"><span class="hi">Edge cases:</span> <span class="hr">No drivers nearby</span> ? expand radius (2km ? 5km ? 10km). <span class="hr">All drivers decline</span> ? re-score with lower threshold. <span class="hr">GPS drift</span> ? Kalman filter smoothing on driver app. <span class="hr">City boundary</span> ? query adjacent H3 cells (k-ring).</div>
+<div class="b br"><span class="hi">Edge cases:</span> <span class="hr">No drivers nearby</span> &#x2192; expand radius (2km &#x2192; 5km &#x2192; 10km). <span class="hr">All drivers decline</span> &#x2192; re-score with lower threshold. <span class="hr">GPS drift</span> &#x2192; Kalman filter smoothing on driver app. <span class="hr">City boundary</span> &#x2192; query adjacent H3 cells (k-ring).</div>
 </div>
 
 <!-- --- SCALE ESTIMATION --- -->
@@ -309,23 +309,23 @@
 
   <!-- Center hex (rider) -->
   <polygon points="80,60 100,48 120,60 120,80 100,92 80,80" fill="rgba(108,140,255,.15)" stroke="var(--a)" stroke-width="1.5"/>
-  <text x="100" y="72" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">?? Rider</text>
+  <text x="100" y="72" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">&#x2794; Rider</text>
 
   <!-- Surrounding hexes (drivers) -->
   <polygon points="120,40 140,28 160,40 160,60 140,72 120,60" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="140" y="52" text-anchor="middle" fill="var(--g)" font-size="5">??&middot;3</text>
+  <text x="140" y="52" text-anchor="middle" fill="var(--g)" font-size="5">&#x2794;&middot;3</text>
 
   <polygon points="120,80 140,68 160,80 160,100 140,112 120,100" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="140" y="92" text-anchor="middle" fill="var(--g)" font-size="5">??&middot;2</text>
+  <text x="140" y="92" text-anchor="middle" fill="var(--g)" font-size="5">&#x2794;&middot;2</text>
 
   <polygon points="40,40 60,28 80,40 80,60 60,72 40,60" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="60" y="52" text-anchor="middle" fill="var(--g)" font-size="5">??&middot;1</text>
+  <text x="60" y="52" text-anchor="middle" fill="var(--g)" font-size="5">&#x2794;&middot;1</text>
 
   <polygon points="40,80 60,68 80,80 80,100 60,112 40,100" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
   <text x="60" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">empty</text>
 
   <polygon points="160,60 180,48 200,60 200,80 180,92 160,80" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="180" y="72" text-anchor="middle" fill="var(--g)" font-size="5">??&middot;4</text>
+  <text x="180" y="72" text-anchor="middle" fill="var(--g)" font-size="5">&#x2794;&middot;4</text>
 
   <polygon points="0,60 20,48 40,60 40,80 20,92 0,80" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".6" stroke-dasharray="2,2"/>
   <text x="20" y="72" text-anchor="middle" fill="var(--muted)" font-size="4.5">outside</text>
@@ -333,11 +333,11 @@
   <!-- Match flow -->
   <rect x="240" y="25" width="420" height="85" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
   <text x="450" y="40" text-anchor="middle" fill="var(--muted)" font-size="6.5" font-weight="700">Match Flow (total &lt;3s)</text>
-  <text x="450" y="56" text-anchor="middle" fill="var(--a)" font-size="5.5">? lat,lng ? H3 cell index (1ms)</text>
-  <text x="450" y="68" text-anchor="middle" fill="var(--g)" font-size="5.5">? GEORADIUS 2km on center + k-ring cells ? 10 candidates (2ms)</text>
-  <text x="450" y="80" text-anchor="middle" fill="var(--y)" font-size="5.5">? Filter available + correct vehicle type (1ms)</text>
-  <text x="450" y="92" text-anchor="middle" fill="var(--o)" font-size="5.5">? Score: ETA&middot;0.4 + rating&middot;0.3 + distance&middot;0.3 ? rank (5ms)</text>
-  <text x="450" y="104" text-anchor="middle" fill="var(--r)" font-size="5.5">? SETNX lock best driver ? push offer ? 15s timeout (50ms network)</text>
+  <text x="450" y="56" text-anchor="middle" fill="var(--a)" font-size="5.5">&#x2714; lat,lng &#x2192; H3 cell index (1ms)</text>
+  <text x="450" y="68" text-anchor="middle" fill="var(--g)" font-size="5.5">&#x2714; GEORADIUS 2km on center + k-ring cells &#x2192; 10 candidates (2ms)</text>
+  <text x="450" y="80" text-anchor="middle" fill="var(--y)" font-size="5.5">&#x2714; Filter available + correct vehicle type (1ms)</text>
+  <text x="450" y="92" text-anchor="middle" fill="var(--o)" font-size="5.5">&#x2714; Score: ETA&middot;0.4 + rating&middot;0.3 + distance&middot;0.3 &#x2192; rank (5ms)</text>
+  <text x="450" y="104" text-anchor="middle" fill="var(--r)" font-size="5.5">&#x2714; SETNX lock best driver &#x2192; push offer &#x2192; 15s timeout (50ms network)</text>
 </svg>
 <pre><code>// --- Driver Location (Redis Geospatial) ---
 GEOADD drivers:nyc {lng} {lat} driver_123     // update position
@@ -345,7 +345,7 @@ GEORADIUS drivers:nyc {lng} {lat} 2 km COUNT 20 ASC  // find nearest 20
 
 // --- Driver State (Redis Hash) ---
 HSET driver:123 status "available" vehicle "sedan" rating 4.8 h3_cell "abc"
-TTL: 10s (auto-expire if no GPS update ? driver considered offline)
+TTL: 10s (auto-expire if no GPS update &#x2192; driver considered offline)
 
 // --- Ride Requests (PostgreSQL) ---
 rides {
@@ -362,7 +362,7 @@ rides {
 
 // --- Match Lock (Redis) ---
 SETNX match_lock:driver_123 ride_456 EX 15   // lock driver for 15s
-// If driver declines or times out ? DEL match_lock:driver_123 ? offer to next</code></pre>
+// If driver declines or times out &#x2192; DEL match_lock:driver_123 &#x2192; offer to next</code></pre>
 </div>
 
 <!-- --- RESILIENCE --- -->
@@ -371,7 +371,7 @@ SETNX match_lock:driver_123 ride_456 EX 15   // lock driver for 15s
 <table>
 <tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
 <tr><td><span class="hr">Redis node failure</span></td><td>Driver locations lost for one city</td><td>Drivers re-register on next GPS update (4s). Sentinel promotes replica.</td></tr>
-<tr><td><span class="hr">No drivers in radius</span></td><td>Rider waits</td><td>Expand radius: 2km ? 5km ? 10km. Show "searching..." with ETA.</td></tr>
+<tr><td><span class="hr">No drivers in radius</span></td><td>Rider waits</td><td>Expand radius: 2km &#x2192; 5km &#x2192; 10km. Show "searching..." with ETA.</td></tr>
 <tr><td><span class="hr">Driver accepts but GPS stale</span></td><td>Driver farther than expected</td><td>Re-verify location on accept. If too far, re-match.</td></tr>
 <tr><td><span class="hr">Concurrent match (race)</span></td><td>Two riders offered same driver</td><td>Redis SETNX lock &middot; only first succeeds. Second gets next candidate.</td></tr>
 <tr><td><span class="hr">GPS spoofing</span></td><td>Fake driver location</td><td>Velocity checks (can't teleport), device attestation, trip verification.</td></tr>
@@ -386,7 +386,7 @@ SETNX match_lock:driver_123 ride_456 EX 15   // lock driver for 15s
 <tr><td><span class="hi">Spatial Index</span></td><td>Redis GEOADD + H3</td><td>Sub-ms GEORADIUS, TTL auto-cleanup, sharded by city</td><td>PostGIS (too slow for 1.25M writes/sec), Elasticsearch (overkill)</td></tr>
 <tr><td><span class="hi">Hex Grid</span></td><td>Uber H3 (open-source)</td><td>Uniform distance, no edge effects, O(1) lat/lng?cell</td><td>Geohash (rectangular, edge effects), S2 (more complex)</td></tr>
 <tr><td><span class="hi">Lock</span></td><td>Redis SETNX + TTL</td><td>Atomic, distributed, auto-expires on timeout</td><td>DB lock (too slow), ZooKeeper (overkill for 15s lock)</td></tr>
-<tr><td><span class="hi">GPS Ingestion</span></td><td>Kafka ? Location Service ? Redis</td><td>Buffer bursts, replay on failure, decouple from Redis</td><td>Direct write to Redis (no buffer, lose data on Redis failure)</td></tr>
+<tr><td><span class="hi">GPS Ingestion</span></td><td>Kafka &#x2192; Location Service &#x2192; Redis</td><td>Buffer bursts, replay on failure, decouple from Redis</td><td>Direct write to Redis (no buffer, lose data on Redis failure)</td></tr>
 <tr><td><span class="hi">Scoring</span></td><td>Custom scoring service (Go)</td><td>Low-latency, ETA from routing service, configurable weights</td><td>ML model (too slow for &lt;5ms budget at this stage)</td></tr>
 </table>
 </div>
@@ -396,14 +396,14 @@ SETNX match_lock:driver_123 ride_456 EX 15   // lock driver for 15s
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 8 things to say for geo-matching design</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>H3 hexagonal grid</strong> &middot; uniform distance, no edge effects, O(1) lat/lng ? cell<br>
+<span class="hg">1.</span> <strong>H3 hexagonal grid</strong> &middot; uniform distance, no edge effects, O(1) lat/lng &#x2192; cell<br>
 <span class="hg">2.</span> <strong>Redis GEOADD/GEORADIUS</strong> &middot; sub-ms spatial queries on 80K drivers per city<br>
 <span class="hg">3.</span> <strong>TTL=10s on driver location</strong> &middot; auto-removes offline drivers without explicit deregister<br>
 <span class="hg">4.</span> <strong>SETNX lock</strong> &middot; prevents same driver offered to two riders simultaneously<br>
 <span class="hg">5.</span> <strong>Scoring: ETA &middot; 0.4 + rating &middot; 0.3 + distance &middot; 0.3</strong> &middot; not just nearest, but best<br>
 <span class="hg">6.</span> <strong>Cascade on decline</strong> &middot; 15s timeout, then offer to next-best candidate<br>
 <span class="hg">7.</span> <strong>City-level sharding</strong> &middot; each city is independent Redis instance, no cross-city queries<br>
-<span class="hg">8.</span> <strong>Expand radius on failure</strong> &middot; 2km ? 5km ? 10km, with rider notification of wait
+<span class="hg">8.</span> <strong>Expand radius on failure</strong> &middot; 2km &#x2192; 5km &#x2192; 10km, with rider notification of wait
 </div>
 </div>
 

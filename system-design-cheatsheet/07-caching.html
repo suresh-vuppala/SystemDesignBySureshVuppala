@@ -180,6 +180,174 @@
 <div class="b bo"><span class="hi">Real-world:</span> <strong>Facebook</strong> uses Memcached (TAO). <strong>Twitter</strong> caches timelines in Redis. Target: <span class="hg">cache hit rate &gt;95%</span>.</div>
 </div>
 
+<div class="T" id="cache-invalidation">
+<h2>Cache Invalidation &amp; Eviction</h2><p class="su">"There are only two hard things in CS: cache invalidation and naming things." — <span class="hg">Phil Karlton</span></p>
+
+<!-- ═══ Invalidation Strategies Visual ═══ -->
+<div class="d-grid" style="margin:4px 0">
+
+<!-- TTL-based -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--y)">TTL-Based Expiry</h4>
+<svg width="100%" viewBox="0 0 220 80" style="max-width:220px;display:block;margin:0 auto">
+  <defs><marker id="ci1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <!-- Timeline -->
+  <line x1="20" y1="30" x2="200" y2="30" stroke="var(--border)" stroke-width="1.5"/>
+  <!-- SET with TTL -->
+  <circle cx="40" cy="30" r="4" fill="var(--g)"/>
+  <text x="40" y="22" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">SET</text>
+  <text x="40" y="42" text-anchor="middle" fill="var(--muted)" font-size="5">TTL=60s</text>
+  <!-- Reads (hits) -->
+  <circle cx="80" cy="30" r="3" fill="var(--a)" opacity=".6"/>
+  <circle cx="100" cy="30" r="3" fill="var(--a)" opacity=".6"/>
+  <circle cx="120" cy="30" r="3" fill="var(--a)" opacity=".6"/>
+  <text x="100" y="22" text-anchor="middle" fill="var(--a)" font-size="5.5">HIT HIT HIT</text>
+  <!-- Expiry -->
+  <circle cx="160" cy="30" r="5" fill="var(--r)" opacity=".8"/>
+  <text x="160" y="22" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">EXPIRE</text>
+  <text x="160" y="42" text-anchor="middle" fill="var(--muted)" font-size="5">60s elapsed</text>
+  <!-- Next read = miss -->
+  <circle cx="190" cy="30" r="3" fill="var(--r)" opacity=".4"/>
+  <text x="190" y="22" text-anchor="middle" fill="var(--r)" font-size="5.5">MISS</text>
+  <!-- Summary -->
+  <text x="110" y="58" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Simple · Stale up to TTL · No coordination needed</text>
+  <text x="110" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">Add jitter to prevent avalanche: TTL = 3600 ± random(300)</text>
+</svg>
+</div>
+
+<!-- Event-Driven Delete -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Event-Driven Invalidation</h4>
+<svg width="100%" viewBox="0 0 220 80" style="max-width:220px;display:block;margin:0 auto">
+  <defs><marker id="ci2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker></defs>
+  <!-- App -->
+  <rect x="10" y="10" width="40" height="20" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="30" y="24" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text>
+  <!-- DB -->
+  <rect x="90" y="10" width="40" height="20" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="110" y="24" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">DB</text>
+  <!-- Cache -->
+  <rect x="170" y="10" width="40" height="20" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="190" y="24" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Cache</text>
+  <!-- Write to DB -->
+  <line x1="50" y1="20" x2="88" y2="20" stroke="var(--g)" stroke-width="1" marker-end="url(#ci2)"/>
+  <text x="69" y="14" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">1. UPDATE</text>
+  <!-- Delete from cache -->
+  <line x1="130" y1="20" x2="168" y2="20" stroke="var(--r)" stroke-width="1" marker-end="url(#ci2)"/>
+  <text x="149" y="14" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">2. DELETE</text>
+  <!-- Or CDC path -->
+  <path d="M110,32 L110,50 L190,50 L190,32" fill="none" stroke="var(--a2)" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ci2)"/>
+  <text x="150" y="58" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">or CDC event → auto-delete</text>
+  <!-- Summary -->
+  <text x="110" y="72" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Near real-time · No stale window · More complex</text>
+</svg>
+</div>
+</div>
+
+<!-- ═══ Cache Problems Visual ═══ -->
+<div class="d-grid tri" style="margin:6px 0">
+
+<!-- Thundering Herd -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--r)">Thundering Herd</h4>
+<svg width="100%" viewBox="0 0 180 70" style="max-width:180px;display:block;margin:0 auto">
+  <!-- Cache expires -->
+  <rect x="60" y="4" width="60" height="16" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1"/>
+  <text x="90" y="15" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Key Expired!</text>
+  <!-- Many requests -->
+  <text x="20" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="40" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="60" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="80" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="100" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="120" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="140" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="160" y="36" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <!-- All hit DB -->
+  <rect x="50" y="48" width="80" height="16" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="90" y="59" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">💥 DB Overloaded</text>
+  <text x="90" y="44" text-anchor="middle" fill="var(--r)" font-size="5">all miss → all hit DB</text>
+</svg>
+<div style="font-size:.65rem;color:var(--muted);margin-top:2px;line-height:1.3">
+  <span class="hg">Fix:</span> Mutex lock · Probabilistic early expiry · Stale-while-revalidate
+</div>
+</div>
+
+<!-- Cache Penetration -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--o)">Cache Penetration</h4>
+<svg width="100%" viewBox="0 0 180 70" style="max-width:180px;display:block;margin:0 auto">
+  <!-- Request for non-existent key -->
+  <text x="20" y="14" text-anchor="middle" fill="var(--muted)" font-size="8">👤</text>
+  <text x="50" y="14" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">GET user:999999</text>
+  <!-- Cache -->
+  <rect x="20" y="22" width="50" height="14" rx="3" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="45" y="32" text-anchor="middle" fill="var(--r)" font-size="6">MISS ❌</text>
+  <!-- DB -->
+  <rect x="20" y="42" width="50" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="45" y="52" text-anchor="middle" fill="var(--g)" font-size="6">NOT FOUND ❌</text>
+  <!-- Arrow showing loop -->
+  <text x="90" y="30" text-anchor="middle" fill="var(--r)" font-size="14">🔄</text>
+  <text x="130" y="26" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Key never exists</text>
+  <text x="130" y="36" text-anchor="middle" fill="var(--r)" font-size="5.5">Always misses</text>
+  <text x="130" y="46" text-anchor="middle" fill="var(--r)" font-size="5.5">DB hit every time</text>
+  <text x="90" y="66" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Fix: Cache NULL · Bloom filter</text>
+</svg>
+<div style="font-size:.65rem;color:var(--muted);margin-top:2px;line-height:1.3">
+  <span class="hg">Fix:</span> Cache null with short TTL · Bloom filter rejects impossible keys
+</div>
+</div>
+
+<!-- Cache Avalanche -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a2)">Cache Avalanche</h4>
+<svg width="100%" viewBox="0 0 180 70" style="max-width:180px;display:block;margin:0 auto">
+  <!-- Many keys expire at once -->
+  <rect x="10" y="4" width="24" height="12" rx="3" fill="var(--r)" opacity=".3"/>
+  <rect x="38" y="4" width="24" height="12" rx="3" fill="var(--r)" opacity=".3"/>
+  <rect x="66" y="4" width="24" height="12" rx="3" fill="var(--r)" opacity=".3"/>
+  <rect x="94" y="4" width="24" height="12" rx="3" fill="var(--r)" opacity=".3"/>
+  <rect x="122" y="4" width="24" height="12" rx="3" fill="var(--r)" opacity=".3"/>
+  <rect x="150" y="4" width="24" height="12" rx="3" fill="var(--r)" opacity=".3"/>
+  <text x="90" y="12" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="700">ALL EXPIRE AT SAME TIME</text>
+  <!-- Massive DB load -->
+  <text x="90" y="30" text-anchor="middle" fill="var(--r)" font-size="10">⬇️⬇️⬇️⬇️⬇️</text>
+  <rect x="40" y="38" width="100" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="90" y="50" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">💥 DB Crushed</text>
+  <text x="90" y="66" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Fix: Jittered TTLs · Stagger expiry</text>
+</svg>
+<div style="font-size:.65rem;color:var(--muted);margin-top:2px;line-height:1.3">
+  <span class="hg">Fix:</span> TTL = base ± random jitter · Never set same TTL for all keys
+</div>
+</div>
+</div>
+
+<table>
+<tr><th>Method</th><th>How It Works</th><th>Freshness</th><th>Complexity</th><th>Best For</th></tr>
+<tr><td><span class="hi">TTL (Time-to-Live)</span></td><td>Key auto-expires after N seconds</td><td>Stale up to TTL</td><td>Low</td><td>General purpose, acceptable staleness</td></tr>
+<tr><td><span class="hi">Event-Driven Delete</span></td><td>App deletes cache key on DB write</td><td>Near real-time</td><td>Medium</td><td>User profiles, settings</td></tr>
+<tr><td><span class="hi">CDC Invalidation</span></td><td>DB change → CDC event → delete key</td><td>Real-time (~100ms)</td><td>High</td><td>Multi-service, decoupled systems</td></tr>
+<tr><td><span class="hi">Version Keys</span></td><td>Key includes version: <code>user:5:v3</code></td><td>Instant (new key = miss)</td><td>Medium</td><td>Immutable data, API responses</td></tr>
+<tr><td><span class="hi">Double-Delete</span></td><td>Delete before + after DB write (with delay)</td><td>Near real-time</td><td>Medium</td><td>Race condition prevention</td></tr>
+<tr><td><span class="hi">Pub/Sub Broadcast</span></td><td>Publish invalidation event to all app nodes</td><td>Real-time</td><td>Medium</td><td>Multi-node local caches</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Eviction Policies</span> (when cache is full):</div>
+<table>
+<tr><th>Policy</th><th>Evicts</th><th>Best For</th></tr>
+<tr><td><span class="hi">LRU</span> (Least Recently Used)</td><td>Key not accessed longest</td><td>General purpose — most common default</td></tr>
+<tr><td><span class="hi">LFU</span> (Least Frequently Used)</td><td>Key accessed fewest times</td><td>Hot/cold data — keeps popular items</td></tr>
+<tr><td><span class="hi">FIFO</span> (First In First Out)</td><td>Oldest key inserted</td><td>Simple, predictable — time-series data</td></tr>
+<tr><td><span class="hi">Random</span></td><td>Random key</td><td>When access patterns are uniform</td></tr>
+<tr><td><span class="hi">TTL-based</span></td><td>Keys closest to expiry first</td><td>Mixed workloads with varying freshness needs</td></tr>
+</table>
+
+<div class="b by"><span class="hi">Cache Penetration:</span> Queries for keys that <span class="hr">never exist</span> in DB → always miss → DB overloaded. Fix: <span class="hg">cache null values</span> with short TTL (60s), or use <span class="hg">Bloom filter</span> to reject impossible keys before hitting cache.</div>
+<div class="b by"><span class="hi">Cache Avalanche:</span> Many keys expire <span class="hr">simultaneously</span> → massive DB spike. Fix: <span class="hg">add random jitter</span> to TTLs (e.g., TTL = 3600 ± random(0,300)), stagger expiration.</div>
+<div class="b by"><span class="hi">Hot Key Problem:</span> One key gets <span class="hr">millions of reads</span> → single Redis node overloaded. Fix: <span class="hg">local cache</span> (L1 in-process), <span class="hg">replicate hot key</span> across multiple slots, or <span class="hg">shard the value</span> (key:1, key:2, ... key:N).</div>
+<div class="b bb"><span class="hi">Interview pattern:</span> When discussing cache invalidation, always mention the <span class="hg">consistency vs latency tradeoff</span>. TTL = simple but stale. Event-driven = fresh but complex. The right choice depends on how much staleness your users can tolerate.</div>
+</div>
+
 <div class="T" id="redis">
 <h2>Redis — Data Structures</h2><p class="su"><span class="hg">In-memory</span> data store — <span class="hi">sub-ms latency, 100K–1M ops/sec</span>. Cache + data structures + messaging</p>
 <table>
@@ -316,6 +484,25 @@ XRANGE orders - +                                           → replay all entri
 <div class="b by"><span class="hi">Redlock (distributed lock):</span> Acquire lock on <span class="hg">majority (N/2+1)</span> of independent Redis nodes. Set TTL to prevent deadlock. Validate lock still held before critical section. <span class="hr">Controversial</span> — Martin Kleppmann argues it's unsafe (clock drift). Alternative: use <span class="hg">etcd/ZooKeeper</span> for strong locks.</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">RAM-bound</span> — all data must fit in memory. <span class="hr">Single-threaded core</span> — one slow command blocks everything. <span class="hr">Not a primary DB</span> — use as cache/accelerator. <span class="hr">Async replication</span> — data loss possible on failover (use WAIT for sync).</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Twitter</strong> — timeline cache (Redis Cluster). <strong>GitHub</strong> — job queues (Resque/Sidekiq). <strong>Snapchat</strong> — rate limiting. <strong>Pinterest</strong> — graph storage (billions of edges in Redis). <strong>Discord</strong> — presence, message cache.</div>
+</div>
+
+<div class="T" id="memcached-vs-redis">
+<h2>Memcached vs Redis</h2><p class="su">Both are in-memory stores — but <span class="hg">Redis = Swiss army knife</span>, <span class="hi">Memcached = simple speed demon</span></p>
+<table>
+<tr><th></th><th>Redis</th><th>Memcached</th></tr>
+<tr><td><span class="hi">Data Structures</span></td><td><span class="hg">Rich</span> — strings, hashes, lists, sets, sorted sets, streams, geo, HLL</td><td>Strings only (key → blob)</td></tr>
+<tr><td><span class="hi">Threading</span></td><td>Single-threaded core (I/O threads in 6.0+)</td><td><span class="hg">Multi-threaded</span> — scales with CPU cores</td></tr>
+<tr><td><span class="hi">Persistence</span></td><td><span class="hg">RDB + AOF</span> — survives restarts</td><td><span class="hr">None</span> — pure volatile cache</td></tr>
+<tr><td><span class="hi">Replication</span></td><td><span class="hg">Built-in</span> — master-replica, Sentinel, Cluster</td><td>None (client-side sharding)</td></tr>
+<tr><td><span class="hi">Pub/Sub</span></td><td><span class="hg">Yes</span> — channels + streams</td><td>No</td></tr>
+<tr><td><span class="hi">Max Value Size</span></td><td>512 MB</td><td>1 MB (default)</td></tr>
+<tr><td><span class="hi">Memory Efficiency</span></td><td>Higher overhead (metadata per key)</td><td><span class="hg">Slab allocator</span> — less fragmentation</td></tr>
+<tr><td><span class="hi">Eviction</span></td><td>8 policies (LRU, LFU, volatile, etc.)</td><td>LRU only</td></tr>
+<tr><td><span class="hi">Scripting</span></td><td><span class="hg">Lua scripts</span> — atomic multi-step ops</td><td>No</td></tr>
+<tr><td><span class="hi">Best For</span></td><td>Sessions, leaderboards, queues, pub/sub, locks, complex caching</td><td>Simple key-value cache at massive scale</td></tr>
+</table>
+<div class="b bg"><span class="hi">When to pick Memcached:</span> You only need simple <code>GET/SET</code> caching, want <span class="hg">multi-threaded performance</span> on a single node, don't need persistence or data structures. Facebook's TAO uses Memcached for billions of social graph lookups.</div>
+<div class="b by"><span class="hi">When to pick Redis:</span> You need <span class="hg">data structures</span> (sorted sets for leaderboards, lists for queues), <span class="hg">persistence</span>, <span class="hg">pub/sub</span>, <span class="hg">Lua scripting</span>, or <span class="hg">built-in HA</span>. Most modern systems default to Redis unless they have a specific Memcached use case.</div>
 </div>
 
 <div class="T" id="cdn">

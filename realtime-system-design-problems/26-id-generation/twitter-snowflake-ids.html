@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Twitter generate 100K+ unique time-sorted IDs/sec without coordination?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a distributed ID generator: 100K+ IDs/sec, 64-bit, time-sortable, 1000+ nodes, zero collisions</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a distributed ID generator: 100K+ IDs/sec, 64-bit, time-sortable, 1000+ nodes, zero collisions</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -70,7 +70,7 @@
   <rect x="68" y="42" width="340" height="30" rx="3" fill="rgba(52,211,153,.18)" stroke="var(--g)" stroke-width="1"/>
   <text x="238" y="60" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">41 bits &middot; timestamp (ms since custom epoch)</text>
   <text x="238" y="80" text-anchor="middle" fill="var(--g)" font-size="5.5">2^41 ms &middot; 69.7 years before overflow</text>
-  <text x="238" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">MSB position ? IDs naturally sort by creation time</text>
+  <text x="238" y="92" text-anchor="middle" fill="var(--muted)" font-size="5">MSB position &#x2192; IDs naturally sort by creation time</text>
 
   <!-- Node ID bar (10 bits) -->
   <rect x="418" y="42" width="140" height="30" rx="3" fill="rgba(248,113,113,.18)" stroke="var(--r)" stroke-width="1"/>
@@ -132,7 +132,7 @@
   <line x1="640" y1="220" x2="210" y2="220" stroke="var(--y)" stroke-width=".5" stroke-dasharray="3,2" marker-end="url(#sf-arr)"/>
 
   <!-- "No network" labels -->
-  <text x="320" y="260" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">? zero network calls during ID generation ?</text>
+  <text x="320" y="260" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">&#x2714; zero network calls during ID generation ?</text>
   <text x="697" y="260" text-anchor="middle" fill="var(--y)" font-size="5">deploy-time only</text>
 
   <!-- --- LAYER 3: GUARANTEES --- -->
@@ -142,23 +142,23 @@
   <!-- Uniqueness boxes -->
   <rect x="30" y="320" width="220" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
   <text x="140" y="336" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Same ms + Same node</text>
-  <text x="140" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">? sequence # differs (0,1,2...4095)</text>
+  <text x="140" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">&#x2714; sequence # differs (0,1,2...4095)</text>
   <text x="140" y="363" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">unique by local seq counter</text>
 
   <rect x="265" y="320" width="220" height="55" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
   <text x="375" y="336" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Same ms + Diff node</text>
-  <text x="375" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">? node_id bits differ (001 vs 002)</text>
+  <text x="375" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">&#x2714; node_id bits differ (001 vs 002)</text>
   <text x="375" y="363" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">unique by node assignment</text>
 
   <rect x="500" y="320" width="220" height="55" rx="5" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
   <text x="610" y="336" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">Diff ms (any node)</text>
-  <text x="610" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">? timestamp bits differ</text>
+  <text x="610" y="350" text-anchor="middle" fill="var(--muted)" font-size="5.5">&#x2714; timestamp bits differ</text>
   <text x="610" y="363" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">unique by time (MSB)</text>
 
   <!-- Clock Skew Handling -->
   <rect x="30" y="385" width="300" height="55" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
   <text x="180" y="401" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">Clock Skew Handling</text>
-  <text x="180" y="415" text-anchor="middle" fill="var(--muted)" font-size="5.5">NTP backward jump detected ? REFUSE generation</text>
+  <text x="180" y="415" text-anchor="middle" fill="var(--muted)" font-size="5.5">NTP backward jump detected &#x2192; REFUSE generation</text>
   <text x="180" y="428" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">wait until clock catches up to last seen ms</text>
   <text x="180" y="440" text-anchor="middle" fill="var(--muted)" font-size="5">prevents duplicate timestamps across restarts</text>
 
@@ -185,30 +185,30 @@
   <text x="340" y="12" text-anchor="middle" fill="var(--muted)" font-size="6.5" font-weight="700">ID Strategy Comparison</text>
   <rect x="10" y="20" width="160" height="55" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
   <text x="90" y="34" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Snowflake (64-bit)</text>
-  <text x="90" y="46" text-anchor="middle" fill="var(--g)" font-size="5">? Time-sortable</text>
-  <text x="90" y="56" text-anchor="middle" fill="var(--g)" font-size="5">? Compact (8 bytes)</text>
-  <text x="90" y="66" text-anchor="middle" fill="var(--g)" font-size="5">? No coordination</text>
-  <text x="90" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">? Needs node_id mgmt</text>
+  <text x="90" y="46" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; Time-sortable</text>
+  <text x="90" y="56" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; Compact (8 bytes)</text>
+  <text x="90" y="66" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; No coordination</text>
+  <text x="90" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">&#x2714; Needs node_id mgmt</text>
 
   <rect x="180" y="20" width="160" height="55" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1"/>
   <text x="260" y="34" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">UUID v4 (128-bit)</text>
-  <text x="260" y="46" text-anchor="middle" fill="var(--r)" font-size="5">? Not sortable</text>
+  <text x="260" y="46" text-anchor="middle" fill="var(--r)" font-size="5">&#x2714; Not sortable</text>
   <text x="260" y="56" text-anchor="middle" fill="var(--r)" font-size="5">? 16 bytes (2&middot; larger)</text>
-  <text x="260" y="66" text-anchor="middle" fill="var(--g)" font-size="5">? No coordination</text>
-  <text x="260" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">? Poor index locality</text>
+  <text x="260" y="66" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; No coordination</text>
+  <text x="260" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">&#x2714; Poor index locality</text>
 
   <rect x="350" y="20" width="160" height="55" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1"/>
   <text x="430" y="34" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Auto-Increment DB</text>
-  <text x="430" y="46" text-anchor="middle" fill="var(--g)" font-size="5">? Sortable, sequential</text>
-  <text x="430" y="56" text-anchor="middle" fill="var(--g)" font-size="5">? Compact</text>
-  <text x="430" y="66" text-anchor="middle" fill="var(--r)" font-size="5">? Single point of failure</text>
-  <text x="430" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">? Not distributed</text>
+  <text x="430" y="46" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; Sortable, sequential</text>
+  <text x="430" y="56" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; Compact</text>
+  <text x="430" y="66" text-anchor="middle" fill="var(--r)" font-size="5">&#x2714; Single point of failure</text>
+  <text x="430" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">&#x2714; Not distributed</text>
 
   <rect x="520" y="20" width="150" height="55" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
   <text x="595" y="34" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">ULID (128-bit)</text>
-  <text x="595" y="46" text-anchor="middle" fill="var(--g)" font-size="5">? Time-sortable</text>
+  <text x="595" y="46" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; Time-sortable</text>
   <text x="595" y="56" text-anchor="middle" fill="var(--r)" font-size="5">? 16 bytes</text>
-  <text x="595" y="66" text-anchor="middle" fill="var(--g)" font-size="5">? No coordination</text>
+  <text x="595" y="66" text-anchor="middle" fill="var(--g)" font-size="5">&#x2714; No coordination</text>
   <text x="595" y="76" text-anchor="middle" fill="var(--a2)" font-size="4.5">Lexicographically sortable</text>
 </svg>
 </div>

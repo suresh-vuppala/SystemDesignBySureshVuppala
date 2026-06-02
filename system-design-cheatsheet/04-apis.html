@@ -499,66 +499,108 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
   <text x="250" y="126" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Scenarios ② and ③ need idempotency keys to make retries safe</text>
 </svg>
 
-<!-- ═══ Idempotency Key Flow — Payment Example ═══ -->
-<div class="d-title"><span class="num d-green">▸</span> Solution: Idempotency Key Flow (Stripe Pattern)</div>
-<svg width="100%" viewBox="0 0 500 204" style="max-width:500px;display:block;margin:2px auto 6px">
+<!-- ═══ Idempotency Key Flow — Payment Example (Race-Condition Safe) ═══ -->
+<div class="d-title"><span class="num d-green">▸</span> Solution: Idempotency Key Flow (Stripe Pattern — Atomic Lock)</div>
+<svg width="100%" viewBox="0 0 680 300" style="max-width:680px;display:block;margin:2px auto 6px">
+  <defs><marker id="id2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
   <!-- Actors -->
-  <text x="60" y="12" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Client (App)</text>
-  <text x="250" y="12" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Payment Server</text>
-  <text x="430" y="12" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Redis (Key Store)</text>
+  <text x="60" y="12" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Client</text>
+  <text x="60" y="22" text-anchor="middle" fill="var(--muted)" font-size="5.5">Web / Mobile / SDK</text>
+  <text x="200" y="12" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Order API</text>
+  <text x="200" y="22" text-anchor="middle" fill="var(--muted)" font-size="5.5">Node / NextJS</text>
+  <text x="360" y="12" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Idempotency Store</text>
+  <text x="360" y="22" text-anchor="middle" fill="var(--muted)" font-size="5.5">Redis (SETNX)</text>
+  <text x="500" y="12" text-anchor="middle" fill="var(--a2)" font-size="7.5" font-weight="700">Payments</text>
+  <text x="500" y="22" text-anchor="middle" fill="var(--muted)" font-size="5.5">Stripe / PSP</text>
+  <text x="620" y="12" text-anchor="middle" fill="var(--o)" font-size="7.5" font-weight="700">Order DB</text>
+  <text x="620" y="22" text-anchor="middle" fill="var(--muted)" font-size="5.5">PostgreSQL</text>
+
   <!-- Lifelines -->
-  <line x1="60" y1="18" x2="60" y2="198" stroke="var(--a)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
-  <line x1="250" y1="18" x2="250" y2="198" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
-  <line x1="430" y1="18" x2="430" y2="198" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="60" y1="28" x2="60" y2="292" stroke="var(--a)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="200" y1="28" x2="200" y2="292" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="360" y1="28" x2="360" y2="292" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="500" y1="28" x2="500" y2="292" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
+  <line x1="620" y1="28" x2="620" y2="292" stroke="var(--o)" stroke-width=".8" stroke-dasharray="3,3" opacity=".3"/>
 
-  <!-- Step 1: Get idempotency key -->
-  <line x1="60" y1="28" x2="250" y2="28" stroke="var(--a)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="155" y="24" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="600">① Generate idempotency key (UUID)</text>
-  <line x1="250" y1="38" x2="60" y2="38" stroke="var(--g)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="155" y="36" text-anchor="middle" fill="var(--g)" font-size="6.5">key: "abc-123-def"</text>
+  <!-- Step 1: Client generates key + sends request -->
+  <rect x="14" y="32" width="92" height="20" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="60" y="40" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Generate UUID</text>
+  <text x="60" y="49" text-anchor="middle" fill="var(--muted)" font-size="5">key: a1f9-7c3e</text>
 
-  <!-- Step 2: Make payment with key -->
-  <line x1="60" y1="54" x2="250" y2="54" stroke="var(--a)" stroke-width="1.2" marker-end="url(#id1)"/>
-  <text x="155" y="50" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">② POST /transfer {$100, to: Bob}</text>
-  <text x="155" y="60" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">Header: Idempotency-Key: abc-123-def</text>
+  <line x1="60" y1="58" x2="200" y2="58" stroke="var(--a)" stroke-width="1.2" marker-end="url(#id2)"/>
+  <text x="130" y="54" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">1 POST /orders</text>
+  <text x="130" y="64" text-anchor="middle" fill="var(--y)" font-size="5.5">Idempotency-Key: a1f9-7c3e</text>
 
-  <!-- Step 3: Server checks Redis -->
-  <line x1="250" y1="70" x2="430" y2="70" stroke="var(--g)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="340" y="66" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">③ Check: key "abc-123-def" exists?</text>
-  <line x1="430" y1="80" x2="250" y2="80" stroke="var(--r)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="340" y="78" text-anchor="middle" fill="var(--r)" font-size="6.5">NO — first time</text>
+  <!-- Step 2: Atomic SETNX -->
+  <line x1="200" y1="74" x2="360" y2="74" stroke="var(--g)" stroke-width="1.2" marker-end="url(#id2)"/>
+  <text x="280" y="70" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">2 SETNX key (atomic)</text>
+  <text x="280" y="80" text-anchor="middle" fill="var(--muted)" font-size="5">SET a1f9-7c3e "processing" NX EX 86400</text>
 
-  <!-- Step 4: Process + store key -->
-  <rect x="220" y="86" width="60" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="250" y="96" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">④ Process $100</text>
-  <line x1="280" y1="93" x2="430" y2="93" stroke="var(--g)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="355" y="90" text-anchor="middle" fill="var(--g)" font-size="6">store key + result (TTL: 24h)</text>
+  <!-- Redis atomic box -->
+  <rect x="320" y="84" width="80" height="28" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
+  <text x="360" y="94" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">ATOMIC SETNX</text>
+  <text x="360" y="103" text-anchor="middle" fill="var(--muted)" font-size="5">check + lock in 1 op</text>
+  <text x="360" y="110" text-anchor="middle" fill="var(--muted)" font-size="5">no race condition</text>
 
-  <!-- Step 5: Response (but lost!) -->
-  <line x1="250" y1="108" x2="155" y2="108" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="170" y="106" fill="var(--r)" font-size="7" font-weight="700">✗ response lost!</text>
+  <!-- SETNX result: OK (first time) -->
+  <line x1="360" y1="116" x2="200" y2="116" stroke="var(--g)" stroke-width="1" marker-end="url(#id2)"/>
+  <text x="280" y="114" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">OK &#x2192; lock acquired (first request)</text>
 
-  <!-- Step 6: Client retries with SAME key -->
-  <rect x="20" y="116" width="180" height="14" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="110" y="126" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">⑤ Client retries (same key!)</text>
-  <line x1="60" y1="140" x2="250" y2="140" stroke="var(--a)" stroke-width="1.2" marker-end="url(#id1)"/>
-  <text x="155" y="136" text-anchor="middle" fill="var(--a)" font-size="6.5">POST /transfer {$100, to: Bob}</text>
-  <text x="155" y="150" text-anchor="middle" fill="var(--y)" font-size="6">key: abc-123-def</text>
+  <!-- Step 3: Charge payment -->
+  <line x1="200" y1="128" x2="500" y2="128" stroke="var(--a2)" stroke-width="1.2" marker-end="url(#id2)"/>
+  <text x="350" y="124" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">3 Charge $100</text>
+  <text x="350" y="134" text-anchor="middle" fill="var(--muted)" font-size="5">idempotent charge via PSP</text>
 
-  <!-- Step 7: Server checks Redis again -->
-  <line x1="250" y1="158" x2="430" y2="158" stroke="var(--g)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="340" y="154" text-anchor="middle" fill="var(--g)" font-size="6.5">⑥ Check: key exists?</text>
-  <line x1="430" y1="168" x2="250" y2="168" stroke="var(--g)" stroke-width="1" marker-end="url(#id1)"/>
-  <text x="340" y="166" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">YES — already processed!</text>
+  <!-- Payment response -->
+  <rect x="468" y="138" width="64" height="14" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="500" y="148" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">&#x2714; charge OK</text>
+  <line x1="500" y1="154" x2="200" y2="154" stroke="var(--a2)" stroke-width="1" marker-end="url(#id2)"/>
+  <text x="350" y="152" text-anchor="middle" fill="var(--g)" font-size="5.5">payment_id: pay_abc123</text>
 
-  <!-- Step 8: Return cached result -->
-  <line x1="250" y1="178" x2="60" y2="178" stroke="var(--g)" stroke-width="1.2" marker-end="url(#id1)"/>
-  <text x="155" y="174" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">⑦ Return cached result (no re-processing)</text>
+  <!-- Step 4: Write order to DB -->
+  <line x1="200" y1="166" x2="620" y2="166" stroke="var(--o)" stroke-width="1.2" marker-end="url(#id2)"/>
+  <text x="410" y="162" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">4 INSERT order row</text>
+  <text x="410" y="172" text-anchor="middle" fill="var(--muted)" font-size="5">order_id, user, amount, payment_id, status=confirmed</text>
 
-  <!-- Result -->
-  <rect x="100" y="186" width="300" height="14" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="250" y="196" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">✓ $100 deducted exactly once — user safe</text>
+  <!-- DB response -->
+  <line x1="620" y1="178" x2="200" y2="178" stroke="var(--o)" stroke-width="1" marker-end="url(#id2)"/>
+  <text x="410" y="176" text-anchor="middle" fill="var(--g)" font-size="5.5">&#x2714; persisted (order_id: ord_xyz)</text>
+
+  <!-- Step 5: Store final response in idempotency store -->
+  <line x1="200" y1="190" x2="360" y2="190" stroke="var(--g)" stroke-width="1" marker-end="url(#id2)"/>
+  <text x="280" y="186" text-anchor="middle" fill="var(--g)" font-size="6">5 SET key &#x2192; {status: done, response: ...}</text>
+
+  <!-- Step 6: Response to client (but lost!) -->
+  <line x1="200" y1="202" x2="130" y2="202" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="145" y="200" fill="var(--r)" font-size="6.5" font-weight="700">&#x2717; response lost!</text>
+
+  <!-- Retry divider -->
+  <rect x="4" y="212" width="672" height="3" rx="1" fill="var(--y)" opacity=".2"/>
+  <text x="340" y="224" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">TIMEOUT &#x2192; CLIENT RETRIES WITH SAME KEY</text>
+
+  <!-- Step 6: Client retries -->
+  <line x1="60" y1="234" x2="200" y2="234" stroke="var(--a)" stroke-width="1.2" marker-end="url(#id2)" stroke-dasharray="4,2"/>
+  <text x="130" y="230" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="600">6 POST /orders (retry, same key)</text>
+
+  <!-- Step 7: SETNX again -->
+  <line x1="200" y1="244" x2="360" y2="244" stroke="var(--g)" stroke-width="1" marker-end="url(#id2)"/>
+  <text x="280" y="240" text-anchor="middle" fill="var(--g)" font-size="6">7 SETNX key</text>
+
+  <!-- Key already exists -->
+  <line x1="360" y1="254" x2="200" y2="254" stroke="var(--r)" stroke-width="1" marker-end="url(#id2)"/>
+  <text x="280" y="252" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">KEY EXISTS &#x2192; read stored response</text>
+
+  <!-- Return cached result to client -->
+  <line x1="200" y1="266" x2="60" y2="266" stroke="var(--g)" stroke-width="1.2" marker-end="url(#id2)"/>
+  <text x="130" y="262" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">8 Return cached result (NO re-charge)</text>
+
+  <!-- Result banner -->
+  <rect x="60" y="278" width="560" height="16" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="340" y="289" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">&#x2714; Exactly-once charge &#x2022; No double payment &#x2022; Concurrency-safe &#x2022; Network-retry resilient</text>
 </svg>
+
+<!-- Why atomic matters callout -->
+<div class="b br" style="margin-top:4px"><span class="hi">&#x26A0; Why SETNX (atomic) is critical:</span> A naive <code>if(!exists(key)) { process(); save(key); }</code> has a <span class="hr">race condition</span> — two concurrent retries both see "key not found" and both process the payment. <span class="hg">SETNX</span> (SET if Not eXists) is a <span class="hg">single atomic Redis operation</span> that checks AND sets in one step. Only the first request wins the lock. All subsequent requests see "key exists" and get the cached response.</div>
 
 <!-- Failure scenarios table -->
 <table style="margin-top:4px">
@@ -568,7 +610,8 @@ Rate Limit: X-RateLimit-Limit: 1000 · X-RateLimit-Remaining: 847</code></pre>
 <tr><td>Response lost in transit</td><td><span class="hr">⚠ Unsafe</span></td><td><span class="hg">✓ Safe</span> — key already processed, returns cached result</td></tr>
 </table>
 
-<div class="b bg" style="margin-top:4px"><span class="hi">Implementation:</span> Store keys in <span class="hg">Redis</span> with TTL (24h). Key = UUID, Value = {status, result}. On request: check key → if exists, return cached result → if not, process + store. Delete key after TTL. <span class="hi">Stripe</span> requires <code>Idempotency-Key</code> header on all POST endpoints.</div>
+<div class="b bg" style="margin-top:4px"><span class="hi">Implementation (concurrency-safe):</span> Use <span class="hg">Redis SETNX</span> (SET if Not eXists) — a single atomic operation that checks AND acquires the lock. Key = UUID, Value = {status: "processing"}. After payment completes, update value to {status: "done", response: ...}. On retry: SETNX fails (key exists) &#x2192; read stored response &#x2192; return immediately. <span class="hg">TTL 24h</span> auto-cleans keys. <span class="hi">Stripe</span> requires <code>Idempotency-Key</code> header on all POST endpoints.</div>
+<div class="b by" style="margin-top:4px"><span class="hi">Key guarantees:</span> <span class="hg">Exactly-once</span> side effects (payment charges once). <span class="hg">No double charges</span> even under concurrent retries. <span class="hg">Concurrency-safe</span> via atomic lock (not check-then-act). <span class="hg">Network-retry resilient</span> — clients can safely retry on any timeout.</div>
 </div>
 
 <div class="T" id="soap">

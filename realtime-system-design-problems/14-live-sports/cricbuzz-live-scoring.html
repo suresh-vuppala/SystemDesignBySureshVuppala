@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How to push live cricket scores to 30M concurrent users within sub-second latency?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a live scoring platform: 30M concurrent, sub-second push, ball-by-ball events</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a live scoring platform: 30M concurrent, sub-second push, ball-by-ball events</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -37,7 +37,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;1s</div>
 <div style="font-size:.72rem;color:var(--muted)">delivery latency</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">event ? all users</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">event &#x2192; all users</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">~1 event/s</div>
@@ -54,7 +54,7 @@
 
 <div class="T" id="architecture">
 <h2>Architecture &middot; Broadcast at Scale</h2>
-<p class="su">Event ingestion ? fan-out tree ? edge push servers ? clients</p>
+<p class="su">Event ingestion &#x2192; fan-out tree &#x2192; edge push serverS &#x2192; Clients</p>
 
 <!-- --- Live Sports SVG --- -->
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Live sports scoring architecture showing ingestion, distribution, and client layers">
@@ -87,7 +87,7 @@
   <text x="625" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Immutable event log per match</text>
   <text x="625" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">Sequence guaranteed ordering</text>
   <text x="625" y="80" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">Source of truth for replay/catch-up</text>
-  <text x="625" y="90" text-anchor="middle" fill="var(--muted)" font-size="4.5">Clients reconnect ? replay from last seq#</text>
+  <text x="625" y="90" text-anchor="middle" fill="var(--muted)" font-size="4.5">Clients reconnect &#x2192; replay from last seq#</text>
 
   <!-- --- LAYER 2: DISTRIBUTION LAYER --- -->
   <rect x="10" y="110" width="760" height="175" rx="6" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1" stroke-dasharray="4,3"/>
@@ -96,7 +96,7 @@
   <!-- Event Bus -->
   <rect x="30" y="133" width="200" height="55" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="130" y="148" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Event Bus (Kafka)</text>
-  <text x="130" y="162" text-anchor="middle" fill="var(--muted)" font-size="5.5">1 event ? all regions simultaneously</text>
+  <text x="130" y="162" text-anchor="middle" fill="var(--muted)" font-size="5.5">1 event &#x2192; all regions simultaneously</text>
   <text x="130" y="175" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Broadcast: same content for ALL users</text>
   <text x="130" y="185" text-anchor="middle" fill="var(--muted)" font-size="4.5">Latency: ~10ms to all consumers</text>
 
@@ -175,23 +175,23 @@
   <text x="390" y="436" text-anchor="middle" fill="var(--muted)" font-size="5.5">Unlike chat (personalized per user), sports scores are identical for everyone watching same match</text>
 
   <text x="390" y="454" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Total Latency Breakdown</text>
-  <text x="390" y="468" text-anchor="middle" fill="var(--muted)" font-size="5.5">Stadium ? Ingestion (50ms) ? Event Bus (10ms) ? Edge Push (5ms) ? Client = &lt;100ms for WebSocket</text>
+  <text x="390" y="468" text-anchor="middle" fill="var(--muted)" font-size="5.5">Stadium &#x2192; Ingestion (50ms) &#x2192; Event Bus (10ms) &#x2192; Edge Push (5ms) &#x2192; Client = &lt;100ms for WebSocket</text>
   <text x="390" y="481" text-anchor="middle" fill="var(--muted)" font-size="5.5">CDN polling clients: max 1-2s stale | CDN absorbs 2.5M polling req/sec without hitting origin</text>
-  <text x="390" y="492" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1 event ? Kafka ? 28 edge servers ? 30M clients in parallel (each server pushes to its 500K connections)</text>
+  <text x="390" y="492" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1 event &#x2192; Kafka &#x2192; 28 edge servers &#x2192; 30M clients in parallel (each server pushes to its 500K connections)</text>
 </svg>
 
 <table>
 <tr><th>Layer</th><th>Component</th><th>Scale</th><th>Role</th></tr>
 <tr><td><span class="hi">Ingestion</span></td><td>Score API + manual operators</td><td>1-10 events/sec</td><td>Normalize ball events from stadium feed, validate, sequence</td></tr>
-<tr><td><span class="hi">Fan-out</span></td><td>Kafka/Redis Pub/Sub</td><td>1 event ? all edge servers</td><td>Broadcast single event to all regional push servers</td></tr>
+<tr><td><span class="hi">Fan-out</span></td><td>Kafka/Redis Pub/Sub</td><td>1 event &#x2192; all edge servers</td><td>Broadcast single event to all regional push servers</td></tr>
 <tr><td><span class="hi">Edge Push</span></td><td>WebSocket/SSE servers (per region)</td><td>~500K connections/server &middot; 60 servers</td><td>Hold persistent connections, push events to connected clients</td></tr>
 <tr><td><span class="hi">Fallback</span></td><td>CDN-cached polling endpoint</td><td>Millions of req/sec</td><td>For clients that can't hold WS (old browsers, firewalls)</td></tr>
 <tr><td><span class="hi">CDN</span></td><td>Edge-cached score JSON</td><td>1s TTL, global PoPs</td><td>Absorb polling traffic, serve stale-but-recent scores</td></tr>
 </table>
 
-<div class="b bg"><span class="hi">Key insight:</span> This is a <span class="hg">broadcast problem, not a fan-out problem</span>. All 30M users receive the SAME event. Unlike chat (personalized per user), sports scores are identical for everyone watching the same match. This means: <span class="hg">one event ? multicast to edge servers ? each server pushes to its connected clients</span>. No per-user fan-out needed.</div>
+<div class="b bg"><span class="hi">Key insight:</span> This is a <span class="hg">broadcast problem, not a fan-out problem</span>. All 30M users receive the SAME event. Unlike chat (personalized per user), sports scores are identical for everyone watching the same match. This means: <span class="hg">one event &#x2192; multicast to edge servers &#x2192; each server pushes to its connected clients</span>. No per-user fan-out needed.</div>
 <div class="b by"><span class="hi">Connection strategy:</span> <span class="hg">WebSocket</span> for mobile apps (persistent, low overhead). <span class="hg">SSE (Server-Sent Events)</span> for web (simpler, HTTP-based, auto-reconnect). <span class="hg">Long-polling</span> as fallback. <span class="hg">CDN-cached JSON</span> (1s TTL) for extreme scale &middot; polling clients get scores within 1-2s.</div>
-<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Edge server crash</span> ? clients auto-reconnect to another server (stateless). <span class="hr">Event source delay</span> ? show "updating..." indicator. <span class="hr">CDN stale</span> ? 1s TTL means max 1s stale. <span class="hr">30M simultaneous reconnect</span> (thundering herd after outage) ? exponential backoff + jitter on client.</div>
+<div class="b br"><span class="hi">Failure modes:</span> <span class="hr">Edge server crash</span> &#x2192; clients auto-reconnect to another server (stateless). <span class="hr">Event source delay</span> &#x2192; show "updating..." indicator. <span class="hr">CDN stale</span> &#x2192; 1s TTL means max 1s stale. <span class="hr">30M simultaneous reconnect</span> (thundering herd after outage) &#x2192; exponential backoff + jitter on client.</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Cricbuzz</strong> &middot; 30M+ during IPL/World Cup. <strong>ESPN</strong> &middot; CDN-first with WebSocket for premium. <strong>Hotstar</strong> &middot; 25M concurrent during cricket (similar architecture). <strong>BBC Sport</strong> &middot; SSE for live text commentary.</div>
 </div>
 
@@ -202,7 +202,7 @@
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
 <tr><td><span class="hi">1</span></td><td>WebSocket servers: 30M &middot; 500K conn/server</td><td><span class="hg">60 edge servers</span></td><td>Distributed across regions (India, UK, Aus)</td></tr>
 <tr><td><span class="hi">2</span></td><td>Events per match: ~300 balls &middot; 3 events/ball</td><td><span class="hg">~900 events/match</span></td><td>Low event rate &middot; broadcast is the challenge, not ingestion</td></tr>
-<tr><td><span class="hi">3</span></td><td>Fan-out per event: 1 event ? 60 servers ? 30M clients</td><td><span class="hg">30M pushes in &lt;1s</span></td><td>Each server pushes to its 500K connections in parallel</td></tr>
+<tr><td><span class="hi">3</span></td><td>Fan-out per event: 1 event &#x2192; 60 servers &#x2192; 30M clients</td><td><span class="hg">30M pushes in &lt;1s</span></td><td>Each server pushes to its 500K connections in parallel</td></tr>
 <tr><td><span class="hi">4</span></td><td>Polling fallback: 5M pollers &middot; every 2s</td><td><span class="hg">2.5M req/sec to CDN</span></td><td>CDN absorbs &middot; 1s TTL means max 1s stale</td></tr>
 <tr><td><span class="hi">5</span></td><td>Bandwidth per client: ~200 bytes/event &middot; 1 event/6s</td><td><span class="hg">~33 bytes/sec per client</span></td><td>Negligible &middot; WebSocket overhead dominates</td></tr>
 </table>
@@ -214,7 +214,7 @@
 <p class="su">The 6 things to say for live broadcast design</p>
 <div style="font-size:.82rem;line-height:1.8">
 <span class="hg">1.</span> <strong>Broadcast, not fan-out</strong> &middot; all users get same event (unlike chat which is personalized)<br>
-<span class="hg">2.</span> <strong>Fan-out tree</strong> &middot; 1 event ? Kafka/Redis Pub/Sub ? 60 edge servers ? 500K clients each<br>
+<span class="hg">2.</span> <strong>Fan-out tree</strong> &middot; 1 event &#x2192; Kafka/Redis Pub/Sub &#x2192; 60 edge servers &#x2192; 500K clients each<br>
 <span class="hg">3.</span> <strong>WebSocket + SSE + CDN polling</strong> &middot; tiered delivery for different client capabilities<br>
 <span class="hg">4.</span> <strong>CDN with 1s TTL</strong> &middot; absorbs polling traffic, serves near-real-time for non-WS clients<br>
 <span class="hg">5.</span> <strong>Stateless edge servers</strong> &middot; client reconnects to any server (no session affinity needed)<br>

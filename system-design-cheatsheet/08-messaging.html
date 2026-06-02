@@ -21,6 +21,52 @@
 
 <div class="T" id="message-queues">
 <h2>Message Queues (RabbitMQ / SQS)</h2><p class="su">Messages wait in a queue for consumers to process — <span class="hg">task distribution &amp; load balancing</span> with retry + DLQ</p>
+
+<!-- ═══ Message Queue Visual ═══ -->
+<div class="d-panel" style="padding:10px">
+<svg width="100%" viewBox="0 0 520 100" style="max-width:520px;display:block;margin:0 auto">
+  <defs><marker id="mqv1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker><marker id="mqv2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker></defs>
+  <!-- Producers -->
+  <rect x="10" y="14" width="60" height="22" rx="5" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="40" y="28" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Producer A</text>
+  <rect x="10" y="42" width="60" height="22" rx="5" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="40" y="56" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Producer B</text>
+  <!-- Arrows to queue -->
+  <line x1="72" y1="25" x2="120" y2="36" stroke="var(--a)" stroke-width="1" marker-end="url(#mqv1)"/>
+  <line x1="72" y1="53" x2="120" y2="42" stroke="var(--a)" stroke-width="1" marker-end="url(#mqv1)"/>
+  <!-- Queue -->
+  <rect x="122" y="22" width="140" height="36" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="2"/>
+  <rect x="130" y="28" width="16" height="24" rx="3" fill="var(--y)" opacity=".2"/>
+  <rect x="150" y="28" width="16" height="24" rx="3" fill="var(--y)" opacity=".3"/>
+  <rect x="170" y="28" width="16" height="24" rx="3" fill="var(--y)" opacity=".4"/>
+  <rect x="190" y="28" width="16" height="24" rx="3" fill="var(--y)" opacity=".5"/>
+  <rect x="210" y="28" width="16" height="24" rx="3" fill="var(--y)" opacity=".6"/>
+  <rect x="230" y="28" width="16" height="24" rx="3" fill="var(--y)" opacity=".7"/>
+  <text x="192" y="66" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">Queue (FIFO)</text>
+  <!-- Visibility timeout annotation -->
+  <rect x="130" y="76" width="130" height="14" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="195" y="86" text-anchor="middle" fill="var(--muted)" font-size="5.5">Visibility timeout: msg hidden while processing</text>
+  <!-- Arrows to consumers (competing) -->
+  <line x1="264" y1="32" x2="310" y2="20" stroke="var(--g)" stroke-width="1.2" marker-end="url(#mqv2)"/>
+  <line x1="264" y1="40" x2="310" y2="40" stroke="var(--g)" stroke-width="1.2" marker-end="url(#mqv2)"/>
+  <line x1="264" y1="48" x2="310" y2="60" stroke="var(--g)" stroke-width="1.2" marker-end="url(#mqv2)"/>
+  <!-- Consumers -->
+  <rect x="312" y="8" width="70" height="22" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="347" y="22" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Consumer 1</text>
+  <rect x="312" y="34" width="70" height="22" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="347" y="48" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Consumer 2</text>
+  <rect x="312" y="60" width="70" height="22" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="347" y="74" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Consumer 3</text>
+  <!-- ACK + Delete -->
+  <text x="400" y="22" fill="var(--g)" font-size="6">✓ ACK → deleted</text>
+  <text x="400" y="48" fill="var(--muted)" font-size="6">⏳ processing...</text>
+  <text x="400" y="74" fill="var(--r)" font-size="6">✗ NACK → retry</text>
+  <!-- Key insight -->
+  <rect x="395" y="82" width="120" height="14" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--border)" stroke-width=".6"/>
+  <text x="455" y="92" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Each msg → exactly ONE consumer</text>
+</svg>
+</div>
+
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">At-least-once delivery</span> (consumer must be idempotent). <span class="hg">Ordering</span> per queue (FIFO). <span class="hg">Dead Letter Queue</span> — after N retries, message moved to DLQ. <span class="hg">Visibility timeout</span> — message invisible to others while being processed.</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">No message replay</span>. <span class="hr">Limited throughput</span> for high-volume streaming. <span class="hr">Fan-out harder</span> than Kafka. <span class="hr">No long-term retention</span>.</div>
 <div class="b bb"><span class="hi">RabbitMQ exchanges:</span> Direct (exact key) · Fanout (broadcast) · Topic (pattern: <code>order.*.created</code>) · Headers. <span class="hi">SQS:</span> Standard (at-least-once, best-effort order) vs FIFO (exactly-once, strict order, 3K msg/sec).</div>
@@ -628,15 +674,49 @@
 
 <div class="T" id="pubsub">
 <h2>Pub/Sub (SNS / Google Pub/Sub)</h2><p class="su">Publishers <span class="hg">broadcast (fan-out)</span> to a topic — every subscriber receives its <span class="hi">own independent copy</span></p>
-<pre><code>Producer publishes to TOPIC (not a queue)
-       ↓ topic: "order-events"
-  ┌────┼────────┬────────────┐
-  ↓    ↓        ↓            ↓
- Sub A  Sub B   Sub C       Sub D
-(Email) (Analytics) (Audit) (Webhook)
 
-Each subscriber gets its OWN copy of every message.
-Subscribers are independent — different speeds, different retry logic.</code></pre>
+<!-- ═══ Pub/Sub Fan-Out Visual ═══ -->
+<div class="d-panel" style="padding:10px">
+<svg width="100%" viewBox="0 0 480 130" style="max-width:480px;display:block;margin:0 auto">
+  <defs><marker id="ps1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker><marker id="ps2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker></defs>
+  <!-- Producer -->
+  <rect x="10" y="40" width="70" height="30" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="45" y="52" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Producer</text>
+  <text x="45" y="63" text-anchor="middle" fill="var(--muted)" font-size="6">Order Service</text>
+  <!-- Arrow to Topic -->
+  <line x1="82" y1="55" x2="130" y2="55" stroke="var(--a)" stroke-width="1.5" marker-end="url(#ps1)"/>
+  <text x="106" y="48" text-anchor="middle" fill="var(--muted)" font-size="6">publish</text>
+  <!-- Topic -->
+  <rect x="132" y="35" width="90" height="40" rx="8" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="2"/>
+  <text x="177" y="52" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">TOPIC</text>
+  <text x="177" y="65" text-anchor="middle" fill="var(--muted)" font-size="6">"order-events"</text>
+  <!-- Fan-out arrows -->
+  <line x1="224" y1="45" x2="280" y2="20" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ps2)"/>
+  <line x1="224" y1="50" x2="280" y2="50" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ps2)"/>
+  <line x1="224" y1="55" x2="280" y2="80" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ps2)"/>
+  <line x1="224" y1="60" x2="280" y2="110" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ps2)"/>
+  <!-- Subscribers -->
+  <rect x="282" y="8" width="80" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="322" y="18" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">📧 Email Svc</text>
+  <text x="322" y="28" text-anchor="middle" fill="var(--muted)" font-size="5.5">sends confirmation</text>
+  <rect x="282" y="38" width="80" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="322" y="48" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">📊 Analytics</text>
+  <text x="322" y="58" text-anchor="middle" fill="var(--muted)" font-size="5.5">tracks metrics</text>
+  <rect x="282" y="68" width="80" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="322" y="78" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">📋 Audit Log</text>
+  <text x="322" y="88" text-anchor="middle" fill="var(--muted)" font-size="5.5">compliance record</text>
+  <rect x="282" y="98" width="80" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="322" y="108" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">🔗 Webhook</text>
+  <text x="322" y="118" text-anchor="middle" fill="var(--muted)" font-size="5.5">partner notify</text>
+  <!-- Key point -->
+  <rect x="380" y="30" width="90" height="60" rx="6" fill="rgba(251,191,36,.06)" stroke="var(--border)" stroke-width=".8"/>
+  <text x="425" y="46" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">Each gets OWN</text>
+  <text x="425" y="57" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">copy of every</text>
+  <text x="425" y="68" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">message</text>
+  <text x="425" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">Independent speed</text>
+</svg>
+</div>
+
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">At-least-once delivery</span> to every subscriber. <span class="hg">Independent processing</span>. <span class="hg">Fully managed</span>. Google Pub/Sub: <span class="hg">seek to timestamp</span>, <span class="hg">ordering keys</span>, <span class="hg">exactly-once delivery</span>. SNS: push to SQS/Lambda/HTTP/email/SMS.</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">No long retention by default</span>. <span class="hr">No consumer-side replay in SNS</span>. <span class="hr">Ordering not guaranteed by default</span>. <span class="hr">Not suited for point-to-point work queues</span>.</div>
 <div class="b by"><span class="hi">Real-world:</span> <strong>Spotify</strong> — Google Pub/Sub for event-driven microservices. <strong>Shopify</strong> — SNS+SQS for order event fan-out. <strong>Uber</strong> — Google Pub/Sub for cross-service event propagation.</div>
@@ -644,27 +724,101 @@ Subscribers are independent — different speeds, different retry logic.</code><
 
 <div class="T" id="messaging-comparison">
 <h2>Message Queues vs Event Streams vs Pub/Sub</h2><p class="su">Three fundamentally different messaging patterns</p>
-<pre><code>┌──────────────────────────────────────────────────────────────┐
-│ MESSAGE QUEUE (Point-to-Point)                               │
-└──────────────────────────────────────────────────────────────┘
-Producer → [ Queue ] → Consumer A
-                         (message deleted after ACK)
-        One message → one consumer (ownership)
-┌──────────────────────────────────────────────────────────────┐
-│ EVENT STREAM (Log/replay-based)                              │
-└──────────────────────────────────────────────────────────────┘
-Producer → [ Append-only Log ] → offset 0 → offset 5 → offset 9
-                                  │            │            │
-                              Group A      Group B      Group C
-      Data is NEVER removed, only appended
-┌──────────────────────────────────────────────────────────────┐
-│ PUB/SUB (Fan-out)                                            │
-└──────────────────────────────────────────────────────────────┘
-Producer → [ Topic ]
-              ├→ Subscriber A → receives COPY (independent)
-              ├→ Subscriber B → receives COPY (independent)
-              └→ Subscriber C → receives COPY (independent)
-      One event → many independent receivers</code></pre>
+
+<!-- ═══ Three Patterns Visual ═══ -->
+<div class="d-grid tri" style="margin:4px 0">
+
+<!-- Message Queue -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Message Queue (Point-to-Point)</h4>
+<svg width="100%" viewBox="0 0 200 80" style="max-width:200px;display:block;margin:0 auto">
+  <defs><marker id="mq1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker></defs>
+  <!-- Producer -->
+  <rect x="4" y="24" width="36" height="20" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="22" y="37" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Prod</text>
+  <!-- Queue -->
+  <rect x="56" y="20" width="60" height="28" rx="5" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.5"/>
+  <rect x="62" y="26" width="10" height="16" rx="2" fill="var(--y)" opacity=".3"/>
+  <rect x="74" y="26" width="10" height="16" rx="2" fill="var(--y)" opacity=".4"/>
+  <rect x="86" y="26" width="10" height="16" rx="2" fill="var(--y)" opacity=".5"/>
+  <rect x="98" y="26" width="10" height="16" rx="2" fill="var(--y)" opacity=".6"/>
+  <text x="86" y="54" text-anchor="middle" fill="var(--muted)" font-size="5.5">Queue (FIFO)</text>
+  <!-- Arrow -->
+  <line x1="42" y1="34" x2="54" y2="34" stroke="var(--a)" stroke-width="1" marker-end="url(#mq1)"/>
+  <!-- Consumer (only one gets it) -->
+  <line x1="118" y1="34" x2="140" y2="34" stroke="var(--g)" stroke-width="1" marker-end="url(#mq1)"/>
+  <rect x="142" y="24" width="50" height="20" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="167" y="37" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Consumer</text>
+  <!-- Key -->
+  <text x="100" y="70" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">Message DELETED after ACK</text>
+  <text x="100" y="80" text-anchor="middle" fill="var(--a)" font-size="5.5">One msg → one consumer</text>
+</svg>
+</div>
+
+<!-- Event Stream -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Event Stream (Log-based)</h4>
+<svg width="100%" viewBox="0 0 200 80" style="max-width:200px;display:block;margin:0 auto">
+  <defs><marker id="es1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker></defs>
+  <!-- Producer -->
+  <rect x="4" y="8" width="36" height="20" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="22" y="21" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Prod</text>
+  <!-- Log -->
+  <line x1="42" y1="18" x2="54" y2="18" stroke="var(--a)" stroke-width="1" marker-end="url(#es1)"/>
+  <rect x="56" y="6" width="130" height="24" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="64" y="20" fill="var(--g)" font-size="6" font-weight="600">0</text>
+  <text x="78" y="20" fill="var(--g)" font-size="6" font-weight="600">1</text>
+  <text x="92" y="20" fill="var(--g)" font-size="6" font-weight="600">2</text>
+  <text x="106" y="20" fill="var(--g)" font-size="6" font-weight="600">3</text>
+  <text x="120" y="20" fill="var(--g)" font-size="6" font-weight="600">4</text>
+  <text x="134" y="20" fill="var(--g)" font-size="6" font-weight="600">5</text>
+  <text x="148" y="20" fill="var(--g)" font-size="6" font-weight="600">→</text>
+  <text x="121" y="38" text-anchor="middle" fill="var(--muted)" font-size="5.5">Append-only log (never deleted)</text>
+  <!-- Multiple consumer groups -->
+  <line x1="80" y1="30" x2="80" y2="48" stroke="var(--g)" stroke-width=".8" marker-end="url(#es1)"/>
+  <line x1="120" y1="30" x2="120" y2="48" stroke="var(--a2)" stroke-width=".8" marker-end="url(#es1)"/>
+  <line x1="160" y1="30" x2="160" y2="48" stroke="var(--o)" stroke-width=".8" marker-end="url(#es1)"/>
+  <rect x="56" y="50" width="44" height="14" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="78" y="60" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Group A</text>
+  <rect x="104" y="50" width="44" height="14" rx="3" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="126" y="60" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Group B</text>
+  <rect x="152" y="50" width="44" height="14" rx="3" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="174" y="60" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Group C</text>
+  <!-- Key -->
+  <text x="100" y="74" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Data RETAINED · Replayable</text>
+  <text x="100" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">Each group reads all at own pace</text>
+</svg>
+</div>
+
+<!-- Pub/Sub -->
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--y)">Pub/Sub (Fan-out)</h4>
+<svg width="100%" viewBox="0 0 200 80" style="max-width:200px;display:block;margin:0 auto">
+  <defs><marker id="fb1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--y)"/></marker></defs>
+  <!-- Producer -->
+  <rect x="4" y="24" width="36" height="20" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="22" y="37" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Prod</text>
+  <!-- Topic -->
+  <line x1="42" y1="34" x2="64" y2="34" stroke="var(--a)" stroke-width="1" marker-end="url(#fb1)"/>
+  <rect x="66" y="22" width="44" height="24" rx="5" fill="rgba(251,191,36,.1)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="88" y="37" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Topic</text>
+  <!-- Fan-out arrows -->
+  <line x1="112" y1="28" x2="140" y2="14" stroke="var(--y)" stroke-width="1" marker-end="url(#fb1)"/>
+  <line x1="112" y1="34" x2="140" y2="34" stroke="var(--y)" stroke-width="1" marker-end="url(#fb1)"/>
+  <line x1="112" y1="40" x2="140" y2="54" stroke="var(--y)" stroke-width="1" marker-end="url(#fb1)"/>
+  <!-- Subscribers -->
+  <rect x="142" y="4" width="50" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="167" y="15" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Sub A (copy)</text>
+  <rect x="142" y="26" width="50" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="167" y="37" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Sub B (copy)</text>
+  <rect x="142" y="48" width="50" height="16" rx="3" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="167" y="59" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Sub C (copy)</text>
+  <!-- Key -->
+  <text x="100" y="74" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Broadcast · Message GONE after</text>
+  <text x="100" y="82" text-anchor="middle" fill="var(--muted)" font-size="5.5">One event → many receivers</text>
+</svg>
+</div>
+</div>
 <table>
 <tr><th>Feature</th><th>Message Queue</th><th>Event Stream</th><th>Pub/Sub</th></tr>
 <tr><td><span class="hi">Definition</span></td><td>Messages <span class="hg">wait in a queue</span> for a consumer to pick up &amp; process</td><td>Messages <span class="hg">appended to a durable ordered log</span> — replayable history</td><td>Publisher <span class="hg">broadcasts</span> to a topic; every subscriber gets its own copy</td></tr>

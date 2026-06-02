@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google crawl 10B+ pages across the internet?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">???</span> Design a web crawler: 10B+ pages, politeness, priority by PageRank, content deduplication</div>
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design a web crawler: 10B+ pages, politeness, priority by PageRank, content deduplication</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -99,12 +99,12 @@
   <text x="640" y="124" text-anchor="middle" fill="var(--muted)" font-size="5.5">URL normalization before check</text>
   <text x="640" y="137" text-anchor="middle" fill="var(--muted)" font-size="5">(strip params, lowercase, resolve redirects)</text>
 
-  <!-- Arrow Layer 1 ? Layer 2 -->
+  <!-- Arrow Layer 1 &#x2192; Layer 2 -->
   <line x1="390" y1="155" x2="390" y2="173" stroke="var(--y)" stroke-width="1.2" marker-end="url(#cr-arr)"/>
 
   <!-- LAYER 2: FETCHING -->
   <rect x="10" y="175" width="760" height="130" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="193" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 &middot; FETCHING (Distributed Workers ? Content Processing)</text>
+  <text x="390" y="193" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 &middot; FETCHING (Distributed WorkerS &#x2192; Content Processing)</text>
 
   <rect x="30" y="205" width="280" height="88" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="170" y="221" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Fetcher Pool (1000s Workers)</text>
@@ -119,12 +119,12 @@
   <rect x="340" y="205" width="420" height="88" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="550" y="221" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Content Processor</text>
   <text x="550" y="235" text-anchor="middle" fill="var(--muted)" font-size="5.5">1. Parse HTML (extract text, metadata, structured data)</text>
-  <text x="550" y="248" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Extract outlinks ? normalize ? check Bloom ? add to frontier</text>
+  <text x="550" y="248" text-anchor="middle" fill="var(--muted)" font-size="5.5">2. Extract outlinks &#x2192; normalize &#x2192; check Bloom &#x2192; add to frontier</text>
   <text x="550" y="261" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">3. SimHash fingerprint (near-duplicate detection)</text>
   <text x="550" y="274" text-anchor="middle" fill="var(--muted)" font-size="5.5">4. Spider trap detection (max depth, URL pattern, domain budget)</text>
   <text x="550" y="287" text-anchor="middle" fill="var(--muted)" font-size="5.5">5. Language detection + content classification</text>
 
-  <!-- Arrow Layer 2 ? Layer 3 -->
+  <!-- Arrow Layer 2 &#x2192; Layer 3 -->
   <line x1="390" y1="305" x2="390" y2="323" stroke="var(--r)" stroke-width="1.2" marker-end="url(#cr-arr)"/>
 
   <!-- LAYER 3: OUTPUT -->
@@ -134,13 +134,13 @@
   <rect x="30" y="355" width="220" height="78" rx="6" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="140" y="371" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Index Pipeline</text>
   <text x="140" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">Build inverted index (MapReduce)</text>
-  <text x="140" y="398" text-anchor="middle" fill="var(--muted)" font-size="5.5">term ? [doc_id, position, freq]</text>
+  <text x="140" y="398" text-anchor="middle" fill="var(--muted)" font-size="5.5">term &#x2192; [doc_id, position, freq]</text>
   <text x="140" y="411" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Feeds search engine</text>
   <text x="140" y="424" text-anchor="middle" fill="var(--muted)" font-size="5">PageRank computed offline</text>
 
   <rect x="270" y="355" width="230" height="78" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="385" y="371" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">URL Store (? Back to Frontier)</text>
-  <text x="385" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">New URLs extracted ? add to frontier</text>
+  <text x="385" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">New URLs extracted &#x2192; add to frontier</text>
   <text x="385" y="398" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">BFS expansion of the web graph</text>
   <text x="385" y="411" text-anchor="middle" fill="var(--muted)" font-size="5.5">Track last-crawled time per URL</text>
   <text x="385" y="424" text-anchor="middle" fill="var(--muted)" font-size="5">Schedule re-crawl by change frequency</text>
@@ -154,7 +154,7 @@
 
   <!-- Feedback: URLs back to frontier -->
   <path d="M 385 433 L 385 445 L 90 445 L 90 155" fill="none" stroke="var(--y)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#cr-arr)"/>
-  <text x="240" y="442" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">new URLs ? back to frontier (BFS expansion)</text>
+  <text x="240" y="442" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">new URLs &#x2192; back to frontier (BFS expansion)</text>
 
   <!-- BOTTOM INSIGHT -->
   <rect x="10" y="458" width="760" height="34" rx="6" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>

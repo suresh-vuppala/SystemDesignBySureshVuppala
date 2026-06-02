@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How do you continuously compute top active channels without scanning historical data?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a real-time ranking system that computes top active channels/users for the last 1 hour, updating within seconds of activity changes</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a real-time ranking system that computes top active channels/users for the last 1 hour, updating within seconds of activity changes</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -27,7 +27,7 @@
 <!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <p class="su">Given message events across millions of channels, design a system that continuously computes the top active channels/users for the last 1 hour without scanning historical data, updating rankings within seconds of activity changes.</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time top-K computation over a sliding time window &middot; not batch analytics, not historical reporting. The hard question: <span class="hr">how do you maintain accurate rankings over a sliding 1-hour window at millions of events/sec without re-scanning all data on every query?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time top-K computation over a sliding time window &middot; not batch analytics, not historical reporting. The hard question: <span class="hr">how do you maintain accurate rankings over a sliding 1-hour window at millions of events/sec without re-scanning all data on every query&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -43,7 +43,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;5s</div>
 <div style="font-size:.72rem;color:var(--muted)">ranking freshness</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">activity ? reflected in top-K</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">activity &#x2192; reflected in top-K</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--g)">Top 100</div>
@@ -72,11 +72,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> <strong>Historical analytics</strong> (daily/weekly reports &middot; batch pipeline)<br>
-  <span class="hr">?</span> <strong>Message content analysis</strong> (topic detection, sentiment)<br>
-  <span class="hr">?</span> <strong>User activity scoring</strong> (engagement metrics for product analytics)<br>
-  <span class="hr">?</span> <strong>Exact counts</strong> (approximate top-K is sufficient for ranking)<br>
-  <span class="hr">?</span> <strong>Custom time windows</strong> (fixed at 1 hour for this design)
+  <span class="hr">&#x2717;</span> <strong>Historical analytics</strong> (daily/weekly reports &middot; batch pipeline)<br>
+  <span class="hr">&#x2717;</span> <strong>Message content analysis</strong> (topic detection, sentiment)<br>
+  <span class="hr">&#x2717;</span> <strong>User activity scoring</strong> (engagement metrics for product analytics)<br>
+  <span class="hr">&#x2717;</span> <strong>Exact counts</strong> (approximate top-K is sufficient for ranking)<br>
+  <span class="hr">&#x2717;</span> <strong>Custom time windows</strong> (fixed at 1 hour for this design)
 </div>
 </div>
 </div>
@@ -104,7 +104,7 @@
 <p class="su">Deriving Redis capacity from event rate and workspace distribution</p>
 <table>
 <tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
-<tr><td>1</td><td>200K msgs/sec from Kafka ? 200K ZINCRBY ops/sec to Redis</td><td>200K write ops/sec</td></tr>
+<tr><td>1</td><td>200K msgs/sec from Kafka &#x2192; 200K ZINCRBY ops/sec to Redis</td><td>200K write ops/sec</td></tr>
 <tr><td>2</td><td>60 time buckets &middot; avg 10K active channels/workspace</td><td>600K ZSET entries</td></tr>
 <tr><td>3</td><td>Memory: 600K entries &middot; 16 bytes</td><td>~10MB per workspace (trivial)</td></tr>
 <tr><td>4</td><td>ZUNIONSTORE across 60 keys: O(60 &middot; 10K)</td><td>600K ops every 5s</td></tr>
@@ -116,7 +116,7 @@
 <!-- --- ARCHITECTURE --- -->
 <div class="T" id="architecture">
 <h2>Architecture Overview</h2>
-<p class="su">Kafka stream ? sliding window aggregation ? Redis sorted sets with time-decay scoring ? top-K query</p>
+<p class="su">Kafka stream &#x2192; sliding window aggregation &#x2192; Redis sorted sets with time-decay scoring &#x2192; top-K query</p>
 
 <svg width="100%" viewBox="0 0 740 310" style="max-width:740px;display:block;margin:4px auto 8px">
 <defs>
@@ -126,7 +126,7 @@
 
 <!-- --- INGESTION PATH --- -->
 <rect x="4" y="4" width="732" height="100" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
-<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">INGESTION &middot; Message events from Kafka ? sliding window counters</text>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">INGESTION &middot; Message events from Kafka &#x2192; sliding window counters</text>
 
 <!-- Kafka source -->
 <rect x="14" y="30" width="100" height="32" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
@@ -146,7 +146,7 @@
 <!-- Redis Sorted Sets -->
 <rect x="296" y="26" width="150" height="40" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
 <text x="371" y="38" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis Sorted Sets</text>
-<text x="371" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">active:{workspace}:{bucket} ? ZSET</text>
+<text x="371" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">active:{workspace}:{bucket} &#x2192; ZSET</text>
 <text x="371" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">member=channel_id, score=msg_count</text>
 <text x="371" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">60 buckets per workspace (1 per minute)</text>
 
@@ -154,13 +154,13 @@
 <rect x="470" y="26" width="130" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
 <text x="535" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">TTL Auto-Expiry</text>
 <text x="535" y="48" text-anchor="middle" fill="var(--muted)" font-size="5">Each bucket key: EXPIRE 3660s</text>
-<text x="535" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">Bucket older than 1hr ? auto-deleted</text>
+<text x="535" y="58" text-anchor="middle" fill="var(--muted)" font-size="5">Bucket older than 1hr &#x2192; auto-deleted</text>
 <text x="535" y="66" text-anchor="middle" fill="var(--muted)" font-size="4.5">No manual cleanup needed</text>
 
 <!-- Latency annotation -->
 <rect x="620" y="26" width="106" height="40" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text x="673" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Ingestion Latency</text>
-<text x="630" y="50" fill="var(--muted)" font-size="5.5">Kafka ? Redis: ~5ms</text>
+<text x="630" y="50" fill="var(--muted)" font-size="5.5">Kafka &#x2192; Redis: ~5ms</text>
 <text x="630" y="60" fill="var(--muted)" font-size="5.5">ZINCRBY: ~0.1ms</text>
 
 <!-- --- QUERY PATH --- -->
@@ -184,7 +184,7 @@
 <rect x="286" y="132" width="150" height="36" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
 <text x="361" y="144" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis ZUNIONSTORE</text>
 <text x="361" y="154" text-anchor="middle" fill="var(--muted)" font-size="5">sum scores across 60 minute-buckets</text>
-<text x="361" y="164" text-anchor="middle" fill="var(--muted)" font-size="4.5">ZREVRANGE 0 99 ? top 100</text>
+<text x="361" y="164" text-anchor="middle" fill="var(--muted)" font-size="4.5">ZREVRANGE 0 99 &#x2192; top 100</text>
 <line x1="436" y1="150" x2="460" y2="150" stroke="var(--r)" stroke-width="1" marker-end="url(#ac1)"/>
 
 <!-- Result -->
@@ -213,7 +213,7 @@
 <rect x="260" y="234" width="230" height="56" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
 <text x="375" y="246" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Min-Heap (size K=100)</text>
 <text x="375" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Maintains top-100 channels by count</text>
-<text x="375" y="268" text-anchor="middle" fill="var(--muted)" font-size="5">New event: if count > heap min ? replace</text>
+<text x="375" y="268" text-anchor="middle" fill="var(--muted)" font-size="5">New event: if count > heap min &#x2192; replace</text>
 <text x="375" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">O(log K) per update = O(log 100) = O(7)</text>
 <text x="375" y="288" text-anchor="middle" fill="var(--muted)" font-size="4.5">Memory: 100 entries &middot; 16 bytes = 1.6KB</text>
 
@@ -235,7 +235,7 @@
 <tr><td><span class="hi">Window Strategy</span></td><td><span class="hg">Time-bucketed (1-min buckets &middot; 60)</span></td><td>Each minute gets its own Redis sorted set. Union 60 buckets = 1-hour window. Old buckets auto-expire via TTL.</td><td>Single counter with decay: hard to expire exactly at 1hr. Tumbling window: stale for up to window-size.</td></tr>
 <tr><td><span class="hi">Storage</span></td><td><span class="hg">Redis Sorted Sets (ZSET)</span></td><td>ZINCRBY O(log N) for increment. ZUNIONSTORE for aggregation. ZREVRANGE for top-K. All sub-ms operations.</td><td>Database: too slow for 200K writes/sec. In-memory only: lost on restart (acceptable for rankings).</td></tr>
 <tr><td><span class="hi">Expiry</span></td><td><span class="hg">TTL on bucket keys (3660s)</span></td><td>Redis auto-deletes expired buckets. No background cleanup job needed. Sliding window maintained passively.</td><td>Manual cleanup cron: adds operational complexity. Explicit delete: race conditions with writers.</td></tr>
-<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">Exact per-workspace, approximate global</span></td><td>Per-workspace has &lt;10K channels ? Redis ZSET is exact. Global across millions ? CMS + heap is approximate but bounded.</td><td>Exact global: requires scanning all workspaces. Too expensive for real-time.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">Exact per-workspace, approximate global</span></td><td>Per-workspace has &lt;10K channels &#x2192; Redis ZSET is exact. Global across millionS &#x2192; CMS + heap is approximate but bounded.</td><td>Exact global: requires scanning all workspaces. Too expensive for real-time.</td></tr>
 <tr><td><span class="hi">Computation Model</span></td><td><span class="hg">Streaming (no batch)</span></td><td>Every message event immediately increments the counter. No periodic batch job. Rankings are always fresh within 5s.</td><td>Batch (every 5 min): stale rankings, spiky compute load. Lambda architecture: unnecessary complexity.</td></tr>
 </table>
 <div class="b bg"><span class="hi">Cross-reference:</span> The event source is the same <a href="slack-real-time-messaging.html">Kafka messages topic</a> used by the fan-out workers and search indexer. The ranking system is just another consumer group on the same topic &middot; no additional event production needed.</div>
@@ -293,7 +293,7 @@
 <div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Every message event immediately increments the counter via Kafka consumer. No periodic batch job. Rankings reflect activity within 5 seconds. Pre-compute the union result every 5s into a cached key for fast reads.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
-<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">? Hierarchical: Per-Workspace Exact ? Global Approximate</div>
+<div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">? Hierarchical: Per-Workspace Exact &#x2192; Global Approximate</div>
 <div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Per-workspace rankings use exact Redis ZSETs (most workspaces have &lt;10K channels). Global cross-workspace rankings use approximate structures (CMS + heap). This gives exact results where users care most and approximate where scale demands it.</div>
 </div>
 </div>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does LaunchDarkly evaluate 1M+ flag checks/sec with &lt;5ms latency?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a feature flag system: 1M+ checks/sec, P99 &lt;5ms, 10s propagation to 100K servers</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a feature flag system: 1M+ checks/sec, P99 &lt;5ms, 10s propagation to 100K servers</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -55,7 +55,7 @@
 
   <!-- LAYER 1: MANAGEMENT -->
   <rect x="10" y="10" width="760" height="125" rx="8" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 &middot; MANAGEMENT (Dashboard ? Flag Store ? Change Event)</text>
+  <text x="390" y="28" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="700">LAYER 1 &middot; MANAGEMENT (Dashboard &#x2192; Flag Store &#x2192; Change Event)</text>
 
   <rect x="30" y="42" width="200" height="82" rx="6" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="130" y="58" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Dashboard</text>
@@ -81,16 +81,16 @@
   <text x="640" y="58" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Change Event</text>
   <text x="640" y="72" text-anchor="middle" fill="var(--muted)" font-size="5.5">Trigger propagation on any edit</text>
   <text x="640" y="85" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Delta payload (only the diff)</text>
-  <text x="640" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">Version N ? N+1 (incremental)</text>
+  <text x="640" y="98" text-anchor="middle" fill="var(--muted)" font-size="5.5">Version N &#x2192; N+1 (incremental)</text>
   <text x="640" y="111" text-anchor="middle" fill="var(--muted)" font-size="5.5">No full sync per change</text>
   <text x="640" y="122" text-anchor="middle" fill="var(--muted)" font-size="5">Minimizes bandwidth to 100K+ SDKs</text>
 
-  <!-- Arrow Layer 1 ? Layer 2 -->
+  <!-- Arrow Layer 1 &#x2192; Layer 2 -->
   <line x1="390" y1="135" x2="390" y2="153" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
 
   <!-- LAYER 2: DISTRIBUTION -->
   <rect x="10" y="155" width="760" height="125" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="6,3"/>
-  <text x="390" y="173" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 &middot; DISTRIBUTION (Stream Relay ? 100K+ SDK Instances)</text>
+  <text x="390" y="173" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="700">LAYER 2 &middot; DISTRIBUTION (Stream Relay &#x2192; 100K+ SDK Instances)</text>
 
   <rect x="30" y="185" width="320" height="82" rx="6" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="190" y="201" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Stream Relay Cluster</text>
@@ -122,7 +122,7 @@
   <text x="645" y="256" text-anchor="middle" fill="var(--muted)" font-size="5.5">Graceful degradation: use last-known</text>
   <text x="645" y="265" text-anchor="middle" fill="var(--muted)" font-size="5">if stream disconnects</text>
 
-  <!-- Arrow Layer 2 ? Layer 3 -->
+  <!-- Arrow Layer 2 &#x2192; Layer 3 -->
   <line x1="390" y1="280" x2="390" y2="298" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ff-arr)"/>
 
   <!-- LAYER 3: EVALUATION -->
@@ -175,10 +175,10 @@
   <text x="390" y="487" text-anchor="middle" fill="var(--muted)" font-size="6">1M+ evals/sec across fleet | ~10MB RAM per SDK | Polling fallback every 30s | Hardcoded defaults as last resort</text>
 </svg>
 
-<div class="b bg"><span class="hi">Local evaluation:</span> The SDK downloads all flag rules at startup and keeps them in-memory. Every flag check is a <span class="hg">local computation</span> &middot; hash user context against targeting rules. No network call per evaluation ? sub-millisecond P99.</div>
+<div class="b bg"><span class="hi">Local evaluation:</span> The SDK downloads all flag rules at startup and keeps them in-memory. Every flag check is a <span class="hg">local computation</span> &middot; hash user context against targeting rules. No network call per evaluation &#x2192; sub-millisecond P99.</div>
 <div class="b by"><span class="hi">Propagation via streaming:</span> Flag changes push through SSE/WebSocket relay layer. <span class="hg">Delta updates</span> (only changed flags) minimize bandwidth. Relay proxies handle fan-out to 100K+ connected SDKs. Fallback: polling every 30s if stream disconnects.</div>
 <div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">API call per flag check</span> &middot; adds latency, creates SPOF. <span class="hr">Polling-only updates</span> &middot; minutes of stale flags. <span class="hr">No fallback defaults</span> &middot; service crashes if flag service is down. <span class="hr">Unbounded rule complexity</span> &middot; evaluation time explodes.</div>
-<div class="b bb"><span class="hi">Targeting rules:</span> Evaluated in order: individual targets ? segment rules ? percentage rollout ? default. Percentage uses <span class="hg">deterministic hashing</span> (same user always gets same variant) &middot; consistent experience across requests.</div>
+<div class="b bb"><span class="hi">Targeting rules:</span> Evaluated in order: individual targets &#x2192; segment rules &#x2192; percentage rollout &#x2192; default. Percentage uses <span class="hg">deterministic hashing</span> (same user always gets same variant) &middot; consistent experience across requests.</div>
 </div>
 
 <!-- --- SCALE ESTIMATION --- -->
@@ -189,7 +189,7 @@
 <tr><td><span class="hi">1</span></td><td>Flag checks: 1M/sec across all services</td><td><span class="hg">1M evaluations/sec</span></td><td>Must be local (in-process) &middot; no network call per check</td></tr>
 <tr><td><span class="hi">2</span></td><td>Flags per project: ~500 flags &middot; 10 rules each</td><td><span class="hg">~5K rules in memory</span></td><td>Fits in ~10MB RAM per SDK instance &middot; trivial</td></tr>
 <tr><td><span class="hi">3</span></td><td>Connected SDKs: 100K servers &middot; 1 connection each</td><td><span class="hg">100K persistent connections</span></td><td>Relay proxy layer for fan-out (not direct to origin)</td></tr>
-<tr><td><span class="hi">4</span></td><td>Propagation: change ? relay ? all SDKs</td><td><span class="hg">&lt;10s end-to-end</span></td><td>SSE streaming with delta updates (only changed flags)</td></tr>
+<tr><td><span class="hi">4</span></td><td>Propagation: change &#x2192; relay &#x2192; all SDKs</td><td><span class="hg">&lt;10s end-to-end</span></td><td>SSE streaming with delta updates (only changed flags)</td></tr>
 <tr><td><span class="hi">5</span></td><td>Event analytics: 1M checks/sec &middot; 100 bytes</td><td><span class="hg">~100 MB/sec telemetry</span></td><td>Sampled (1-10%) + aggregated client-side before sending</td></tr>
 </table>
 </div>
@@ -213,7 +213,7 @@
 <span class="hg">1.</span> <strong>In-process evaluation</strong> &middot; SDK holds rules locally, no network call per check (&lt;1ms)<br>
 <span class="hg">2.</span> <strong>Streaming propagation</strong> &middot; SSE/WebSocket push, delta updates, 10s global propagation<br>
 <span class="hg">3.</span> <strong>Deterministic hashing</strong> &middot; hash(user_id + flag) % 100 for consistent percentage rollouts<br>
-<span class="hg">4.</span> <strong>Rule evaluation order</strong> &middot; individual ? segment ? percentage ? default<br>
+<span class="hg">4.</span> <strong>Rule evaluation order</strong> &middot; individual &#x2192; segment &#x2192; percentage &#x2192; default<br>
 <span class="hg">5.</span> <strong>Graceful degradation</strong> &middot; SDK uses last-known state if stream disconnects, hardcoded defaults as last resort<br>
 <span class="hg">6.</span> <strong>Relay proxy</strong> &middot; intermediate cache for high fan-out, reduces load on origin
 </div>

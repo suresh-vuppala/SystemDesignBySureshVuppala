@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a presence system track online/offline status for 100M+ concurrent users in real-time?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a presence system that tracks online/offline status for 100M+ concurrent users, delivering status changes to relevant contacts within seconds</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a presence system that tracks online/offline status for 100M+ concurrent users, delivering status changes to relevant contacts within seconds</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -28,7 +28,7 @@
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a presence system track online/offline status for 100M+ concurrent users in real-time, delivering status changes to relevant contacts within seconds without flooding the network with unnecessary updates?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Presence tracking and propagation only &middot; not messaging, media, or call signaling. The hard question: <span class="hr">how do you fan-out status changes to hundreds of contacts per user without creating a thundering herd of 27.5M updates/sec?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Presence tracking and propagation only &middot; not messaging, media, or call signaling. The hard question: <span class="hr">how do you fan-out status changes to hundreds of contacts per user without creating a thundering herd of 27.5M updates/sec&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -75,12 +75,12 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> <strong>Typing indicators</strong> (separate ephemeral event system)<br>
-  <span class="hr">?</span> <strong>Message delivery</strong> (separate messaging pipeline)<br>
-  <span class="hr">?</span> <strong>Read receipts</strong> (separate aggregation problem)<br>
-  <span class="hr">?</span> <strong>Group presence</strong> aggregation (e.g., "5 members online")<br>
-  <span class="hr">?</span> <strong>Custom status</strong> messages ("In a meeting")<br>
-  <span class="hr">?</span> <strong>Push notifications</strong> for presence changes
+  <span class="hr">&#x2717;</span> <strong>Typing indicators</strong> (separate ephemeral event system)<br>
+  <span class="hr">&#x2717;</span> <strong>Message delivery</strong> (separate messaging pipeline)<br>
+  <span class="hr">&#x2717;</span> <strong>Read receipts</strong> (separate aggregation problem)<br>
+  <span class="hr">&#x2717;</span> <strong>Group presence</strong> aggregation (e.g., "5 members online")<br>
+  <span class="hr">&#x2717;</span> <strong>Custom status</strong> messages ("In a meeting")<br>
+  <span class="hr">&#x2717;</span> <strong>Push notifications</strong> for presence changes
 </div>
 </div>
 </div>
@@ -107,7 +107,7 @@
 <!-- --- SCALE ESTIMATION --- -->
 <div class="T" id="numbers">
 <h2>Scale Estimation</h2>
-<p class="su">Given numbers ? derive infrastructure sizing. Show this reasoning in an interview.</p>
+<p class="su">Given numbers &#x2192; derive infrastructure sizing. Show this reasoning in an interview.</p>
 
 <div class="b bb" style="margin-bottom:10px">
   <span class="hi">Given (from question):</span>
@@ -154,7 +154,7 @@
 <tr>
   <td><span class="hi">6</span></td>
   <td>Cross-shard routing</td>
-  <td>User A on shard-7, contact B on shard-42 ? internal pub/sub</td>
+  <td>User A on shard-7, contact B on shard-42 &#x2192; internal pub/sub</td>
   <td><span class="hg">~80% cross-shard</span></td>
   <td>Internal message bus (Kafka/NATS) for cross-shard subscription routing</td>
 </tr>
@@ -174,7 +174,7 @@
 </tr>
 </table>
 
-<div class="b by"><span class="hi">Interview tip:</span> Start with step 1&middot;2 (the naive fan-out math) to show the problem is hard. Then step 3 (subscription filtering) is the key insight that makes it tractable. The 27.5M ? 1.37M reduction is what drives the entire architecture.</div>
+<div class="b by"><span class="hi">Interview tip:</span> Start with step 1&middot;2 (the naive fan-out math) to show the problem is hard. Then step 3 (subscription filtering) is the key insight that makes it tractable. The 27.5M &#x2192; 1.37M reduction is what drives the entire architecture.</div>
 </div>
 
 <!-- --- ARCHITECTURE --- -->
@@ -247,7 +247,7 @@
 <rect data-dp-step="8" x="500" y="152" width="246" height="48" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
 <text data-dp-step="8" x="623" y="164" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Internal Pub/Sub (NATS/Kafka)</text>
 <text data-dp-step="8" x="623" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">Cross-shard subscription routing</text>
-<text data-dp-step="8" x="623" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">User A on shard-7 changes ? notify</text>
+<text data-dp-step="8" x="623" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">User A on shard-7 changes &#x2192; notify</text>
 <text data-dp-step="8" x="623" y="196" text-anchor="middle" fill="var(--muted)" font-size="5">subscribers on shard-42, shard-15, etc.</text>
 
 <line data-dp-step="8" x1="466" y1="176" x2="498" y2="176" stroke="var(--o)" stroke-width="1" marker-end="url(#ps1)"/>
@@ -257,7 +257,7 @@
 <text data-dp-step="9" x="380" y="232" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">DELIVERY FLOW &middot; User A goes online</text>
 
 <rect data-dp-step="10" x="14" y="240" width="100" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".6"/>
-<text data-dp-step="10" x="64" y="252" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">1. A connects ? shard</text>
+<text data-dp-step="10" x="64" y="252" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">1. A connects &#x2192; shard</text>
 <text data-dp-step="10" x="64" y="261" text-anchor="middle" fill="var(--muted)" font-size="5">marks A = online</text>
 <line data-dp-step="10" x1="114" y1="253" x2="130" y2="253" stroke="var(--a)" stroke-width=".8" marker-end="url(#ps1)"/>
 
@@ -283,8 +283,8 @@
 <!-- Comparison note -->
 <rect data-dp-step="11" x="4" y="282" width="752" height="50" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".8"/>
 <text data-dp-step="11" x="380" y="296" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">WHY SLACK'S APPROACH DOESN'T WORK AT 100M</text>
-<text data-dp-step="11" x="380" y="310" text-anchor="middle" fill="var(--muted)" font-size="5.5">Slack: Single Redis cluster ? channel:{id}:online SET ? works at 10M users, ~300K ops/sec per node</text>
-<text data-dp-step="11" x="380" y="322" text-anchor="middle" fill="var(--muted)" font-size="5.5">WhatsApp scale: 27.5M fan-out ops/sec ? needs ~92 Redis nodes just for presence. Solution: purpose-built sharded presence servers with in-memory subscription lists.</text>
+<text data-dp-step="11" x="380" y="310" text-anchor="middle" fill="var(--muted)" font-size="5.5">Slack: Single Redis cluster &#x2192; channel:{id}:online SET &#x2192; works at 10M users, ~300K ops/sec per node</text>
+<text data-dp-step="11" x="380" y="322" text-anchor="middle" fill="var(--muted)" font-size="5.5">WhatsApp scale: 27.5M fan-out ops/sec &#x2192; needs ~92 Redis nodes just for presence. Solution: purpose-built sharded presence servers with in-memory subscription lists.</text>
 </svg>
 
 <div class="b bg"><span class="hi">Architecture principle:</span> Each presence shard is a <span class="hg">self-contained unit</span> &middot; it owns the state for its users AND the subscription list of who wants to know about those users. Cross-shard communication happens via internal pub/sub, not shared state.</div>
@@ -346,13 +346,13 @@
 
 <rect data-dp-step="9" x="14" y="152" width="200" height="52" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text data-dp-step="9" x="114" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Without Subscriptions</text>
-<text data-dp-step="9" x="114" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes ? push to ALL 500 contacts</text>
-<text data-dp-step="9" x="114" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">475 are offline ? 95% wasted work</text>
+<text data-dp-step="9" x="114" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes &#x2192; push to ALL 500 contacts</text>
+<text data-dp-step="9" x="114" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">475 are offline &#x2192; 95% wasted work</text>
 <text data-dp-step="9" x="114" y="196" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">27.5M updates/sec &middot; impossible</text>
 
 <rect data-dp-step="9" x="230" y="152" width="200" height="52" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text data-dp-step="9" x="330" y="164" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">With Subscriptions</text>
-<text data-dp-step="9" x="330" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes ? push to 25 online subscribers</text>
+<text data-dp-step="9" x="330" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">A changes &#x2192; push to 25 online subscribers</text>
 <text data-dp-step="9" x="330" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">0% wasted &middot; every push is useful</text>
 <text data-dp-step="9" x="330" y="196" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">1.37M updates/sec &middot; feasible ?</text>
 
@@ -399,17 +399,17 @@
 
 <rect data-dp-step="4" x="14" y="84" width="200" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".6"/>
 <text data-dp-step="4" x="114" y="96" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Presence Map</text>
-<text data-dp-step="4" x="114" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id ? {status, last_seen, gateway_id}</text>
+<text data-dp-step="4" x="114" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id &#x2192; {status, last_seen, gateway_id}</text>
 <text data-dp-step="4" x="114" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">HashMap&lt;u64, PresenceEntry&gt; &middot; O(1) lookup</text>
 
 <rect data-dp-step="4" x="230" y="84" width="210" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".6"/>
 <text data-dp-step="4" x="335" y="96" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Subscriber Lists</text>
-<text data-dp-step="4" x="335" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id ? Set&lt;subscriber_id&gt; (online contacts watching)</text>
+<text data-dp-step="4" x="335" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">user_id &#x2192; Set&lt;subscriber_id&gt; (online contacts watching)</text>
 <text data-dp-step="4" x="335" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">Avg 25 subscribers per user (only online ones)</text>
 
 <rect data-dp-step="4" x="456" y="84" width="210" height="40" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".6"/>
 <text data-dp-step="4" x="561" y="96" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Reverse Index</text>
-<text data-dp-step="4" x="561" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">subscriber_id ? Set&lt;watched_user_ids&gt;</text>
+<text data-dp-step="4" x="561" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">subscriber_id &#x2192; Set&lt;watched_user_ids&gt;</text>
 <text data-dp-step="4" x="561" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">For fast cleanup on disconnect</text>
 
 <!-- Cross-shard routing -->
@@ -426,7 +426,7 @@
 <rect data-dp-step="7" x="202" y="168" width="140" height="50" rx="4" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
 <text data-dp-step="7" x="272" y="182" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Internal Pub/Sub Bus</text>
 <text data-dp-step="7" x="272" y="194" text-anchor="middle" fill="var(--muted)" font-size="5">NATS / Kafka internal topic</text>
-<text data-dp-step="7" x="272" y="204" text-anchor="middle" fill="var(--muted)" font-size="5">Route: "A online" ? gateways of B, D, E</text>
+<text data-dp-step="7" x="272" y="204" text-anchor="middle" fill="var(--muted)" font-size="5">Route: "A online" &#x2192; gateways of B, D, E</text>
 <line data-dp-step="7" x1="342" y1="185" x2="380" y2="178" stroke="var(--o)" stroke-width=".8" marker-end="url(#ps3)"/>
 <line data-dp-step="7" x1="342" y1="198" x2="380" y2="205" stroke="var(--o)" stroke-width=".8" marker-end="url(#ps3)"/>
 
@@ -455,7 +455,7 @@
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:10px;text-align:left">
-<h4 style="color:var(--g);font-size:.82rem">?? Batch Updates</h4>
+<h4 style="color:var(--g);font-size:.82rem">&#x2794; Batch Updates</h4>
 <div style="font-size:.76rem;line-height:1.6;color:var(--muted)">
   Collect presence changes over a <strong style="color:var(--text)">500ms window</strong> before fanning out.<br>
   If 10 users on the same shard change status within 500ms, send <strong style="color:var(--text)">one batch notification</strong> to each gateway instead of 10 individual pushes.<br>
@@ -471,7 +471,7 @@
 </div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left">
-<h4 style="color:var(--y);font-size:.82rem">?? Lazy "Last Seen" Propagation</h4>
+<h4 style="color:var(--y);font-size:.82rem">&#x2794; Lazy "Last Seen" Propagation</h4>
 <div style="font-size:.76rem;line-height:1.6;color:var(--muted)">
   "Last seen" timestamps are <strong style="color:var(--text)">NOT pushed in real-time</strong>. They're stored on the shard and fetched on-demand when a contact opens a chat.<br>
   Only the <strong style="color:var(--text)">online/offline transition</strong> is pushed. Timestamp is pulled lazily.<br>
@@ -538,7 +538,7 @@
   <span style="color:var(--muted)">100M users &middot; status change every 30min = 55K changes/sec. Each change &middot; 500 contacts = 27.5M updates/sec. This is why naive broadcast fails and why you need subscription-based delivery.</span><br><br>
 
   <span class="hg" style="font-weight:700">2. Subscription model is the key insight.</span><br>
-  <span style="color:var(--muted)">Only push to online subscribers (not all contacts). 500 contacts ? ~25 online subscribers = 20&middot; reduction. Subscribe on connect, unsubscribe on disconnect. This single decision makes the system feasible.</span><br><br>
+  <span style="color:var(--muted)">Only push to online subscribers (not all contacts). 500 contacts &#x2192; ~25 online subscribers = 20&middot; reduction. Subscribe on connect, unsubscribe on disconnect. This single decision makes the system feasible.</span><br><br>
 
   <span class="hg" style="font-weight:700">3. Shard by user_id, not by "channel" or "group".</span><br>
   <span style="color:var(--muted)">Each shard owns presence state + subscriber lists for its users. Cross-shard routing via internal pub/sub. ~100 shards for 100M users. Each shard is an independent failure domain with its own replica.</span><br><br>

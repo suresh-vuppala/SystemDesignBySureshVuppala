@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a multi-region chat system guarantee causal message ordering when an entire cloud region goes down?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a multi-region messaging system that maintains causal ordering across 3+ regions with &lt;250ms cross-region latency while surviving full region failures</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a multi-region messaging system that maintains causal ordering across 3+ regions with &lt;250ms cross-region latency while surviving full region failures</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -28,7 +28,7 @@
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a multi-region chat system guarantee causal message ordering within conversations when an entire cloud region goes down, while maintaining consistency and conflict resolution across geographically distributed nodes?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> In a single-region system, a monotonic sequence number trivially orders messages. But when messages originate in different regions with 60&middot;120ms replication lag, <span class="hr">how do you guarantee that "Reply B" always appears after "Original A" &middot; even during a region failover?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> In a single-region system, a monotonic sequence number trivially orders messages. But when messages originate in different regions with 60&middot;120ms replication lag, <span class="hr">how do you guarantee that "Reply B" always appears after "Original A" &middot; even during a region failover&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -73,12 +73,12 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> Global total ordering across all conversations (only per-conversation causal order)<br>
-  <span class="hr">?</span> End-to-end encryption key distribution across regions<br>
-  <span class="hr">?</span> Media/file replication strategy<br>
-  <span class="hr">?</span> User authentication and session management<br>
-  <span class="hr">?</span> Read receipts and typing indicators<br>
-  <span class="hr">?</span> Message search indexing across regions
+  <span class="hr">&#x2717;</span> Global total ordering across all conversations (only per-conversation causal order)<br>
+  <span class="hr">&#x2717;</span> End-to-end encryption key distribution across regions<br>
+  <span class="hr">&#x2717;</span> Media/file replication strategy<br>
+  <span class="hr">&#x2717;</span> User authentication and session management<br>
+  <span class="hr">&#x2717;</span> Read receipts and typing indicators<br>
+  <span class="hr">&#x2717;</span> Message search indexing across regions
 </div>
 </div>
 </div>
@@ -117,7 +117,7 @@
 <tr>
   <td><span class="hi">1</span></td>
   <td>Cross-region RTT</td>
-  <td>US-East ? EU-West measured</td>
+  <td>US-East &#x2192; EU-West measured</td>
   <td><span class="hg">~80ms</span></td>
   <td>Sets floor for replication lag &middot; cannot do synchronous consensus within latency budget</td>
 </tr>
@@ -184,41 +184,41 @@
   <rect x="20" y="20" width="170" height="130" rx="8" fill="none" stroke="var(--border)" stroke-width="1.5"/>
   <text x="105" y="45" text-anchor="middle" fill="var(--y)" font-size="11" font-weight="700">Lamport Timestamps</text>
   <text x="105" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">Single counter, increment on send</text>
-  <text x="35" y="90" fill="var(--text)" font-size="9">? Total order</text>
-  <text x="35" y="108" fill="var(--text)" font-size="9">? No causal detection</text>
-  <text x="35" y="126" fill="var(--r)" font-size="9">? Can't tell concurrent</text>
+  <text x="35" y="90" fill="var(--text)" font-size="9">&#x2714; Total order</text>
+  <text x="35" y="108" fill="var(--text)" font-size="9">&#x2714; No causal detection</text>
+  <text x="35" y="126" fill="var(--r)" font-size="9">&#x2714; Can't tell concurrent</text>
   <text x="35" y="144" fill="var(--r)" font-size="9">   from causally related</text>
 
   <!-- Vector Clocks -->
   <rect x="210" y="20" width="170" height="130" rx="8" fill="none" stroke="var(--border)" stroke-width="1.5"/>
   <text x="295" y="45" text-anchor="middle" fill="var(--a)" font-size="11" font-weight="700">Vector Clocks</text>
   <text x="295" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">One counter per node</text>
-  <text x="225" y="90" fill="var(--text)" font-size="9">? Detects causality</text>
-  <text x="225" y="108" fill="var(--text)" font-size="9">? Detects concurrency</text>
-  <text x="225" y="126" fill="var(--r)" font-size="9">? O(n) space per message</text>
-  <text x="225" y="144" fill="var(--r)" font-size="9">? Grows with participants</text>
+  <text x="225" y="90" fill="var(--text)" font-size="9">&#x2714; Detects causality</text>
+  <text x="225" y="108" fill="var(--text)" font-size="9">&#x2714; Detects concurrency</text>
+  <text x="225" y="126" fill="var(--r)" font-size="9">&#x2714; O(n) space per message</text>
+  <text x="225" y="144" fill="var(--r)" font-size="9">&#x2714; Grows with participants</text>
 
   <!-- HLC -->
   <rect x="400" y="20" width="170" height="130" rx="8" fill="none" stroke="var(--g)" stroke-width="2"/>
   <text x="485" y="45" text-anchor="middle" fill="var(--g)" font-size="11" font-weight="700">Hybrid Logical Clocks</text>
   <text x="485" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">Physical time + logical counter</text>
-  <text x="415" y="90" fill="var(--text)" font-size="9">? Causal ordering</text>
-  <text x="415" y="108" fill="var(--text)" font-size="9">? Bounded size (64-bit)</text>
-  <text x="415" y="126" fill="var(--text)" font-size="9">? Close to wall-clock</text>
-  <text x="415" y="144" fill="var(--g)" font-size="9">? Best for multi-region</text>
+  <text x="415" y="90" fill="var(--text)" font-size="9">&#x2714; Causal ordering</text>
+  <text x="415" y="108" fill="var(--text)" font-size="9">&#x2714; Bounded size (64-bit)</text>
+  <text x="415" y="126" fill="var(--text)" font-size="9">&#x2714; Close to wall-clock</text>
+  <text x="415" y="144" fill="var(--g)" font-size="9">&#x2714; Best for multi-region</text>
 
   <!-- Server-Assigned Seq -->
   <rect x="590" y="20" width="180" height="130" rx="8" fill="none" stroke="var(--border)" stroke-width="1.5"/>
   <text x="680" y="45" text-anchor="middle" fill="var(--o)" font-size="11" font-weight="700">Server-Assigned Seq</text>
   <text x="680" y="65" text-anchor="middle" fill="var(--muted)" font-size="9">Monotonic per partition</text>
-  <text x="605" y="90" fill="var(--text)" font-size="9">? Simple, fast</text>
-  <text x="605" y="108" fill="var(--text)" font-size="9">? Total order (single region)</text>
-  <text x="605" y="126" fill="var(--r)" font-size="9">? Breaks on region failover</text>
-  <text x="605" y="144" fill="var(--r)" font-size="9">? Single point of assignment</text>
+  <text x="605" y="90" fill="var(--text)" font-size="9">&#x2714; Simple, fast</text>
+  <text x="605" y="108" fill="var(--text)" font-size="9">&#x2714; Total order (single region)</text>
+  <text x="605" y="126" fill="var(--r)" font-size="9">&#x2714; Breaks on region failover</text>
+  <text x="605" y="144" fill="var(--r)" font-size="9">&#x2714; Single point of assignment</text>
 
   <!-- Winner indicator -->
   <rect x="400" y="165" width="170" height="30" rx="6" fill="var(--g)" opacity="0.15"/>
-  <text x="485" y="185" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="700">? CHOSEN: HLC</text>
+  <text x="485" y="185" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="700">&#x2714; CHOSEN: HLC</text>
 
   <!-- Comparison arrows -->
   <line x1="190" y1="200" x2="400" y2="185" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4"/>
@@ -240,7 +240,7 @@
 <tr><th>Strategy</th><th>Causality Detection</th><th>Space per Message</th><th>Multi-Region</th><th>Failover Behavior</th><th>Best For</th></tr>
 <tr><td><span class="hi">Lamport Timestamps</span></td><td><span class="hr">No</span> &middot; only total order</td><td><span class="hg">O(1)</span> &middot; single integer</td><td><span class="hr">Poor</span> &middot; no concurrency detection</td><td>Counter gaps on failover</td><td>Single-leader systems</td></tr>
 <tr><td><span class="hi">Vector Clocks</span></td><td><span class="hg">Yes</span> &middot; full causal history</td><td><span class="hr">O(n)</span> &middot; grows with nodes</td><td><span class="hg">Good</span> &middot; detects conflicts</td><td>Works but expensive metadata</td><td>Small node counts (Dynamo)</td></tr>
-<tr><td><span class="hi">Hybrid Logical Clocks</span></td><td><span class="hg">Yes</span> &middot; causal + physical</td><td><span class="hg">O(1)</span> &middot; 64-bit fixed</td><td><span class="hg">Excellent</span> &middot; bounded, sortable</td><td>Seamless &middot; no single assigner</td><td><span class="hg">Multi-region chat ?</span></td></tr>
+<tr><td><span class="hi">Hybrid Logical Clocks</span></td><td><span class="hg">Yes</span> &middot; causal + physical</td><td><span class="hg">O(1)</span> &middot; 64-bit fixed</td><td><span class="hg">Excellent</span> &middot; bounded, sortable</td><td>Seamless &middot; no single assigner</td><td><span class="hg">Multi-region chat &#x2714;</span></td></tr>
 <tr><td><span class="hi">Server-Assigned Seq</span></td><td><span class="hg">Yes</span> &middot; within partition</td><td><span class="hg">O(1)</span> &middot; integer</td><td><span class="hr">Breaks</span> &middot; single assigner</td><td><span class="hr">Fails</span> &middot; assigner is SPOF</td><td>Single-region (Kafka partition)</td></tr>
 </table>
 
@@ -393,7 +393,7 @@
 
   <!-- Conflict Detection -->
   <rect x="280" y="210" width="220" height="35" rx="6" fill="var(--r)" opacity="0.1" stroke="var(--r)" stroke-width="1.5"/>
-  <text x="390" y="225" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="600">? Conflict Detected</text>
+  <text x="390" y="225" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="600">&#x2714; Conflict Detected</text>
   <text x="390" y="240" text-anchor="middle" fill="var(--muted)" font-size="8">Same HLC physical time, no causal link</text>
 
   <!-- Resolution Strategies -->
@@ -416,16 +416,16 @@
 
   <!-- Final ordered result -->
   <rect x="250" y="350" width="280" height="25" rx="4" fill="var(--g)" opacity="0.1"/>
-  <text x="390" y="367" text-anchor="middle" fill="var(--g)" font-size="9">Final order: M1 ? M2 (nodeID "A" &lt; "B" tiebreak)</text>
+  <text x="390" y="367" text-anchor="middle" fill="var(--g)" font-size="9">Final order: M1 &#x2192; M2 (nodeID "A" &lt; "B" tiebreak)</text>
 </svg>
 
-<div class="b bb"><span class="hi">Key insight:</span> Concurrent messages (no causal relationship) can be ordered arbitrarily &middot; as long as <em>all nodes agree on the same order</em>. The deterministic tiebreak (HLC physical ? logical ? node ID) ensures every region converges to identical message ordering without coordination.</div>
+<div class="b bb"><span class="hi">Key insight:</span> Concurrent messages (no causal relationship) can be ordered arbitrarily &middot; as long as <em>all nodes agree on the same order</em>. The deterministic tiebreak (HLC physical &#x2192; logical &#x2192; node ID) ensures every region converges to identical message ordering without coordination.</div>
 </div>
 
 <!-- --- REGION FAILOVER --- -->
 <div class="T" id="failover">
 <h2>Region Failover</h2>
-<p class="su">Region A dies ? promote Region B ? handle in-flight messages ? reconcile when Region A recovers</p>
+<p class="su">Region A dies &#x2192; promote Region B &#x2192; handle in-flight messages &#x2192; reconcile when Region A recovers</p>
 
 <!-- SVG: Failover Sequence -->
 <svg viewBox="0 0 800 440" style="width:100%;max-width:800px;margin:10px auto;display:block;font-family:system-ui,sans-serif">
@@ -487,7 +487,7 @@
   <!-- Failover: DNS update + client reconnect -->
   <rect x="415" y="110" width="150" height="40" rx="4" fill="var(--o)" opacity="0.15"/>
   <text x="490" y="125" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="600">t=10s: Failover triggered</text>
-  <text x="490" y="138" text-anchor="middle" fill="var(--muted)" font-size="7">DNS routes A's users ? B</text>
+  <text x="490" y="138" text-anchor="middle" fill="var(--muted)" font-size="7">DNS routes A's users &#x2192; B</text>
   <text x="490" y="148" text-anchor="middle" fill="var(--muted)" font-size="7">Clients reconnect (~5s)</text>
 
   <!-- Region B absorbs load -->
@@ -506,7 +506,7 @@
   <rect x="250" y="280" width="500" height="60" rx="8" fill="none" stroke="var(--r)" stroke-width="1.5"/>
   <text x="500" y="300" text-anchor="middle" fill="var(--r)" font-size="10" font-weight="700">Split-Brain Detection &amp; Resolution</text>
   <text x="500" y="318" text-anchor="middle" fill="var(--muted)" font-size="9">If Region A accepted writes while partitioned (before detecting failure):</text>
-  <text x="500" y="334" text-anchor="middle" fill="var(--text)" font-size="9">Compare HLC timestamps ? Identify unreplicated messages ? Merge using causal graph ? Notify affected clients</text>
+  <text x="500" y="334" text-anchor="middle" fill="var(--text)" font-size="9">Compare HLC timestamps &#x2192; Identify unreplicated messages &#x2192; Merge using causal graph &#x2192; Notify affected clients</text>
 
   <!-- Fencing token -->
   <rect x="250" y="360" width="500" height="45" rx="8" fill="none" stroke="var(--y)" stroke-width="1"/>
@@ -648,7 +648,7 @@ You don't need <strong>total ordering</strong> (every message globally ordered) 
 <div class="d-panel" style="padding:10px;text-align:left">
 <h4 style="color:var(--o);margin-bottom:6px">3. The 80ms Conflict Window</h4>
 <div style="font-size:.78rem;line-height:1.7;color:var(--text)">
-Cross-region replication takes ~80ms. Any two messages sent within this window from different regions are <strong>potentially concurrent</strong>. The system must: (a) detect this via HLC comparison, (b) apply deterministic tiebreaking (physical ? logical ? nodeID), and (c) ensure all regions converge to the same order. This is the core distributed systems insight.
+Cross-region replication takes ~80ms. Any two messages sent within this window from different regions are <strong>potentially concurrent</strong>. The system must: (a) detect this via HLC comparison, (b) apply deterministic tiebreaking (physical &#x2192; logical &#x2192; nodeID), and (c) ensure all regions converge to the same order. This is the core distributed systems insight.
 </div>
 </div>
 

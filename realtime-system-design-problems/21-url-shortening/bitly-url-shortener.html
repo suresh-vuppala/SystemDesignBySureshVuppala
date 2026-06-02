@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a URL shortener generate globally unique short codes at scale?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a URL shortener: 1000+ URLs/sec, 7-char codes, no collisions, 100K redirects/sec</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a URL shortener: 1000+ URLs/sec, 7-char codes, no collisions, 100K redirects/sec</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -75,14 +75,14 @@
   <rect x="335" y="28" width="165" height="55" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="417" y="43" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">ID Generator</text>
   <text x="417" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Pre-allocated counter ranges</text>
-  <text x="417" y="68" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">base62(counter) ? 7 chars</text>
+  <text x="417" y="68" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">base62(counter) &#x2192; 7 chars</text>
   <text x="417" y="79" text-anchor="middle" fill="var(--muted)" font-size="4.5">Collision-free by construction</text>
 
   <line x1="500" y1="55" x2="530" y2="55" stroke="var(--g)" stroke-width="1.2" marker-end="url(#url-arr)"/>
 
   <rect x="535" y="28" width="110" height="55" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
   <text x="590" y="43" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">DB Write</text>
-  <text x="590" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">code ? long_url</text>
+  <text x="590" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">code &#x2192; long_url</text>
   <text x="590" y="68" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">DynamoDB/Cassandra</text>
   <text x="590" y="79" text-anchor="middle" fill="var(--muted)" font-size="4.5">Highly available</text>
 
@@ -101,7 +101,7 @@
 
   <!-- --- LAYER 2: READ PATH --- -->
   <rect x="10" y="140" width="760" height="130" rx="6" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,3"/>
-  <text x="390" y="153" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">READ PATH &middot; GET /abc123 ? 301 Redirect (100K req/sec)</text>
+  <text x="390" y="153" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">READ PATH &middot; GET /abc123 &#x2192; 301 Redirect (100K req/sec)</text>
 
   <rect x="25" y="165" width="100" height="50" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="75" y="183" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Browser</text>
@@ -112,7 +112,7 @@
 
   <rect x="165" y="163" width="170" height="55" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
   <text x="250" y="178" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Redis Cache</text>
-  <text x="250" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">GET code ? long_url</text>
+  <text x="250" y="192" text-anchor="middle" fill="var(--muted)" font-size="5.5">GET code &#x2192; long_url</text>
   <text x="250" y="205" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">99% hit rate | &lt;1ms</text>
   <text x="250" y="215" text-anchor="middle" fill="var(--muted)" font-size="4.5">170GB for top 20% URLs (Pareto)</text>
 
@@ -123,7 +123,7 @@
   <line x1="250" y1="218" x2="250" y2="240" stroke="var(--r)" stroke-width=".8" stroke-dasharray="2,2" marker-end="url(#url-arr)"/>
   <text x="270" y="235" fill="var(--r)" font-size="4.5">miss (1%)</text>
   <rect x="195" y="242" width="110" height="25" rx="3" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".8"/>
-  <text x="250" y="258" text-anchor="middle" fill="var(--a2)" font-size="5">DB lookup ? cache fill</text>
+  <text x="250" y="258" text-anchor="middle" fill="var(--a2)" font-size="5">DB lookup &#x2192; cache fill</text>
 
   <rect x="375" y="163" width="150" height="55" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="450" y="178" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">301/302 Redirect</text>
@@ -185,14 +185,14 @@
   <!-- --- BOTTOM: Key Insight --- -->
   <rect x="10" y="400" width="760" height="92" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
   <text x="390" y="416" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">KEY DESIGN DECISIONS</text>
-  <text x="390" y="432" text-anchor="middle" fill="var(--muted)" font-size="5.5">Write:Read = 1:100 ? optimize for reads | Cache is the critical path, DB is fallback only</text>
+  <text x="390" y="432" text-anchor="middle" fill="var(--muted)" font-size="5.5">Write:Read = 1:100 &#x2192; optimize for reads | Cache is the critical path, DB is fallback only</text>
   <text x="390" y="448" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">base62(counter) = collision-free by construction | 3.5 trillion possible 7-char codes (won't exhaust for centuries)</text>
-  <text x="390" y="464" text-anchor="middle" fill="var(--muted)" font-size="5.5">301 (permanent, browser caches ? fewer server hits) vs 302 (temporary, track every click for analytics)</text>
+  <text x="390" y="464" text-anchor="middle" fill="var(--muted)" font-size="5.5">301 (permanent, browser caches &#x2192; fewer server hits) vs 302 (temporary, track every click for analytics)</text>
   <text x="390" y="480" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">1000 URLs/sec write | 100K redirects/sec read | 7 chars base62 | &lt;10ms redirect</text>
 </svg>
 
-<div class="b bg"><span class="hi">ID generation:</span> Pre-allocate counter ranges from a central sequence (ZooKeeper/DB). Each node gets a range (e.g., 1M IDs). Encode counter as base62 ? 7 chars. <span class="hg">No coordination during normal operation</span> &middot; only when range exhausted.</div>
-<div class="b by"><span class="hi">Redirect path:</span> GET /abc1234 ? Redis lookup (1ms) ? if miss, DB lookup ? 301 redirect. <span class="hg">301 (permanent)</span> for SEO, <span class="hg">302 (temporary)</span> if you need analytics on every click.</div>
+<div class="b bg"><span class="hi">ID generation:</span> Pre-allocate counter ranges from a central sequence (ZooKeeper/DB). Each node gets a range (e.g., 1M IDs). Encode counter as base62 &#x2192; 7 chars. <span class="hg">No coordination during normal operation</span> &middot; only when range exhausted.</div>
+<div class="b by"><span class="hi">Redirect path:</span> GET /abc1234 &#x2192; Redis lookup (1ms) &#x2192; if miss, DB lookup &#x2192; 301 redirect. <span class="hg">301 (permanent)</span> for SEO, <span class="hg">302 (temporary)</span> if you need analytics on every click.</div>
 <div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Random hash + check-for-collision</span> &middot; race conditions under load. <span class="hr">Auto-increment single DB</span> &middot; bottleneck. <span class="hr">No cache for redirects</span> &middot; DB melts at 100K req/sec.</div>
 </div>
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Zoom handle 300-person meetings with screen sharing and adaptive video quality?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Zoom &middot; 300 participants &middot; &lt;200ms latency &middot; adaptive quality per participant</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Zoom &middot; 300 participants &middot; &lt;200ms latency &middot; adaptive quality per participant</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -26,7 +26,7 @@
 <!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <p class="su">How does Zoom handle 300-person meetings with screen sharing, adapting per-participant video quality in real-time based on available bandwidth while keeping total meeting latency under 200ms?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time media routing &middot; SFU architecture, simulcast, bandwidth estimation, speaker detection. Not scheduling, recording, or chat. The hard question: <span class="hr">how do you route 300 video streams selectively to each participant based on their individual bandwidth and viewport, all under 200ms?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Real-time media routing &middot; SFU architecture, simulcast, bandwidth estimation, speaker detection. Not scheduling, recording, or chat. The hard question: <span class="hr">how do you route 300 video streams selectively to each participant based on their individual bandwidth and viewport, all under 200ms&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -136,9 +136,9 @@
   <text x="140" y="280" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Packet Router (O(1) per packet, no decode)</text>
 
   <text x="370" y="225" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Decision Logic:</text>
-  <text x="370" y="240" text-anchor="middle" fill="var(--muted)" font-size="5">speaker ? forward 1080p/720p</text>
-  <text x="370" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">gallery ? forward 180p thumbnails</text>
-  <text x="370" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">off-screen ? forward nothing</text>
+  <text x="370" y="240" text-anchor="middle" fill="var(--muted)" font-size="5">speaker &#x2192; forward 1080p/720p</text>
+  <text x="370" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">gallery &#x2192; forward 180p thumbnails</text>
+  <text x="370" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">off-screen &#x2192; forward nothing</text>
   <text x="370" y="279" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">adapt every 1-2s per receiver BW</text>
 
   <!-- Cascaded SFUs -->
@@ -147,16 +147,16 @@
   <text x="630" y="207" text-anchor="middle" fill="var(--muted)" font-size="5.5">multi-region meetings: SFU per region</text>
   <text x="630" y="220" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">inter-SFU relay (1 stream per region)</text>
   <text x="630" y="233" text-anchor="middle" fill="var(--muted)" font-size="5.5">minimize cross-region hops</text>
-  <text x="630" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">US-East ? EU-West ? AP-South</text>
+  <text x="630" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">US-East &#x2192; EU-West &#x2192; AP-South</text>
   <text x="630" y="259" text-anchor="middle" fill="var(--muted)" font-size="5">users connect to nearest SFU</text>
-  <text x="630" y="272" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">300 users ? 300 cross-region streams</text>
+  <text x="630" y="272" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">300 users &#x2192; 300 cross-region streams</text>
   <text x="630" y="285" text-anchor="middle" fill="var(--muted)" font-size="5">only unique streams relayed between SFUs</text>
 
   <line x1="475" y1="240" x2="498" y2="240" stroke="var(--c)" stroke-width="1" marker-end="url(#zm-arr)"/>
 
   <!-- --- LAYER 3: RECEIVER --- -->
   <rect x="10" y="322" width="760" height="130" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="337" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: RECEIVER &middot; Each gets 1 high-quality speaker + N thumbnails ? gallery/speaker view</text>
+  <text x="390" y="337" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: RECEIVER &middot; Each gets 1 high-quality speaker + N thumbnails &#x2192; gallery/speaker view</text>
 
   <rect x="25" y="347" width="230" height="90" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="140" y="364" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Client B (5 Mbps)</text>
@@ -209,7 +209,7 @@
 
 <div class="b bg"><span class="hi">SFU vs MCU:</span> An MCU (Multipoint Control Unit) decodes all streams, composites them into one video, and re-encodes &middot; adding <span class="hr">300-500ms latency</span>. An SFU just forwards packets selectively &middot; <span class="hg">&lt;50ms added latency</span>. At 300 participants, SFU is the only viable choice for real-time interaction.</div>
 <div class="b by"><span class="hi">Simulcast trade-off:</span> Each sender uploads 3 layers (~2.5 Mbps total) instead of 1 (~1 Mbps). The extra upload cost enables the SFU to <span class="hg">instantly switch quality per receiver</span> without requesting a new encode from the sender &middot; critical for real-time adaptation.</div>
-<div class="b br"><span class="hi">Failure handling:</span> If a participant's bandwidth drops ? SFU switches to lower simulcast layer within 1-2 seconds. If SFU node fails ? clients reconnect to backup SFU (ICE restart). Audio is never sacrificed &middot; video drops first.</div>
+<div class="b br"><span class="hi">Failure handling:</span> If a participant's bandwidth drops &#x2192; SFU switches to lower simulcast layer within 1-2 seconds. If SFU node failS &#x2192; Clients reconnect to backup SFU (ICE restart). Audio is never sacrificed &middot; video drops first.</div>
 </div>
 
 <!-- --- INTERVIEW TIPS --- -->

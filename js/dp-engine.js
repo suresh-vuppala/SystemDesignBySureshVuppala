@@ -107,6 +107,7 @@
     var svgs=document.querySelectorAll('.T svg');
     Array.prototype.forEach.call(svgs,function(svg){
       if(svg.closest && svg.closest('.dp-panel'))return;
+      if(svg.closest && svg.closest('td'))return;
       var wrap=document.createElement('div');
       wrap.className='dp-panel dp-auto';
       svg.parentNode.insertBefore(wrap,svg);

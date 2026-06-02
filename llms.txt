@@ -34,5 +34,4 @@ Real-world scale problems from: Slack, WhatsApp, Discord, Netflix, Uber, Google,
 - Individual problem: https://hellosde.com/realtime-system-design-problems/[module]/[problem].html
 
 ## Contact
-Author: Suresh Vuppala
 Website: https://hellosde.com

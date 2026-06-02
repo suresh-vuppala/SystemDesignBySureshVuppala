@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Google index 100B+ pages and return ranked results in &lt;200ms?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a web search engine: 100B+ pages, &lt;200ms results, authority + relevance ranking</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a web search engine: 100B+ pages, &lt;200ms results, authority + relevance ranking</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -74,9 +74,9 @@
 
   <rect x="170" y="28" width="230" height="72" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="285" y="43" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Query Parser</text>
-  <text x="285" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Tokenize words ? normalize</text>
+  <text x="285" y="56" text-anchor="middle" fill="var(--muted)" font-size="5.5">Tokenize words &#x2192; normalize</text>
   <text x="285" y="68" text-anchor="middle" fill="var(--muted)" font-size="5.5">Spell-check correction (did you mean?)</text>
-  <text x="285" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">Synonym expansion (car ? automobile)</text>
+  <text x="285" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">Synonym expansion (car &#x2192; automobile)</text>
   <text x="285" y="92" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Intent classification (navigational/info/transactional)</text>
 
   <line x1="400" y1="64" x2="430" y2="64" stroke="var(--y)" stroke-width="1.2" marker-end="url(#gs-arr)"/>
@@ -113,7 +113,7 @@
   <text x="150" y="238" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Tier 3: 90B+ pages (disk)</text>
   <text x="150" y="248" text-anchor="middle" fill="var(--muted)" font-size="4.5">Long-tail, niche content</text>
 
-  <text x="150" y="270" text-anchor="middle" fill="var(--muted)" font-size="4.5">word ? [(doc_id, position, tf-idf)]</text>
+  <text x="150" y="270" text-anchor="middle" fill="var(--muted)" font-size="4.5">word &#x2192; [(doc_id, position, tf-idf)]</text>
 
   <!-- Scatter-Gather -->
   <line x1="275" y1="190" x2="310" y2="190" stroke="var(--g)" stroke-width="1" marker-end="url(#gs-arr)"/>
@@ -137,11 +137,11 @@
   <text x="660" y="152" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">ML Re-Rank</text>
   <text x="660" y="167" text-anchor="middle" fill="var(--muted)" font-size="5.5">BERT on top 1000 candidates</text>
   <text x="660" y="180" text-anchor="middle" fill="var(--muted)" font-size="5.5">Semantic understanding</text>
-  <text x="660" y="193" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">? Final top 10 results</text>
+  <text x="660" y="193" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">&#x2714; Final top 10 results</text>
   <text x="660" y="210" text-anchor="middle" fill="var(--muted)" font-size="5">Scoring formula:</text>
   <text x="660" y="222" text-anchor="middle" fill="var(--muted)" font-size="5">BM25 &middot; PageRank</text>
   <text x="660" y="234" text-anchor="middle" fill="var(--muted)" font-size="5">&middot; Freshness &middot; CTR</text>
-  <text x="660" y="248" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">? BERT re-rank</text>
+  <text x="660" y="248" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">&#x2714; BERT re-rank</text>
   <text x="660" y="263" text-anchor="middle" fill="var(--muted)" font-size="4.5">~50ms ML inference</text>
 
   <!-- --- LAYER 3: RESULT LAYER --- -->
@@ -179,20 +179,20 @@
   <!-- --- BOTTOM: Key Insight --- -->
   <rect x="10" y="405" width="760" height="88" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
   <text x="390" y="420" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">RANKING &amp; EARLY TERMINATION</text>
-  <text x="390" y="436" text-anchor="middle" fill="var(--muted)" font-size="5.5">Score = BM25(relevance) &middot; PageRank(authority) &middot; Freshness &middot; UserSignals(CTR) ? BERT re-rank top 1000 ? final top 10</text>
+  <text x="390" y="436" text-anchor="middle" fill="var(--muted)" font-size="5.5">Score = BM25(relevance) &middot; PageRank(authority) &middot; Freshness &middot; UserSignals(CTR) &#x2192; BERT re-rank top 1000 &#x2192; final top 10</text>
   <text x="390" y="452" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Early termination: scan in decreasing PageRank order, stop when top-K stable (~0.01% of shard scanned)</text>
-  <text x="390" y="468" text-anchor="middle" fill="var(--muted)" font-size="5.5">Latency: Parse(5ms) ? Cache check(2ms) ? Index lookup(30ms) ? Scatter-gather(80ms) ? ML re-rank(50ms) ? Network(30ms) = &lt;200ms</text>
+  <text x="390" y="468" text-anchor="middle" fill="var(--muted)" font-size="5.5">Latency: Parse(5ms) &#x2192; Cache check(2ms) &#x2192; Index lookup(30ms) &#x2192; Scatter-gather(80ms) &#x2192; ML re-rank(50ms) &#x2192; Network(30ms) = &lt;200ms</text>
   <text x="390" y="484" text-anchor="middle" fill="var(--muted)" font-size="5.5" font-style="italic">100B+ pages | &lt;200ms | 100K queries/sec | 10K+ shards</text>
 </svg>
 <table>
 <tr><th>Layer</th><th>Role</th><th>How</th></tr>
 <tr><td><span class="hi">Crawl</span></td><td>Discover and fetch pages</td><td>Priority queue by PageRank + change frequency. Politeness (robots.txt). 1000s of crawlers.</td></tr>
-<tr><td><span class="hi">Index Build</span></td><td>Create inverted index</td><td>word ? [(doc_id, position, tf-idf score), ...]. MapReduce pipeline. Partitioned by doc_id range.</td></tr>
+<tr><td><span class="hi">Index Build</span></td><td>Create inverted index</td><td>word &#x2192; [(doc_id, position, tf-idf score), ...]. MapReduce pipeline. Partitioned by doc_id range.</td></tr>
 <tr><td><span class="hi">Tier 1 (Hot)</span></td><td>Top 1B most important pages</td><td>In-memory index on SSDs. Serves 90% of queries. Fast path.</td></tr>
 <tr><td><span class="hi">Tier 2 (Warm)</span></td><td>Next 10B pages</td><td>SSD-based index. Queried only if Tier 1 has insufficient results.</td></tr>
 <tr><td><span class="hi">Tier 3 (Cold)</span></td><td>Long-tail 90B+ pages</td><td>Disk-based. Rarely queried. Niche/old content.</td></tr>
 <tr><td><span class="hi">Ranking</span></td><td>Score and order results</td><td>BM25 (text relevance) &middot; PageRank (authority) &middot; freshness &middot; user signals. ML re-ranking (BERT).</td></tr>
-<tr><td><span class="hi">Serving</span></td><td>Scatter-gather across shards</td><td>Query ? fan-out to 1000s of shards ? each returns top-K ? merge ? re-rank ? return top 10.</td></tr>
+<tr><td><span class="hi">Serving</span></td><td>Scatter-gather across shards</td><td>Query &#x2192; fan-out to 1000s of shards &#x2192; each returns top-K &#x2192; merge &#x2192; re-rank &#x2192; return top 10.</td></tr>
 </table>
 
 <div class="b bg"><span class="hi">Early termination:</span> Each shard scores documents in <span class="hg">decreasing static rank order</span> (PageRank). Once top-K candidates are "good enough" (score gap threshold), stop scanning. This means most queries only scan <span class="hg">~0.01% of the shard</span> &middot; not all documents containing the query terms.</div>
@@ -231,7 +231,7 @@
 <h2>Interview Cheat Sheet</h2>
 <p class="su">The 7 things to say for search system design</p>
 <div style="font-size:.82rem;line-height:1.8">
-<span class="hg">1.</span> <strong>Inverted index</strong> &middot; word ? list of (doc_id, position, score). Core data structure.<br>
+<span class="hg">1.</span> <strong>Inverted index</strong> &middot; word &#x2192; list of (doc_id, position, score). Core data structure.<br>
 <span class="hg">2.</span> <strong>Tiered serving</strong> &middot; Tier 1 (top 1B pages, in-memory) serves 90% of queries. Tier 2/3 for long-tail.<br>
 <span class="hg">3.</span> <strong>Scatter-gather</strong> &middot; query fans out to 1000s of shards, each returns top-K, merge + re-rank<br>
 <span class="hg">4.</span> <strong>Early termination</strong> &middot; scan docs in decreasing PageRank order, stop when top-K is "good enough"<br>

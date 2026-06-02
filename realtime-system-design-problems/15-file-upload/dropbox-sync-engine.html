@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Dropbox sync file changes across millions of devices within seconds?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a file sync engine: millions of devices, block-level dedup, delta sync, conflict resolution</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a file sync engine: millions of devices, block-level dedup, delta sync, conflict resolution</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -26,7 +26,7 @@
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a cloud storage platform sync file changes across millions of devices within seconds, deduplicating content at the block level and tracking per-file block maps for efficient delta sync?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> User edits a 1GB file on laptop. Only 4KB changed. <span class="hr">How do you sync just the changed blocks (not the whole file) to phone, tablet, and web &middot; within seconds &middot; while deduplicating identical blocks across 700M+ users?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> User edits a 1GB file on laptop. Only 4KB changed. <span class="hr">How do you sync just the changed blocks (not the whole file) to phone, tablet, and web &middot; within seconds &middot; while deduplicating identical blocks across 700M+ users&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -42,7 +42,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;5s</div>
 <div style="font-size:.72rem;color:var(--muted)">sync latency</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">change ? all devices</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">change &#x2192; all devices</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--g)">~60%</div>
@@ -54,7 +54,7 @@
 
 <div class="T" id="architecture">
 <h2>Architecture &middot; Block-Level Sync Engine</h2>
-<p class="su">Content-defined chunking ? hash blocks ? upload only new blocks ? notify other devices</p>
+<p class="su">Content-defined chunking &#x2192; hash blocks &#x2192; upload only new blocks &#x2192; notify other devices</p>
 
 <!-- --- Dropbox Sync SVG --- -->
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dropbox sync engine architecture showing client chunking, server storage, and sync layers">
@@ -80,7 +80,7 @@
   <text x="257" y="67" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Content-defined 4KB blocks</text>
   <text x="257" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">Boundaries based on content</text>
   <text x="257" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">not fixed offsets</text>
-  <text x="257" y="101" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Insert 1 byte ? 1 block shifts</text>
+  <text x="257" y="101" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Insert 1 byte &#x2192; 1 block shifts</text>
 
   <line x1="330" y1="65" x2="355" y2="65" stroke="var(--y)" stroke-width="1" marker-end="url(#db-arr)"/>
 
@@ -96,7 +96,7 @@
 
   <rect x="520" y="28" width="235" height="82" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="637" y="42" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Upload Delta (only NEW blocks)</text>
-  <text x="637" y="55" text-anchor="middle" fill="var(--muted)" font-size="5.5">Edit 4KB in 1GB file ? upload 1 block</text>
+  <text x="637" y="55" text-anchor="middle" fill="var(--muted)" font-size="5.5">Edit 4KB in 1GB file &#x2192; upload 1 block</text>
   <text x="637" y="67" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Massive bandwidth savings</text>
   <text x="637" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">Parallel upload (4 concurrent streams)</text>
   <text x="637" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">Resumable: track last successful block</text>
@@ -113,12 +113,12 @@
 
   <rect x="25" y="148" width="230" height="95" rx="5" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width="1.2"/>
   <text x="140" y="163" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Metadata Service</text>
-  <text x="140" y="177" text-anchor="middle" fill="var(--muted)" font-size="5.5">file ? [block_hash_1, hash_2, ...]</text>
+  <text x="140" y="177" text-anchor="middle" fill="var(--muted)" font-size="5.5">file &#x2192; [block_hash_1, hash_2, ...]</text>
   <text x="140" y="190" text-anchor="middle" fill="var(--muted)" font-size="5.5">Version history per file</text>
   <text x="140" y="203" text-anchor="middle" fill="var(--muted)" font-size="5.5">Permissions &amp; sharing metadata</text>
   <text x="140" y="216" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">MySQL sharded by user_id</text>
   <text x="140" y="229" text-anchor="middle" fill="var(--muted)" font-size="4.5">File = ordered list of block hashes (tiny)</text>
-  <text x="140" y="240" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Conflict: divergent block maps ? copy</text>
+  <text x="140" y="240" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Conflict: divergent block mapS &#x2192; Copy</text>
 
   <rect x="275" y="148" width="230" height="95" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="390" y="163" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Block Store (S3/Magic Pocket)</text>
@@ -132,7 +132,7 @@
   <rect x="525" y="148" width="230" height="95" rx="5" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
   <text x="640" y="163" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Notification Service</text>
   <text x="640" y="177" text-anchor="middle" fill="var(--muted)" font-size="5.5">Long-poll / WebSocket channel</text>
-  <text x="640" y="190" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">"file X changed" ? all devices</text>
+  <text x="640" y="190" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">"file X changed" &#x2192; all devices</text>
   <text x="640" y="203" text-anchor="middle" fill="var(--muted)" font-size="5.5">Per-user notification queue</text>
   <text x="640" y="216" text-anchor="middle" fill="var(--muted)" font-size="5.5">Fallback: periodic poll (5 min)</text>
   <text x="640" y="229" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">Triggers sync on other devices</text>
@@ -184,8 +184,8 @@
   <rect x="10" y="370" width="760" height="122" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
   <text x="390" y="386" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">CONTENT-DEFINED CHUNKING vs FIXED-SIZE CHUNKING</text>
 
-  <text x="390" y="402" text-anchor="middle" fill="var(--a)" font-size="5.5">Fixed-size: insert 1 byte at start ? ALL block boundaries shift ? re-upload ENTIRE file</text>
-  <text x="390" y="416" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Content-defined (Rabin): insert 1 byte ? only 1 block boundary shifts ? upload 1 block (4KB)</text>
+  <text x="390" y="402" text-anchor="middle" fill="var(--a)" font-size="5.5">Fixed-size: insert 1 byte at start &#x2192; ALL block boundaries shift &#x2192; re-upload ENTIRE file</text>
+  <text x="390" y="416" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Content-defined (Rabin): insert 1 byte &#x2192; only 1 block boundary shifts &#x2192; upload 1 block (4KB)</text>
 
   <text x="390" y="436" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">DEDUPLICATION</text>
   <text x="390" y="450" text-anchor="middle" fill="var(--muted)" font-size="5.5">Same PDF shared by 1M users = stored ONCE in block store (referenced 1M times)</text>
@@ -199,16 +199,16 @@
 <tr><th>Step</th><th>What Happens</th><th>Key Technology</th></tr>
 <tr><td><span class="hi">1. Detect change</span></td><td>File system watcher detects modified file</td><td>inotify (Linux), FSEvents (macOS), ReadDirectoryChanges (Windows)</td></tr>
 <tr><td><span class="hi">2. Chunk file</span></td><td>Split file into 4KB blocks using content-defined chunking (Rabin fingerprint)</td><td>Rolling hash &middot; boundaries shift with content, not fixed offsets</td></tr>
-<tr><td><span class="hi">3. Hash blocks</span></td><td>SHA-256 each block ? check which are new (not in server's block store)</td><td>Client sends hash list ? server returns "need" list</td></tr>
-<tr><td><span class="hi">4. Upload delta</span></td><td>Upload only NEW blocks (not already on server)</td><td>Typically 1-5% of file for small edits ? massive bandwidth savings</td></tr>
-<tr><td><span class="hi">5. Update metadata</span></td><td>Update file's block map: [block_hash_1, block_hash_2, ...]</td><td>Metadata DB (file ? ordered list of block hashes)</td></tr>
+<tr><td><span class="hi">3. Hash blocks</span></td><td>SHA-256 each block &#x2192; check which are new (not in server's block store)</td><td>Client sends hash list &#x2192; server returns "need" list</td></tr>
+<tr><td><span class="hi">4. Upload delta</span></td><td>Upload only NEW blocks (not already on server)</td><td>Typically 1-5% of file for small edits &#x2192; massive bandwidth savings</td></tr>
+<tr><td><span class="hi">5. Update metadata</span></td><td>Update file's block map: [block_hash_1, block_hash_2, ...]</td><td>Metadata DB (file &#x2192; ordered list of block hashes)</td></tr>
 <tr><td><span class="hi">6. Notify devices</span></td><td>Push notification to all user's other devices: "file X changed"</td><td>Long-poll / WebSocket notification channel</td></tr>
 <tr><td><span class="hi">7. Pull delta</span></td><td>Other devices fetch new block map, download only missing blocks, reconstruct file</td><td>Same dedup: if block already cached locally, skip download</td></tr>
 </table>
 
 <div class="b bg"><span class="hi">Content-defined chunking:</span> Unlike fixed-size blocks, <span class="hg">Rabin fingerprint</span> creates boundaries based on content. Inserting 1 byte at the start of a file only changes 1 block boundary &middot; not all blocks. This means <span class="hg">small edits = small uploads</span> regardless of edit position.</div>
 <div class="b by"><span class="hi">Deduplication:</span> Same block content across ANY user = stored once. A popular PDF shared by 1M users = <span class="hg">stored once, referenced 1M times</span>. Reference counting tracks when blocks can be garbage-collected. Saves ~60% storage globally.</div>
-<div class="b br"><span class="hi">Conflict resolution:</span> Two devices edit same file offline ? both upload ? <span class="hr">conflict detected</span> (divergent block maps). Resolution: keep both versions as "file.txt" and "file (conflicted copy).txt". User manually merges. For collaborative docs: use OT/CRDT instead.</div>
+<div class="b br"><span class="hi">Conflict resolution:</span> Two devices edit same file offline &#x2192; both upload &#x2192; <span class="hr">conflict detected</span> (divergent block maps). Resolution: keep both versions as "file.txt" and "file (conflicted copy).txt". User manually merges. For collaborative docs: use OT/CRDT instead.</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Dropbox</strong> &middot; Magic Pocket (custom block store, exabytes). <strong>Google Drive</strong> &middot; similar chunking for large files. <strong>OneDrive</strong> &middot; differential sync with BITS protocol. <strong>rsync</strong> &middot; rolling checksum algorithm (inspiration for all sync engines).</div>
 </div>
 
@@ -232,7 +232,7 @@
 <div style="font-size:.82rem;line-height:1.8">
 <span class="hg">1.</span> <strong>Content-defined chunking (Rabin fingerprint)</strong> &middot; boundaries based on content, not fixed offsets<br>
 <span class="hg">2.</span> <strong>Block-level dedup</strong> &middot; SHA-256 per block, upload only new blocks (~60% storage savings)<br>
-<span class="hg">3.</span> <strong>Delta sync</strong> &middot; edit 4KB in 1GB file ? upload only 1 block, not entire file<br>
+<span class="hg">3.</span> <strong>Delta sync</strong> &middot; edit 4KB in 1GB file &#x2192; upload only 1 block, not entire file<br>
 <span class="hg">4.</span> <strong>File = ordered list of block hashes</strong> &middot; metadata is tiny, blocks are content-addressed<br>
 <span class="hg">5.</span> <strong>Notification channel (long-poll/WS)</strong> &middot; push "file changed" to other devices instantly<br>
 <span class="hg">6.</span> <strong>Conflict = divergent block maps</strong> &middot; create "conflicted copy", user resolves manually<br>

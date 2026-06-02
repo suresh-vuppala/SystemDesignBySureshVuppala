@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Discord maintain 10M+ concurrent WebSocket connections across thousands of gateway servers?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a real-time communication platform that maintains 10M+ concurrent WebSocket connections with heartbeats, shard assignment, graceful failover, and voice signaling</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a real-time communication platform that maintains 10M+ concurrent WebSocket connections with heartbeats, shard assignment, graceful failover, and voice signaling</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -74,12 +74,12 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> Message <strong>persistence and search</strong> (Cassandra/ScyllaDB layer)<br>
-  <span class="hr">?</span> <strong>Push notifications</strong> for mobile (APNs / FCM pipeline)<br>
-  <span class="hr">?</span> <strong>CDN and media delivery</strong> (attachments, embeds, avatars)<br>
-  <span class="hr">?</span> <strong>Bot framework</strong> and application commands<br>
-  <span class="hr">?</span> <strong>User authentication</strong> and OAuth2 flows<br>
-  <span class="hr">?</span> <strong>Rate limiting logic</strong> details (separate middleware)
+  <span class="hr">&#x2717;</span> Message <strong>persistence and search</strong> (Cassandra/ScyllaDB layer)<br>
+  <span class="hr">&#x2717;</span> <strong>Push notifications</strong> for mobile (APNs / FCM pipeline)<br>
+  <span class="hr">&#x2717;</span> <strong>CDN and media delivery</strong> (attachments, embeds, avatars)<br>
+  <span class="hr">&#x2717;</span> <strong>Bot framework</strong> and application commands<br>
+  <span class="hr">&#x2717;</span> <strong>User authentication</strong> and OAuth2 flows<br>
+  <span class="hr">&#x2717;</span> <strong>Rate limiting logic</strong> details (separate middleware)
 </div>
 </div>
 </div>
@@ -160,7 +160,7 @@
 <tr>
   <td><span class="hi">7</span></td>
   <td>Reconnect storm (worst case)</td>
-  <td>1 gateway crash ? 1M reconnects in ~5s = 200K/sec</td>
+  <td>1 gateway crash &#x2192; 1M reconnects in ~5s = 200K/sec</td>
   <td><span class="hr">200K reconnects/sec</span></td>
   <td>Jittered backoff + session resume (not full re-identify) reduces load</td>
 </tr>
@@ -179,7 +179,7 @@
 <!-- --- ARCHITECTURE OVERVIEW --- -->
 <div class="T" id="architecture">
 <h2>Architecture Overview</h2>
-<p class="su">Client ? Gateway (WS termination) ? Session Service ? Guild Sharding ? Event Distribution</p>
+<p class="su">Client &#x2192; Gateway (WS termination) &#x2192; Session Service &#x2192; Guild Sharding &#x2192; Event Distribution</p>
 
 <svg width="100%" viewBox="0 0 740 340" style="max-width:740px;display:block;margin:4px auto 8px">
 <defs><marker id="dc1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
@@ -230,12 +230,12 @@
 
 <rect data-dp-step="8" x="14" y="180" width="120" height="34" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
 <text data-dp-step="8" x="74" y="192" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Session Service</text>
-<text data-dp-step="8" x="74" y="202" text-anchor="middle" fill="var(--muted)" font-size="5">session_id ? seq buffer</text>
+<text data-dp-step="8" x="74" y="202" text-anchor="middle" fill="var(--muted)" font-size="5">session_id &#x2192; seq buffer</text>
 <text data-dp-step="8" x="74" y="210" text-anchor="middle" fill="var(--muted)" font-size="5">resume token mgmt</text>
 
 <rect data-dp-step="9" x="150" y="180" width="120" height="34" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
 <text data-dp-step="9" x="210" y="192" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Guild Shard Map</text>
-<text data-dp-step="9" x="210" y="202" text-anchor="middle" fill="var(--muted)" font-size="5">guild_id ? shard_id</text>
+<text data-dp-step="9" x="210" y="202" text-anchor="middle" fill="var(--muted)" font-size="5">guild_id &#x2192; shard_id</text>
 <text data-dp-step="9" x="210" y="210" text-anchor="middle" fill="var(--muted)" font-size="5">(guild_id >> 22) % num_shards</text>
 
 <rect data-dp-step="10" x="286" y="180" width="120" height="34" rx="4" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".8"/>
@@ -262,7 +262,7 @@
 <line data-dp-step="14" x1="320" y1="275" x2="344" y2="275" stroke="var(--a)" stroke-width=".8" marker-end="url(#dc1)"/>
 
 <rect data-dp-step="15" x="346" y="262" width="140" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-<text data-dp-step="15" x="416" y="273" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">? Gateway WS Push</text>
+<text data-dp-step="15" x="416" y="273" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">&#x2714; Gateway WS Push</text>
 <text data-dp-step="15" x="416" y="283" text-anchor="middle" fill="var(--muted)" font-size="5">to all subscribed clients</text>
 
 <!-- Key concept annotation -->
@@ -300,7 +300,7 @@
 
 <!-- Guild distribution visualization -->
 <rect data-dp-step="2" x="4" y="52" width="712" height="100" rx="6" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1"/>
-<text data-dp-step="2" x="360" y="66" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">GUILD ? SHARD DISTRIBUTION</text>
+<text data-dp-step="2" x="360" y="66" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">GUILD &#x2192; SHARD DISTRIBUTION</text>
 
 <!-- Shard 0 -->
 <rect data-dp-step="3" x="14" y="74" width="130" height="68" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".8"/>
@@ -366,8 +366,8 @@
 <!-- Comparison note -->
 <rect data-dp-step="9" x="14" y="228" width="694" height="36" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
 <text data-dp-step="9" x="360" y="242" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Slack vs Discord Routing Comparison</text>
-<text data-dp-step="9" x="360" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">Slack: user_id ? Redis ? gateway_host (user-level routing, any gateway can serve any channel)</text>
-<text data-dp-step="9" x="360" y="264" text-anchor="middle" fill="var(--muted)" font-size="5.5">Discord: guild_id ? shard_id ? gateway_node (guild-level sharding, events stay local to shard)</text>
+<text data-dp-step="9" x="360" y="254" text-anchor="middle" fill="var(--muted)" font-size="5.5">Slack: user_id &#x2192; Redis &#x2192; gateway_host (user-level routing, any gateway can serve any channel)</text>
+<text data-dp-step="9" x="360" y="264" text-anchor="middle" fill="var(--muted)" font-size="5.5">Discord: guild_id &#x2192; shard_id &#x2192; gateway_node (guild-level sharding, events stay local to shard)</text>
 </svg>
 
 <div class="b bg"><span class="hi">Why guild-level sharding?</span> A guild's events (messages, presence, voice state) are highly correlated &middot; members of the same guild need the same events. By co-locating all guild members on the same shard, Discord avoids cross-node communication for intra-guild events. This is fundamentally different from <a href="slack-real-time-messaging.html#architecture">Slack's approach</a> where any user can be on any gateway.</div>
@@ -376,7 +376,7 @@
 <!-- --- CONNECTION LIFECYCLE --- -->
 <div class="T" id="connection-lifecycle">
 <h2>Connection Lifecycle</h2>
-<p class="su">State machine: CONNECTING ? IDENTIFYING ? RESUMING/READY ? CONNECTED ? DISCONNECTED. Similar heartbeat mechanism to <a href="slack-real-time-messaging.html#presence">Slack's presence system</a> but with different timeout values (41.25s vs 30s).</p>
+<p class="su">State machine: CONNECTING &#x2192; IDENTIFYING &#x2192; RESUMING/READY &#x2192; CONNECTED &#x2192; DISCONNECTED. Similar heartbeat mechanism to <a href="slack-real-time-messaging.html#presence">Slack's presence system</a> but with different timeout values (41.25s vs 30s).</p>
 
 <svg width="100%" viewBox="0 0 740 320" style="max-width:740px;display:block;margin:4px auto 8px">
 <defs><marker id="dc3" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
@@ -432,7 +432,7 @@
 
 <!-- Reconnect arrow back -->
 <path data-dp-step="12" d="M615,68 L615,90 L64,90 L64,64" fill="none" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="4,3" marker-end="url(#dc3)"/>
-<text data-dp-step="12" x="340" y="100" text-anchor="middle" fill="var(--a2)" font-size="5">jittered backoff ? reconnect (resume if session valid, else re-identify)</text>
+<text data-dp-step="12" x="340" y="100" text-anchor="middle" fill="var(--a2)" font-size="5">jittered backoff &#x2192; reconnect (resume if session valid, else re-identify)</text>
 
 <!-- Heartbeat mechanism -->
 <rect data-dp-step="13" x="4" y="110" width="350" height="68" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width=".8"/>
@@ -440,49 +440,49 @@
 <text data-dp-step="13" x="179" y="138" text-anchor="middle" fill="var(--muted)" font-size="5.5">Server sends Hello with heartbeat_interval: 41250ms</text>
 <text data-dp-step="13" x="179" y="150" text-anchor="middle" fill="var(--muted)" font-size="5.5">Client must send Heartbeat (op 1) within interval</text>
 <text data-dp-step="13" x="179" y="162" text-anchor="middle" fill="var(--muted)" font-size="5.5">Server responds with Heartbeat ACK (op 11)</text>
-<text data-dp-step="13" x="179" y="174" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">No ACK received ? zombie connection ? close + reconnect</text>
+<text data-dp-step="13" x="179" y="174" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">No ACK received &#x2192; zombie connection &#x2192; close + reconnect</text>
 
 <!-- Resume vs Reconnect -->
 <rect data-dp-step="14" x="366" y="110" width="366" height="68" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width=".8"/>
 <text data-dp-step="14" x="549" y="124" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">RESUME vs RECONNECT</text>
-<text data-dp-step="14" x="549" y="138" text-anchor="middle" fill="var(--muted)" font-size="5.5">Resume (op 6): session_id + seq ? server replays missed events</text>
-<text data-dp-step="14" x="549" y="150" text-anchor="middle" fill="var(--muted)" font-size="5.5">  ? Fast (~1s), no guild re-subscription, no READY payload</text>
+<text data-dp-step="14" x="549" y="138" text-anchor="middle" fill="var(--muted)" font-size="5.5">Resume (op 6): session_id + seq &#x2192; server replays missed events</text>
+<text data-dp-step="14" x="549" y="150" text-anchor="middle" fill="var(--muted)" font-size="5.5">  &#x2192; Fast (~1s), no guild re-subscription, no READY payload</text>
 <text data-dp-step="14" x="549" y="162" text-anchor="middle" fill="var(--muted)" font-size="5.5">Reconnect (op 2): full re-identify, new session, full READY</text>
-<text data-dp-step="14" x="549" y="174" text-anchor="middle" fill="var(--muted)" font-size="5.5">  ? Slow (~5s), re-subscribe all guilds, large READY payload</text>
+<text data-dp-step="14" x="549" y="174" text-anchor="middle" fill="var(--muted)" font-size="5.5">  &#x2192; Slow (~5s), re-subscribe all guilds, large READY payload</text>
 
 <!-- Opcodes reference -->
 <rect data-dp-step="15" x="4" y="190" width="732" height="124" rx="6" fill="rgba(167,139,250,.02)" stroke="var(--a2)" stroke-width=".8"/>
 <text data-dp-step="15" x="370" y="204" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="800">GATEWAY OPCODES</text>
 
 <text data-dp-step="16" x="20" y="220" fill="var(--g)" font-size="5.5" font-weight="600">op 0 &middot; Dispatch</text>
-<text data-dp-step="16" x="20" y="232" fill="var(--muted)" font-size="5">Server ? Client event (MESSAGE_CREATE, PRESENCE_UPDATE, etc.)</text>
+<text data-dp-step="16" x="20" y="232" fill="var(--muted)" font-size="5">Server &#x2192; Client event (MESSAGE_CREATE, PRESENCE_UPDATE, etc.)</text>
 
 <text data-dp-step="16" x="20" y="248" fill="var(--y)" font-size="5.5" font-weight="600">op 1 &middot; Heartbeat</text>
-<text data-dp-step="16" x="20" y="260" fill="var(--muted)" font-size="5">Client ? Server keepalive (send last seq number)</text>
+<text data-dp-step="16" x="20" y="260" fill="var(--muted)" font-size="5">Client &#x2192; Server keepalive (send last seq number)</text>
 
 <text data-dp-step="16" x="20" y="276" fill="var(--a)" font-size="5.5" font-weight="600">op 2 &middot; Identify</text>
-<text data-dp-step="16" x="20" y="288" fill="var(--muted)" font-size="5">Client ? Server auth (token, intents, shard info)</text>
+<text data-dp-step="16" x="20" y="288" fill="var(--muted)" font-size="5">Client &#x2192; Server auth (token, intents, shard info)</text>
 
 <text data-dp-step="16" x="20" y="304" fill="var(--o)" font-size="5.5" font-weight="600">op 6 &middot; Resume</text>
-<text data-dp-step="16" x="20" y="316" fill="var(--muted)" font-size="5">Client ? Server reconnect (session_id, seq)</text>
+<text data-dp-step="16" x="20" y="316" fill="var(--muted)" font-size="5">Client &#x2192; Server reconnect (session_id, seq)</text>
 
 <text data-dp-step="16" x="250" y="220" fill="var(--r)" font-size="5.5" font-weight="600">op 7 &middot; Reconnect</text>
-<text data-dp-step="16" x="250" y="232" fill="var(--muted)" font-size="5">Server ? Client: you should reconnect</text>
+<text data-dp-step="16" x="250" y="232" fill="var(--muted)" font-size="5">Server &#x2192; Client: you should reconnect</text>
 
 <text data-dp-step="16" x="250" y="248" fill="var(--p)" font-size="5.5" font-weight="600">op 9 &middot; Invalid Session</text>
-<text data-dp-step="16" x="250" y="260" fill="var(--muted)" font-size="5">Server ? Client: session expired, re-identify</text>
+<text data-dp-step="16" x="250" y="260" fill="var(--muted)" font-size="5">Server &#x2192; Client: session expired, re-identify</text>
 
 <text data-dp-step="16" x="250" y="276" fill="var(--y)" font-size="5.5" font-weight="600">op 10 &middot; Hello</text>
-<text data-dp-step="16" x="250" y="288" fill="var(--muted)" font-size="5">Server ? Client: connection established, heartbeat_interval</text>
+<text data-dp-step="16" x="250" y="288" fill="var(--muted)" font-size="5">Server &#x2192; Client: connection established, heartbeat_interval</text>
 
 <text data-dp-step="16" x="250" y="304" fill="var(--g)" font-size="5.5" font-weight="600">op 11 &middot; Heartbeat ACK</text>
-<text data-dp-step="16" x="250" y="316" fill="var(--muted)" font-size="5">Server ? Client: heartbeat received</text>
+<text data-dp-step="16" x="250" y="316" fill="var(--muted)" font-size="5">Server &#x2192; Client: heartbeat received</text>
 
 <text data-dp-step="16" x="500" y="220" fill="var(--a2)" font-size="5.5" font-weight="600">Zombie Detection:</text>
 <text data-dp-step="16" x="500" y="234" fill="var(--muted)" font-size="5">If client sends heartbeat but gets no ACK:</text>
-<text data-dp-step="16" x="500" y="246" fill="var(--muted)" font-size="5">? close WS with code 1001</text>
-<text data-dp-step="16" x="500" y="258" fill="var(--muted)" font-size="5">? wait random(1-5s) jitter</text>
-<text data-dp-step="16" x="500" y="270" fill="var(--muted)" font-size="5">? reconnect with Resume</text>
+<text data-dp-step="16" x="500" y="246" fill="var(--muted)" font-size="5">&#x2714; close WS with code 1001</text>
+<text data-dp-step="16" x="500" y="258" fill="var(--muted)" font-size="5">&#x2714; wait random(1-5s) jitter</text>
+<text data-dp-step="16" x="500" y="270" fill="var(--muted)" font-size="5">&#x2714; reconnect with Resume</text>
 <text data-dp-step="16" x="500" y="286" fill="var(--r)" font-size="5.5" font-weight="600">Close Codes:</text>
 <text data-dp-step="16" x="500" y="298" fill="var(--muted)" font-size="5">4000 &middot; Unknown error (reconnect)</text>
 <text data-dp-step="16" x="500" y="310" fill="var(--muted)" font-size="5">4004 &middot; Auth failed (don't reconnect)</text>
@@ -524,17 +524,17 @@
 
 <rect data-dp-step="8" x="408" y="28" width="140" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
 <text data-dp-step="8" x="478" y="40" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Voice Server Ready</text>
-<text data-dp-step="8" x="478" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">endpoint + token ? client</text>
+<text data-dp-step="8" x="478" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">endpoint + token &#x2192; client</text>
 
 <line data-dp-step="9" x1="548" y1="43" x2="574" y2="43" stroke="var(--r)" stroke-width="1" marker-end="url(#dc4)"/>
 
 <rect data-dp-step="10" x="576" y="28" width="150" height="30" rx="4" fill="rgba(244,114,182,.06)" stroke="var(--p)" stroke-width=".8"/>
-<text data-dp-step="10" x="651" y="40" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="700">Client ? Voice WS</text>
+<text data-dp-step="10" x="651" y="40" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="700">Client &#x2192; Voice WS</text>
 <text data-dp-step="10" x="651" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">separate WS to voice server</text>
 
 <!-- Signaling flow detail -->
 <rect data-dp-step="11" x="14" y="66" width="718" height="30" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".5"/>
-<text data-dp-step="11" x="370" y="78" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Flow: Client sends Voice State Update (op 4) ? Gateway responds with Voice Server Update ? Client opens separate WS to voice endpoint ? exchanges SDP/ICE</text>
+<text data-dp-step="11" x="370" y="78" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Flow: Client sends Voice State Update (op 4) &#x2192; Gateway responds with Voice Server Update &#x2192; Client opens separate WS to voice endpoint &#x2192; exchanges SDP/ICE</text>
 <text data-dp-step="11" x="370" y="90" text-anchor="middle" fill="var(--muted)" font-size="5">Voice WS handles: session description, speaking indicators, heartbeat (separate from gateway heartbeat)</text>
 
 <!-- Media path -->
@@ -617,19 +617,19 @@
 <tr>
   <td><span class="hi">Shard Rebalance</span></td>
   <td>Need to move guilds between shards without downtime.</td>
-  <td>Drain pattern: mark shard DRAINING ? transfer state ? send <strong>Reconnect (op 7)</strong> to affected clients ? clients resume on new shard.</td>
+  <td>Drain pattern: mark shard DRAINING &#x2192; transfer state &#x2192; send <strong>Reconnect (op 7)</strong> to affected clientS &#x2192; Clients resume on new shard.</td>
   <td><span class="hg">&lt;10s</span> per guild</td>
 </tr>
 <tr>
   <td><span class="hi">Thundering Herd</span></td>
-  <td>Gateway crash ? 1M clients reconnect simultaneously ? overload remaining gateways.</td>
+  <td>Gateway crash &#x2192; 1M clients reconnect simultaneously &#x2192; overload remaining gateways.</td>
   <td><strong>Jittered exponential backoff</strong>: random(1-5s) initial delay, then 2&middot; backoff. Server returns <code>429</code> with <code>Retry-After</code> header. Rate limit reconnects per IP.</td>
   <td><span class="hg">~30s</span> to stabilize</td>
 </tr>
 <tr>
   <td><span class="hi">Voice Server Failover</span></td>
-  <td>Voice server crash ? active voice channels interrupted.</td>
-  <td>Voice service detects failure ? assigns new voice server ? sends <strong>Voice Server Update</strong> to affected clients ? clients reconnect voice WS + re-negotiate WebRTC.</td>
+  <td>Voice server crash &#x2192; active voice channels interrupted.</td>
+  <td>Voice service detects failure &#x2192; assigns new voice server &#x2192; sends <strong>Voice Server Update</strong> to affected clientS &#x2192; Clients reconnect voice WS + re-negotiate WebRTC.</td>
   <td><span class="ho">~2-3s</span> audio gap</td>
 </tr>
 <tr>
@@ -646,12 +646,12 @@
 </tr>
 <tr>
   <td><span class="hi">Large Guild Events</span></td>
-  <td>Guild with 500K+ members ? presence updates would flood all connections.</td>
+  <td>Guild with 500K+ members &#x2192; presence updates would flood all connections.</td>
   <td><strong>Lazy loading</strong>: guilds &gt;250 members don't send full member list in READY. Client requests member chunks on demand. Presence only for visible members.</td>
   <td><span class="hg">N/A</span> (prevention)</td>
 </tr>
 </table>
-<div class="b br"><span class="hi">Worst case:</span> Full region failure. All gateways in a region go down simultaneously. Mitigation: GeoDNS failover to next-closest region. Clients reconnect to new region. Session resume may fail (buffer lost) ? full re-identify. Expected recovery: <span class="hr">30-60s</span> with degraded latency until region recovers.</div>
+<div class="b br"><span class="hi">Worst case:</span> Full region failure. All gateways in a region go down simultaneously. Mitigation: GeoDNS failover to next-closest region. Clients reconnect to new region. Session resume may fail (buffer lost) &#x2192; full re-identify. Expected recovery: <span class="hr">30-60s</span> with degraded latency until region recovers.</div>
 </div>
 
 <!-- --- TECH STACK --- -->
@@ -672,7 +672,7 @@
 </tr>
 <tr>
   <td><span class="hi">Message Storage</span></td>
-  <td><span class="hg">Cassandra ? ScyllaDB</span></td>
+  <td><span class="hg">Cassandra &#x2192; ScyllaDB</span></td>
   <td>Write-heavy workload (billions of messages/day). ScyllaDB: C++ rewrite of Cassandra with better tail latencies. Partition key = channel_id for time-series access pattern.</td>
 </tr>
 <tr>
@@ -682,7 +682,7 @@
 </tr>
 <tr>
   <td><span class="hi">API Services</span></td>
-  <td><span class="hg">Python (Flask) ? Rust</span></td>
+  <td><span class="hg">Python (Flask) &#x2192; Rust</span></td>
   <td>Originally Python for rapid development. Migrating hot paths to Rust for performance. API gateway handles REST + rate limiting.</td>
 </tr>
 <tr>

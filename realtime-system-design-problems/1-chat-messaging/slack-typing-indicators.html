@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a chat system handle millions of ephemeral typing events per second?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a typing indicator system that delivers ephemeral events to conversation participants in sub-100ms without persisting anything to disk</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a typing indicator system that delivers ephemeral events to conversation participants in sub-100ms without persisting anything to disk</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -26,7 +26,7 @@
 <!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <p class="su">How does a chat system handle millions of ephemeral 'typing...' events per second without persisting anything to disk, while ensuring sub-100ms delivery to all conversation participants?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Ephemeral typing indicator delivery only &middot; not message send, not presence, not read receipts. The hard question: <span class="hr">how do you fan-out millions of fire-and-forget events per second with zero disk I/O and sub-100ms latency?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Ephemeral typing indicator delivery only &middot; not message send, not presence, not read receipts. The hard question: <span class="hr">how do you fan-out millions of fire-and-forget events per second with zero disk I/O and sub-100ms latency&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -71,11 +71,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> Message <strong>delivery</strong> (separate Kafka-based pipeline &middot; see Slack Real-Time Messaging)<br>
-  <span class="hr">?</span> <strong>Presence</strong> (online/offline status &middot; different protocol)<br>
-  <span class="hr">?</span> <strong>Read receipts</strong> (persisted, different consistency model)<br>
-  <span class="hr">?</span> <strong>Offline delivery</strong> &middot; typing events are meaningless if recipient is offline<br>
-  <span class="hr">?</span> <strong>Multi-device sync</strong> of typing state (only deliver to other users, not same user's devices)
+  <span class="hr">&#x2717;</span> Message <strong>delivery</strong> (separate Kafka-based pipeline &middot; see Slack Real-Time Messaging)<br>
+  <span class="hr">&#x2717;</span> <strong>Presence</strong> (online/offline status &middot; different protocol)<br>
+  <span class="hr">&#x2717;</span> <strong>Read receipts</strong> (persisted, different consistency model)<br>
+  <span class="hr">&#x2717;</span> <strong>Offline delivery</strong> &middot; typing events are meaningless if recipient is offline<br>
+  <span class="hr">&#x2717;</span> <strong>Multi-device sync</strong> of typing state (only deliver to other users, not same user's devices)
 </div>
 </div>
 </div>
@@ -105,7 +105,7 @@
 <tr><td>1</td><td>10M concurrent users &middot; 20% actively typing</td><td>2M typing users</td></tr>
 <tr><td>2</td><td>2M users &middot; 1 event/5s (throttled)</td><td>400K events/sec avg</td></tr>
 <tr><td>3</td><td>Peak factor 10&middot;</td><td>~4-5M events/sec</td></tr>
-<tr><td>4</td><td>Avg conversation size 5 people ? 400K &middot; 4 recipients</td><td>1.6M deliveries/sec</td></tr>
+<tr><td>4</td><td>Avg conversation size 5 people &#x2192; 400K &middot; 4 recipients</td><td>1.6M deliveries/sec</td></tr>
 <tr><td>5</td><td>Redis Pub/Sub capacity: ~1M msgs/sec per node</td><td>Need 2-3 Redis nodes</td></tr>
 <tr><td>6</td><td>Memory for throttle state: 2M users &middot; 32 bytes</td><td>~64MB per gateway (trivial)</td></tr>
 </table>
@@ -143,7 +143,7 @@
 <!-- In-Memory Router -->
 <rect x="246" y="26" width="130" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
 <text x="311" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">In-Memory Pub/Sub Router</text>
-<text x="311" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">channel ? online user ? gateway</text>
+<text x="311" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">channel &#x2192; online user &#x2192; gateway</text>
 <text x="311" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">Redis Pub/Sub (no persistence)</text>
 
 <!-- Fan to gateways -->
@@ -153,18 +153,18 @@
 
 <!-- Target Gateways -->
 <rect x="412" y="24" width="90" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
-<text x="457" y="35" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-B ? ????</text>
+<text x="457" y="35" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-B &#x2192; &#x2714;&#x2714;</text>
 <rect x="412" y="42" width="90" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
-<text x="457" y="53" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-C ? ??</text>
+<text x="457" y="53" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-C &#x2192; &#x2794;</text>
 <rect x="412" y="60" width="90" height="16" rx="3" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".6"/>
-<text x="457" y="71" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-D ? ??????</text>
+<text x="457" y="71" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gateway-D &#x2192; &#x2714;&#x2714;&#x2714;</text>
 
 <!-- Latency box -->
 <rect x="530" y="26" width="196" height="50" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text x="628" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Latency Breakdown</text>
-<text x="540" y="50" fill="var(--muted)" font-size="5.5">Client ? Gateway: ~2ms (WS frame)</text>
+<text x="540" y="50" fill="var(--muted)" font-size="5.5">Client &#x2192; Gateway: ~2ms (WS frame)</text>
 <text x="540" y="60" fill="var(--muted)" font-size="5.5">Redis Pub/Sub hop: ~1ms</text>
-<text x="540" y="70" fill="var(--muted)" font-size="5.5">Gateway ? Client: ~2ms (WS push)</text>
+<text x="540" y="70" fill="var(--muted)" font-size="5.5">Gateway &#x2192; Client: ~2ms (WS push)</text>
 <text x="680" y="50" fill="var(--g)" font-size="5.5" font-weight="600">Total: ~5ms</text>
 
 <!-- --- THROTTLE & TTL LOGIC --- -->
@@ -175,11 +175,11 @@
 <text x="124" y="166" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Client-Side Throttle</text>
 <text x="124" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">Max 1 event per 5s per conversation</text>
 <text x="124" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Debounce: wait 300ms after last keystroke</text>
-<text x="124" y="198" text-anchor="middle" fill="var(--muted)" font-size="4.5">Reduces 60 keystrokes/min ? 1 event/5s</text>
+<text x="124" y="198" text-anchor="middle" fill="var(--muted)" font-size="4.5">Reduces 60 keystrokes/min &#x2192; 1 event/5s</text>
 
 <rect x="260" y="154" width="220" height="46" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
 <text x="370" y="166" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Server-Side Throttle (Gateway)</text>
-<text x="370" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">In-memory map: {user_id+channel_id ? last_ts}</text>
+<text x="370" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">In-memory map: {user_id+channel_id &#x2192; last_ts}</text>
 <text x="370" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Drop if last event &lt; 5s ago</text>
 <text x="370" y="198" text-anchor="middle" fill="var(--muted)" font-size="4.5">Prevents misbehaving clients from flooding</text>
 
@@ -194,13 +194,13 @@
 <text x="370" y="232" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">WHY NOT KAFKA &middot; Latency Math</text>
 
 <rect x="14" y="240" width="350" height="44" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
-<text x="189" y="254" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">? With Kafka: ~50-80ms added latency</text>
+<text x="189" y="254" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">&#x2714; With Kafka: ~50-80ms added latency</text>
 <text x="189" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">Produce (5ms) + Broker persist (10ms) + Consumer poll (30ms) + Fan-out (5ms)</text>
 <text x="189" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">Total: ~50-80ms &middot; too slow for ephemeral events, wastes disk I/O</text>
 
 <rect x="380" y="240" width="346" height="44" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
-<text x="553" y="254" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">? Direct Pub/Sub: ~5ms total</text>
-<text x="553" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">Gateway ? Redis Pub/Sub (1ms) ? Target Gateway ? WS push (2ms)</text>
+<text x="553" y="254" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">&#x2714; Direct Pub/Sub: ~5ms total</text>
+<text x="553" y="266" text-anchor="middle" fill="var(--muted)" font-size="5">Gateway &#x2192; Redis Pub/Sub (1ms) &#x2192; Target Gateway &#x2192; WS push (2ms)</text>
 <text x="553" y="278" text-anchor="middle" fill="var(--muted)" font-size="5">No disk, no consumer lag, no partition assignment overhead</text>
 </svg>
 </div>
@@ -242,7 +242,7 @@
 <table>
 <tr><th>Component</th><th>Technology</th><th>Why This</th><th>Why Not X</th></tr>
 <tr><td><span class="hi">Event Transport</span></td><td>Redis Pub/Sub</td><td>Sub-ms delivery, fire-and-forget, no persistence overhead. Channel-based subscription model.</td><td>Kafka: persists to disk, adds 50ms+ latency. Overkill for ephemeral events.</td></tr>
-<tr><td><span class="hi">Throttle State</span></td><td>In-memory HashMap (per Gateway)</td><td>O(1) lookup, no network hop. Map: {user+channel ? last_event_ts}. Evicted on disconnect.</td><td>Redis: adds 1ms per event for throttle check &middot; unnecessary network hop.</td></tr>
+<tr><td><span class="hi">Throttle State</span></td><td>In-memory HashMap (per Gateway)</td><td>O(1) lookup, no network hop. Map: {user+channel &#x2192; last_event_ts}. Evicted on disconnect.</td><td>Redis: adds 1ms per event for throttle check &middot; unnecessary network hop.</td></tr>
 <tr><td><span class="hi">Client Timer</span></td><td>setTimeout (8s TTL)</td><td>Auto-expires indicator without server involvement. Reset on each new event.</td><td>Server-sent "stop" event: doubles traffic, complex state management.</td></tr>
 <tr><td><span class="hi">WebSocket Gateway</span></td><td>Same as message delivery (Go/Java)</td><td>Reuses existing WS connections. Typing events are just another frame type on the same socket.</td><td>Separate connection: wasteful, doubles connection count.</td></tr>
 <tr><td><span class="hi">Subscription Management</span></td><td>Redis Pub/Sub channels per conversation</td><td>Gateway subscribes to <code>typing:{channel_id}</code> when first user in that channel connects.</td><td>Per-user subscriptions: O(members) subscriptions per channel, doesn't scale.</td></tr>

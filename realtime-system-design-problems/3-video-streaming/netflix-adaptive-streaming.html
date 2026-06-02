@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Netflix deliver 4K HDR video without buffering to 230M+ subscribers globally?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design adaptive bitrate streaming for 230M users with &lt;0.1% rebuffer rate</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design adaptive bitrate streaming for 230M users with &lt;0.1% rebuffer rate</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -27,7 +27,7 @@
 <div class="T" id="problem">
 <h2>Problem Statement</h2>
 <p class="su">How does a streaming platform deliver 4K HDR video to 230M+ subscribers globally without buffering, adapting quality in real-time to each viewer's bandwidth while minimizing rebuffer events to &lt;0.1% of sessions?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A user's bandwidth fluctuates constantly (WiFi ? cellular ? tunnel). The player must <span class="hr">predict bandwidth, pre-buffer segments, and switch quality seamlessly</span> &middot; all without visible artifacts or interruption.</div>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> A user's bandwidth fluctuates constantly (WiFi &#x2192; cellular &#x2192; tunnel). The player must <span class="hr">predict bandwidth, pre-buffer segments, and switch quality seamlessly</span> &middot; all without visible artifacts or interruption.</div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -48,7 +48,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--g)">8+</div>
 <div style="font-size:.72rem;color:var(--muted)">quality levels</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">240p ? 4K HDR</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">240p &#x2192; 4K HDR</div>
 </div>
 </div>
 </div>
@@ -56,14 +56,14 @@
 <!-- --- ARCHITECTURE --- -->
 <div class="T" id="architecture">
 <h2>High-Level Architecture</h2>
-<p class="su">Content preparation ? CDN distribution ? adaptive client playback</p>
+<p class="su">Content preparation &#x2192; CDN distribution &#x2192; adaptive client playback</p>
 
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Netflix adaptive streaming end-to-end architecture">
   <defs><marker id="nf-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
 
   <!-- --- LAYER 1: ENCODING --- -->
   <rect x="10" y="8" width="760" height="140" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: ENCODING &middot; Upload ? Transcoding Pipeline (~1200 versions per title)</text>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: ENCODING &middot; Upload &#x2192; Transcoding Pipeline (~1200 versions per title)</text>
 
   <rect x="25" y="35" width="100" height="95" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="75" y="52" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Upload</text>
@@ -77,7 +77,7 @@
 
   <rect x="160" y="35" width="310" height="95" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
   <text x="315" y="52" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Transcoding Pipeline</text>
-  <text x="315" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">8+ resolutions (240p ? 4K) &middot; 3 codecs (H.264, H.265, AV1)</text>
+  <text x="315" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">8+ resolutions (240p &#x2192; 4K) &middot; 3 codecs (H.264, H.265, AV1)</text>
   <text x="315" y="80" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">&middot; HDR variants (SDR, HDR10, Dolby Vision)</text>
   <text x="315" y="93" text-anchor="middle" fill="var(--muted)" font-size="5.5">= ~1200 encoded versions per title</text>
   <text x="315" y="106" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">per-shot encoding (VMAF optimized per scene)</text>
@@ -95,14 +95,14 @@
 
   <!-- --- LAYER 2: DELIVERY --- -->
   <rect x="10" y="155" width="760" height="140" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="170" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: DELIVERY &middot; CDN (Open Connect, 17K+ edge servers) ? Adaptive Bitrate Selection</text>
+  <text x="390" y="170" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: DELIVERY &middot; CDN (Open Connect, 17K+ edge servers) &#x2192; Adaptive Bitrate Selection</text>
 
   <rect x="25" y="180" width="340" height="100" rx="6" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.5"/>
   <text x="195" y="197" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="700">Open Connect CDN</text>
   <text x="195" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">17,000+ edge servers in 6000+ ISP locations</text>
   <text x="195" y="225" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">95%+ traffic served from edge (in-ISP)</text>
   <text x="195" y="238" text-anchor="middle" fill="var(--muted)" font-size="5.5">pre-positioned during off-peak (predict popularity)</text>
-  <text x="195" y="251" text-anchor="middle" fill="var(--muted)" font-size="5">tiered: edge ? regional ? origin (S3)</text>
+  <text x="195" y="251" text-anchor="middle" fill="var(--muted)" font-size="5">tiered: edge &#x2192; regional &#x2192; origin (S3)</text>
   <text x="195" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">100+ Tbps total capacity, BGP anycast routing</text>
   <text x="195" y="277" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">zero transit cost (embedded in ISP)</text>
 
@@ -113,13 +113,13 @@
   <text x="580" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">manifest lists all quality levels + segment URLs</text>
   <text x="580" y="225" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">client picks quality based on bandwidth estimate</text>
   <text x="580" y="238" text-anchor="middle" fill="var(--muted)" font-size="5.5">EWMA bandwidth estimation (last N segments)</text>
-  <text x="580" y="251" text-anchor="middle" fill="var(--muted)" font-size="5">buffer-based: low buffer ? drop quality aggressively</text>
+  <text x="580" y="251" text-anchor="middle" fill="var(--muted)" font-size="5">buffer-based: low buffer &#x2192; drop quality aggressively</text>
   <text x="580" y="264" text-anchor="middle" fill="var(--muted)" font-size="5">hysteresis: avoid oscillating between levels</text>
   <text x="580" y="277" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">seamless mid-stream quality switch</text>
 
   <!-- --- LAYER 3: PLAYBACK --- -->
   <rect x="10" y="302" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="317" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: PLAYBACK &middot; Client Player (buffer-based ABR) ? Quality Metrics ? Telemetry</text>
+  <text x="390" y="317" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 3: PLAYBACK &middot; Client Player (buffer-based ABR) &#x2192; Quality Metrics &#x2192; Telemetry</text>
 
   <rect x="25" y="327" width="340" height="105" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1.5"/>
   <text x="195" y="344" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Client Player (ABR Engine)</text>
@@ -127,7 +127,7 @@
   <text x="195" y="372" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">bandwidth estimation (EWMA of segment downloads)</text>
   <text x="195" y="385" text-anchor="middle" fill="var(--muted)" font-size="5.5">seamless quality switch mid-stream (no interruption)</text>
   <text x="195" y="398" text-anchor="middle" fill="var(--muted)" font-size="5">pre-buffer next episode (predictive prefetch)</text>
-  <text x="195" y="411" text-anchor="middle" fill="var(--muted)" font-size="5">start conservative (fast start) ? ramp up quality</text>
+  <text x="195" y="411" text-anchor="middle" fill="var(--muted)" font-size="5">start conservative (fast start) &#x2192; ramp up quality</text>
   <text x="195" y="424" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">device-aware: no 4K to phone on cellular</text>
 
   <rect x="400" y="327" width="360" height="105" rx="6" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1.2"/>
@@ -158,7 +158,7 @@
 <table>
 <tr><th>Signal</th><th>What It Measures</th><th>How It's Used</th></tr>
 <tr><td><span class="hi">Throughput</span></td><td>Download speed of last N segments (EWMA)</td><td>Upper bound on selectable bitrate</td></tr>
-<tr><td><span class="hi">Buffer Level</span></td><td>Seconds of video buffered ahead</td><td>Low buffer ? drop quality aggressively</td></tr>
+<tr><td><span class="hi">Buffer Level</span></td><td>Seconds of video buffered ahead</td><td>Low buffer &#x2192; drop quality aggressively</td></tr>
 <tr><td><span class="hi">VMAF Score</span></td><td>Perceptual quality metric per encode</td><td>Choose encode with best quality/bitrate ratio</td></tr>
 <tr><td><span class="hi">Device</span></td><td>Screen resolution, HDR capability</td><td>Don't send 4K to a phone on cellular</td></tr>
 <tr><td><span class="hi">Network type</span></td><td>WiFi vs cellular vs ethernet</td><td>More conservative on cellular (data caps)</td></tr>
@@ -197,7 +197,7 @@
 <span class="hg">5.</span> <strong>Buffer-based algorithm</strong> &middot; switch quality based on buffer level, not just bandwidth estimate<br>
 <span class="hg">6.</span> <strong>Rebuffer rate &lt;0.1%</strong> &middot; the key quality metric (users leave after 2s of buffering)<br>
 <span class="hg">7.</span> <strong>Pre-positioning popular content</strong> &middot; push to edge during off-peak, serve locally at peak<br>
-<span class="hg">8.</span> <strong>Multi-codec strategy</strong> &middot; H.264 (compatibility) ? H.265 (4K) ? AV1 (next-gen, 30% savings)
+<span class="hg">8.</span> <strong>Multi-codec strategy</strong> &middot; H.264 (compatibility) &#x2192; H.265 (4K) &#x2192; AV1 (next-gen, 30% savings)
 </div>
 </div>
 

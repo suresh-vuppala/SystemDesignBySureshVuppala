@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a notification system deliver push notifications to millions of devices reliably?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a push notification system that delivers to millions of devices without duplicates, handling token lifecycle and cross-platform delivery</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a push notification system that delivers to millions of devices without duplicates, handling token lifecycle and cross-platform delivery</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -27,7 +27,7 @@
 <!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <p class="su">How does a notification system deliver push notifications to millions of devices without duplicates, handling device token lifecycle, retry logic, and cross-platform delivery (iOS/Android) reliably?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Push notification delivery to mobile devices when the app is backgrounded or the device is offline. The hard question: <span class="hr">how do you guarantee exactly-once delivery semantics across unreliable APNs/FCM gateways while managing millions of device tokens that constantly change?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Push notification delivery to mobile devices when the app is backgrounded or the device is offline. The hard question: <span class="hr">how do you guarantee exactly-once delivery semantics across unreliable APNs/FCM gateways while managing millions of device tokens that constantly change&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -48,7 +48,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--g)">&lt;2s</div>
 <div style="font-size:.72rem;color:var(--muted)">delivery P95</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">trigger ? device display</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">trigger &#x2192; device display</div>
 </div>
 </div>
 </div>
@@ -72,11 +72,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> <strong>In-app notifications</strong> (delivered via WebSocket &middot; see Real-Time Messaging)<br>
-  <span class="hr">?</span> <strong>Email/SMS notifications</strong> (different delivery channels, same trigger system)<br>
-  <span class="hr">?</span> <strong>Notification preferences UI</strong> (user settings, mute, DND schedules)<br>
-  <span class="hr">?</span> <strong>Rich media in notifications</strong> (images, action buttons &middot; platform-specific)<br>
-  <span class="hr">?</span> <strong>Analytics</strong> (open rates, click-through &middot; separate pipeline)
+  <span class="hr">&#x2717;</span> <strong>In-app notifications</strong> (delivered via WebSocket &middot; see Real-Time Messaging)<br>
+  <span class="hr">&#x2717;</span> <strong>Email/SMS notifications</strong> (different delivery channels, same trigger system)<br>
+  <span class="hr">&#x2717;</span> <strong>Notification preferences UI</strong> (user settings, mute, DND schedules)<br>
+  <span class="hr">&#x2717;</span> <strong>Rich media in notifications</strong> (images, action buttons &middot; platform-specific)<br>
+  <span class="hr">&#x2717;</span> <strong>Analytics</strong> (open rates, click-through &middot; separate pipeline)
 </div>
 </div>
 </div>
@@ -105,7 +105,7 @@
 <table>
 <tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
 <tr><td>1</td><td>2B users &middot; 50% with push enabled</td><td>1B push-eligible devices</td></tr>
-<tr><td>2</td><td>100B msgs/day &middot; 30% to offline users</td><td>30B offline msgs ? triggers</td></tr>
+<tr><td>2</td><td>100B msgs/day &middot; 30% to offline users</td><td>30B offline msgs &#x2192; triggers</td></tr>
 <tr><td>3</td><td>Collapse/batch: 30B triggers &middot; 30 (avg batch)</td><td>~1B actual pushes/day</td></tr>
 <tr><td>4</td><td>1B &middot; 86400</td><td>~12K pushes/sec avg, peak 50K/sec</td></tr>
 <tr><td>5</td><td>Device registry: 1B devices &middot; 200 bytes</td><td>~200GB (Cassandra)</td></tr>
@@ -116,7 +116,7 @@
 <!-- --- ARCHITECTURE --- -->
 <div class="T" id="architecture">
 <h2>Architecture Overview</h2>
-<p class="su">Event trigger ? Notification Service ? Platform Router ? APNs/FCM delivery with retry and dedup</p>
+<p class="su">Event trigger &#x2192; Notification Service &#x2192; Platform Router &#x2192; APNs/FCM delivery with retry and dedup</p>
 
 <svg width="100%" viewBox="0 0 740 300" style="max-width:740px;display:block;margin:4px auto 8px">
 <defs>
@@ -126,7 +126,7 @@
 
 <!-- --- TRIGGER PATH --- -->
 <rect x="4" y="4" width="732" height="90" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
-<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">TRIGGER PATH &middot; Message arrives for offline user ? push notification</text>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">TRIGGER PATH &middot; Message arrives for offline user &#x2192; push notification</text>
 
 <!-- Trigger Event -->
 <rect x="14" y="30" width="100" height="32" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
@@ -145,7 +145,7 @@
 <!-- Device Registry -->
 <rect x="286" y="26" width="120" height="40" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
 <text x="346" y="40" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Device Token Registry</text>
-<text x="346" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">user_id ? [{token, platform}]</text>
+<text x="346" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">user_id &#x2192; [{token, platform}]</text>
 <text x="346" y="60" text-anchor="middle" fill="var(--muted)" font-size="4.5">handles multi-device</text>
 <line x1="406" y1="40" x2="430" y2="34" stroke="var(--r)" stroke-width=".8" marker-end="url(#pn1)"/>
 <line x1="406" y1="52" x2="430" y2="58" stroke="var(--r)" stroke-width=".8" marker-end="url(#pn1)"/>
@@ -168,9 +168,9 @@
 
 <!-- Devices -->
 <line x1="628" y1="34" x2="652" y2="34" stroke="var(--a)" stroke-width=".8" marker-end="url(#pn1)"/>
-<text x="670" y="37" fill="var(--a)" font-size="6">?? iOS</text>
+<text x="670" y="37" fill="var(--a)" font-size="6">&#x2794; iOS</text>
 <line x1="628" y1="62" x2="652" y2="62" stroke="var(--g)" stroke-width=".8" marker-end="url(#pn1)"/>
-<text x="670" y="65" fill="var(--g)" font-size="6">?? Android</text>
+<text x="670" y="65" fill="var(--g)" font-size="6">&#x2794; Android</text>
 
 <!-- --- TOKEN LIFECYCLE --- -->
 <rect x="4" y="100" width="732" height="90" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
@@ -178,14 +178,14 @@
 
 <rect x="14" y="124" width="170" height="54" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
 <text x="99" y="136" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Registration</text>
-<text x="99" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">App launch ? get token from OS</text>
+<text x="99" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">App launch &#x2192; get token from OS</text>
 <text x="99" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">POST /v1/devices {token, platform, user_id}</text>
 <text x="99" y="168" text-anchor="middle" fill="var(--muted)" font-size="4.5">Upsert: same device_id updates token</text>
 
 <rect x="200" y="124" width="170" height="54" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
 <text x="285" y="136" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Token Refresh</text>
 <text x="285" y="148" text-anchor="middle" fill="var(--muted)" font-size="5">OS rotates token periodically</text>
-<text x="285" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">App detects change ? re-register</text>
+<text x="285" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">App detects change &#x2192; re-register</text>
 <text x="285" y="168" text-anchor="middle" fill="var(--muted)" font-size="4.5">Old token invalidated automatically</text>
 
 <rect x="386" y="124" width="170" height="54" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
@@ -212,14 +212,14 @@
 
 <rect x="260" y="222" width="230" height="60" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
 <text x="375" y="234" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Priority Levels</text>
-<text x="375" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">HIGH: new message ? immediate delivery, wake device</text>
-<text x="375" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">NORMAL: status update ? batched by OS</text>
-<text x="375" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">LOW: marketing ? silent, OS may delay hours</text>
+<text x="375" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">HIGH: new message &#x2192; immediate delivery, wake device</text>
+<text x="375" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">NORMAL: status update &#x2192; batched by OS</text>
+<text x="375" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">LOW: marketing &#x2192; silent, OS may delay hours</text>
 
 <rect x="506" y="222" width="220" height="60" rx="4" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width=".6"/>
 <text x="616" y="234" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Batching for Efficiency</text>
-<text x="616" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Group chat: 5 msgs in 10s ? 1 push "5 new messages"</text>
-<text x="616" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Collapse key: same chat ? replace previous push</text>
+<text x="616" y="246" text-anchor="middle" fill="var(--muted)" font-size="5">Group chat: 5 msgs in 10s &#x2192; 1 push "5 new messages"</text>
+<text x="616" y="258" text-anchor="middle" fill="var(--muted)" font-size="5">Collapse key: same chat &#x2192; replace previous push</text>
 <text x="616" y="270" text-anchor="middle" fill="var(--muted)" font-size="5">Badge count: atomic increment per notification</text>
 </svg>
 </div>
@@ -231,10 +231,10 @@
 <table>
 <tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
 <tr><td><span class="hi">Deduplication</span></td><td><span class="hg">Idempotency key per notification</span></td><td>hash(user_id + message_id) stored in Redis with 24h TTL. Prevents duplicate pushes on retry.</td><td>No dedup: users receive same notification 2-3&middot; on transient failures. Unacceptable UX.</td></tr>
-<tr><td><span class="hi">Token Storage</span></td><td><span class="hg">Device Registry (Cassandra)</span></td><td>user_id ? list of {device_id, token, platform, last_seen}. Supports multi-device. Handles token rotation.</td><td>Single token per user: breaks multi-device. In-memory: lost on restart.</td></tr>
+<tr><td><span class="hi">Token Storage</span></td><td><span class="hg">Device Registry (Cassandra)</span></td><td>user_id &#x2192; list of {device_id, token, platform, last_seen}. Supports multi-device. Handles token rotation.</td><td>Single token per user: breaks multi-device. In-memory: lost on restart.</td></tr>
 <tr><td><span class="hi">Platform Routing</span></td><td><span class="hg">Separate sender per platform</span></td><td>APNs and FCM have different APIs, rate limits, and error codes. Separate senders allow independent scaling.</td><td>Unified sender: complex error handling, can't scale platforms independently.</td></tr>
 <tr><td><span class="hi">Trigger Mechanism</span></td><td><span class="hg">Kafka consumer on offline-delivery topic</span></td><td>Same event that triggers offline message storage also triggers push. Decoupled from message delivery path.</td><td>Synchronous push on message send: adds latency to sender, couples systems.</td></tr>
-<tr><td><span class="hi">Collapse Strategy</span></td><td><span class="hg">Collapse key = conversation_id</span></td><td>Multiple messages in same chat ? single notification updated. Reduces notification fatigue.</td><td>One push per message: 50 messages = 50 notifications. Terrible UX in active group chats.</td></tr>
+<tr><td><span class="hi">Collapse Strategy</span></td><td><span class="hg">Collapse key = conversation_id</span></td><td>Multiple messages in same chat &#x2192; single notification updated. Reduces notification fatigue.</td><td>One push per message: 50 messages = 50 notifications. Terrible UX in active group chats.</td></tr>
 </table>
 <div class="b bg"><span class="hi">Cross-reference:</span> The push notification system is triggered by the same offline delivery mechanism described in <a href="whatsapp-offline-delivery.html">WhatsApp Offline Delivery</a>. When a message can't be delivered via WebSocket (user offline), it's queued for offline delivery AND triggers a push notification.</div>
 </div>
@@ -280,11 +280,11 @@
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
 <div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">? Device Token Lifecycle Management</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Tokens are ephemeral &middot; they change on app reinstall, OS update, or periodic rotation. Registry stores user_id ? [{device_id, token, platform}]. On "invalid token" response from APNs/FCM, immediately mark dead. On app launch, always re-register.</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Tokens are ephemeral &middot; they change on app reinstall, OS update, or periodic rotation. Registry stores user_id &#x2192; [{device_id, token, platform}]. On "invalid token" response from APNs/FCM, immediately mark dead. On app launch, always re-register.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
 <div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">? Collapse Key for Notification Batching</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Set collapse_key = conversation_id. Multiple messages in same chat within a short window ? single notification that updates (not stacks). "5 new messages from #general" instead of 5 separate notifications. Reduces notification fatigue dramatically.</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Set collapse_key = conversation_id. Multiple messages in same chat within a short window &#x2192; single notification that updates (not stacks). "5 new messages from #general" instead of 5 separate notifications. Reduces notification fatigue dramatically.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--o)">
 <div style="font-size:.72rem;font-weight:700;color:var(--o);margin-bottom:4px">? Separate Senders per Platform (APNs/FCM)</div>
@@ -292,7 +292,7 @@
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--r)">
 <div style="font-size:.72rem;font-weight:700;color:var(--r);margin-bottom:4px">? Retry Only Transient Failures</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Critical distinction: 5xx/timeout ? retry with exponential backoff (transient). 410 Gone ? delete token, never retry (permanent). 429 ? backoff per Retry-After header. Wrong retry strategy = wasted resources or lost notifications.</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Critical distinction: 5xx/timeout &#x2192; retry with exponential backoff (transient). 410 Gone &#x2192; delete token, never retry (permanent). 429 &#x2192; backoff per Retry-After header. Wrong retry strategy = wasted resources or lost notifications.</div>
 </div>
 </div>
 <div class="b bg" style="margin-top:8px"><span class="hi">One-liner answer:</span> <em>"Kafka-triggered push with idempotency key dedup in Redis, device token registry in Cassandra with lifecycle management, collapse keys for notification batching per conversation, separate APNs/FCM senders with platform-specific scaling, and retry only on transient failures with exponential backoff."</em></div>

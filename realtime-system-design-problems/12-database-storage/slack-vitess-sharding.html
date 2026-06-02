@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does Slack shard 10B+ messages across hundreds of shards with online resharding?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">???</span> Design a database sharding layer: 10B+ messages, online resharding, 100&middot; connection reduction</div>
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design a database sharding layer: 10B+ messages, online resharding, 100&middot; connection reduction</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -80,7 +80,7 @@
 
   <text x="500" y="52" fill="var(--a)" font-size="7" font-weight="600">... 10K instances</text>
   <text x="500" y="66" fill="var(--muted)" font-size="5">standard MySQL protocol</text>
-  <text x="660" y="52" fill="var(--a)" font-size="5.5" font-weight="600" font-style="italic">10K apps ? 1 pool ? 100 shards</text>
+  <text x="660" y="52" fill="var(--a)" font-size="5.5" font-weight="600" font-style="italic">10K apps &#x2192; 1 pool &#x2192; 100 shards</text>
 
   <!-- Arrows from App Layer to Vitess Layer -->
   <line x1="95" y1="76" x2="200" y2="105" stroke="var(--a)" stroke-width="1" marker-end="url(#vt-arr)"/>
@@ -95,8 +95,8 @@
   <!-- VTGate -->
   <rect x="130" y="110" width="320" height="75" rx="6" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1.8"/>
   <text x="290" y="126" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">VTGate (Stateless Router)</text>
-  <text x="290" y="140" text-anchor="middle" fill="var(--muted)" font-size="5.5">Parse SQL ? route by vindex (hash of workspace_id)</text>
-  <text x="290" y="153" text-anchor="middle" fill="var(--muted)" font-size="5.5">Connection pooling: 10K app conns ? 100 shard conns (100&middot; reduction)</text>
+  <text x="290" y="140" text-anchor="middle" fill="var(--muted)" font-size="5.5">Parse SQL &#x2192; route by vindex (hash of workspace_id)</text>
+  <text x="290" y="153" text-anchor="middle" fill="var(--muted)" font-size="5.5">Connection pooling: 10K app conns &#x2192; 100 shard conns (100&middot; reduction)</text>
   <text x="290" y="166" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Scatter-gather for cross-shard queries | Stateless, horizontally scalable</text>
   <text x="290" y="179" text-anchor="middle" fill="var(--muted)" font-size="5">shard key: workspace_id</text>
 
@@ -108,7 +108,7 @@
   <text x="620" y="166" text-anchor="middle" fill="var(--muted)" font-size="5.5">Query rewriting &amp; throttling</text>
   <text x="620" y="179" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Promotes replica on primary failure (~5s)</text>
 
-  <!-- Arrow VTGate ? VTTablet -->
+  <!-- Arrow VTGate &#x2192; VTTablet -->
   <line x1="450" y1="147" x2="488" y2="147" stroke="var(--y)" stroke-width="1.2" marker-end="url(#vt-arr)"/>
   <text x="469" y="141" fill="var(--muted)" font-size="4.5">route</text>
 
@@ -120,7 +120,7 @@
   <text x="70" y="167" text-anchor="middle" fill="var(--muted)" font-size="5">keyrange?node</text>
   <text x="70" y="178" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">updated on reshard</text>
 
-  <!-- Arrow Topology ? VTGate -->
+  <!-- Arrow Topology &#x2192; VTGate -->
   <line x1="120" y1="140" x2="128" y2="140" stroke="var(--r)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#vt-arr)"/>
   <text x="125" y="133" fill="var(--r)" font-size="4.5">watch</text>
 
@@ -181,48 +181,48 @@
 
   <!-- Resharding steps -->
   <rect x="30" y="422" width="120" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="90" y="436" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">? VReplication</text>
+  <text x="90" y="436" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&#x2714; VReplication</text>
   <text x="90" y="447" text-anchor="middle" fill="var(--muted)" font-size="4.5">stream rows to target</text>
 
   <line x1="150" y1="437" x2="175" y2="437" stroke="var(--g)" stroke-width=".8" marker-end="url(#vt-arr)"/>
 
   <rect x="177" y="422" width="120" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
-  <text x="237" y="436" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">? Catch-up Binlog</text>
+  <text x="237" y="436" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&#x2714; Catch-up Binlog</text>
   <text x="237" y="447" text-anchor="middle" fill="var(--muted)" font-size="4.5">replay new writes</text>
 
   <line x1="297" y1="437" x2="322" y2="437" stroke="var(--g)" stroke-width=".8" marker-end="url(#vt-arr)"/>
 
   <rect x="324" y="422" width="120" height="30" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
-  <text x="384" y="436" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">? Lag &lt; 1s</text>
+  <text x="384" y="436" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">&#x2714; Lag &lt; 1s</text>
   <text x="384" y="447" text-anchor="middle" fill="var(--muted)" font-size="4.5">nearly caught up</text>
 
   <line x1="444" y1="437" x2="469" y2="437" stroke="var(--y)" stroke-width=".8" marker-end="url(#vt-arr)"/>
 
   <rect x="471" y="422" width="130" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
-  <text x="536" y="436" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">? Atomic Cutover</text>
+  <text x="536" y="436" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">&#x2714; Atomic Cutover</text>
   <text x="536" y="447" text-anchor="middle" fill="var(--muted)" font-size="4.5">~1s write pause</text>
 
   <line x1="601" y1="437" x2="626" y2="437" stroke="var(--r)" stroke-width=".8" marker-end="url(#vt-arr)"/>
 
   <rect x="628" y="422" width="120" height="30" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
-  <text x="688" y="436" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">? Done!</text>
+  <text x="688" y="436" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">&#x2714; Done!</text>
   <text x="688" y="447" text-anchor="middle" fill="var(--g)" font-size="4.5">zero downtime</text>
 
   <!-- Bottom insight -->
   <rect x="30" y="460" width="720" height="28" rx="4" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
-  <text x="390" y="475" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">10K apps ? 1 pool ? 100 shards | shard key: workspace_id | 115K writes/sec across shards</text>
-  <text x="390" y="485" text-anchor="middle" fill="var(--muted)" font-size="5">Connection reduction: 10K &middot; 100 = 1M impossible ? VTGate pools to ~100 backend conns per shard</text>
+  <text x="390" y="475" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">10K apps &#x2192; 1 pool &#x2192; 100 shards | shard key: workspace_id | 115K writes/sec across shards</text>
+  <text x="390" y="485" text-anchor="middle" fill="var(--muted)" font-size="5">Connection reduction: 10K &middot; 100 = 1M impossible &#x2192; VTGate pools to ~100 backend conns per shard</text>
 </svg>
 <table>
 <tr><th>Component</th><th>Role</th><th>How</th></tr>
-<tr><td><span class="hi">VTGate</span></td><td>Query router + connection pool</td><td>Parses SQL, routes to correct shard by vindex (shard key). Pools connections: 10K apps ? 1 VTGate pool ? 100 shards</td></tr>
+<tr><td><span class="hi">VTGate</span></td><td>Query router + connection pool</td><td>Parses SQL, routes to correct shard by vindex (shard key). Pools connections: 10K apps &#x2192; 1 VTGate pool &#x2192; 100 shards</td></tr>
 <tr><td><span class="hi">VTTablet</span></td><td>Shard-local agent</td><td>Sits in front of each MySQL. Handles replication, health checks, query rewriting</td></tr>
-<tr><td><span class="hi">Topology (etcd)</span></td><td>Shard map + metadata</td><td>Stores which keyrange ? which shard. Updated during resharding</td></tr>
+<tr><td><span class="hi">Topology (etcd)</span></td><td>Shard map + metadata</td><td>Stores which keyrange &#x2192; which shard. Updated during resharding</td></tr>
 <tr><td><span class="hi">VReplication</span></td><td>Online resharding engine</td><td>Streams rows from source to target shard. Catches up binlog. Atomic cutover.</td></tr>
 </table>
 
-<div class="b bg"><span class="hi">Shard key:</span> <code>workspace_id</code> &middot; all messages for one workspace on same shard. Ensures channel queries never cross shards. <span class="hg">Vindex</span> maps workspace_id ? keyrange ? shard. Lookup vindex for secondary access patterns.</div>
-<div class="b by"><span class="hi">Online resharding:</span> ? Create target shards ? VReplication copies existing data ? Binlog streaming catches up writes ? When lag &lt; 1s, atomic cutover (freeze writes for ~1s, switch routing) ? Old shard becomes read-only, then decommissioned. <span class="hg">Zero downtime</span> for reads, ~1s pause for writes.</div>
+<div class="b bg"><span class="hi">Shard key:</span> <code>workspace_id</code> &middot; all messages for one workspace on same shard. Ensures channel queries never cross shards. <span class="hg">Vindex</span> maps workspace_id &#x2192; keyrange &#x2192; shard. Lookup vindex for secondary access patterns.</div>
+<div class="b by"><span class="hi">Online resharding:</span> &#x2192; Create target shards &#x2192; VReplication copies existing data &#x2192; Binlog streaming catches up writes &#x2192; When lag &lt; 1s, atomic cutover (freeze writes for ~1s, switch routing) &#x2192; Old shard becomes read-only, then decommissioned. <span class="hg">Zero downtime</span> for reads, ~1s pause for writes.</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">Cross-shard joins</span> &middot; not supported (denormalize or scatter-gather). <span class="hr">Cross-shard transactions</span> &middot; 2PC available but expensive. <span class="hr">Hot shards</span> &middot; one large workspace can overwhelm a shard (solution: dedicated shard for enterprise customers).</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Slack</strong> &middot; Vitess for all message storage. <strong>YouTube</strong> &middot; Vitess originated at Google (open-sourced). <strong>GitHub</strong> &middot; Vitess for MySQL sharding. <strong>Square</strong> &middot; Vitess for payment data. <strong>PlanetScale</strong> &middot; managed Vitess as a service.</div>
 </div>
@@ -232,10 +232,10 @@
 <h2>Scale Estimation</h2>
 <table>
 <tr><th>Step</th><th>Derivation</th><th>Result</th><th>Design Impact</th></tr>
-<tr><td><span class="hi">1</span></td><td>Messages: 10B/day &middot; 86400</td><td><span class="hg">~115K writes/sec</span></td><td>Single MySQL maxes at ~10K writes/sec ? need 12+ shards minimum</td></tr>
+<tr><td><span class="hi">1</span></td><td>Messages: 10B/day &middot; 86400</td><td><span class="hg">~115K writes/sec</span></td><td>Single MySQL maxes at ~10K writes/sec &#x2192; need 12+ shards minimum</td></tr>
 <tr><td><span class="hi">2</span></td><td>Storage growth: 10B &middot; 1KB/msg</td><td><span class="hg">~10 TB/day</span></td><td>7-day hot retention = 70TB across shards</td></tr>
 <tr><td><span class="hi">3</span></td><td>Shards needed: 115K writes &middot; 5K/shard (safe)</td><td><span class="hg">~23 shards minimum</span></td><td>Use 100+ for headroom and per-workspace isolation</td></tr>
-<tr><td><span class="hi">4</span></td><td>Connections without Vitess: 10K apps &middot; 100 shards</td><td><span class="hr">1M connections (impossible)</span></td><td>VTGate pools: 10K apps ? 1 pool ? 100 shards = manageable</td></tr>
+<tr><td><span class="hi">4</span></td><td>Connections without Vitess: 10K apps &middot; 100 shards</td><td><span class="hr">1M connections (impossible)</span></td><td>VTGate pools: 10K apps &#x2192; 1 pool &#x2192; 100 shards = manageable</td></tr>
 <tr><td><span class="hi">5</span></td><td>Read queries: 10&middot; write ratio</td><td><span class="hg">~1.15M reads/sec</span></td><td>Read replicas per shard (2 replicas each)</td></tr>
 </table>
 </div>
@@ -258,9 +258,9 @@
 <p class="su">The 6 things to say for database sharding</p>
 <div style="font-size:.82rem;line-height:1.8">
 <span class="hg">1.</span> <strong>Shard key = workspace_id</strong> &middot; all data for one tenant on same shard (no cross-shard joins)<br>
-<span class="hg">2.</span> <strong>VTGate connection pooling</strong> &middot; 10K apps ? 1 pool ? 100 shards (100&middot; reduction)<br>
+<span class="hg">2.</span> <strong>VTGate connection pooling</strong> &middot; 10K apps &#x2192; 1 pool &#x2192; 100 shards (100&middot; reduction)<br>
 <span class="hg">3.</span> <strong>Online resharding via VReplication</strong> &middot; stream + catch up binlog + atomic cutover (~1s pause)<br>
-<span class="hg">4.</span> <strong>Vindex</strong> &middot; maps shard key ? keyrange ? physical shard (like consistent hashing)<br>
+<span class="hg">4.</span> <strong>Vindex</strong> &middot; maps shard key &#x2192; keyrange &#x2192; physical shard (like consistent hashing)<br>
 <span class="hg">5.</span> <strong>No cross-shard joins</strong> &middot; denormalize or scatter-gather (design constraint)<br>
 <span class="hg">6.</span> <strong>Dedicated shards for large tenants</strong> &middot; enterprise customers get their own shard to avoid noisy-neighbor
 </div>

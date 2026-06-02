@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How to handle 5M users booking 50K concert seats simultaneously without double-booking?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a ticket booking system: 5M users, 50K seats, zero double-booking, fair queue</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a ticket booking system: 5M users, 50K seats, zero double-booking, fair queue</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -54,21 +54,21 @@
 
 <div class="T" id="architecture">
 <h2>High-Level Architecture</h2>
-<p class="su">Virtual queue ? seat selection ? distributed lock ? payment ? confirmation</p>
+<p class="su">Virtual queue &#x2192; seat selection &#x2192; distributed lock &#x2192; payment &#x2192; confirmation</p>
 
 <svg width="100%" viewBox="0 0 780 500" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ticket booking end-to-end architecture with virtual queue and distributed locking">
   <defs><marker id="tk-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b8fa3"/></marker></defs>
 
   <!-- --- LAYER 1: QUEUE --- -->
   <rect x="10" y="8" width="760" height="140" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: QUEUE &middot; 5M users ? Virtual Queue (Redis sorted set) + Bot Detection</text>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: QUEUE &middot; 5M users &#x2192; Virtual Queue (Redis sorted set) + Bot Detection</text>
 
   <rect x="25" y="35" width="130" height="100" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1.2"/>
   <text x="90" y="52" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">5M Users</text>
   <text x="90" y="67" text-anchor="middle" fill="var(--muted)" font-size="5.5">hit "Buy" at 10:00:00</text>
   <text x="90" y="80" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">100:1 oversubscribed</text>
   <text x="90" y="93" text-anchor="middle" fill="var(--muted)" font-size="5">50K seats available</text>
-  <text x="90" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">spike: 0 ? 5M in seconds</text>
+  <text x="90" y="106" text-anchor="middle" fill="var(--muted)" font-size="5">spike: 0 &#x2192; 5M in seconds</text>
   <text x="90" y="119" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">~3M see "Sold Out"</text>
 
   <line x1="155" y1="80" x2="180" y2="80" stroke="var(--r)" stroke-width="1.2" marker-end="url(#tk-arr)"/>
@@ -101,7 +101,7 @@
 
   <!-- --- LAYER 2: BOOKING --- -->
   <rect x="10" y="155" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="170" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: BOOKING &middot; Dequeue ? Seat Selection (WebSocket) ? Distributed Lock (Redis SETNX + 5min TTL) ? Payment</text>
+  <text x="390" y="170" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: BOOKING &middot; Dequeue &#x2192; Seat Selection (WebSocket) &#x2192; Distributed Lock (Redis SETNX + 5min TTL) &#x2192; Payment</text>
 
   <rect x="25" y="182" width="160" height="100" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="105" y="199" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Seat Selection</text>
@@ -119,7 +119,7 @@
   <text x="320" y="227" text-anchor="middle" fill="var(--muted)" font-size="5.5">TTL = 5 minutes (auto-expire)</text>
   <text x="320" y="240" text-anchor="middle" fill="var(--muted)" font-size="5.5">key: seat:{event_id}:{seat_id}</text>
   <text x="320" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">value: user_id + lock_timestamp</text>
-  <text x="320" y="266" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">if expired ? seat released back</text>
+  <text x="320" y="266" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">if expired &#x2192; seat released back</text>
   <text x="320" y="279" text-anchor="middle" fill="var(--muted)" font-size="5">abandoned carts auto-release</text>
 
   <line x1="420" y1="232" x2="450" y2="232" stroke="var(--r)" stroke-width="1.2" marker-end="url(#tk-arr)"/>
@@ -130,15 +130,15 @@
   <text x="550" y="227" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Stripe/Razorpay charge</text>
   <text x="550" y="240" text-anchor="middle" fill="var(--muted)" font-size="5.5">retry-safe (no double-charge)</text>
   <text x="550" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">timeout = 3 min max</text>
-  <text x="550" y="266" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">success ? confirm</text>
-  <text x="550" y="279" text-anchor="middle" fill="var(--muted)" font-size="5">fail/timeout ? release lock</text>
+  <text x="550" y="266" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">succesS &#x2192; Confirm</text>
+  <text x="550" y="279" text-anchor="middle" fill="var(--muted)" font-size="5">fail/timeout &#x2192; release lock</text>
 
   <!-- Result indicator -->
   <rect x="660" y="190" width="100" height="80" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
-  <text x="710" y="207" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">? Confirmed</text>
+  <text x="710" y="207" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">&#x2714; Confirmed</text>
   <text x="710" y="222" text-anchor="middle" fill="var(--muted)" font-size="5">ticket issued</text>
   <text x="710" y="237" text-anchor="middle" fill="var(--muted)" font-size="5">email + SMS</text>
-  <text x="710" y="255" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">? Failed</text>
+  <text x="710" y="255" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="600">&#x2714; Failed</text>
   <text x="710" y="268" text-anchor="middle" fill="var(--muted)" font-size="5">lock released</text>
 
   <line x1="645" y1="232" x2="658" y2="232" stroke="var(--y)" stroke-width="1" marker-end="url(#tk-arr)"/>
@@ -152,17 +152,17 @@
   <text x="200" y="367" text-anchor="middle" fill="var(--muted)" font-size="5.5">seats table: seat_id, event_id, status, locked_by, locked_until</text>
   <text x="200" y="382" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">UNIQUE constraint on (seat_id, event_id) WHERE status='BOOKED'</text>
   <text x="200" y="397" text-anchor="middle" fill="var(--muted)" font-size="5.5">UPDATE seats SET status='BOOKED' WHERE status='LOCKED' AND locked_by=?</text>
-  <text x="200" y="412" text-anchor="middle" fill="var(--muted)" font-size="5">even if Redis fails ? DB prevents double-booking</text>
+  <text x="200" y="412" text-anchor="middle" fill="var(--muted)" font-size="5">even if Redis fails &#x2192; DB prevents double-booking</text>
   <text x="200" y="425" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">DB is final arbiter (Redis is optimization layer)</text>
 
   <!-- Lock lifecycle -->
   <rect x="395" y="335" width="365" height="100" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="577" y="352" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Lock Lifecycle &amp; Guarantees</text>
-  <text x="577" y="367" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">? No double-booking (Redis lock + DB constraint)</text>
-  <text x="577" y="382" text-anchor="middle" fill="var(--muted)" font-size="5.5">? Fair ordering (timestamp-based queue position)</text>
-  <text x="577" y="397" text-anchor="middle" fill="var(--muted)" font-size="5.5">? Lock expiry (5min TTL auto-releases abandoned carts)</text>
-  <text x="577" y="412" text-anchor="middle" fill="var(--muted)" font-size="5.5">? Idempotent payment (no double-charge on retry)</text>
-  <text x="577" y="425" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">? Graceful degradation (queue overflow ? "Sold Out")</text>
+  <text x="577" y="367" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&#x2714; No double-booking (Redis lock + DB constraint)</text>
+  <text x="577" y="382" text-anchor="middle" fill="var(--muted)" font-size="5.5">&#x2714; Fair ordering (timestamp-based queue position)</text>
+  <text x="577" y="397" text-anchor="middle" fill="var(--muted)" font-size="5.5">&#x2714; Lock expiry (5min TTL auto-releases abandoned carts)</text>
+  <text x="577" y="412" text-anchor="middle" fill="var(--muted)" font-size="5.5">&#x2714; Idempotent payment (no double-charge on retry)</text>
+  <text x="577" y="425" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">&#x2714; Graceful degradation (queue overflow &#x2192; "Sold Out")</text>
 
   <!-- Arrows from payment to DB -->
   <line x1="320" y1="282" x2="200" y2="333" stroke="var(--a2)" stroke-width=".8" stroke-dasharray="3,2" marker-end="url(#tk-arr)"/>
@@ -171,7 +171,7 @@
   <!-- --- BOTTOM INSIGHT --- -->
   <rect x="10" y="455" width="760" height="38" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".6"/>
   <text x="390" y="470" text-anchor="middle" fill="var(--y)" font-size="6.5" font-weight="700">100:1 demand:supply | Redis lock + DB constraint = double safety | Lock TTL auto-releases abandoned carts | Queue position updates via SSE every 5s</text>
-  <text x="390" y="486" text-anchor="middle" fill="var(--muted)" font-size="5.5">5M users ? 50K seats | Batch release 500/min | CAPTCHA blocks 30-40% bots | Idempotent payment prevents double-charge</text>
+  <text x="390" y="486" text-anchor="middle" fill="var(--muted)" font-size="5.5">5M users &#x2192; 50K seats | Batch release 500/min | CAPTCHA blocks 30-40% bots | Idempotent payment prevents double-charge</text>
 </svg>
 </div>
 
@@ -191,7 +191,7 @@
 </table>
 
 <div class="b bg"><span class="hi">Locking strategy:</span> Two-phase: <span class="hg">Redis lock</span> (fast, distributed, TTL-based) for real-time seat reservation + <span class="hg">DB constraint</span> (UNIQUE on seat_id+event_id WHERE status='BOOKED') as final safety net. If Redis and DB disagree, DB wins.</div>
-<div class="b by"><span class="hi">Queue fairness:</span> Users get a <span class="hg">queue position</span> (Redis ZRANK) and <span class="hg">estimated wait time</span> (position &middot; avg_processing_time). Position updates pushed via SSE every 5s. Users who abandon queue ? position freed for next in line.</div>
+<div class="b by"><span class="hi">Queue fairness:</span> Users get a <span class="hg">queue position</span> (Redis ZRANK) and <span class="hg">estimated wait time</span> (position &middot; avg_processing_time). Position updates pushed via SSE every 5s. Users who abandon queue &#x2192; position freed for next in line.</div>
 <div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No queue (direct DB hit)</span> &middot; 5M concurrent connections crash the DB. <span class="hr">Infinite lock TTL</span> &middot; abandoned carts block seats forever. <span class="hr">Optimistic-only (no lock)</span> &middot; high contention = most users get "seat taken" error. <span class="hr">No idempotency</span> &middot; payment retries = double-charge.</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>BookMyShow</strong> &middot; Redis queue + seat locking for IPL/concerts. <strong>Ticketmaster</strong> &middot; virtual waiting room (Queue-it). <strong>Amazon</strong> &middot; flash sales use atomic inventory decrement. <strong>Airbnb</strong> &middot; calendar locking with optimistic concurrency for date conflicts.</div>
 </div>

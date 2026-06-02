@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does a multi-device messaging app keep messages perfectly synced across all devices?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a multi-device sync system that keeps messages, read status, and edits consistent across phone/tablet/desktop</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a multi-device sync system that keeps messages, read status, and edits consistent across phone/tablet/desktop</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -27,7 +27,7 @@
 <!-- --- PROBLEM STATEMENT --- -->
 <div class="T" id="problem">
 <p class="su">How does a multi-device messaging app keep messages, read status, and edits perfectly synced across phone/tablet/desktop, resolving conflicts when edits happen simultaneously on different devices?</p>
-<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Multi-device synchronization of messages, read markers, and edits &middot; not E2E encryption key management, not media sync. The hard question: <span class="hr">how do you guarantee every device converges to the same state when edits happen simultaneously on different devices with different network conditions?</span></div>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Multi-device synchronization of messages, read markers, and edits &middot; not E2E encryption key management, not media sync. The hard question: <span class="hr">how do you guarantee every device converges to the same state when edits happen simultaneously on different devices with different network conditions&#x2717;</span></div>
 
 <div class="d-grid quad" style="margin:6px 0">
 <div class="d-panel" style="padding:8px;text-align:center">
@@ -38,7 +38,7 @@
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;1s</div>
 <div style="font-size:.72rem;color:var(--muted)">sync latency P99</div>
-<div style="font-size:.68rem;color:var(--muted);margin-top:2px">action on one ? visible on all</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">action on one &#x2192; visible on all</div>
 </div>
 <div class="d-panel" style="padding:8px;text-align:center">
 <div style="font-size:1.5rem;font-weight:700;color:var(--a)">pts/qts</div>
@@ -62,7 +62,7 @@
 <h4 style="color:var(--g)">Must Have (Core)</h4>
 <div style="font-size:.78rem;line-height:1.7">
   <span class="hg">1.</span> All devices see the <strong>same messages</strong> in the same order<br>
-  <span class="hg">2.</span> <strong>Read status</strong> syncs across devices &middot; read on phone ? marked read on desktop<br>
+  <span class="hg">2.</span> <strong>Read status</strong> syncs across devices &middot; read on phone &#x2192; marked read on desktop<br>
   <span class="hg">3.</span> <strong>Message edits/deletes</strong> propagate to all devices within 1 second<br>
   <span class="hg">4.</span> <strong>Offline catch-up</strong> &middot; device that was offline gets all missed updates on reconnect<br>
   <span class="hg">5.</span> <strong>Conflict resolution</strong> &middot; simultaneous edits on different devices converge to same state<br>
@@ -72,11 +72,11 @@
 <div class="d-panel" style="padding:8px;text-align:left">
 <h4 style="color:var(--y)">Out of Scope (this design)</h4>
 <div style="font-size:.78rem;line-height:1.7">
-  <span class="hr">?</span> <strong>E2E encryption</strong> key distribution across devices (separate protocol)<br>
-  <span class="hr">?</span> <strong>Media file sync</strong> (lazy download, separate blob storage)<br>
-  <span class="hr">?</span> <strong>Device authorization</strong> (QR code login, session management)<br>
-  <span class="hr">?</span> <strong>Typing indicators</strong> (ephemeral, not synced &middot; see Typing Indicators)<br>
-  <span class="hr">?</span> <strong>Contact sync</strong> (different data model, different sync frequency)
+  <span class="hr">&#x2717;</span> <strong>E2E encryption</strong> key distribution across devices (separate protocol)<br>
+  <span class="hr">&#x2717;</span> <strong>Media file sync</strong> (lazy download, separate blob storage)<br>
+  <span class="hr">&#x2717;</span> <strong>Device authorization</strong> (QR code login, session management)<br>
+  <span class="hr">&#x2717;</span> <strong>Typing indicators</strong> (ephemeral, not synced &middot; see Typing Indicators)<br>
+  <span class="hr">&#x2717;</span> <strong>Contact sync</strong> (different data model, different sync frequency)
 </div>
 </div>
 </div>
@@ -105,7 +105,7 @@
 <table>
 <tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
 <tr><td>1</td><td>700M MAU &middot; 3 devices avg</td><td>2.1B device sessions</td></tr>
-<tr><td>2</td><td>100B msgs/day ? each msg = 1 update &middot; 3 devices</td><td>300B update deliveries/day</td></tr>
+<tr><td>2</td><td>100B msgs/day &#x2192; each msg = 1 update &middot; 3 devices</td><td>300B update deliveries/day</td></tr>
 <tr><td>3</td><td>300B &middot; 86400</td><td>~3.5M update pushes/sec</td></tr>
 <tr><td>4</td><td>Update log storage: 700M users &middot; 7 days &middot; 50 updates/day &middot; 200B</td><td>~49TB</td></tr>
 <tr><td>5</td><td>getDifference calls: 700M users &middot; 5 reconnects/day &middot; 86400</td><td>~40K calls/sec</td></tr>
@@ -126,11 +126,11 @@
 
 <!-- --- REAL-TIME SYNC PATH --- -->
 <rect x="4" y="4" width="732" height="110" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
-<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">REAL-TIME SYNC &middot; User sends message from Phone ? Desktop sees it instantly</text>
+<text x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">REAL-TIME SYNC &middot; User sends message from Phone &#x2192; Desktop sees it instantly</text>
 
 <!-- Phone -->
 <rect x="14" y="30" width="80" height="36" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
-<text x="54" y="42" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">?? Phone</text>
+<text x="54" y="42" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">&#x2794; Phone</text>
 <text x="54" y="52" text-anchor="middle" fill="var(--muted)" font-size="5">sends message</text>
 <text x="54" y="62" text-anchor="middle" fill="var(--muted)" font-size="4.5">local pts = 47</text>
 <line x1="94" y1="48" x2="128" y2="48" stroke="var(--a)" stroke-width="1" marker-end="url(#md1)"/>
@@ -148,12 +148,12 @@
 
 <!-- Desktop -->
 <rect x="306" y="20" width="90" height="28" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
-<text x="351" y="32" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">?? Desktop</text>
+<text x="351" y="32" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">&#x2794; Desktop</text>
 <text x="351" y="42" text-anchor="middle" fill="var(--muted)" font-size="5">receives pts=48 update</text>
 
 <!-- Tablet -->
 <rect x="306" y="54" width="90" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
-<text x="351" y="66" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">?? Tablet</text>
+<text x="351" y="66" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">&#x2794; Tablet</text>
 <text x="351" y="76" text-anchor="middle" fill="var(--muted)" font-size="5">receives pts=48 update</text>
 
 <!-- Sequence explanation -->
@@ -162,7 +162,7 @@
 <text x="440" y="46" fill="var(--muted)" font-size="5.5">pts (per-user): increments on every update for this user</text>
 <text x="440" y="56" fill="var(--muted)" font-size="5.5">qts (per-user secret chats): separate counter for E2E chats</text>
 <text x="440" y="66" fill="var(--muted)" font-size="5.5">Each device tracks its own last_pts &middot; gap = missed updates</text>
-<text x="440" y="78" fill="var(--g)" font-size="5.5" font-weight="600">Device pts=45, server pts=48 ? getDifference returns 3 updates</text>
+<text x="440" y="78" fill="var(--g)" font-size="5.5" font-weight="600">Device pts=45, server pts=48 &#x2192; getDifference returns 3 updates</text>
 
 <!-- --- CATCH-UP PATH --- -->
 <rect x="4" y="120" width="732" height="90" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
@@ -170,7 +170,7 @@
 
 <!-- Desktop reconnects -->
 <rect x="14" y="146" width="100" height="32" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
-<text x="64" y="158" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">?? Desktop</text>
+<text x="64" y="158" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">&#x2794; Desktop</text>
 <text x="64" y="168" text-anchor="middle" fill="var(--muted)" font-size="5">reconnects, local pts=45</text>
 <line x1="114" y1="162" x2="148" y2="162" stroke="var(--y)" stroke-width="1" marker-end="url(#md1)"/>
 
@@ -225,7 +225,7 @@
 <table>
 <tr><th>Decision</th><th>Choice</th><th>Why</th><th>Alternative Rejected</th></tr>
 <tr><td><span class="hi">Authority Model</span></td><td><span class="hg">Server as source of truth</span></td><td>All devices are equal peers. Server holds canonical state. Any device can send/edit. No "primary device" concept.</td><td>Phone-primary (WhatsApp): desktop depends on phone being online. Terrible UX for multi-device.</td></tr>
-<tr><td><span class="hi">Sync Protocol</span></td><td><span class="hg">pts sequence + getDifference</span></td><td>Each user has a monotonic update counter (pts). Device sends last known pts ? server returns all updates since. Efficient delta sync.</td><td>Full state sync: transfer entire inbox on reconnect &middot; O(messages) instead of O(missed updates).</td></tr>
+<tr><td><span class="hi">Sync Protocol</span></td><td><span class="hg">pts sequence + getDifference</span></td><td>Each user has a monotonic update counter (pts). Device sends last known pts &#x2192; server returns all updates since. Efficient delta sync.</td><td>Full state sync: transfer entire inbox on reconnect &middot; O(messages) instead of O(missed updates).</td></tr>
 <tr><td><span class="hi">Conflict Resolution</span></td><td><span class="hg">Last-Write-Wins (server timestamp)</span></td><td>Simple, deterministic. For chat edits, conflicts are rare and LWW is acceptable. Server assigns authoritative timestamp.</td><td>CRDT/OT: overkill for chat messages (not collaborative editing). User-prompt: bad UX for background sync.</td></tr>
 <tr><td><span class="hi">Update Retention</span></td><td><span class="hg">7-day update log per user</span></td><td>If device offline &gt;7 days, force full re-sync. Keeps update log bounded. Most devices sync within hours.</td><td>Infinite retention: unbounded storage growth. 24h: too aggressive for vacation scenarios.</td></tr>
 <tr><td><span class="hi">Real-time Push</span></td><td><span class="hg">Persistent connection per device</span></td><td>Each device maintains its own WebSocket/TCP connection. Server pushes updates to all active sessions simultaneously.</td><td>Polling: adds latency, wastes bandwidth. Single connection: can't push to multiple devices.</td></tr>
@@ -258,7 +258,7 @@
 <tr><td><span class="hi">Sequence Generator</span></td><td>Redis INCR (per-user key)</td><td>Atomic increment for pts. O(1), sub-ms. Each user has independent counter &middot; no global bottleneck.</td><td>DB auto-increment: too slow for real-time. Snowflake IDs: not monotonic per user.</td></tr>
 <tr><td><span class="hi">Real-time Push</span></td><td>Persistent TCP/WebSocket per device</td><td>Server pushes updates to all active sessions. Each device has independent connection. Multiplexed protocol.</td><td>Polling: adds 1-5s latency. Push notifications: not real-time enough for active sessions.</td></tr>
 <tr><td><span class="hi">Conflict Resolution</span></td><td>Server-side LWW (timestamp)</td><td>Simple, deterministic. Server clock is authoritative. No client clock dependency.</td><td>Vector clocks: more complex, marginal benefit for chat (edits are rare). CRDTs: overkill.</td></tr>
-<tr><td><span class="hi">Session Registry</span></td><td>Redis (user ? active sessions)</td><td>Track which devices are online for push routing. TTL-based cleanup on disconnect.</td><td>In-memory on gateway: not shared across gateway instances.</td></tr>
+<tr><td><span class="hi">Session Registry</span></td><td>Redis (user &#x2192; active sessions)</td><td>Track which devices are online for push routing. TTL-based cleanup on disconnect.</td><td>In-memory on gateway: not shared across gateway instances.</td></tr>
 </table>
 <div class="b bg"><span class="hi">Cross-reference:</span> The per-user sequence number approach mirrors <a href="slack-real-time-messaging.html">Slack's per-channel channel_seq</a> but scoped to a user across all their conversations. Both enable efficient gap detection and delta sync without transferring full state.</div>
 </div>
@@ -274,7 +274,7 @@
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--g)">
 <div style="font-size:.72rem;font-weight:700;color:var(--g);margin-bottom:4px">? pts Sequence + getDifference for Delta Sync</div>
-<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each user has a monotonic counter (pts). Every update (message, edit, read, delete) increments pts. On reconnect, device sends last_pts ? server returns only missed updates. O(missed) not O(total). Efficient even after hours offline.</div>
+<div style="font-size:.75rem;line-height:1.5;color:var(--text-2)">Each user has a monotonic counter (pts). Every update (message, edit, read, delete) increments pts. On reconnect, device sends last_pts &#x2192; server returns only missed updates. O(missed) not O(total). Efficient even after hours offline.</div>
 </div>
 <div class="d-panel" style="padding:10px;text-align:left;border-left:3px solid var(--y)">
 <div style="font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px">? Last-Write-Wins Conflict Resolution</div>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,7 @@
 <body>
 <div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>How does GitHub Actions execute 10M+ builds/day at scale?</p></div>
 <div class="ct">
-<div class="sd sd-5"><span class="e">??</span> Design a CI/CD system: 10M builds/day, distributed workers, artifact caching, real-time logs</div>
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a CI/CD system: 10M builds/day, distributed workers, artifact caching, real-time logs</div>
 
 <details class="concepts-involved">
 <summary>Concepts Involved</summary>
@@ -55,7 +55,7 @@
 
   <!-- --- LAYER 1: TRIGGER --- -->
   <rect x="10" y="8" width="760" height="130" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: TRIGGER &middot; Git Push ? Orchestrator ? Matrix Expansion</text>
+  <text x="390" y="22" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 1: TRIGGER &middot; Git Push &#x2192; Orchestrator &#x2192; Matrix Expansion</text>
 
   <rect x="25" y="35" width="110" height="85" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1.2"/>
   <text x="80" y="52" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">Git Push</text>
@@ -85,21 +85,21 @@
   <!-- DAG visualization mini -->
   <rect x="670" y="40" width="90" height="75" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".8"/>
   <text x="715" y="55" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Job DAG</text>
-  <text x="715" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">build ? test</text>
-  <text x="715" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">test ? deploy</text>
-  <text x="715" y="90" text-anchor="middle" fill="var(--g)" font-size="5">lint ? test</text>
+  <text x="715" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">build &#x2192; test</text>
+  <text x="715" y="79" text-anchor="middle" fill="var(--muted)" font-size="5">test &#x2192; deploy</text>
+  <text x="715" y="90" text-anchor="middle" fill="var(--g)" font-size="5">lint &#x2192; test</text>
   <text x="715" y="103" text-anchor="middle" fill="var(--muted)" font-size="4.5">maximize parallel</text>
 
   <!-- --- LAYER 2: EXECUTION --- -->
   <rect x="10" y="145" width="760" height="145" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
-  <text x="390" y="160" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: EXECUTION &middot; Job Queue (fair-share) ? Worker Pool (ephemeral, auto-scale 0?10K)</text>
+  <text x="390" y="160" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">LAYER 2: EXECUTION &middot; Job Queue (fair-share) &#x2192; Worker Pool (ephemeral, auto-scale 0?10K)</text>
 
   <rect x="25" y="170" width="280" height="105" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.5"/>
   <text x="165" y="187" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Job Queue</text>
   <text x="165" y="202" text-anchor="middle" fill="var(--muted)" font-size="5.5">priority scheduling (paid tiers first)</text>
   <text x="165" y="215" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">fair-share per org (prevent starvation)</text>
   <text x="165" y="228" text-anchor="middle" fill="var(--muted)" font-size="5.5">concurrency limits enforced per repo</text>
-  <text x="165" y="241" text-anchor="middle" fill="var(--muted)" font-size="5">queue depth ? auto-scale signal</text>
+  <text x="165" y="241" text-anchor="middle" fill="var(--muted)" font-size="5">queue depth &#x2192; auto-scale signal</text>
   <text x="165" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">dequeue when worker available</text>
   <text x="165" y="267" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">per-org quotas prevent monopolization</text>
 
@@ -108,7 +108,7 @@
   <rect x="350" y="170" width="310" height="105" rx="6" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
   <text x="505" y="187" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="700">Worker Pool (Ephemeral)</text>
   <text x="505" y="202" text-anchor="middle" fill="var(--muted)" font-size="5.5">ephemeral VMs / containers per job</text>
-  <text x="505" y="215" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">auto-scale 0 ? 10K workers on demand</text>
+  <text x="505" y="215" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">auto-scale 0 &#x2192; 10K workers on demand</text>
   <text x="505" y="228" text-anchor="middle" fill="var(--muted)" font-size="5.5">isolated execution (no cross-job leakage)</text>
   <text x="505" y="241" text-anchor="middle" fill="var(--muted)" font-size="5.5">secrets injected at runtime (vault integration)</text>
   <text x="505" y="254" text-anchor="middle" fill="var(--muted)" font-size="5">destroyed after job completes (clean slate)</text>
@@ -118,7 +118,7 @@
   <rect x="675" y="175" width="85" height="50" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".8"/>
   <text x="717" y="192" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Auto-Scale</text>
   <text x="717" y="205" text-anchor="middle" fill="var(--muted)" font-size="5">queue depth</text>
-  <text x="717" y="218" text-anchor="middle" fill="var(--muted)" font-size="5">? scale workers</text>
+  <text x="717" y="218" text-anchor="middle" fill="var(--muted)" font-size="5">&#x2714; scale workers</text>
 
   <!-- --- LAYER 3: OUTPUT --- -->
   <rect x="10" y="297" width="760" height="150" rx="6" fill="none" stroke="var(--border)" stroke-width=".6" stroke-dasharray="4,3"/>
@@ -129,7 +129,7 @@
   <text x="140" y="339" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">Artifact Cache (Blob Store)</text>
   <text x="140" y="354" text-anchor="middle" fill="var(--muted)" font-size="5.5">content-addressed by hash(lockfile)</text>
   <text x="140" y="367" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">key: hash(package-lock + OS + Node)</text>
-  <text x="140" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">cache hit ? skip install ? 10&middot; speedup</text>
+  <text x="140" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">cache hit &#x2192; skip install &#x2192; 10&middot; speedup</text>
   <text x="140" y="393" text-anchor="middle" fill="var(--muted)" font-size="5">shared across branches (same deps)</text>
   <text x="140" y="406" text-anchor="middle" fill="var(--muted)" font-size="5">Docker layer caching</text>
   <text x="140" y="419" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">eviction: LRU after 7 days</text>
@@ -137,7 +137,7 @@
   <!-- Log Streaming -->
   <rect x="275" y="322" width="230" height="110" rx="5" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1.2"/>
   <text x="390" y="339" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="700">Log Streaming (Real-time)</text>
-  <text x="390" y="354" text-anchor="middle" fill="var(--muted)" font-size="5.5">WebSocket: worker ? aggregator ? browser</text>
+  <text x="390" y="354" text-anchor="middle" fill="var(--muted)" font-size="5.5">WebSocket: worker &#x2192; aggregator &#x2192; browser</text>
   <text x="390" y="367" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">real-time tail (chunked upload)</text>
   <text x="390" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">persisted to blob storage for later</text>
   <text x="390" y="393" text-anchor="middle" fill="var(--muted)" font-size="5">structured log lines (timestamp + step)</text>
@@ -148,7 +148,7 @@
   <rect x="525" y="322" width="235" height="110" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1.2"/>
   <text x="642" y="339" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Status Reporting</text>
   <text x="642" y="354" text-anchor="middle" fill="var(--muted)" font-size="5.5">GitHub Checks API integration</text>
-  <text x="642" y="367" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">PR status: pending ? pass/fail</text>
+  <text x="642" y="367" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">PR status: pending &#x2192; pass/fail</text>
   <text x="642" y="380" text-anchor="middle" fill="var(--muted)" font-size="5.5">per-job annotations (errors, warnings)</text>
   <text x="642" y="393" text-anchor="middle" fill="var(--muted)" font-size="5">Slack/Teams notifications</text>
   <text x="642" y="406" text-anchor="middle" fill="var(--muted)" font-size="5">deployment status tracking</text>
@@ -165,7 +165,7 @@
   <text x="390" y="486" text-anchor="middle" fill="var(--muted)" font-size="5.5">10M builds/day | Bursty (Mon 9am = 10&middot; weekend) | Ephemeral workers destroyed after each job | WebSocket log streaming (no polling)</text>
 </svg>
 
-<div class="b bg"><span class="hi">Job DAG scheduling:</span> Workflow YAML defines jobs with <code>needs:</code> dependencies. Orchestrator builds a DAG ? schedules independent jobs in parallel ? waits for dependencies before starting downstream jobs. <span class="hg">Matrix builds</span> fan out (e.g., test on 5 OS &middot; 3 Node versions = 15 parallel jobs).</div>
+<div class="b bg"><span class="hi">Job DAG scheduling:</span> Workflow YAML defines jobs with <code>needs:</code> dependencies. Orchestrator builds a DAG &#x2192; schedules independent jobs in parallel &#x2192; waits for dependencies before starting downstream jobs. <span class="hg">Matrix builds</span> fan out (e.g., test on 5 OS &middot; 3 Node versions = 15 parallel jobs).</div>
 <div class="b by"><span class="hi">Artifact caching:</span> Cache key = hash(package-lock.json + OS + Node version). On hit, restore node_modules from blob store (seconds vs minutes). <span class="hg">Content-addressed storage</span> &middot; same dependencies across branches share cache. Layer caching for Docker builds (each layer cached independently).</div>
 <div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No job isolation</span> &middot; one build's side effects break another. <span class="hr">Polling for logs</span> &middot; wastes bandwidth, poor UX. <span class="hr">No concurrency limits</span> &middot; one repo monopolizes all workers. <span class="hr">Cache everything blindly</span> &middot; stale caches cause flaky builds.</div>
 <div class="b bb"><span class="hi">Real-time log streaming:</span> Workers stream stdout/stderr via WebSocket to log aggregator. Client connects to aggregator for live tail. Logs also persisted to blob storage for later retrieval. <span class="hg">Chunked upload</span> &middot; don't wait for job completion to see output.</div>
@@ -178,7 +178,7 @@
 <span class="hg">2.</span> <strong>Ephemeral workers</strong> &middot; fresh VM/container per job, auto-scale 0?10K based on queue depth<br>
 <span class="hg">3.</span> <strong>Content-addressed caching</strong> &middot; hash(lockfile) as cache key, 10&middot; speedup on cache hit<br>
 <span class="hg">4.</span> <strong>Fair-share scheduling</strong> &middot; per-org quotas prevent one customer from starving others<br>
-<span class="hg">5.</span> <strong>Real-time logs</strong> &middot; WebSocket streaming from worker ? aggregator ? client browser<br>
+<span class="hg">5.</span> <strong>Real-time logs</strong> &middot; WebSocket streaming from worker &#x2192; aggregator &#x2192; client browser<br>
 <span class="hg">6.</span> <strong>Isolation</strong> &middot; each job gets clean environment, secrets injected at runtime, destroyed after
 </div>
 </div>

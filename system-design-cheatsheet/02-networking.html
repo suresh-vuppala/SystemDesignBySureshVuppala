@@ -19,6 +19,113 @@
 <div class="ct">
 <div class="sd sd-1"><span class="e">🌐</span> 2 · NETWORKING</div>
 
+<div class="T" id="web-request">
+<h2>How a Website Works — Journey of a URL</h2><p class="su">What happens from the moment you type a URL to seeing the page — <span class="hg">end-to-end in 8 steps</span></p>
+
+<!-- ═══ Full Journey Visual ═══ -->
+<div class="d-panel" style="padding:10px">
+<svg width="100%" viewBox="0 0 700 180" style="max-width:700px;display:block;margin:0 auto">
+  <defs>
+    <marker id="wra" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker>
+    <marker id="wrg" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker>
+  </defs>
+
+  <!-- Step 1: Browser -->
+  <rect x="4" y="20" width="64" height="44" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="36" y="38" text-anchor="middle" font-size="14">💻</text>
+  <text x="36" y="54" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">Browser</text>
+  <circle cx="22" cy="9" r="5" fill="var(--a)" opacity=".15" stroke="var(--a)" stroke-width=".8"/><text x="22" y="12" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">1</text><text x="42" y="12" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Type URL</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="70" y1="42" x2="100" y2="42" stroke="var(--a)" stroke-width="1.2" marker-end="url(#wra)"/>
+
+  <!-- Step 2: DNS -->
+  <rect x="102" y="20" width="64" height="44" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="134" y="38" text-anchor="middle" font-size="12">📖</text>
+  <text x="134" y="54" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">DNS</text>
+  <circle cx="120" cy="9" r="5" fill="var(--y)" opacity=".15" stroke="var(--y)" stroke-width=".8"/><text x="120" y="12" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">2</text><text x="143" y="12" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Resolve IP</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="168" y1="42" x2="198" y2="42" stroke="var(--a)" stroke-width="1.2" marker-end="url(#wra)"/>
+  <text x="183" y="36" text-anchor="middle" fill="var(--muted)" font-size="5">93.184.216.34</text>
+
+  <!-- Step 3: TCP -->
+  <rect x="200" y="20" width="64" height="44" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="232" y="38" text-anchor="middle" font-size="12">🤝</text>
+  <text x="232" y="54" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">TCP</text>
+  <circle cx="218" cy="9" r="5" fill="var(--g)" opacity=".15" stroke="var(--g)" stroke-width=".8"/><text x="218" y="12" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">3</text><text x="241" y="12" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Connect</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="266" y1="42" x2="296" y2="42" stroke="var(--a)" stroke-width="1.2" marker-end="url(#wra)"/>
+  <text x="281" y="36" text-anchor="middle" fill="var(--muted)" font-size="5">SYN→SYN-ACK→ACK</text>
+
+  <!-- Step 4: TLS -->
+  <rect x="298" y="20" width="64" height="44" rx="6" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width="1.5"/>
+  <text x="330" y="38" text-anchor="middle" font-size="12">🔒</text>
+  <text x="330" y="54" text-anchor="middle" fill="var(--p)" font-size="7" font-weight="700">TLS</text>
+  <circle cx="316" cy="9" r="5" fill="var(--p)" opacity=".15" stroke="var(--p)" stroke-width=".8"/><text x="316" y="12" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="700">4</text><text x="339" y="12" text-anchor="middle" fill="var(--p)" font-size="5.5" font-weight="600">Encrypt</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="364" y1="42" x2="394" y2="42" stroke="var(--a)" stroke-width="1.2" marker-end="url(#wra)"/>
+
+  <!-- Step 5: HTTP Request -->
+  <rect x="396" y="20" width="64" height="44" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="428" y="38" text-anchor="middle" font-size="12">📤</text>
+  <text x="428" y="54" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">HTTP Req</text>
+  <circle cx="414" cy="9" r="5" fill="var(--a)" opacity=".15" stroke="var(--a)" stroke-width=".8"/><text x="414" y="12" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">5</text><text x="437" y="12" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Send</text>
+
+  <!-- Arrow 5→6 -->
+  <line x1="462" y1="42" x2="492" y2="42" stroke="var(--a)" stroke-width="1.2" marker-end="url(#wra)"/>
+  <text x="477" y="36" text-anchor="middle" fill="var(--muted)" font-size="5">GET /index.html</text>
+
+  <!-- Step 6: Server -->
+  <rect x="494" y="20" width="64" height="44" rx="6" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="526" y="38" text-anchor="middle" font-size="12">🖥️</text>
+  <text x="526" y="54" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Server</text>
+  <circle cx="512" cy="9" r="5" fill="var(--o)" opacity=".15" stroke="var(--o)" stroke-width=".8"/><text x="512" y="12" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">6</text><text x="535" y="12" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Process</text>
+
+  <!-- Arrow 6→7 -->
+  <line x1="560" y1="42" x2="590" y2="42" stroke="var(--g)" stroke-width="1.2" marker-end="url(#wrg)"/>
+
+  <!-- Step 7: Response -->
+  <rect x="592" y="20" width="64" height="44" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="624" y="38" text-anchor="middle" font-size="12">📥</text>
+  <text x="624" y="54" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Response</text>
+  <circle cx="610" cy="9" r="5" fill="var(--g)" opacity=".15" stroke="var(--g)" stroke-width=".8"/><text x="610" y="12" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">7</text><text x="633" y="12" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">HTML</text>
+
+  <!-- Return arrow back to browser -->
+  <path d="M624,66 L624,80 Q624,90 614,90 L46,90 Q36,90 36,80 L36,66" fill="none" stroke="var(--g)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#wrg)"/>
+  <circle cx="310" cy="97" r="5" fill="var(--g)" opacity=".15" stroke="var(--g)" stroke-width=".8"/><text x="310" y="100" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">8</text><text x="370" y="100" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">Browser renders HTML → fetches CSS, JS, images → paints page</text>
+
+  <!-- Timing annotations -->
+  <rect x="80" y="110" width="540" height="24" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".8"/>
+  <text x="134" y="124" text-anchor="middle" fill="var(--y)" font-size="6">~50ms</text>
+  <text x="232" y="124" text-anchor="middle" fill="var(--g)" font-size="6">~30ms</text>
+  <text x="330" y="124" text-anchor="middle" fill="var(--p)" font-size="6">~50ms</text>
+  <text x="428" y="124" text-anchor="middle" fill="var(--a)" font-size="6">~1ms</text>
+  <text x="526" y="124" text-anchor="middle" fill="var(--o)" font-size="6">~50-500ms</text>
+  <text x="624" y="124" text-anchor="middle" fill="var(--g)" font-size="6">~10ms</text>
+  <text x="350" y="138" text-anchor="middle" fill="var(--muted)" font-size="6">Total: ~200-700ms for first page load (varies by distance, server speed, page size)</text>
+</svg>
+</div>
+
+<table>
+<tr><th>Step</th><th>What Happens</th><th>Protocol / Layer</th><th>Latency</th></tr>
+<tr><td><span class="hi">① URL Parse</span></td><td>Browser extracts scheme, host, path from <code>https://example.com/page</code></td><td>Browser internals</td><td>&lt;1ms</td></tr>
+<tr><td><span class="hi">② DNS Lookup</span></td><td>Resolve <code>example.com</code> → IP address. Checks browser cache → OS cache → resolver → root/TLD/authoritative</td><td>DNS (UDP :53)</td><td>0-100ms</td></tr>
+<tr><td><span class="hi">③ TCP Handshake</span></td><td>3-way handshake: SYN → SYN-ACK → ACK. Establishes reliable connection</td><td>TCP (L4)</td><td>1 RTT (~30ms)</td></tr>
+<tr><td><span class="hi">④ TLS Handshake</span></td><td>Negotiate cipher, exchange keys, verify certificate. TLS 1.3 = 1 RTT, TLS 1.2 = 2 RTT</td><td>TLS (L5/L6)</td><td>1-2 RTT (~50ms)</td></tr>
+<tr><td><span class="hi">⑤ HTTP Request</span></td><td>Send <code>GET /page HTTP/2</code> with headers (Host, Accept, Cookie, Auth)</td><td>HTTP (L7)</td><td>&lt;1ms</td></tr>
+<tr><td><span class="hi">⑥ Server Processing</span></td><td>Load balancer → app server → DB query → build response</td><td>Application</td><td>50-500ms</td></tr>
+<tr><td><span class="hi">⑦ HTTP Response</span></td><td>Server sends <code>200 OK</code> + HTML body. May be chunked/streamed</td><td>HTTP (L7)</td><td>Depends on size</td></tr>
+<tr><td><span class="hi">⑧ Render</span></td><td>Parse HTML → fetch CSS/JS/images (parallel) → build DOM → paint pixels</td><td>Browser engine</td><td>100-2000ms</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Key insight:</span> Steps ②③④ are the <span class="hg">connection overhead</span> — this is why <span class="hg">HTTP/2 multiplexing</span> (reuse one connection), <span class="hg">connection pooling</span>, and <span class="hg">CDNs</span> (shorter distance = fewer RTTs) matter so much for performance.</div>
+<div class="b by"><span class="hi">Optimizations:</span> <strong>DNS prefetch</strong> (<code>&lt;link rel="dns-prefetch"&gt;</code>) · <strong>Preconnect</strong> (TCP+TLS ahead of time) · <strong>HTTP/2 push</strong> (send CSS before browser asks) · <strong>Edge caching</strong> (skip steps ⑥⑦ entirely) · <strong>TLS 1.3 0-RTT</strong> (resume without handshake)</div>
+<div class="b bb"><span class="hi">Interview framing:</span> When asked "what happens when you type a URL", walk through these 8 steps. It shows you understand <span class="hg">DNS, TCP, TLS, HTTP, and server architecture</span> — the full networking stack in one answer.</div>
+</div>
+
 <div class="T" id="osi">
 <h2>OSI Model</h2><p class="su">7-layer reference model for network communication — know <span class="hg">L4 and L7</span> for interviews</p>
 <table>
@@ -31,7 +138,6 @@
 <tr><td>2</td><td>Data Link</td><td style="text-align:center"><svg width="60" height="40" viewBox="0 0 60 40"><rect x="4" y="14" width="14" height="12" rx="2" fill="var(--c)" opacity=".15" stroke="var(--c)" stroke-width="1.2"/><rect x="6" y="18" width="4" height="2" rx="1" fill="var(--c)" opacity=".5"/><rect x="6" y="22" width="4" height="2" rx="1" fill="var(--c)" opacity=".5"/><rect x="22" y="10" width="16" height="20" rx="3" fill="var(--c)" opacity=".1" stroke="var(--c)" stroke-width="1.5"/><rect x="25" y="14" width="3" height="3" rx="1" fill="var(--c)" opacity=".6"/><rect x="30" y="14" width="3" height="3" rx="1" fill="var(--c)" opacity=".6"/><rect x="25" y="20" width="3" height="3" rx="1" fill="var(--c)" opacity=".6"/><rect x="30" y="20" width="3" height="3" rx="1" fill="var(--c)" opacity=".6"/><rect x="42" y="14" width="14" height="12" rx="2" fill="var(--c)" opacity=".15" stroke="var(--c)" stroke-width="1.2"/><rect x="44" y="18" width="4" height="2" rx="1" fill="var(--c)" opacity=".5"/><rect x="44" y="22" width="4" height="2" rx="1" fill="var(--c)" opacity=".5"/><line x1="18" y1="20" x2="22" y2="20" stroke="var(--c)" stroke-width="1"/><line x1="38" y1="20" x2="42" y2="20" stroke="var(--c)" stroke-width="1"/><text x="30" y="38" text-anchor="middle" fill="var(--muted)" font-size="5">switch</text></svg></td><td>Ethernet, ARP</td><td>MAC addresses, switches</td></tr>
 <tr><td>1</td><td>Physical</td><td style="text-align:center"><svg width="60" height="40" viewBox="0 0 60 40"><rect x="2" y="14" width="14" height="12" rx="6" fill="var(--r)" opacity=".2" stroke="var(--r)" stroke-width="1.2"/><circle cx="9" cy="20" r="3" fill="var(--r)" opacity=".4"/><line x1="16" y1="20" x2="44" y2="20" stroke="var(--r)" stroke-width="1.5"/><text x="30" y="14" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">01101</text><rect x="44" y="14" width="14" height="12" rx="6" fill="var(--r)" opacity=".2" stroke="var(--r)" stroke-width="1.2"/><circle cx="51" cy="20" r="3" fill="var(--r)" opacity=".4"/></svg></td><td>Fiber, copper</td><td>Data center hardware</td></tr>
 </table>
-<div class="b bg"><span class="hi">Why it matters:</span> <span class="hg">L4 LB</span> routes by IP+port (fast, no content inspection). <span class="hg">L7 LB</span> routes by URL/headers/cookies (smart, can do path-based routing). Most system design discussions happen at <span class="hg">L4 and L7</span>.</div>
 </div>
 
 <div class="T" id="tcp-udp">
