@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edge/DDoS rate limiting at the CDN layer &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design coarse rate limiting at the CDN/edge to absorb volumetric attacks before traffic reaches origin</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design edge-layer rate limiting to absorb DDoS attacks at the proxy/CDN layer before traffic reaches origin servers</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/07-caching.html#cdn">CDN</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+<a href="../../system-design-cheatsheet/03-security.html#authentication">Security</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design coarse rate limiting at the CDN/edge layer to absorb volumetric DDoS attacks before traffic reaches origin servers. Per-IP limiting at the proxy layer, where approximate counting is acceptable, with fail-open vs fail-closed trade-offs under active attack.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> At the edge, you're processing <span class="hr">millions of requests per second</span> per node. You cannot afford Redis calls or complex algorithms. Rate limiting must be <span class="hr">in-memory, per-worker, approximate</span> — and that's fine. The goal isn't precision; it's absorbing 99% of attack volume so origin servers survive. False positives are acceptable during active attack.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">10M+</div>
+<div style="font-size:.72rem;color:var(--muted)">req/sec attack volume</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">volumetric DDoS</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">Per-IP</div>
+<div style="font-size:.72rem;color:var(--muted)">coarse key</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">+ /24 subnet</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Approximate</div>
+<div style="font-size:.72rem;color:var(--muted)">good enough</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">speed &gt; precision</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Fixed Window</div>
+<div style="font-size:.72rem;color:var(--muted)">simplest &amp; fastest</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">NGINX-style</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; edge-layer volumetric attack mitigation</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Per-IP <strong>fixed window counter</strong> in-memory (no external deps)<br>
+  <span class="hg">2.</span> <strong>Subnet-level blocking</strong> (/24 IPv4, /48 IPv6) for rotating IPs<br>
+  <span class="hg">3.</span> <strong>Progressive escalation</strong>: 429 &rarr; TCP RST &rarr; IP blocklist &rarr; L3 null-route<br>
+  <span class="hg">4.</span> Operator-controlled <strong>fail-open/fail-closed switch</strong><br>
+  <span class="hg">5.</span> <strong>Challenge page</strong> (JS challenge) for gray-area traffic during attacks
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Application-layer</strong> attack analysis (L7 payload inspection)<br>
+  <span class="hr">&#x2717;</span> <strong>Bot fingerprinting ML</strong> (behavioral detection models)<br>
+  <span class="hr">&#x2717;</span> <strong>Origin server protection</strong> (separate concern, behind CDN)<br>
+  <span class="hr">&#x2717;</span> <strong>Legitimate traffic classification</strong> (user reputation systems)<br>
+  <span class="hr">&#x2717;</span> <strong>Geographic filtering</strong> (geo-blocking decisions)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the edge rate limiting design</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">Nanoseconds</span> (L1 cache hit)</td><td>No network I/O. In-memory hash map per worker. Counter access from CPU cache.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td>Handle <span class="hg">10M+ req/sec</span> per edge node</td><td>Each worker processes millions of requests. Fixed window O(1) check is essential.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">Approximate (&plusmn;5%)</span></td><td>Irrelevant at DDoS scale. If counter says 1050 when real is 1000, still an attacker. Speed &gt; precision.</td></tr>
+<tr><td><span class="hi">Memory</span></td><td>Bounded hash map with <span class="hg">LRU eviction</span> (max 1M entries/worker)</td><td>Must not exhaust worker memory. Evict stale entries. ~20MB per worker.</td></tr>
+<tr><td><span class="hi">Mode Switch</span></td><td>Operator can toggle within <span class="hg">seconds</span></td><td>Fail-open (normal) to fail-closed (under attack) via control plane broadcast.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key constraint:</span> <span class="hg">Speed over precision</span>. At 10M req/sec you cannot afford Redis calls, sorted sets, or weighted calculations. Fixed window counter with in-memory hash map is the only viable approach at this scale.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question &#x2192; derive edge infrastructure sizing</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>10M req/sec attack</strong> &middot; <strong>500K req/sec legitimate</strong> &middot; <strong>threshold 1000 req/sec per IP</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Botnet profile</td>
+  <td>100K IPs &times; 95 req/sec each</td>
+  <td><span class="hr">Below per-IP threshold individually</span></td>
+  <td>Need aggregate detection when per-IP is insufficient (challenge page trigger).</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Memory per worker</td>
+  <td>1M entries &times; 20 bytes (IP + count + timestamp)</td>
+  <td><span class="hg">~20MB per worker</span></td>
+  <td>Fits in L2/L3 cache. Hot entries in L1. LRU eviction at boundary.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Total edge capacity</td>
+  <td>100 workers &times; 10M req/sec</td>
+  <td><span class="hg">1B req/sec</span> before saturation</td>
+  <td>Edge fleet absorbs attack. Origin never sees volumetric flood.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>False positive rate</td>
+  <td>Legitimate users rarely hit 1000 req/sec per IP</td>
+  <td><span class="hg">&lt;0.1% during attack</span></td>
+  <td>Threshold is generous. Only corporate NATs risk hitting it (whitelist those).</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Attack absorption</td>
+  <td>IPs exceeding threshold get dropped</td>
+  <td><span class="hg">&gt;99% attack traffic filtered</span></td>
+  <td>Remaining 1% handled by challenge page for sophisticated botnets.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Emphasize the scale difference first &mdash; "at 10M req/sec, we need nanosecond decisions, not millisecond." Then show memory is bounded (20MB/worker) and false positives are negligible. The sophisticated botnet case (below threshold) is handled by challenge page, not per-IP counting.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Not user-facing &middot; internal control plane for operator management of edge behavior</p>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.25)">POST</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/edge/mode</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Operator toggle: switch between fail-open (normal) and fail-closed (under attack) mode across all edge workers.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+{ "mode": "fail-open" | "fail-closed" }
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.25)">POST</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/edge/blocklist</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Manual IP block with TTL. Broadcast to all edge workers via gossip or pub/sub.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+{ "ips": ["203.0.113.0/24", "198.51.100.5"], "ttl": 3600 }
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(251,191,36,.12);color:var(--y);border:1px solid rgba(251,191,36,.25)">POST</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/edge/challenge</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Enable JavaScript challenge for specific path prefixes. Humans pass, bots fail.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+{ "path_prefix": "/api/*" }
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.25)">GET</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/edge/stats</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5">Returns current block rate, pass rate, and top offending IPs for operator visibility.</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">In-memory per-worker counters &middot; no persistent storage needed</p>
+
+<div class="b bg" style="margin-bottom:8px"><span class="hi">In-Memory Per Worker &middot; Fixed Window Counter</span></div>
+<pre><code>// Per-worker hash map (bounded at 1M entries with LRU eviction)
+HashMap&lt;IP/Subnet, { count: u32, window_ts: u32 }&gt;
+
+// Example entries:
+203.0.113.5     → { count: 1842, window_ts: 1705312200 }  // OVER threshold
+198.51.100.0/24 → { count: 95000, window_ts: 1705312200 } // subnet aggregate
+10.0.0.1        → { count: 12, window_ts: 1705312200 }    // legitimate
+
+// LRU eviction when entries > 1M
+// Window resets: if current_ts != window_ts → reset count to 1
+</code></pre>
+
+<div class="b bb" style="margin-bottom:8px"><span class="hi">Shared Blocklist &middot; Control Plane Broadcast</span></div>
+<pre><code>// Broadcast from control plane to all workers (gossip or pub/sub)
+blocklist: Set&lt;IP/Subnet&gt; with TTL per entry
+  Example: { "203.0.113.0/24": expires_at_1705315800 }
+
+// Workers check blocklist BEFORE counter (O(1) set lookup)
+// Blocklisted IPs get dropped immediately — no counter update needed
+</code></pre>
+
+<div class="b br" style="margin-bottom:8px"><span class="hi">No Persistent Storage</span></div>
+<pre><code>// Ephemeral counters rebuilt each window (1-second buckets)
+// Worker restart = counters reset = acceptable (brief false negatives)
+// No database, no Redis, no disk I/O — purely in-memory
+// This is by design: speed > durability for DDoS mitigation
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Fixed Window at the Edge (NGINX-style)</h2>
+<p class="su">In-memory fixed-window counters per IP — fastest possible, O(1), no external dependencies</p>
+
+<!-- --- Edge DDoS Rate Limiting SVG --- -->
+<svg width="100%" viewBox="0 0 780 430" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Edge DDoS Rate Limiting Architecture">
+  <defs><marker id="ed-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Edge/DDoS Rate Limiting &middot; In-Memory Fixed Window at CDN Layer</text>
+
+  <!-- ATTACK TRAFFIC -->
+  <rect x="10" y="25" width="760" height="65" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="800">INCOMING TRAFFIC: 10M+ req/sec (DDoS Attack + Legitimate)</text>
+
+  <!-- Attack traffic -->
+  <rect x="30" y="48" width="200" height="30" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="130" y="63" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">Botnet: 9.5M req/sec</text>
+  <text x="130" y="74" text-anchor="middle" fill="var(--muted)" font-size="4.5">100K IPs, each 95 req/sec</text>
+
+  <!-- Legitimate traffic -->
+  <rect x="250" y="48" width="200" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="350" y="63" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Legitimate: 500K req/sec</text>
+  <text x="350" y="74" text-anchor="middle" fill="var(--muted)" font-size="4.5">50K users, each 10 req/sec</text>
+
+  <!-- Flash crowd -->
+  <rect x="470" y="48" width="170" height="30" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="555" y="63" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Gray area (flash crowd?)</text>
+  <text x="555" y="74" text-anchor="middle" fill="var(--muted)" font-size="4.5">Could be viral or attack</text>
+
+  <!-- Arrows down -->
+  <line x1="390" y1="85" x2="390" y2="105" stroke="#8b8fa3" stroke-width="1" marker-end="url(#ed-arr)"/>
+
+  <!-- EDGE LAYER -->
+  <rect x="10" y="100" width="760" height="130" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="390" y="115" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">CDN EDGE LAYER &middot; Per-Worker In-Memory Counters</text>
+
+  <!-- Edge worker -->
+  <rect x="25" y="125" width="350" height="80" rx="6" fill="rgba(34,211,238,.04)" stroke="var(--c)" stroke-width="1"/>
+  <text x="200" y="142" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">Edge Worker (per CPU core)</text>
+  <text x="200" y="157" text-anchor="middle" fill="var(--muted)" font-size="5">In-memory HashMap&lt;IP, {count, window_ts}&gt;</text>
+  <text x="200" y="170" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">O(1) check: if count &gt; 1000 &rarr; DROP</text>
+  <text x="200" y="183" text-anchor="middle" fill="var(--muted)" font-size="4.5">No Redis, no DB, no network I/O</text>
+  <text x="200" y="196" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Latency: nanoseconds (L1 cache)</text>
+
+  <!-- Approximate is fine panel -->
+  <rect x="400" y="125" width="350" height="80" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+  <text x="575" y="142" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Why Approximate is Fine Here</text>
+  <text x="575" y="158" text-anchor="middle" fill="var(--muted)" font-size="5">Counter says 1050, real is 1000?</text>
+  <text x="575" y="172" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Doesn't matter &mdash; still an attacker.</text>
+  <text x="575" y="186" text-anchor="middle" fill="var(--muted)" font-size="4.5">±5% accuracy irrelevant when threshold is 100x normal</text>
+  <text x="575" y="199" text-anchor="middle" fill="var(--muted)" font-size="4.5">Speed &gt;&gt; Precision for volumetric attacks</text>
+
+  <!-- PROGRESSIVE ESCALATION -->
+  <rect x="10" y="240" width="760" height="80" rx="8" fill="rgba(251,146,60,.02)" stroke="var(--o)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="255" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="800">PROGRESSIVE ESCALATION (Response to Persistent Attackers)</text>
+
+  <!-- Level 1 -->
+  <rect x="25" y="265" width="155" height="42" rx="4" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="102" y="280" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">1. 429 Response</text>
+  <text x="102" y="293" text-anchor="middle" fill="var(--muted)" font-size="4.5">Polite: "slow down"</text>
+  <text x="102" y="303" text-anchor="middle" fill="var(--muted)" font-size="4.5">Retry-After header</text>
+
+  <line x1="180" y1="286" x2="205" y2="286" stroke="var(--o)" stroke-width=".7" marker-end="url(#ed-arr)"/>
+
+  <!-- Level 2 -->
+  <rect x="205" y="265" width="155" height="42" rx="4" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="282" y="280" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">2. TCP RST</text>
+  <text x="282" y="293" text-anchor="middle" fill="var(--muted)" font-size="4.5">Drop connection</text>
+  <text x="282" y="303" text-anchor="middle" fill="var(--muted)" font-size="4.5">No HTTP response (save CPU)</text>
+
+  <line x1="360" y1="286" x2="385" y2="286" stroke="var(--o)" stroke-width=".7" marker-end="url(#ed-arr)"/>
+
+  <!-- Level 3 -->
+  <rect x="385" y="265" width="155" height="42" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="462" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">3. IP Blocklist</text>
+  <text x="462" y="293" text-anchor="middle" fill="var(--muted)" font-size="4.5">Add to edge blocklist</text>
+  <text x="462" y="303" text-anchor="middle" fill="var(--muted)" font-size="4.5">TTL: 1 hour</text>
+
+  <line x1="540" y1="286" x2="565" y2="286" stroke="var(--r)" stroke-width=".7" marker-end="url(#ed-arr)"/>
+
+  <!-- Level 4 -->
+  <rect x="565" y="265" width="185" height="42" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="657" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">4. L3 Null-Route</text>
+  <text x="657" y="293" text-anchor="middle" fill="var(--muted)" font-size="4.5">Drop at network layer</text>
+  <text x="657" y="303" text-anchor="middle" fill="var(--r)" font-size="4.5">Zero CPU cost per packet</text>
+
+  <!-- FAIL MODE DECISION -->
+  <rect x="10" y="330" width="760" height="90" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="347" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Fail-Open vs Fail-Closed (Operator-Controlled Mode Switch)</text>
+
+  <!-- Normal mode -->
+  <rect x="30" y="358" width="340" height="50" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="200" y="375" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">NORMAL: Fail-Open</text>
+  <text x="200" y="390" text-anchor="middle" fill="var(--muted)" font-size="5">If limiter crashes &rarr; ALLOW all traffic</text>
+  <text x="200" y="402" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Don't self-DoS by blocking everything</text>
+
+  <!-- Attack mode -->
+  <rect x="400" y="358" width="350" height="50" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="575" y="375" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">UNDER ATTACK: Fail-Closed</text>
+  <text x="575" y="390" text-anchor="middle" fill="var(--muted)" font-size="5">Operator activates &rarr; DENY unverified traffic</text>
+  <text x="575" y="402" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">JS challenge for gray-area traffic (humans pass, bots fail)</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Fixed window counter (1-second buckets)</td><td>Simplest. O(1) increment + check. No sorted sets, no weighted calculations. Speed is everything at the edge.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>In-memory hash map per worker process</td><td>Zero network I/O. Counter access is nanoseconds. Each worker handles its own connections independently.</td></tr>
+<tr><td><span class="hi">Key</span></td><td>Client IP (+ /24 subnet for IPv4, /48 for IPv6)</td><td>Coarse but effective for volumetric attacks. Subnet blocking catches rotating IPs within same block.</td></tr>
+<tr><td><span class="hi">Threshold</span></td><td>1000 req/sec per IP (configurable per endpoint)</td><td>Generous enough for legitimate users (even aggressive scrapers). Catches bot floods instantly.</td></tr>
+<tr><td><span class="hi">Action on exceed</span></td><td>Escalating: 429 &rarr; TCP RST &rarr; IP blocklist &rarr; null-route at L3</td><td>Progressive response. Start polite (429), escalate to connection-level drop for persistent attackers.</td></tr>
+<tr><td><span class="hi">Fail mode</span></td><td>Fail-open in normal operation, switch to fail-closed under active attack (operator decision)</td><td>Normal: availability matters. Under DDoS: protection matters. Operator flips mode via control plane.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Why approximate is fine:</span> At the edge, you're filtering <span class="hg">volumetric attacks</span> (10M+ req/sec). If your counter says an IP sent 1050 requests when the real number is 1000, that IP is still an attacker. ±5% accuracy doesn't matter when the threshold is 100x normal traffic. Speed &gt; precision.</div>
+<div class="b by"><span class="hi">Fail-open vs fail-closed:</span> <span class="hg">Normal traffic:</span> fail-open (if limiter crashes, allow traffic — don't self-DoS). <span class="hg">Under active attack:</span> operator activates fail-closed mode — unknown/unverified traffic is blocked by default. The switch is a manual/automated operator decision based on attack detection signals.</div>
+<div class="b br"><span class="hi">Why NOT sliding window at the edge:</span> <span class="hr">Sliding window log</span> stores timestamps per request — memory explodes at 10M req/sec. <span class="hr">Sliding window counter</span> needs weighted calculation — unnecessary overhead for DDoS mitigation. <span class="hr">Token bucket</span> allows bursts — bad for DDoS (you want to catch any spike immediately). Fixed window is the right tool.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>NGINX</strong> &middot; ngx_http_limit_req_module (leaky bucket variant). <strong>Cloudflare</strong> &middot; per-IP fixed window at edge workers. <strong>AWS Shield</strong> &middot; L3/L4 rate limiting before L7 processing. <strong>Akamai</strong> &middot; edge rate controls with progressive blocking.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Distributed attack (10K unique IPs)</span></td><td>No single IP exceeds per-IP limit</td><td>Aggregate rate limiting: total requests to origin &gt; threshold = enable challenge page (CAPTCHA). Behavioral analysis: request patterns, header fingerprints.</td></tr>
+<tr><td><span class="hr">Legitimate CDN/proxy IP (shared NAT)</span></td><td>Corporate office (1000 users, 1 IP) looks like attack</td><td>Whitelist known corporate IPs. Use X-Forwarded-For with trusted proxy chain. Rate limit by inner IP when possible.</td></tr>
+<tr><td><span class="hr">Application-layer attack (slow POST)</span></td><td>Few requests but hold connections open</td><td>Connection timeout limits. Request body size limits. Concurrent connection limits per IP (separate from rate).</td></tr>
+<tr><td><span class="hr">Flash crowd (legitimate viral event)</span></td><td>Legitimate traffic looks like DDoS</td><td>Challenge page (JavaScript challenge) to distinguish humans from bots. Passed challenges get allow-listed for session.</td></tr>
+<tr><td><span class="hr">Memory exhaustion (too many unique IPs)</span></td><td>Counter hash map grows unbounded</td><td>LRU eviction of stale entries. Or probabilistic counting (Count-Min Sketch) for memory-bounded approximation.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for edge/DDoS rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Fixed window, in-memory</strong> &middot; fastest possible (O(1), nanoseconds), no external dependencies<br>
+<span class="hg">2.</span> <strong>Approximate is fine</strong> &middot; at 10M req/sec, ±5% accuracy doesn't matter for attack mitigation<br>
+<span class="hg">3.</span> <strong>Per-IP + subnet</strong> &middot; coarse keying catches volumetric floods, subnet for rotating IPs<br>
+<span class="hg">4.</span> <strong>Fail-open normally, fail-closed under attack</strong> &middot; operator-controlled mode switch<br>
+<span class="hg">5.</span> <strong>Progressive escalation</strong> &middot; 429 &rarr; connection drop &rarr; IP blocklist &rarr; L3 null-route<br>
+<span class="hg">6.</span> <strong>Challenge page for gray area</strong> &middot; JavaScript challenge distinguishes humans from bots during flash crowds
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification Service Architecture &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design a notification service that delivers push/email/SMS/in-app to 500M users</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a notification service that delivers push/email/SMS/in-app notifications to 500M users with priority queuing, channel routing, delivery guarantees, template rendering, and preference checking</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/07-caching.html">Priority Queue</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Fan-out</a>
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">At-Least-Once Delivery</a>
+<a href="../../system-design-cheatsheet/04-apis.html">Channel Routing</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Worker Pools</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How do you build a notification service that fans out to 4 channels (push/email/SMS/in-app), manages device tokens for 500M users, guarantees delivery, renders templates, and checks preferences — all within 10s P99?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Core notification service — priority queue ingestion, channel routing based on user preferences, per-channel delivery workers, device token management, template rendering engine. <span class="hr">Not</span> covering preference management UI or analytics dashboards.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="500" data-suffix="M" style="font-size:1.5rem;font-weight:700;color:var(--a)">500M</div>
+<div style="font-size:.72rem;color:var(--muted)">registered users</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">multi-device, multi-channel</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="5" data-suffix="B/day" style="font-size:1.5rem;font-weight:700;color:var(--g)">5B/day</div>
+<div style="font-size:.72rem;color:var(--muted)">notifications sent</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">~58K notifications/sec avg</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="4" data-suffix=" channels" style="font-size:1.5rem;font-weight:700;color:var(--o)">4</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery channels</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">push / email / SMS / in-app</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="10" data-prefix="&lt;" data-suffix="s" style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;10s</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery P99 latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">end-to-end from trigger</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the notification service must do &middot; core delivery behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Accept notification events via API and route to <strong>priority queue</strong><br>
+  <span class="hg">2.</span> <strong>Channel routing</strong> &middot; determine which channels (push/email/SMS/in-app) based on user preferences<br>
+  <span class="hg">3.</span> <strong>Template rendering</strong> &middot; resolve notification templates with dynamic params per channel<br>
+  <span class="hg">4.</span> <strong>Device token management</strong> &middot; store/refresh APNs, FCM tokens per user per device<br>
+  <span class="hg">5.</span> <strong>Per-channel workers</strong> &middot; dedicated worker pools for push, email, SMS, in-app delivery<br>
+  <span class="hg">6.</span> <strong>At-least-once delivery</strong> &middot; retry failed deliveries with exponential backoff
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> User preference <strong>management UI</strong> (separate microservice)<br>
+  <span class="hr">&#x2717;</span> <strong>Analytics and reporting</strong> (open rates, click-through)<br>
+  <span class="hr">&#x2717;</span> <strong>A/B testing</strong> of notification content<br>
+  <span class="hr">&#x2717;</span> <strong>Rich media</strong> rendering (images, deep links in push)<br>
+  <span class="hr">&#x2717;</span> <strong>Billing/cost</strong> management for SMS/email providers<br>
+  <span class="hr">&#x2717;</span> <strong>Compliance</strong> (GDPR opt-out, CAN-SPAM) enforcement logic
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the notification service architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Delivery Guarantee</span></td><td><span class="hg">At-least-once</span></td><td>Retry with backoff on provider failure. Idempotency keys prevent duplicate sends from user perspective.</td></tr>
+<tr><td><span class="hi">Latency (P99)</span></td><td><span class="hg">&lt;10s</span> end-to-end</td><td>Priority queue ensures critical notifications (OTP, alerts) bypass marketing batch. Pre-rendered templates cached.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span></td><td>Multi-AZ deployment. Queue durability ensures no notification lost even during deployments.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">58K+ notifications/sec</span></td><td>Horizontally scaled workers per channel. Kafka partitions for parallel consumption.</td></tr>
+<tr><td><span class="hi">Multi-Channel</span></td><td><span class="hg">4 channels</span> simultaneously</td><td>Each channel has independent worker pool, retry policy, and provider failover.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td>Linear with <span class="hg">user growth</span></td><td>Stateless workers. Partition by user_id for token lookups. Add workers per channel independently.</td></tr>
+<tr><td><span class="hi">Observability</span></td><td><span class="hg">Per-notification tracking</span></td><td>Delivery log for every notification: sent, delivered, failed, opened. SLA alerting on delivery rate drops.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Latency vs. Throughput</span>. High-priority notifications (OTP, security alerts) need &lt;3s delivery, while marketing batches can tolerate minutes. Solved with a multi-priority queue where P0 notifications always dequeue first.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing from given constraints. Show this reasoning in an interview.</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>500M users</strong> &middot; <strong>5B notifications/day</strong> &middot; <strong>4 channels</strong> &middot; <strong>&lt;10s P99</strong> &middot; <strong>avg 2 devices/user</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Avg notifications/sec</td>
+  <td>5B / 86,400s</td>
+  <td><span class="hg">~58K/sec</span></td>
+  <td>Kafka with 128 partitions handles this with headroom for burst</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Peak notifications/sec</td>
+  <td>58K &times; 5 (burst during events)</td>
+  <td><span class="hg">~290K/sec peak</span></td>
+  <td>Auto-scaling worker pools. Queue absorbs burst, workers drain at capacity.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Device tokens stored</td>
+  <td>500M users &times; 2 devices avg</td>
+  <td><span class="hg">1B device tokens</span></td>
+  <td>Sharded Redis for hot lookups + DynamoDB for persistence</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Push worker pool size</td>
+  <td>60% of 58K = 35K push/sec &middot; 500 push/sec/worker</td>
+  <td><span class="hg">~70 push workers</span></td>
+  <td>Batch API calls to APNs/FCM (500 tokens per batch request)</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Email worker pool size</td>
+  <td>25% of 58K = 14.5K emails/sec &middot; 1000 emails/sec/worker</td>
+  <td><span class="hg">~15 email workers</span></td>
+  <td>SendGrid/SES batch API. Template pre-rendered, just inject params.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>SMS worker pool size</td>
+  <td>5% of 58K = 2.9K SMS/sec &middot; 200 SMS/sec/worker</td>
+  <td><span class="hg">~15 SMS workers</span></td>
+  <td>Twilio rate limits per number. Pool of sender numbers for throughput.</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Delivery log storage/day</td>
+  <td>5B logs &times; 200 bytes each</td>
+  <td><span class="hg">~1TB/day</span></td>
+  <td>Time-partitioned table in Cassandra. TTL 30 days for compliance.</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Redis memory (tokens + prefs)</td>
+  <td>1B tokens &times; 128 bytes + 500M prefs &times; 64 bytes</td>
+  <td><span class="hg">~160GB</span></td>
+  <td>Redis cluster (32 shards, 5GB each). LRU eviction for cold users.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with throughput (step 1-2), then show you understand per-channel capacity planning (steps 4-6). The key insight is that each channel has wildly different throughput characteristics — push is batch-friendly, SMS is rate-limited per number.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Core notification service endpoints &middot; RESTful with priority support</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">POST /v1/notifications/send</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Enqueue a notification for delivery across configured channels</div>
+<pre><code>{
+  "user_id": "u_abc123",
+  "template_id": "order_shipped",
+  "priority": "high",           // high | medium | low
+  "channels": ["push", "email"],
+  "params": {
+    "order_id": "ORD-9876",
+    "tracking_url": "https://track.example.com/9876"
+  },
+  "dedup_key": "order_shipped:ORD-9876:u_abc123",
+  "schedule_at": null           // null = immediate, ISO8601 = delayed
+}</code></pre>
+<div style="font-size:.72rem;color:var(--muted)">Response: <code>202 Accepted</code> &middot; <code>{ "notification_id": "n_xyz789", "status": "queued" }</code></div>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /v1/notifications/{user_id}/feed</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Retrieve in-app notification feed with pagination</div>
+<pre><code>GET /v1/notifications/u_abc123/feed?limit=20&cursor=eyJ0IjoiMjAyNC0wMS0xNSJ9
+
+Response 200:
+{
+  "notifications": [
+    { "id": "n_xyz789", "title": "Order Shipped", "body": "...", "read": false, "created_at": "..." }
+  ],
+  "next_cursor": "eyJ0IjoiMjAyNC0wMS0xNCJ9",
+  "unread_count": 7
+}</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--o);font-size:.85rem">PUT /v1/notifications/{id}/read</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Mark a notification as read (updates in-app feed)</div>
+<pre><code>PUT /v1/notifications/n_xyz789/read
+
+Response 200: { "id": "n_xyz789", "read": true, "read_at": "2024-01-15T10:30:00Z" }</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Core tables and Redis structures powering the notification pipeline</p>
+
+<h4 style="color:var(--a)">notification_events (Cassandra)</h4>
+<pre><code>CREATE TABLE notification_events (
+  notification_id   UUID PRIMARY KEY,
+  user_id           TEXT,
+  template_id       TEXT,
+  priority          TEXT,          -- high | medium | low
+  channels          SET&lt;TEXT&gt;,     -- {push, email, sms, inapp}
+  params            MAP&lt;TEXT,TEXT&gt;,
+  dedup_key         TEXT,
+  status            TEXT,          -- queued | processing | delivered | failed
+  created_at        TIMESTAMP,
+  delivered_at      TIMESTAMP
+);</code></pre>
+
+<h4 style="color:var(--g)">user_devices (DynamoDB)</h4>
+<pre><code>{
+  "user_id":      "u_abc123",          // partition key
+  "device_id":    "dev_001",           // sort key
+  "platform":     "ios",               // ios | android | web
+  "push_token":   "APNs:abc...",       // provider-specific token
+  "token_updated": "2024-01-10T...",
+  "app_version":  "4.2.1",
+  "active":       true
+}</code></pre>
+
+<h4 style="color:var(--o)">delivery_log (Cassandra, time-partitioned)</h4>
+<pre><code>CREATE TABLE delivery_log (
+  notification_id   UUID,
+  channel           TEXT,          -- push | email | sms | inapp
+  attempt           INT,
+  status            TEXT,          -- sent | delivered | failed | bounced
+  provider          TEXT,          -- apns | fcm | sendgrid | twilio
+  provider_msg_id   TEXT,
+  error_code        TEXT,
+  attempted_at      TIMESTAMP,
+  PRIMARY KEY ((notification_id), channel, attempt)
+) WITH default_time_to_live = 2592000;  -- 30 day TTL</code></pre>
+
+<h4 style="color:var(--r)">Redis Structures</h4>
+<pre><code>// Device tokens for fast lookup during send
+HSET device_tokens:{user_id} {device_id} "{platform}:{push_token}"
+
+// User preferences cache (channel subscriptions)
+HSET preferences:{user_id} "push" "true" "email" "true" "sms" "false"
+
+// In-app notification feed (sorted set by timestamp)
+ZADD inapp_feed:{user_id} {timestamp} {notification_id}
+
+// Unread counter
+INCR unread:{user_id}</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Event Source &#x2192; Priority Queue &#x2192; Channel Router &#x2192; Per-Channel Workers &#x2192; Delivery Providers</p>
+
+<svg width="100%" viewBox="0 0 740 360" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="na1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- EVENT SOURCE LAYER -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="50" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">EVENT SOURCES &middot; Triggers that generate notifications</text>
+
+<rect data-dp-step="2" x="14" y="26" width="100" height="22" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="64" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Order Service</text>
+
+<rect data-dp-step="2" x="130" y="26" width="100" height="22" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="180" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Auth Service</text>
+
+<rect data-dp-step="2" x="246" y="26" width="100" height="22" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="296" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Payment Service</text>
+
+<rect data-dp-step="2" x="362" y="26" width="100" height="22" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="412" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Marketing Engine</text>
+
+<line data-dp-step="3" x1="370" y1="54" x2="370" y2="68" stroke="var(--a)" stroke-width="1" marker-end="url(#na1)"/>
+
+<!-- PRIORITY QUEUE LAYER -->
+<rect data-dp-step="4" x="4" y="70" width="732" height="55" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="4" x="370" y="84" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">PRIORITY QUEUE &middot; Kafka with priority topics</text>
+
+<rect data-dp-step="5" x="14" y="92" width="140" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="84" y="103" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">P0: Critical (OTP/Security)</text>
+<text data-dp-step="5" x="84" y="113" text-anchor="middle" fill="var(--muted)" font-size="5">32 partitions &middot; &lt;3s SLA</text>
+
+<rect data-dp-step="5" x="170" y="92" width="140" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="5" x="240" y="103" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">P1: High (Transactional)</text>
+<text data-dp-step="5" x="240" y="113" text-anchor="middle" fill="var(--muted)" font-size="5">64 partitions &middot; &lt;10s SLA</text>
+
+<rect data-dp-step="5" x="326" y="92" width="140" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="5" x="396" y="103" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">P2: Medium (Social)</text>
+<text data-dp-step="5" x="396" y="113" text-anchor="middle" fill="var(--muted)" font-size="5">64 partitions &middot; &lt;60s SLA</text>
+
+<rect data-dp-step="5" x="482" y="92" width="140" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="5" x="552" y="103" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">P3: Low (Marketing)</text>
+<text data-dp-step="5" x="552" y="113" text-anchor="middle" fill="var(--muted)" font-size="5">32 partitions &middot; best-effort</text>
+
+<line data-dp-step="6" x1="370" y1="125" x2="370" y2="138" stroke="var(--y)" stroke-width="1" marker-end="url(#na1)"/>
+
+<!-- CHANNEL ROUTER LAYER -->
+<rect data-dp-step="7" x="4" y="140" width="732" height="55" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="7" x="370" y="154" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">CHANNEL ROUTER &middot; Preference check + template render + fan-out</text>
+
+<rect data-dp-step="8" x="14" y="162" width="160" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="8" x="94" y="173" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Preference Checker</text>
+<text data-dp-step="8" x="94" y="183" text-anchor="middle" fill="var(--muted)" font-size="5">Redis lookup &middot; suppress if opted-out</text>
+
+<rect data-dp-step="8" x="190" y="162" width="160" height="26" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="8" x="270" y="173" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Template Engine</text>
+<text data-dp-step="8" x="270" y="183" text-anchor="middle" fill="var(--muted)" font-size="5">Render per channel (HTML/plain/short)</text>
+
+<rect data-dp-step="8" x="366" y="162" width="160" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="8" x="446" y="173" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Channel Fan-out</text>
+<text data-dp-step="8" x="446" y="183" text-anchor="middle" fill="var(--muted)" font-size="5">1 event &#x2192; N channel queues</text>
+
+<line data-dp-step="9" x1="370" y1="195" x2="370" y2="208" stroke="var(--g)" stroke-width="1" marker-end="url(#na1)"/>
+
+<!-- PER-CHANNEL WORKERS -->
+<rect data-dp-step="10" x="4" y="210" width="732" height="65" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="10" x="370" y="224" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">PER-CHANNEL DELIVERY WORKERS</text>
+
+<rect data-dp-step="11" x="14" y="234" width="160" height="32" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="11" x="94" y="247" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Push Workers (70 pods)</text>
+<text data-dp-step="11" x="94" y="259" text-anchor="middle" fill="var(--muted)" font-size="5">Batch 500 tokens/request to APNs/FCM</text>
+
+<rect data-dp-step="11" x="190" y="234" width="160" height="32" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="11" x="270" y="247" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Email Workers (15 pods)</text>
+<text data-dp-step="11" x="270" y="259" text-anchor="middle" fill="var(--muted)" font-size="5">SendGrid/SES batch API</text>
+
+<rect data-dp-step="11" x="366" y="234" width="160" height="32" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="11" x="446" y="247" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">SMS Workers (15 pods)</text>
+<text data-dp-step="11" x="446" y="259" text-anchor="middle" fill="var(--muted)" font-size="5">Twilio &middot; pooled sender numbers</text>
+
+<rect data-dp-step="11" x="542" y="234" width="160" height="32" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="11" x="622" y="247" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">In-App Workers (20 pods)</text>
+<text data-dp-step="11" x="622" y="259" text-anchor="middle" fill="var(--muted)" font-size="5">Write to feed + push via WebSocket</text>
+
+<line data-dp-step="12" x1="370" y1="275" x2="370" y2="288" stroke="var(--o)" stroke-width="1" marker-end="url(#na1)"/>
+
+<!-- DELIVERY PROVIDERS -->
+<rect data-dp-step="13" x="4" y="290" width="732" height="55" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="13" x="370" y="304" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">EXTERNAL DELIVERY PROVIDERS</text>
+
+<rect data-dp-step="14" x="14" y="312" width="120" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="14" x="74" y="323" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">APNs (Apple)</text>
+<text data-dp-step="14" x="74" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">HTTP/2 multiplexed</text>
+
+<rect data-dp-step="14" x="150" y="312" width="120" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="14" x="210" y="323" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">FCM (Google)</text>
+<text data-dp-step="14" x="210" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">Batch up to 500 tokens</text>
+
+<rect data-dp-step="14" x="286" y="312" width="120" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="14" x="346" y="323" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">SendGrid</text>
+<text data-dp-step="14" x="346" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">SMTP + template API</text>
+
+<rect data-dp-step="14" x="422" y="312" width="120" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="14" x="482" y="323" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Twilio</text>
+<text data-dp-step="14" x="482" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">SMS + voice fallback</text>
+
+<rect data-dp-step="14" x="558" y="312" width="140" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="14" x="628" y="323" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">WebSocket Gateway</text>
+<text data-dp-step="14" x="628" y="333" text-anchor="middle" fill="var(--muted)" font-size="5">Real-time in-app push</text>
+
+<!-- Annotations -->
+<rect data-dp-step="15" x="560" y="140" width="170" height="50" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="15" x="645" y="154" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">KEY INSIGHT</text>
+<text data-dp-step="15" x="645" y="166" text-anchor="middle" fill="var(--muted)" font-size="5">Channel router checks preferences</text>
+<text data-dp-step="15" x="645" y="176" text-anchor="middle" fill="var(--muted)" font-size="5">BEFORE fan-out. Never send to</text>
+<text data-dp-step="15" x="645" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">an opted-out channel.</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs made in this architecture and their rationale</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">Queue Technology</span></td>
+  <td>RabbitMQ, SQS, Kafka</td>
+  <td><span class="hg">Kafka</span></td>
+  <td>Durable, replayable, high throughput. Priority via separate topics. Consumer groups for scaling workers.</td>
+</tr>
+<tr>
+  <td><span class="hi">Priority Implementation</span></td>
+  <td>Single queue with priority field, separate queues per priority</td>
+  <td><span class="hg">Separate topics per priority</span></td>
+  <td>P0 consumers never blocked by P3 backlog. Independent scaling per priority level.</td>
+</tr>
+<tr>
+  <td><span class="hi">Template Storage</span></td>
+  <td>DB per render, pre-compiled cache</td>
+  <td><span class="hg">Pre-compiled + cached in Redis</span></td>
+  <td>Template rendering is CPU-bound. Pre-compile Mustache/Handlebars templates, cache in Redis. Invalidate on template update.</td>
+</tr>
+<tr>
+  <td><span class="hi">Device Token Store</span></td>
+  <td>PostgreSQL, DynamoDB, Redis-only</td>
+  <td><span class="hg">DynamoDB + Redis cache</span></td>
+  <td>DynamoDB for durability (tokens are critical). Redis for sub-ms lookup during send path. Write-through cache.</td>
+</tr>
+<tr>
+  <td><span class="hi">Delivery Guarantee</span></td>
+  <td>At-most-once, at-least-once, exactly-once</td>
+  <td><span class="hg">At-least-once + dedup</span></td>
+  <td>Provider ACKs are unreliable. Retry on failure. Dedup key prevents user-visible duplicates.</td>
+</tr>
+<tr>
+  <td><span class="hi">Worker Isolation</span></td>
+  <td>Shared workers, per-channel workers</td>
+  <td><span class="hg">Per-channel worker pools</span></td>
+  <td>SMS rate limits shouldn't block push delivery. Independent scaling, retry policies, circuit breakers per channel.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why priority queues matter:</span> An OTP code that arrives 30s late is useless. By separating P0 (critical) from P3 (marketing), we guarantee that a batch of 10M marketing emails never delays a single OTP delivery. P0 has dedicated consumers that are never backlogged.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">Template rendering tradeoff:</span> Rendering at send-time allows personalization but adds latency. Solution: pre-compile templates to bytecode, cache in Redis. At send-time, only variable injection happens (~0.1ms per notification). Template updates invalidate cache via pub/sub.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Provider failover:</span> If APNs returns 503, don't retry immediately to APNs. Instead, circuit-break that provider and route push notifications to FCM (for Android) or fall back to in-app. Provider health is tracked per-region with sliding window failure rates.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">Device token hygiene:</span> APNs returns HTTP 410 (Gone) for uninstalled apps. FCM returns <code>NotRegistered</code>. Workers MUST delete stale tokens immediately. Sending to stale tokens wastes quota and can trigger provider throttling. Run daily sweep for tokens not updated in 30 days.</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">How the notification service handles failures gracefully</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Provider Outage</span></td>
+  <td>APNs or Twilio returns 5xx for extended period.</td>
+  <td>Circuit breaker opens after 50% failure rate in 60s window. Messages queue up. Auto-retry when circuit closes. Alert on-call.</td>
+  <td><span class="hg">Auto-recover</span> on provider restoration</td>
+</tr>
+<tr>
+  <td><span class="hi">Token Expiry Storm</span></td>
+  <td>App update causes mass token refresh — 100M tokens invalid simultaneously.</td>
+  <td>Batch token refresh via FCM/APNs canonical ID response. Queue token updates. Don't block send path — mark for async refresh.</td>
+  <td><span class="ho">~1 hour</span> full refresh</td>
+</tr>
+<tr>
+  <td><span class="hi">Notification Flood</span></td>
+  <td>Upstream bug sends 100x normal volume.</td>
+  <td>Per-user rate limiting (max 10 notifications/min per user). Per-source rate limiting. Queue depth alerting + auto-scale workers.</td>
+  <td><span class="hg">Immediate</span> suppression</td>
+</tr>
+<tr>
+  <td><span class="hi">Duplicate Events</span></td>
+  <td>Producer retries cause same notification enqueued twice.</td>
+  <td>Dedup key (user_id + template_id + params_hash) checked in Redis before processing. 24h TTL on dedup entries.</td>
+  <td><span class="hg">Zero</span> user-visible duplicates</td>
+</tr>
+<tr>
+  <td><span class="hi">Template Corruption</span></td>
+  <td>Bad template deploy renders broken notifications.</td>
+  <td>Template versioning. Canary deploy to 1% traffic. Rollback on error rate spike. Fallback to previous version automatically.</td>
+  <td><span class="hg">&lt;5 min</span> auto-rollback</td>
+</tr>
+<tr>
+  <td><span class="hi">Queue Lag Spike</span></td>
+  <td>Consumer lag exceeds SLA threshold (P0 messages waiting &gt;3s).</td>
+  <td>Auto-scale consumers on lag metric. Priority isolation ensures P0 consumers are never starved. Alert if lag persists after scale-up.</td>
+  <td><span class="hg">&lt;30s</span> auto-scale response</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail a notification service architecture interview</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Priority Queue is the Core Differentiator</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Not all notifications are equal. OTP codes need &lt;3s, marketing can wait minutes. Use separate Kafka topics per priority level with dedicated consumer groups. P0 consumers are over-provisioned and never share resources with lower priorities. This guarantees SLA per notification type.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. Per-Channel Workers with Independent Scaling</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Push, email, SMS, and in-app have wildly different throughput profiles. Push batches 500 tokens/request. SMS is rate-limited per number. Email is CPU-bound for template rendering. Isolating workers per channel prevents one slow channel from blocking others and enables independent auto-scaling.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Preference Check BEFORE Fan-out</strong><br>
+<span style="font-size:.82rem;color:var(--text)">The channel router checks user preferences before splitting to per-channel queues. This prevents wasted work — if a user opted out of SMS, we never enqueue to the SMS worker. Preferences are cached in Redis for &lt;1ms lookup. Real-time opt-out propagation via pub/sub.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. Device Token Management is Critical Infrastructure</strong><br>
+<span style="font-size:.82rem;color:var(--text)">1B device tokens across 500M users. Tokens expire, rotate, get invalidated on app uninstall. You must handle APNs 410 (Gone), FCM NotRegistered responses by immediately deleting stale tokens. A daily sweep removes tokens not refreshed in 30 days. Stale tokens waste provider quota and trigger throttling.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. At-Least-Once + Dedup = User-Perceived Exactly-Once</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Provider ACKs are unreliable (network timeout ≠ delivery failure). So we retry on any ambiguous failure. To prevent user-visible duplicates, every notification carries a dedup_key (user_id + template_id + params_hash). Workers check Redis SETNX before sending. 24h TTL on dedup entries covers retry windows.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outbound rate limiting for a fragile downstream (Leaky Bucket) &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design outbound rate limiting for an SMS service that must not exceed a carrier's fixed acceptance rate</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design rate limiting for an SMS gateway where the downstream carrier accepts exactly 100 msgs/sec — no bursts allowed</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Message Queues</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#backpressure">Backpressure</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#dlq">Dead Letter Queue</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design rate limiting for an outbound SMS service where the downstream carrier enforces a strict, fixed acceptance rate (100 messages/second). Bursts are not tolerated — the carrier will drop messages. The system must queue overflow, drain at a smooth constant rate, and handle backlog gracefully.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> This is <span class="hr">outbound</span> rate limiting — you're protecting a downstream system, not your own. The carrier doesn't care about your traffic patterns; it will silently drop anything above 100 msg/sec. You must <span class="hr">smooth output to a constant rate</span>, queueing internally when inbound rate exceeds outbound capacity.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">100</div>
+<div style="font-size:.72rem;color:var(--muted)">msg/sec max</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">carrier hard limit</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">No Burst</div>
+<div style="font-size:.72rem;color:var(--muted)">constant drain rate</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">smooth output required</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Queue</div>
+<div style="font-size:.72rem;color:var(--muted)">internal buffer</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">absorb inbound spikes</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Leaky Bucket</div>
+<div style="font-size:.72rem;color:var(--muted)">ideal algorithm</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">fixed output rate</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; outbound rate limiting for a fixed-rate downstream carrier</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Fixed constant output rate</strong> (no bursts) &middot; exactly 100 msg/sec to carrier<br>
+  <span class="hg">2.</span> <strong>Bounded FIFO queue</strong> to absorb inbound spikes (capacity: 10,000 messages)<br>
+  <span class="hg">3.</span> <strong>Priority lanes</strong> for critical messages (OTP/2FA) &middot; reserved drain capacity<br>
+  <span class="hg">4.</span> <strong>TTL-based message expiry</strong> &middot; stale messages removed before drain<br>
+  <span class="hg">5.</span> <strong>Backpressure signal</strong> to upstream when queue full (HTTP 503)<br>
+  <span class="hg">6.</span> <strong>Overflow to DLQ</strong> &middot; expired/failed messages preserved for analysis
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Multi-carrier routing</strong> (separate routing layer)<br>
+  <span class="hr">&#x2717;</span> <strong>Message content formatting</strong> (template engine)<br>
+  <span class="hr">&#x2717;</span> <strong>Delivery confirmation/receipts</strong> (carrier callback handling)<br>
+  <span class="hr">&#x2717;</span> <strong>Billing per message</strong> (billing service)<br>
+  <span class="hr">&#x2717;</span> <strong>Geographic routing</strong> (number-to-carrier mapping)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the leaky bucket design</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Output Rate</span></td><td><span class="hg">EXACTLY 100 msg/sec</span></td><td>Carrier hard limit, no tolerance. Exceeding &rarr; messages silently dropped by carrier.</td></tr>
+<tr><td><span class="hi">Queue Capacity</span></td><td><span class="hg">10,000 messages</span></td><td>100 seconds of buffer. Absorbs sustained bursts up to 25s at 500 msg/sec inbound.</td></tr>
+<tr><td><span class="hi">Priority</span></td><td><span class="hg">OTP/2FA skip regular queue</span></td><td>Reserved 20% drain capacity (20 msg/sec) for critical messages. Never delayed by bulk.</td></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">Variable</span> (depends on queue depth)</td><td>Max: capacity / drain_rate = 10,000 / 100 = 100 seconds worst case.</td></tr>
+<tr><td><span class="hi">Overflow</span></td><td><span class="hg">503 to upstream</span> when queue full</td><td>Never silently drop. Upstream callers get explicit backpressure signal + Retry-After.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Throughput vs. Latency</span>. Higher queue capacity absorbs longer bursts but increases worst-case delivery latency. A 10K queue means a message could wait up to 100s during sustained overload &middot; OTP messages bypass this via priority lane.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive queue sizing and overflow timing from the given constraints</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>Carrier limit 100 msg/sec</strong> &middot; <strong>Average inbound 80 msg/sec</strong> &middot; <strong>Peak 500 msg/sec during campaigns</strong> &middot; <strong>Queue capacity 10,000 messages</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Queue fill rate during spike</td>
+  <td>500 (inbound) - 100 (drain) = 400 msg/sec accumulation</td>
+  <td><span class="hg">400 msg/sec net fill</span></td>
+  <td>Queue absorbs difference between inbound and outbound rates</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Time to fill queue</td>
+  <td>10,000 / 400 = 25 seconds of sustained peak</td>
+  <td><span class="hr">25 seconds before overflow</span></td>
+  <td>Marketing campaigns must be time-boxed or rate-limited upstream</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Memory for queue</td>
+  <td>10K messages &times; 1KB avg size</td>
+  <td><span class="hg">~10MB queue memory</span></td>
+  <td>Easily fits in Redis or in-memory buffer on single node</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Priority lane capacity</td>
+  <td>20% of 100 msg/sec drain reserved for OTP</td>
+  <td><span class="hg">20 msg/sec OTP, 80 msg/sec regular</span></td>
+  <td>Critical messages always have guaranteed drain bandwidth</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Time to drain full queue (no new input)</td>
+  <td>10,000 / 100 = 100 seconds</td>
+  <td><span class="hg">100s to fully drain</span></td>
+  <td>Max delivery latency during recovery from sustained overload</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with fill rate math (step 1-2) &middot; this shows you understand the core tension. Then mention priority lanes (step 4) to show you protect critical messages. The 25-second overflow window is the key number interviewers want to hear.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">External and internal interfaces for the SMS rate limiting service</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px">
+<h4 style="color:var(--g);margin-bottom:4px">POST /sms/send</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <strong>Purpose:</strong> Enqueue an SMS message for delivery<br>
+  <strong>Body:</strong> { to, from, body, priority: "critical"|"regular", ttl_seconds }<br>
+  <strong>Response (success):</strong> 202 Accepted + { queue_position, estimated_delivery_seconds }<br>
+  <strong>Response (queue full):</strong> 503 Service Unavailable + Retry-After: {seconds}
+</div>
+</div>
+<div class="d-panel" style="padding:10px">
+<h4 style="color:var(--a);margin-bottom:4px">Internal: Timer-Based Drain</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <strong>Mechanism:</strong> Dequeue 1 message every 10ms (= 100 msg/sec)<br>
+  <strong>Priority interleave:</strong> Every 5th dequeue from critical lane (20% reserved)<br>
+  <strong>TTL check:</strong> Before sending, verify message hasn&rsquo;t expired &rarr; if expired, move to DLQ<br>
+  <strong>Carrier call:</strong> HTTP POST to carrier API with message payload
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Storage structures for queue, priority lanes, and overflow handling</p>
+<pre><code>// Queue: Redis LIST (RPUSH to enqueue, LPOP to drain)
+// Or in-memory bounded buffer for single-node deployment
+
+RPUSH sms:queue:regular {message_json}    // Regular messages
+RPUSH sms:queue:critical {message_json}   // OTP/2FA messages
+LPOP sms:queue:critical                   // Drain critical first
+LPOP sms:queue:regular                    // Then drain regular
+
+// Message structure
+{
+  "id": "msg_abc123",
+  "to": "+1234567890",
+  "body": "Your OTP is 482910",
+  "priority": "critical",
+  "enqueued_at": 1705312200.123,
+  "ttl_expires_at": 1705312500.123
+}
+
+// DLQ: Separate Redis LIST for expired/failed messages
+RPUSH sms:dlq {expired_message_json}
+
+// Monitoring keys
+GET sms:queue:regular:length    // Current queue depth
+GET sms:metrics:drain_rate      // Actual drain rate (should be ~100/sec)
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Leaky Bucket with Queue</h2>
+<p class="su">Messages enter a queue (bucket) and drain at a fixed, constant rate regardless of input pattern</p>
+
+<!-- --- Leaky Bucket Architecture SVG --- -->
+<svg width="100%" viewBox="0 0 780 420" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Outbound Rate Limiting &middot; Leaky Bucket Architecture">
+  <defs><marker id="lb-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Outbound Rate Limiting &middot; Leaky Bucket with Priority Queue</text>
+
+  <!-- INBOUND LAYER -->
+  <rect x="10" y="25" width="760" height="65" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">INBOUND SMS REQUESTS (Variable Rate)</text>
+
+  <!-- Burst -->
+  <rect x="40" y="48" width="130" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="105" y="63" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Burst: 500 msg/sec</text>
+  <text x="105" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">Marketing campaign</text>
+
+  <!-- Normal -->
+  <rect x="200" y="48" width="130" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="265" y="63" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Normal: 50 msg/sec</text>
+  <text x="265" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">Steady transactional</text>
+
+  <!-- OTP -->
+  <rect x="360" y="48" width="130" height="30" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="425" y="63" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Critical: OTP/2FA</text>
+  <text x="425" y="73" text-anchor="middle" fill="var(--y)" font-size="4.5">Must not be delayed</text>
+
+  <!-- Spike -->
+  <rect x="520" y="48" width="130" height="30" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="585" y="63" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Spike: 2000 msg/sec</text>
+  <text x="585" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">Flash sale alerts</text>
+
+  <!-- Arrows down into bucket -->
+  <line x1="105" y1="82" x2="300" y2="110" stroke="var(--r)" stroke-width=".6" marker-end="url(#lb-arr)"/>
+  <line x1="265" y1="82" x2="340" y2="110" stroke="var(--g)" stroke-width=".6" marker-end="url(#lb-arr)"/>
+  <line x1="425" y1="82" x2="390" y2="110" stroke="var(--y)" stroke-width=".6" marker-end="url(#lb-arr)"/>
+  <line x1="585" y1="82" x2="450" y2="110" stroke="var(--r)" stroke-width=".6" marker-end="url(#lb-arr)"/>
+
+  <!-- THE BUCKET (Main visual) -->
+  <rect x="200" y="105" width="380" height="150" rx="10" fill="rgba(34,211,238,.03)" stroke="var(--c)" stroke-width="2"/>
+  <text x="390" y="122" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">LEAKY BUCKET (Queue)</text>
+
+  <!-- Priority lane: Critical -->
+  <rect x="220" y="135" width="340" height="28" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="390" y="152" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="700">Priority Lane: OTP/2FA (reserved 20% drain capacity)</text>
+
+  <!-- Regular queue -->
+  <rect x="220" y="170" width="340" height="35" rx="4" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="390" y="185" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="700">Regular Queue (FIFO) &middot; Capacity: 10,000 messages</text>
+  <text x="390" y="198" text-anchor="middle" fill="var(--muted)" font-size="5">TTL per message: 5 min | Expired &rarr; DLQ</text>
+
+  <!-- Queue depth indicator -->
+  <rect x="220" y="212" width="340" height="18" rx="3" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".5"/>
+  <rect x="220" y="212" width="200" height="18" rx="3" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="390" y="224" text-anchor="middle" fill="var(--muted)" font-size="4.5">Queue depth: 5,800 / 10,000 (58%)</text>
+
+  <!-- Bucket capacity labels -->
+  <text x="590" y="145" fill="var(--muted)" font-size="5">Capacity: 10K msgs</text>
+  <text x="590" y="158" fill="var(--muted)" font-size="5">If full: reject + 503</text>
+  <text x="590" y="171" fill="var(--r)" font-size="5" font-weight="600">Overflow &rarr; Backpressure</text>
+  <text x="590" y="184" fill="var(--muted)" font-size="5">to upstream callers</text>
+
+  <!-- THE LEAK (drain) -->
+  <line x1="390" y1="255" x2="390" y2="280" stroke="var(--g)" stroke-width="2" marker-end="url(#lb-arr)"/>
+  <text x="390" y="272" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DRAIN</text>
+
+  <!-- Fixed rate output -->
+  <rect x="250" y="280" width="280" height="50" rx="8" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="390" y="298" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">FIXED OUTPUT: 100 msg/sec</text>
+  <text x="390" y="312" text-anchor="middle" fill="var(--muted)" font-size="5.5">Timer: dequeue 1 message every 10ms</text>
+  <text x="390" y="324" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Perfectly smooth, constant rate &middot; no burst ever</text>
+
+  <!-- Arrow to carrier -->
+  <line x1="390" y1="330" x2="390" y2="355" stroke="var(--g)" stroke-width="1" marker-end="url(#lb-arr)"/>
+
+  <!-- CARRIER -->
+  <rect x="250" y="350" width="280" height="55" rx="8" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1.2"/>
+  <text x="390" y="368" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="800">CARRIER (Downstream)</text>
+  <text x="390" y="383" text-anchor="middle" fill="var(--muted)" font-size="5.5">Hard limit: 100 msg/sec</text>
+  <text x="390" y="396" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Exceeding &rarr; silently dropped (no retry)</text>
+
+  <!-- Token Bucket comparison (side note) -->
+  <rect x="10" y="280" width="220" height="55" rx="5" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="120" y="296" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">&#x2717; Why NOT Token Bucket?</text>
+  <text x="120" y="310" text-anchor="middle" fill="var(--muted)" font-size="4.5">Token bucket allows bursts up to capacity</text>
+  <text x="120" y="322" text-anchor="middle" fill="var(--muted)" font-size="4.5">Carrier drops anything &gt; 100/sec</text>
+  <text x="120" y="333" text-anchor="middle" fill="var(--r)" font-size="4.5" font-weight="600">&rarr; Messages permanently lost</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Leaky bucket (FIFO queue + fixed drain rate)</td><td>Guarantees smooth, constant output. No burst ever reaches downstream. The textbook use case for leaky bucket.</td></tr>
+<tr><td><span class="hi">Queue</span></td><td>Bounded FIFO queue (capacity: 10,000 messages)</td><td>Absorbs up to ~100s of burst. When full, reject with backpressure signal (HTTP 503 to upstream callers).</td></tr>
+<tr><td><span class="hi">Drain</span></td><td>Timer-based: dequeue 1 message every 10ms (= 100/sec)</td><td>Tick-based drain ensures perfectly uniform output regardless of input pattern.</td></tr>
+<tr><td><span class="hi">Overflow</span></td><td>When queue full: reject + DLQ for retry, or backpressure to upstream</td><td>Never drop silently. Upstream can retry or user sees delayed delivery.</td></tr>
+<tr><td><span class="hi">Priority</span></td><td>Priority queue variant: OTP/2FA messages skip the regular queue</td><td>Critical messages (login OTP) must not be delayed by marketing bulk sends.</td></tr>
+<tr><td><span class="hi">Monitoring</span></td><td>Queue depth + drain rate + overflow rate alerts</td><td>If queue stays &gt; 80% for 5 minutes, scale capacity or shed low-priority load.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Leaky bucket explained:</span> Think of a bucket with a hole at the bottom. Water (requests) pours in at variable rates. It leaks out at a <span class="hg">fixed, constant rate</span>. If the bucket overflows (queue full), water is lost (messages rejected). The output is always smooth.</div>
+<div class="b by"><span class="hi">Why NOT token bucket:</span> Token bucket <span class="hr">allows bursts</span> up to bucket capacity. If you have 100 tokens saved up, you can send 100 messages instantly. The carrier would drop most of them. Leaky bucket guarantees <span class="hg">no burst ever</span> — exactly what a fixed-rate downstream requires.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Token bucket</span> &middot; allows bursts (fatal for fixed-rate downstream). <span class="hr">Sliding window</span> &middot; allows micro-bursts within the window. <span class="hr">No queue</span> &middot; rejects all overflow immediately (poor UX for legitimate traffic). <span class="hr">Unbounded queue</span> &middot; memory exhaustion during sustained overload.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Twilio</strong> &middot; per-carrier rate limiting with queue. <strong>AWS SES</strong> &middot; sending rate per second (leaky bucket). <strong>Stripe</strong> &middot; outbound webhook delivery rate. <strong>SendGrid</strong> &middot; per-domain throttling to avoid blacklisting.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Sustained overload (&gt; 100 msg/sec for hours)</span></td><td>Queue fills up, delivery delays grow unbounded</td><td>Backpressure to upstream. Shed low-priority messages. Alert on queue depth &gt; 80%. Consider additional carrier routes.</td></tr>
+<tr><td><span class="hr">Carrier outage</span></td><td>Drain rate drops to 0, queue fills</td><td>Pause drain timer. Switch to backup carrier. Queue persists messages for retry when carrier recovers.</td></tr>
+<tr><td><span class="hr">Message expires in queue</span></td><td>OTP delivered after timeout (useless)</td><td>TTL per message. Expired messages moved to DLQ. Application regenerates OTP if needed.</td></tr>
+<tr><td><span class="hr">Priority inversion</span></td><td>Bulk marketing messages delay OTP</td><td>Separate priority lanes: critical (OTP) dequeues first. Critical lane gets 20% of drain capacity reserved.</td></tr>
+<tr><td><span class="hr">Multiple carriers with different rates</span></td><td>Routing complexity</td><td>One leaky bucket per carrier. Router assigns messages to carrier with shortest queue.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for outbound rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Leaky bucket</strong> &middot; fixed output rate, no bursts ever reach downstream (this is THE algorithm)<br>
+<span class="hg">2.</span> <strong>Bounded queue as buffer</strong> &middot; absorb inbound spikes, reject overflow with backpressure<br>
+<span class="hg">3.</span> <strong>Timer-based drain</strong> &middot; dequeue at fixed interval (10ms = 100/sec) regardless of input<br>
+<span class="hg">4.</span> <strong>Priority lanes</strong> &middot; critical messages (OTP) bypass regular queue<br>
+<span class="hg">5.</span> <strong>TTL on queued messages</strong> &middot; expired messages go to DLQ, not delivered stale<br>
+<span class="hg">6.</span> <strong>Say "leaky bucket" immediately</strong> &middot; the keyword "must not burst" is the dead giveaway
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

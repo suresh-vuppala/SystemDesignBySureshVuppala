@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification Aggregation &amp; Batching &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design notification aggregation — "5 people liked your post" instead of 5 separate notifications</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design notification aggregation — batch multiple events about the same entity into one notification ("5 people liked your post") with immediate first-event delivery and time-windowed subsequent batching</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Time-Windowed Aggregation</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis Counters</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#kafka">Stream Processing</a>
+<a href="../../system-design-cheatsheet/04-apis.html">Collapse/Update Notifications</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Per-Entity Batching</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How do you aggregate multiple engagement events (likes, comments, follows) about the same entity into a single notification — delivering the first event immediately but batching subsequent events into updates like "5 people liked your post"?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Time-windowed aggregation per entity per user, first-event immediate delivery, subsequent events queued into batch window, dynamic count templates, collapse/update existing notifications. <span class="hr">Not</span> covering channel delivery, device management, or analytics.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="1" data-suffix="B/day" style="font-size:1.5rem;font-weight:700;color:var(--a)">1B/day</div>
+<div style="font-size:.72rem;color:var(--muted)">engagement events</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">likes, comments, shares, follows</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="15" data-suffix=" min" style="font-size:1.5rem;font-weight:700;color:var(--g)">15 min</div>
+<div style="font-size:.72rem;color:var(--muted)">max batch window</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">aggregate within this window</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="85" data-suffix="%" style="font-size:1.5rem;font-weight:700;color:var(--o)">85%</div>
+<div style="font-size:.72rem;color:var(--muted)">notification reduction</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">10 likes → 1 aggregated notification</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="150" data-suffix="M" style="font-size:1.5rem;font-weight:700;color:var(--r)">150M</div>
+<div style="font-size:.72rem;color:var(--muted)">aggregated notifications/day</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">down from 1B raw events</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the aggregation system must do &middot; core batching behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>First-event immediate delivery</strong> &middot; first like on a post notifies immediately<br>
+  <span class="hg">2.</span> <strong>Subsequent event batching</strong> &middot; 2nd-Nth events within window aggregate into update<br>
+  <span class="hg">3.</span> <strong>Per-entity aggregation key</strong> &middot; group by (target_user, entity_type, entity_id)<br>
+  <span class="hg">4.</span> <strong>Dynamic count template</strong> &middot; "{actor} and {N} others liked your {entity}"<br>
+  <span class="hg">5.</span> <strong>Collapse existing notification</strong> &middot; update in-app feed entry instead of adding new row<br>
+  <span class="hg">6.</span> <strong>Window expiry flush</strong> &middot; after 15 min, flush batch regardless of count
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> Channel <strong>delivery mechanics</strong> (push/email/SMS workers)<br>
+  <span class="hr">&#x2717;</span> <strong>Preference management</strong> (opt-out, frequency caps)<br>
+  <span class="hr">&#x2717;</span> <strong>Content personalization</strong> (ML-driven message copy)<br>
+  <span class="hr">&#x2717;</span> <strong>Actor deduplication</strong> within display (showing top 3 names)<br>
+  <span class="hr">&#x2717;</span> <strong>Cross-entity aggregation</strong> ("activity on 3 of your posts")
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the aggregation architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">First-Event Latency</span></td><td><span class="hg">&lt;3s</span></td><td>First like on a post must notify immediately. No batching delay for the initial event.</td></tr>
+<tr><td><span class="hi">Batch Window</span></td><td><span class="hg">15 min max</span></td><td>After 15 min, flush whatever is in the batch. User shouldn't wait longer than 15 min for aggregated update.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">1B events/day (11.5K/sec)</span></td><td>Kafka partitioned by aggregation key for per-entity processing.</td></tr>
+<tr><td><span class="hi">Notification Reduction</span></td><td><span class="hg">85%+ reduction</span></td><td>From 1B raw events down to ~150M aggregated notifications. Reduces user notification fatigue.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Count accuracy ±1</span></td><td>Aggregated count may be slightly stale (±1) but must converge. Eventual consistency acceptable.</td></tr>
+<tr><td><span class="hi">Collapse Guarantee</span></td><td><span class="hg">No duplicate notifications</span></td><td>An already-displayed "3 people liked" must update to "5 people liked", not show a separate notification.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td><span class="hg">Linear with events</span></td><td>Partitioned by aggregation key. Adding Kafka partitions + consumers scales linearly.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Immediacy vs. Aggregation</span>. Users want to know about the first like instantly, but don't want 50 separate notifications. Solution: immediate delivery of first event, then switch to batching mode for that entity for the next 15 minutes.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing from given constraints. Show this reasoning in an interview.</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>1B engagement events/day</strong> &middot; <strong>15 min batch window</strong> &middot; <strong>avg 6.7 events per aggregated notification</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Avg events/sec</td>
+  <td>1B / 86,400s</td>
+  <td><span class="hg">~11,574/sec</span></td>
+  <td>Kafka with 64 partitions (key = aggregation_key hash)</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Aggregated notifications/day</td>
+  <td>1B / 6.7 avg events per batch</td>
+  <td><span class="hg">~150M/day</span></td>
+  <td>85% reduction in downstream notification volume</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Active aggregation windows</td>
+  <td>11,574 new entities/sec &times; 900s window</td>
+  <td><span class="hg">~10.4M active windows</span></td>
+  <td>Redis hash per active window. ~10M keys at any time.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Redis memory for windows</td>
+  <td>10.4M windows &times; 256 bytes (key + count + actors + timer)</td>
+  <td><span class="hg">~2.7GB</span></td>
+  <td>Single Redis cluster (8 shards) with room for peak</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Window flush rate</td>
+  <td>10.4M windows / 900s avg lifetime</td>
+  <td><span class="hg">~11,500 flushes/sec</span></td>
+  <td>Matches event rate. Each flush emits one aggregated notification.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Peak event burst</td>
+  <td>11.5K &times; 10x (viral post)</td>
+  <td><span class="hg">~115K/sec peak</span></td>
+  <td>Auto-scale consumers. Hot partition detection for viral entities.</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Consumer instances</td>
+  <td>64 partitions &times; 1 consumer per partition</td>
+  <td><span class="hg">64 consumers</span></td>
+  <td>Each consumer processes ~180 events/sec avg. Headroom for burst.</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Window timer storage</td>
+  <td>Redis sorted set for timer expiry, 10.4M entries</td>
+  <td><span class="hg">~1.5GB</span></td>
+  <td>ZRANGEBYSCORE polls every 1s for expired windows</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> The key insight is the 85% reduction ratio. For every 1B raw events, you only send ~150M actual notifications. This is the core value proposition of aggregation — massive reduction in user notification fatigue while preserving awareness of activity.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Aggregation service internal APIs &middot; event ingestion and window management</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">POST /v1/events/engagement (Internal — from engagement service)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Ingest an engagement event for aggregation processing</div>
+<pre><code>{
+  "event_id": "evt_001",
+  "event_type": "like",                 // like | comment | share | follow | mention
+  "actor_id": "u_actor_456",
+  "actor_name": "Jane Smith",
+  "target_user_id": "u_owner_123",      // notification recipient
+  "entity_type": "post",                // post | comment | story | profile
+  "entity_id": "post_789",
+  "entity_preview": "My vacation photos...",
+  "timestamp": "2024-03-15T10:30:00Z"
+}</code></pre>
+<div style="font-size:.72rem;color:var(--muted)">Response: <code>202 Accepted</code> &middot; <code>{ "aggregation_key": "like:post_789:u_owner_123", "window_status": "active" }</code></div>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /v1/aggregation/window/{aggregation_key} (Internal)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Query current aggregation window state (for debugging/monitoring)</div>
+<pre><code>GET /v1/aggregation/window/like:post_789:u_owner_123
+
+Response 200:
+{
+  "aggregation_key": "like:post_789:u_owner_123",
+  "count": 5,
+  "first_actor": "Jane Smith",
+  "recent_actors": ["Jane Smith", "Bob Lee", "Alice Kim"],
+  "window_opened_at": "2024-03-15T10:30:00Z",
+  "window_expires_at": "2024-03-15T10:45:00Z",
+  "first_event_delivered": true,
+  "last_batch_sent_at": "2024-03-15T10:35:00Z"
+}</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--o);font-size:.85rem">POST /v1/aggregation/flush (Internal — timer-triggered)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Force-flush an aggregation window (called by timer or threshold trigger)</div>
+<pre><code>{
+  "aggregation_key": "like:post_789:u_owner_123",
+  "reason": "window_expired",          // window_expired | threshold_reached | manual
+  "emit_notification": {
+    "template_id": "engagement_aggregated",
+    "target_user_id": "u_owner_123",
+    "params": {
+      "count": 5,
+      "first_actor": "Jane Smith",
+      "entity_type": "post",
+      "entity_preview": "My vacation photos..."
+    },
+    "collapse_key": "like:post_789:u_owner_123"
+  }
+}</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Redis structures and persistent store for aggregation windows</p>
+
+<h4 style="color:var(--a)">aggregation_window (Redis Hash per active window)</h4>
+<pre><code>// Key: agg_window:{aggregation_key}
+// aggregation_key = {event_type}:{entity_id}:{target_user_id}
+HSET agg_window:like:post_789:u_owner_123
+  "count"           "5"
+  "first_actor_id"  "u_actor_456"
+  "first_actor_name" "Jane Smith"
+  "recent_actors"   "[\"Jane Smith\",\"Bob Lee\",\"Alice Kim\"]"  // last 3
+  "entity_type"     "post"
+  "entity_preview"  "My vacation photos..."
+  "window_opened"   "1710495000000"     // unix ms
+  "first_delivered"  "1"                // boolean: first event already sent
+  "last_batch_ts"   "1710495300000"     // last batch notification sent
+
+EXPIRE agg_window:like:post_789:u_owner_123 960  // 16 min (window + buffer)</code></pre>
+
+<h4 style="color:var(--g)">window_timers (Redis Sorted Set — for expiry polling)</h4>
+<pre><code>// Score = window_expiry_time_ms (opened_at + 15 min)
+ZADD window_timers {expiry_ms} "like:post_789:u_owner_123"
+
+// Poller runs ZRANGEBYSCORE every 1s to find expired windows
+ZRANGEBYSCORE window_timers 0 {now_ms} LIMIT 0 1000</code></pre>
+
+<h4 style="color:var(--o)">notification_feed (update existing entry on collapse)</h4>
+<pre><code>// In-app feed entry — updated in place when aggregation count changes
+{
+  "notification_id": "n_agg_001",
+  "target_user_id":  "u_owner_123",
+  "collapse_key":    "like:post_789:u_owner_123",   // used to find & update
+  "template_id":     "engagement_aggregated",
+  "params": {
+    "count": 5,
+    "first_actor": "Jane Smith",
+    "others_count": 4,
+    "entity_type": "post",
+    "entity_preview": "My vacation photos..."
+  },
+  "rendered_text":   "Jane Smith and 4 others liked your post",
+  "updated_at":      "2024-03-15T10:45:00Z",
+  "read":            false
+}</code></pre>
+
+<h4 style="color:var(--r)">Kafka Topics</h4>
+<pre><code>// Input: raw engagement events (partitioned by aggregation_key)
+Topic: engagement-events
+  Key: "like:post_789:u_owner_123"
+  Value: { event_id, actor_id, actor_name, timestamp, ... }
+
+// Output: aggregated notifications (to notification service)
+Topic: aggregated-notifications
+  Key: "u_owner_123"
+  Value: { template_id, params, collapse_key, ... }</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Event Stream &#x2192; Aggregation Processor &#x2192; Window Manager &#x2192; Batch Flusher &#x2192; Notification Service</p>
+
+<svg width="100%" viewBox="0 0 740 380" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="ab1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- EVENT INGESTION LAYER -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="55" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">EVENT INGESTION &middot; Engagement events from social platform</text>
+
+<rect data-dp-step="2" x="14" y="26" width="130" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="79" y="37" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Like Service</text>
+<text data-dp-step="2" x="79" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">1B likes/day</text>
+
+<rect data-dp-step="2" x="158" y="26" width="130" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="2" x="223" y="37" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Comment Service</text>
+<text data-dp-step="2" x="223" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">200M comments/day</text>
+
+<rect data-dp-step="2" x="302" y="26" width="130" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="2" x="367" y="37" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Share Service</text>
+<text data-dp-step="2" x="367" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">100M shares/day</text>
+
+<rect data-dp-step="2" x="446" y="26" width="130" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="2" x="511" y="37" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Follow Service</text>
+<text data-dp-step="2" x="511" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">50M follows/day</text>
+
+<rect data-dp-step="2" x="590" y="26" width="140" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="2" x="660" y="37" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Kafka (64 partitions)</text>
+<text data-dp-step="2" x="660" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">Key = aggregation_key</text>
+
+<line data-dp-step="3" x1="370" y1="59" x2="370" y2="72" stroke="var(--a)" stroke-width="1" marker-end="url(#ab1)"/>
+
+<!-- AGGREGATION PROCESSOR LAYER -->
+<rect data-dp-step="4" x="4" y="74" width="732" height="70" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="4" x="370" y="88" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">AGGREGATION PROCESSOR &middot; First-event gate + window accumulation</text>
+
+<rect data-dp-step="5" x="14" y="96" width="220" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="5" x="124" y="110" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">First-Event Gate</text>
+<text data-dp-step="5" x="124" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">Check: does window exist for this agg_key?</text>
+<text data-dp-step="5" x="124" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">NO → deliver immediately + open window</text>
+
+<rect data-dp-step="5" x="250" y="96" width="220" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="5" x="360" y="110" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Window Accumulator</text>
+<text data-dp-step="5" x="360" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">YES window exists → HINCRBY count</text>
+<text data-dp-step="5" x="360" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">Append actor to recent_actors list</text>
+
+<rect data-dp-step="5" x="486" y="96" width="244" height="40" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="5" x="608" y="110" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Threshold Checker</text>
+<text data-dp-step="5" x="608" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">If count hits threshold (10, 50, 100)</text>
+<text data-dp-step="5" x="608" y="130" text-anchor="middle" fill="var(--muted)" font-size="5">→ emit intermediate batch update</text>
+
+<line data-dp-step="6" x1="370" y1="144" x2="370" y2="158" stroke="var(--g)" stroke-width="1" marker-end="url(#ab1)"/>
+
+<!-- WINDOW TIMER LAYER -->
+<rect data-dp-step="7" x="4" y="160" width="732" height="55" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="7" x="370" y="174" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">WINDOW TIMER &middot; Track expiry + flush on timeout</text>
+
+<rect data-dp-step="8" x="14" y="182" width="220" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="8" x="124" y="193" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis ZSET (window_timers)</text>
+<text data-dp-step="8" x="124" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">Score = expiry_time &middot; 10.4M entries</text>
+
+<rect data-dp-step="8" x="250" y="182" width="220" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="8" x="360" y="193" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Timer Poller (every 1s)</text>
+<text data-dp-step="8" x="360" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">ZRANGEBYSCORE 0 {now} → expired windows</text>
+
+<rect data-dp-step="8" x="486" y="182" width="244" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="8" x="608" y="193" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Flush Dispatcher</text>
+<text data-dp-step="8" x="608" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">Read window state → emit aggregated notification</text>
+
+<line data-dp-step="9" x1="370" y1="215" x2="370" y2="228" stroke="var(--y)" stroke-width="1" marker-end="url(#ab1)"/>
+
+<!-- NOTIFICATION EMISSION LAYER -->
+<rect data-dp-step="10" x="4" y="230" width="732" height="60" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="10" x="370" y="244" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">NOTIFICATION EMISSION &middot; Template + Collapse + Deliver</text>
+
+<rect data-dp-step="11" x="14" y="254" width="200" height="28" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="11" x="114" y="266" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Template Renderer</text>
+<text data-dp-step="11" x="114" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">"Jane and 4 others liked your post"</text>
+
+<rect data-dp-step="11" x="230" y="254" width="200" height="28" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="11" x="330" y="266" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Collapse Manager</text>
+<text data-dp-step="11" x="330" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">Find existing notif by collapse_key → update</text>
+
+<rect data-dp-step="11" x="446" y="254" width="284" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="11" x="588" y="266" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Push Updater (silent push to refresh badge)</text>
+<text data-dp-step="11" x="588" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">Update in-app feed + silent push for badge count</text>
+
+<line data-dp-step="12" x1="370" y1="290" x2="370" y2="303" stroke="var(--o)" stroke-width="1" marker-end="url(#ab1)"/>
+
+<!-- DOWNSTREAM -->
+<rect data-dp-step="13" x="4" y="305" width="732" height="55" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="13" x="370" y="319" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">NOTIFICATION SERVICE &middot; Channel delivery (push / email / in-app)</text>
+
+<rect data-dp-step="14" x="14" y="327" width="220" height="26" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="14" x="124" y="338" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">First Event: Immediate Push</text>
+<text data-dp-step="14" x="124" y="348" text-anchor="middle" fill="var(--muted)" font-size="5">"Jane Smith liked your post" (instant)</text>
+
+<rect data-dp-step="14" x="250" y="327" width="220" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="14" x="360" y="338" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Batch: Collapsed Update</text>
+<text data-dp-step="14" x="360" y="348" text-anchor="middle" fill="var(--muted)" font-size="5">"Jane and 4 others liked your post" (update)</text>
+
+<rect data-dp-step="14" x="486" y="327" width="244" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="14" x="608" y="338" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">In-App Feed Update</text>
+<text data-dp-step="14" x="608" y="348" text-anchor="middle" fill="var(--muted)" font-size="5">Overwrite existing row + bump timestamp</text>
+
+<!-- Annotations -->
+<rect data-dp-step="15" x="560" y="74" width="170" height="55" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="15" x="645" y="88" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">KEY INSIGHT</text>
+<text data-dp-step="15" x="645" y="100" text-anchor="middle" fill="var(--muted)" font-size="5">First event = immediate delivery</text>
+<text data-dp-step="15" x="645" y="110" text-anchor="middle" fill="var(--muted)" font-size="5">Opens 15-min aggregation window.</text>
+<text data-dp-step="15" x="645" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">Subsequent events accumulate.</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs made in this architecture and their rationale</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">First-Event Strategy</span></td>
+  <td>Always batch (delay all), always immediate, hybrid (first immediate + batch rest)</td>
+  <td><span class="hg">Hybrid: first immediate, rest batched</span></td>
+  <td>Users want instant feedback on first interaction. But 50 separate "X liked your post" is spam. Hybrid gives both immediacy and aggregation.</td>
+</tr>
+<tr>
+  <td><span class="hi">Window Duration</span></td>
+  <td>5 min, 15 min, 30 min, adaptive</td>
+  <td><span class="hg">15 min fixed window</span></td>
+  <td>Short enough that users get timely updates. Long enough to meaningfully aggregate. Adaptive adds complexity without proportional UX benefit.</td>
+</tr>
+<tr>
+  <td><span class="hi">Aggregation Key</span></td>
+  <td>Per-entity only, per-entity-per-type, per-user-per-entity-per-type</td>
+  <td><span class="hg">{event_type}:{entity_id}:{target_user_id}</span></td>
+  <td>Separate likes from comments on same post. Per-user ensures personalized notification per recipient.</td>
+</tr>
+<tr>
+  <td><span class="hi">Collapse Behavior</span></td>
+  <td>New notification each batch, update existing, replace existing</td>
+  <td><span class="hg">Update existing notification in-place</span></td>
+  <td>User sees one entry per entity in feed, count updates. No notification list pollution. Push notification updates silently.</td>
+</tr>
+<tr>
+  <td><span class="hi">Intermediate Updates</span></td>
+  <td>Only on window expiry, on every event, on thresholds (10, 50, 100)</td>
+  <td><span class="hg">Threshold-based intermediate updates</span></td>
+  <td>For viral posts with 1000+ likes, update at thresholds (10, 50, 100, 500) so user sees activity without waiting 15 min.</td>
+</tr>
+<tr>
+  <td><span class="hi">Window State Store</span></td>
+  <td>In-memory (Flink state), Redis, database</td>
+  <td><span class="hg">Redis Hash per window</span></td>
+  <td>Fast atomic HINCRBY for count. EXPIRE handles cleanup. Survives consumer restart (unlike in-memory Flink state).</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why first-event immediate matters:</span> If someone likes your post and you only find out 15 minutes later in a batch, the platform feels unresponsive. The first event creates the "someone noticed me" dopamine hit. Subsequent events are less urgent — "5 people" vs "6 people" doesn't matter in real-time.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">Collapse key prevents notification pollution:</span> Without collapse, a viral post generates a new notification every batch window (every 15 min). With collapse_key, the existing notification updates in-place: "5 people liked" → "50 people liked" → "1,000 people liked". User sees ONE entry in their feed, count grows.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Hot entity protection:</span> A celebrity post may get 10M likes in 1 hour. Without protection, this creates 10M events on a single Kafka partition (same aggregation_key). Solution: detect hot entities (>1K events/min), promote to dedicated processing with sampling — count accurately but process fewer events.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">Actor list management:</span> Showing "Jane, Bob, and 998 others" requires storing actor names. Don't store all 1000 — keep only the 3 most recent actors in the Redis hash. The count is accurate, but the displayed names are the latest. Template: "{actor1}, {actor2}, and {count-2} others".</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">How the aggregation system handles failures and edge cases</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Consumer Restart</span></td>
+  <td>Aggregation consumer restarts mid-window. In-memory state lost.</td>
+  <td>All window state is in Redis (not in-memory). Consumer reads Redis state on each event. Stateless consumer design.</td>
+  <td><span class="hg">Instant</span> recovery (Redis has state)</td>
+</tr>
+<tr>
+  <td><span class="hi">Window Timer Miss</span></td>
+  <td>Timer poller misses a window expiry (poller crash/lag).</td>
+  <td>Redis EXPIRE on window hash ensures data is cleaned even if timer missed. Catch-up: scan for windows older than 15 min + buffer.</td>
+  <td><span class="hg">&lt;30s</span> catch-up on poller recovery</td>
+</tr>
+<tr>
+  <td><span class="hi">Unlike/Undo Event</span></td>
+  <td>User unlikes a post after being counted in aggregation.</td>
+  <td>Decrement count in window (HINCRBY -1). If count drops to 0, cancel the pending aggregated notification. Don't send "0 people liked".</td>
+  <td><span class="hg">Real-time</span> count correction</td>
+</tr>
+<tr>
+  <td><span class="hi">Viral Entity (10M events)</span></td>
+  <td>Single entity gets millions of events, overwhelming one partition.</td>
+  <td>Hot entity detection: >1K events/min triggers sampling mode. Count = sample_count &times; sample_rate. Accuracy ±5% is acceptable for "~10K people liked".</td>
+  <td><span class="hg">Automatic</span> sampling mode</td>
+</tr>
+<tr>
+  <td><span class="hi">Redis Failure</span></td>
+  <td>Redis cluster unavailable, window state inaccessible.</td>
+  <td>Fallback: treat every event as first-event (immediate delivery). Temporarily disable aggregation. Resume when Redis recovers. Brief notification burst acceptable.</td>
+  <td><span class="ho">Degraded mode</span> until Redis recovers</td>
+</tr>
+<tr>
+  <td><span class="hi">Duplicate Events</span></td>
+  <td>Same like event processed twice due to Kafka redelivery.</td>
+  <td>Event deduplication: check event_id in Redis SET before processing. TTL 1 hour. Prevents double-counting in aggregation window.</td>
+  <td><span class="hg">Zero</span> count inflation</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail a notification aggregation interview</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Hybrid Strategy: First Immediate + Rest Batched</strong><br>
+<span style="font-size:.82rem;color:var(--text)">The first event for an entity triggers immediate delivery ("Jane liked your post"). This opens a 15-minute aggregation window. Subsequent events increment a counter in Redis. On window expiry, emit one aggregated notification ("Jane and 4 others liked your post"). This gives users both immediacy and spam reduction.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. Aggregation Key Design</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Key = {event_type}:{entity_id}:{target_user_id}. This groups all likes on the same post for the same recipient. Different event types (like vs. comment) on the same post get separate aggregation windows. The key also serves as the Kafka partition key, ensuring all events for one window go to one consumer.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Collapse Key for In-Place Updates</strong><br>
+<span style="font-size:.82rem;color:var(--text)">When the batch fires, it doesn't create a new notification. It finds the existing notification (by collapse_key) and updates it in-place: count goes from 3 to 5, actor list refreshes. The user sees one clean feed entry that evolves over time, not a stream of "X and Y others liked" entries.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. 85% Notification Volume Reduction</strong><br>
+<span style="font-size:.82rem;color:var(--text)">The core value proposition: 1B raw events → 150M actual notifications. Average 6.7 events per aggregation window. This dramatically reduces push notification fatigue, improves user engagement (fewer dismissals), and reduces infrastructure cost on downstream delivery systems.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Window State in Redis (Not In-Memory)</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Storing window state in Redis (not in consumer memory) makes consumers stateless. On restart, no state is lost. HINCRBY atomically increments counts. EXPIRE auto-cleans dead windows. This design trades slightly higher latency (Redis round-trip) for operational simplicity and fault tolerance.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

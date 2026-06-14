@@ -371,9 +371,155 @@
 <div class="b bb"><span class="hi">Schema Registry</span> (Confluent) — central store for Avro/Protobuf schemas. Enforces compatibility rules. Used with Kafka to prevent breaking changes.</div>
 <div class="b bb"><span class="hi">Why needed:</span> <span class="hg">Network</span> — send objects over HTTP/TCP/Kafka (network only understands bytes). <span class="hg">Persistence</span> — store to DB/Redis/disk. <span class="hg">Cross-language</span> — Java → Python via Protobuf (no language barrier). <span class="hg">Caching</span> — serialize to Redis, deserialize on hit. <span class="hg">Distributed Computing / RPC</span> — gRPC serializes to Protobuf binary — faster &amp; smaller than JSON for internal service calls.</div>
 </div>
+
+<div class="T" id="concurrency-io">
+<h2>Concurrency &amp; I/O Models</h2><p class="su">The mental models that explain why <span class="hg">Redis (single-thread)</span>, <span class="hg">Nginx</span>, and <span class="hg">Node.js</span> handle millions of connections</p>
+
+<!-- ═══ Full-width SVG: Process vs Thread + Concurrency vs Parallelism ═══ -->
+<svg width="100%" viewBox="0 0 720 200" style="max-width:720px;display:block;margin:8px auto 12px">
+
+<!-- PROCESS vs THREAD (top half) -->
+<rect x="10" y="4" width="340" height="88" rx="8" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2"/>
+<text x="180" y="18" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="800">Process (Isolated)</text>
+<rect x="24" y="28" width="100" height="54" rx="5" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width="1"/>
+<text x="74" y="42" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">Process A</text>
+<text x="74" y="54" text-anchor="middle" fill="var(--muted)" font-size="6">Own memory</text>
+<text x="74" y="64" text-anchor="middle" fill="var(--muted)" font-size="6">Own fds</text>
+<text x="74" y="76" text-anchor="middle" fill="var(--a)" font-size="6">Nginx worker 1</text>
+<rect x="150" y="28" width="100" height="54" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+<text x="200" y="42" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Process B</text>
+<text x="200" y="54" text-anchor="middle" fill="var(--muted)" font-size="6">Own memory</text>
+<text x="200" y="64" text-anchor="middle" fill="var(--muted)" font-size="6">Own fds</text>
+<text x="200" y="76" text-anchor="middle" fill="var(--g)" font-size="6">Nginx worker 2</text>
+<text x="135" y="56" text-anchor="middle" fill="var(--r)" font-size="10">&#x2716;</text>
+<text x="280" y="40" fill="var(--muted)" font-size="6.5">No shared memory</text>
+<text x="280" y="52" fill="var(--muted)" font-size="6.5">Crash-safe isolation</text>
+<text x="280" y="64" fill="var(--muted)" font-size="6.5">IPC for communication</text>
+<text x="280" y="80" fill="var(--a)" font-size="6.5" font-weight="600">Nginx, Chrome tabs, Gunicorn</text>
+
+<rect x="370" y="4" width="340" height="88" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2"/>
+<text x="540" y="18" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Threads (Shared Memory)</text>
+<rect x="384" y="26" width="310" height="56" rx="5" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width="1"/>
+<text x="540" y="38" text-anchor="middle" fill="var(--g)" font-size="6.5">One process — shared heap, code, file descriptors</text>
+<rect x="394" y="44" width="60" height="30" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width=".8"/>
+<text x="424" y="58" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="600">Thread 1</text>
+<text x="424" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">own stack</text>
+<rect x="464" y="44" width="60" height="30" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+<text x="494" y="58" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="600">Thread 2</text>
+<text x="494" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">own stack</text>
+<rect x="534" y="44" width="60" height="30" rx="4" fill="rgba(244,114,182,.08)" stroke="var(--p)" stroke-width=".8"/>
+<text x="564" y="58" text-anchor="middle" fill="var(--p)" font-size="6" font-weight="600">Thread 3</text>
+<text x="564" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">own stack</text>
+<rect x="604" y="44" width="60" height="30" rx="4" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width=".8"/>
+<text x="634" y="58" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="600">Thread 4</text>
+<text x="634" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">own stack</text>
+<text x="540" y="88" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">Java Tomcat, Go goroutines, Python asyncio</text>
+
+<!-- CONCURRENCY vs PARALLELISM (bottom half) -->
+<rect x="10" y="100" width="340" height="92" rx="8" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1.2"/>
+<text x="180" y="114" text-anchor="middle" fill="var(--y)" font-size="9" font-weight="800">Concurrency (1 core, interleaved)</text>
+<text x="50" y="132" fill="var(--muted)" font-size="7">1 CPU core:</text>
+<rect x="110" y="126" width="30" height="14" rx="2" fill="var(--a)" opacity=".7"/>
+<rect x="142" y="126" width="18" height="14" rx="2" fill="var(--g)" opacity=".7"/>
+<rect x="162" y="126" width="24" height="14" rx="2" fill="var(--a)" opacity=".7"/>
+<rect x="188" y="126" width="14" height="14" rx="2" fill="var(--y)" opacity=".7"/>
+<rect x="204" y="126" width="22" height="14" rx="2" fill="var(--g)" opacity=".7"/>
+<rect x="228" y="126" width="30" height="14" rx="2" fill="var(--a)" opacity=".7"/>
+<rect x="260" y="126" width="16" height="14" rx="2" fill="var(--y)" opacity=".7"/>
+<rect x="278" y="126" width="26" height="14" rx="2" fill="var(--g)" opacity=".7"/>
+<text x="180" y="156" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="600">Tasks switch so fast it LOOKS parallel</text>
+<text x="180" y="168" text-anchor="middle" fill="var(--muted)" font-size="6.5">Redis handles 100K ops/sec on 1 thread this way</text>
+<text x="180" y="182" text-anchor="middle" fill="var(--muted)" font-size="6.5">Node.js serves 10K connections on 1 thread</text>
+
+<rect x="370" y="100" width="340" height="92" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2"/>
+<text x="540" y="114" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Parallelism (N cores, simultaneous)</text>
+<text x="400" y="132" fill="var(--muted)" font-size="7">Core 1:</text>
+<rect x="440" y="126" width="240" height="10" rx="2" fill="var(--a)" opacity=".6"/>
+<text x="400" y="148" fill="var(--muted)" font-size="7">Core 2:</text>
+<rect x="440" y="142" width="240" height="10" rx="2" fill="var(--g)" opacity=".6"/>
+<text x="400" y="164" fill="var(--muted)" font-size="7">Core 3:</text>
+<rect x="440" y="158" width="240" height="10" rx="2" fill="var(--y)" opacity=".6"/>
+<text x="400" y="180" fill="var(--muted)" font-size="7">Core 4:</text>
+<rect x="440" y="174" width="240" height="10" rx="2" fill="var(--o)" opacity=".6"/>
+<text x="540" y="192" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">Kafka partitions, video transcoding, MapReduce</text>
+</svg>
+
+<!-- ═══ CPU-bound vs I/O-bound + Blocking vs Non-blocking ═══ -->
+<svg width="100%" viewBox="0 0 720 160" style="max-width:720px;display:block;margin:4px auto 10px">
+
+<!-- CPU-bound vs I/O-bound -->
+<rect x="10" y="4" width="340" height="70" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2"/>
+<text x="180" y="18" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="800">CPU-bound (compute bottleneck)</text>
+<rect x="30" y="28" width="300" height="14" rx="3" fill="var(--r)" opacity=".5"/>
+<text x="180" y="38" text-anchor="middle" fill="#fff" font-size="6.5" font-weight="600">COMPUTING &#x2026; CPU at 100% &#x2026; no idle time</text>
+<text x="180" y="56" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">Fix: more cores (parallelism)</text>
+<text x="180" y="68" text-anchor="middle" fill="var(--muted)" font-size="6.5">Video encoding &#x2022; ML inference &#x2022; Compression &#x2022; Encryption</text>
+
+<rect x="370" y="4" width="340" height="70" rx="8" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1.2"/>
+<text x="540" y="18" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="800">I/O-bound (waiting bottleneck)</text>
+<rect x="390" y="28" width="24" height="14" rx="2" fill="var(--a)" opacity=".6"/>
+<rect x="416" y="28" width="60" height="14" rx="2" fill="var(--muted)" opacity=".12"/>
+<rect x="478" y="28" width="18" height="14" rx="2" fill="var(--a)" opacity=".6"/>
+<rect x="498" y="28" width="50" height="14" rx="2" fill="var(--muted)" opacity=".12"/>
+<rect x="550" y="28" width="30" height="14" rx="2" fill="var(--a)" opacity=".6"/>
+<rect x="582" y="28" width="44" height="14" rx="2" fill="var(--muted)" opacity=".12"/>
+<rect x="628" y="28" width="20" height="14" rx="2" fill="var(--a)" opacity=".6"/>
+<text x="448" y="37" text-anchor="middle" fill="var(--muted)" font-size="5">wait</text>
+<text x="523" y="37" text-anchor="middle" fill="var(--muted)" font-size="5">wait</text>
+<text x="604" y="37" text-anchor="middle" fill="var(--muted)" font-size="5">wait</text>
+<text x="540" y="56" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="600">Fix: non-blocking I/O (event loop)</text>
+<text x="540" y="68" text-anchor="middle" fill="var(--muted)" font-size="6.5">API calls &#x2022; DB queries &#x2022; File reads &#x2022; Network</text>
+
+<!-- Blocking vs Non-blocking -->
+<rect x="10" y="82" width="340" height="70" rx="8" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1.2"/>
+<text x="180" y="96" text-anchor="middle" fill="var(--r)" font-size="9" font-weight="800">Blocking I/O (thread-per-connection)</text>
+<text x="30" y="112" fill="var(--muted)" font-size="6">T1:</text><rect x="46" y="106" width="14" height="8" rx="1" fill="var(--g)" opacity=".6"/><rect x="62" y="106" width="50" height="8" rx="1" fill="var(--r)" opacity=".2"/><rect x="114" y="106" width="10" height="8" rx="1" fill="var(--g)" opacity=".6"/>
+<text x="30" y="124" fill="var(--muted)" font-size="6">T2:</text><rect x="46" y="118" width="20" height="8" rx="1" fill="var(--g)" opacity=".6"/><rect x="68" y="118" width="40" height="8" rx="1" fill="var(--r)" opacity=".2"/><rect x="110" y="118" width="14" height="8" rx="1" fill="var(--g)" opacity=".6"/>
+<text x="30" y="136" fill="var(--muted)" font-size="6">T3:</text><rect x="46" y="130" width="10" height="8" rx="1" fill="var(--g)" opacity=".6"/><rect x="58" y="130" width="56" height="8" rx="1" fill="var(--r)" opacity=".2"/><rect x="116" y="130" width="12" height="8" rx="1" fill="var(--g)" opacity=".6"/>
+<text x="87" y="112" text-anchor="middle" fill="var(--r)" font-size="5">blocked</text>
+<text x="88" y="124" text-anchor="middle" fill="var(--r)" font-size="5">blocked</text>
+<text x="86" y="136" text-anchor="middle" fill="var(--r)" font-size="5">blocked</text>
+<text x="245" y="112" fill="var(--r)" font-size="7" font-weight="600">10K conn = 10K threads</text>
+<text x="245" y="126" fill="var(--muted)" font-size="6.5">~1MB stack each = 10GB RAM</text>
+<text x="245" y="140" fill="var(--muted)" font-size="6.5">Apache, old Java Servlet, PHP-FPM</text>
+
+<rect x="370" y="82" width="340" height="70" rx="8" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1.2"/>
+<text x="540" y="96" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Non-blocking I/O (event loop)</text>
+<text x="390" y="112" fill="var(--muted)" font-size="6">1T:</text>
+<rect x="408" y="106" width="10" height="8" rx="1" fill="var(--a)" opacity=".7"/>
+<rect x="420" y="106" width="8" height="8" rx="1" fill="var(--g)" opacity=".7"/>
+<rect x="430" y="106" width="12" height="8" rx="1" fill="var(--y)" opacity=".7"/>
+<rect x="444" y="106" width="8" height="8" rx="1" fill="var(--a)" opacity=".7"/>
+<rect x="454" y="106" width="10" height="8" rx="1" fill="var(--p)" opacity=".7"/>
+<rect x="466" y="106" width="8" height="8" rx="1" fill="var(--g)" opacity=".7"/>
+<rect x="476" y="106" width="12" height="8" rx="1" fill="var(--o)" opacity=".7"/>
+<rect x="490" y="106" width="8" height="8" rx="1" fill="var(--a)" opacity=".7"/>
+<rect x="500" y="106" width="10" height="8" rx="1" fill="var(--y)" opacity=".7"/>
+<rect x="512" y="106" width="8" height="8" rx="1" fill="var(--g)" opacity=".7"/>
+<text x="600" y="112" fill="var(--g)" font-size="7" font-weight="600">10K conn = 1 thread</text>
+<text x="600" y="126" fill="var(--muted)" font-size="6.5">epoll: "these fds ready"</text>
+<text x="600" y="140" fill="var(--g)" font-size="6.5" font-weight="600">Redis, Nginx, Node.js, Netty</text>
+</svg>
+
+<table>
+<tr><th>Concept</th><th>Definition</th><th>System Design Impact</th><th>Real-World</th></tr>
+<tr><td><span class="hi">Process</span></td><td>Isolated memory space, own fds</td><td>Crash-safe isolation, heavier to create</td><td>Nginx workers, Chrome tabs, Gunicorn</td></tr>
+<tr><td><span class="hi">Thread</span></td><td>Shared memory within a process</td><td>Fast communication but needs locks</td><td>Java thread pools, Go goroutines</td></tr>
+<tr><td><span class="hi">Concurrency</span></td><td>Interleaving tasks on 1 core</td><td>Single thread handles 100K+ connections</td><td>Redis, Node.js event loop</td></tr>
+<tr><td><span class="hi">Parallelism</span></td><td>Simultaneous execution on N cores</td><td>Linear throughput scaling for CPU work</td><td>Kafka partitions, MapReduce, ffmpeg</td></tr>
+<tr><td><span class="hi">CPU-bound</span></td><td>Bottleneck = computation</td><td>Fix: more cores / worker threads</td><td>Video encoding, ML inference, zlib</td></tr>
+<tr><td><span class="hi">I/O-bound</span></td><td>Bottleneck = waiting (net/disk)</td><td>Fix: non-blocking I/O + event loop</td><td>Web APIs, DB queries, file uploads</td></tr>
+<tr><td><span class="hi">Blocking I/O</span></td><td>Thread sleeps waiting for I/O</td><td>10K conn = 10K threads (expensive)</td><td>Apache, old Java Servlet</td></tr>
+<tr><td><span class="hi">Non-blocking</span></td><td>Thread asks "ready?" + moves on</td><td>10K conn = 1 thread (efficient)</td><td>Redis, Nginx, Node.js, Netty</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">The key insight:</span> <span class="hg">Most web services are I/O-bound</span> — they spend 90%+ of time waiting on network/DB responses. A single thread with non-blocking I/O can handle 100K connections because it's only doing work when data is actually ready. No idle threads wasting memory.</div>
+<div class="b by"><span class="hi">Who uses what:</span> <strong>Redis</strong> — 1 thread + epoll (100K-1M ops/sec). <strong>Nginx</strong> — multi-process, each with event loop (10M+ conn). <strong>Node.js</strong> — 1 thread + libuv + thread pool for CPU. <strong>Go</strong> — goroutines (M:N scheduling, millions of lightweight threads). <strong>Java Netty</strong> — few threads + NIO (Discord uses this). <strong>Apache</strong> — thread-per-connection (old model, max ~10K).</div>
+<div class="b bb"><span class="hi">Interview framing:</span> <em>"Redis is single-threaded because it's I/O-bound — the bottleneck is network, not CPU. Using epoll, one thread handles 100K sockets concurrently. No locks, no context switches, no wasted memory. This is why it achieves sub-millisecond latency."</em></div>
+</div>
 </div>
 
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&#x2191;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>

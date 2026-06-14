@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global multi-region rate limiter &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design a single global limit of 10,000 req/min for a user across three regions</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design a global rate limit of 10,000 req/min per user enforced across US-East, EU-West, and AP-South regions</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#multi-region">Multi-Region</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#consistency-models">Consistency</a>
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">Fault Tolerance</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design a rate limiter that enforces a single global limit of 10,000 requests/minute per user across three geographically distributed regions (US-East, EU-West, AP-South). A user hitting all three regions simultaneously must not exceed the global limit, regardless of request distribution across regions.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> The hardest trade-off in distributed rate limiting: <span class="hr">regional Redis</span> gives low latency (~1ms) but loose global accuracy (each region counts independently). <span class="hr">Central Redis</span> gives strict accuracy but adds 50-150ms cross-region RTT per request. No solution is perfect — you must choose where on the consistency-latency spectrum to sit.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">10,000</div>
+<div style="font-size:.72rem;color:var(--muted)">req/min global</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">single user limit</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">3 Regions</div>
+<div style="font-size:.72rem;color:var(--muted)">US / EU / AP</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">50-150ms apart</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Trade-off</div>
+<div style="font-size:.72rem;color:var(--muted)">latency vs accuracy</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">fundamental tension</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Token Leasing</div>
+<div style="font-size:.72rem;color:var(--muted)">best compromise</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">local speed + global accuracy</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; global rate limiting across multiple regions</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Single <strong>global limit</strong> across all regions (10,000 req/min per user)<br>
+  <span class="hg">2.</span> <strong>Token leasing</strong> from central coordinator to regional limiters<br>
+  <span class="hg">3.</span> <strong>Adaptive lease sizing</strong> based on regional traffic patterns<br>
+  <span class="hg">4.</span> <strong>Async reconciliation</strong> every 5s between regions and coordinator<br>
+  <span class="hg">5.</span> <strong>Graceful degradation</strong> when coordinator is unreachable (drain local lease)<br>
+  <span class="hg">6.</span> <strong>No over-allocation</strong> &mdash; leases never exceed global pool total
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> Per-region <strong>separate limits</strong> (this enforces one global limit)<br>
+  <span class="hr">&#x2717;</span> <strong>Geographic-aware routing</strong> decisions<br>
+  <span class="hr">&#x2717;</span> <strong>Multi-tenant</strong> within regions<br>
+  <span class="hr">&#x2717;</span> <strong>DDoS mitigation</strong> (separate edge concern)<br>
+  <span class="hr">&#x2717;</span> <strong>User-facing APIs</strong> (this is infrastructure-level)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the multi-region rate limiting design</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;1ms per request</span></td><td>Local Redis only on hot path. No cross-region call per request.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td>Bounded overrun = <span class="hg">max 1 reconciliation period (5s)</span> of excess</td><td>Eventually consistent model. Bounded over-admit is acceptable trade-off for speed.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td>Continue serving from <span class="hg">local lease</span> even if coordinator unreachable</td><td>Graceful degradation: drain local budget then reject. No hard dependency on central store per request.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Eventually consistent</span> (5s reconciliation cycle)</td><td>Regions report usage and receive new leases every 5s. Global truth converges within one cycle.</td></tr>
+<tr><td><span class="hi">Coordinator HA</span></td><td><span class="hg">Consensus-backed (Raft)</span>, no SPOF</td><td>Central coordinator uses Raft consensus for leader election. Failover within seconds.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Latency vs. Accuracy</span>. Cross-region RTT (50-150ms) makes per-request central calls unacceptable. Token leasing solves this by making most requests local-only, accepting bounded eventual consistency.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question &#x2192; derive infrastructure sizing</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>10,000 req/min global limit per user</strong> &middot; <strong>3 regions (US, EU, AP)</strong> &middot; <strong>RTT between regions 50-150ms</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Regional split (adaptive)</td>
+  <td>US 50%, EU 30%, AP 20% of global limit</td>
+  <td><span class="hg">US: 5K, EU: 3K, AP: 2K</span></td>
+  <td>Proportional to observed traffic. Rebalanced every 5s.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Lease request frequency</td>
+  <td>Every 5s or when local lease &lt; 20% remaining</td>
+  <td><span class="hg">~12 cross-region calls/min per user</span></td>
+  <td>Only lease requests cross regions, not per-request checks.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Local Redis ops</td>
+  <td>Same as single-region (INCR/EXPIRE per request)</td>
+  <td><span class="hg">&lt;1ms per check</span></td>
+  <td>Hot path is entirely local. No cross-region latency.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Worst-case overrun</td>
+  <td>3 regions &times; 5s &times; regional drain rate</td>
+  <td><span class="hr">Bounded: max 1 reconciliation period</span></td>
+  <td>Total leases never exceed global limit. Overrun is bounded.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Cross-region bandwidth</td>
+  <td>~12 lease requests/min &times; ~200 bytes each</td>
+  <td><span class="hg">Negligible</span></td>
+  <td>Lease protocol is lightweight. Reconciliation messages are tiny.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start by acknowledging the fundamental trade-off (latency vs accuracy), then show the lease math. The key insight: cross-region calls happen only ~12 times/min (lease requests), not per-request. That's the core of token leasing.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Internal lease protocol between coordinator and regional limiters &middot; per-request check is local only</p>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(251,191,36,.12);color:var(--y);border:1px solid rgba(251,191,36,.25)">INTERNAL</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">LeaseRequest(user_id, region, requested_tokens) &rarr; LeaseGrant(tokens, ttl)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Region requests a token lease from central coordinator. Coordinator checks remaining pool and allocates proportionally.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Region → Coordinator</span><br>
+LeaseRequest { user_id: "u_42", region: "us-east", requested_tokens: 5000 }<br><br>
+<span style="color:var(--muted);font-style:italic">// Coordinator → Region</span><br>
+LeaseGrant { tokens: 5000, ttl: 60, lease_id: "lease_abc" }
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.25)">INTERNAL</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">ReportUsage(user_id, region, consumed_tokens, remaining)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Every 5s each region reports consumption to coordinator for reconciliation and lease rebalancing.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Region → Coordinator (every 5s)</span><br>
+ReportUsage { user_id: "u_42", region: "us-east", consumed: 3200, remaining: 1800 }
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(108,140,255,.12);color:var(--a);border:1px solid rgba(108,140,255,.25)">PER-REQUEST</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">Local rate check (Redis INCR — same as single-region)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5">Hot path is purely local. No cross-region call. Deducts from local lease budget via Redis INCR with EXPIRE.</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Central coordinator state + regional Redis lease counters</p>
+
+<div class="b bg" style="margin-bottom:8px"><span class="hi">Central Coordinator &middot; Global Pool</span></div>
+<pre><code>// Global pool per user (source of truth)
+global_pool:{user_id} → {
+  total: 10000,
+  allocated: { us: 5000, eu: 3000, ap: 2000 },
+  remaining: 0    // total - sum(allocated)
+}
+</code></pre>
+
+<div class="b bb" style="margin-bottom:8px"><span class="hi">Regional Redis &middot; Lease State</span></div>
+<pre><code>// Lease counter per user per region
+ratelimit:{user_id}:lease → {
+  remaining: 1800,
+  lease_ts: 1705312200,
+  lease_ttl: 60
+}
+
+// Local consumption counter
+ratelimit:{user_id}:counter → INTEGER (auto-incremented per request)
+  TTL: matches lease window
+</code></pre>
+
+<div class="b by" style="margin-bottom:8px"><span class="hi">Reconciliation Log</span></div>
+<pre><code>// Timestamped lease grant/return events
+lease_history:{user_id} → [
+  { ts: 1705312200, region: "us", action: "grant", tokens: 5000 },
+  { ts: 1705312205, region: "us", action: "report", consumed: 820 },
+  { ts: 1705312210, region: "ap", action: "return", tokens: 200 }
+]
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Token Leasing with Async Reconciliation</h2>
+<p class="su">Central coordinator allocates token leases to regions. Each region spends locally from its lease, requests more when depleted.</p>
+
+<!-- --- Global Multi-Region Rate Limiter SVG --- -->
+<svg width="100%" viewBox="0 0 780 480" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Global Multi-Region Rate Limiter Architecture">
+  <defs><marker id="gm-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Global Multi-Region Rate Limiter &middot; Token Leasing Architecture</text>
+
+  <!-- CENTRAL COORDINATOR -->
+  <rect x="250" y="30" width="280" height="70" rx="10" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="2"/>
+  <text x="390" y="50" text-anchor="middle" fill="var(--y)" font-size="7.5" font-weight="800">CENTRAL COORDINATOR</text>
+  <text x="390" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">Global Token Pool: 10,000 req/min per user</text>
+  <text x="390" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">Consensus-backed (Raft) | Home region: US-East</text>
+  <text x="390" y="90" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">Allocates leases to regions on demand</text>
+
+  <!-- Lease arrows from coordinator to regions -->
+  <line x1="310" y1="100" x2="130" y2="140" stroke="var(--y)" stroke-width="1" marker-end="url(#gm-arr)"/>
+  <line x1="390" y1="100" x2="390" y2="140" stroke="var(--y)" stroke-width="1" marker-end="url(#gm-arr)"/>
+  <line x1="470" y1="100" x2="650" y2="140" stroke="var(--y)" stroke-width="1" marker-end="url(#gm-arr)"/>
+
+  <!-- Lease labels on arrows -->
+  <text x="200" y="118" fill="var(--y)" font-size="4.5" font-weight="600">lease: 5000</text>
+  <text x="380" y="118" fill="var(--y)" font-size="4.5" font-weight="600">lease: 3000</text>
+  <text x="540" y="118" fill="var(--y)" font-size="4.5" font-weight="600">lease: 2000</text>
+
+  <!-- REGION LAYER -->
+  <rect x="10" y="135" width="760" height="130" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="390" y="150" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="800">REGIONAL RATE LIMITERS (Local Enforcement, &lt;1ms)</text>
+
+  <!-- US-East region -->
+  <rect x="25" y="160" width="220" height="80" rx="6" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="135" y="177" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">US-East (Home Region)</text>
+  <text x="135" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">Local Redis: token bucket</text>
+  <text x="135" y="205" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Lease: 5,000 tokens/min</text>
+  <text x="135" y="218" text-anchor="middle" fill="var(--muted)" font-size="4.5">Used: 3,200 | Remaining: 1,800</text>
+  <text x="135" y="231" text-anchor="middle" fill="var(--g)" font-size="4.5">&lt;1ms per request (local)</text>
+
+  <!-- EU-West region -->
+  <rect x="280" y="160" width="220" height="80" rx="6" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="390" y="177" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">EU-West</text>
+  <text x="390" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">Local Redis: token bucket</text>
+  <text x="390" y="205" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Lease: 3,000 tokens/min</text>
+  <text x="390" y="218" text-anchor="middle" fill="var(--muted)" font-size="4.5">Used: 1,100 | Remaining: 1,900</text>
+  <text x="390" y="231" text-anchor="middle" fill="var(--g)" font-size="4.5">&lt;1ms per request (local)</text>
+
+  <!-- AP-South region -->
+  <rect x="535" y="160" width="220" height="80" rx="6" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width="1"/>
+  <text x="645" y="177" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">AP-South</text>
+  <text x="645" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">Local Redis: token bucket</text>
+  <text x="645" y="205" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Lease: 2,000 tokens/min</text>
+  <text x="645" y="218" text-anchor="middle" fill="var(--muted)" font-size="4.5">Used: 1,800 | Remaining: 200</text>
+  <text x="645" y="231" text-anchor="middle" fill="var(--o)" font-size="4.5">Requesting new lease...</text>
+
+  <!-- Reconciliation arrows back up -->
+  <line x1="130" y1="160" x2="310" y2="100" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="3,2"/>
+  <line x1="390" y1="160" x2="390" y2="100" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="3,2"/>
+  <line x1="650" y1="160" x2="470" y2="100" stroke="var(--o)" stroke-width=".8" stroke-dasharray="3,2"/>
+  <text x="575" y="132" fill="var(--o)" font-size="4.5">requesting more tokens</text>
+
+  <!-- COMPARISON: Three approaches -->
+  <rect x="10" y="275" width="760" height="90" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="290" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">THREE APPROACHES COMPARED</text>
+
+  <!-- Approach 1: Central -->
+  <rect x="25" y="300" width="230" height="52" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="140" y="316" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">&#x2717; Central Redis (always)</text>
+  <text x="140" y="330" text-anchor="middle" fill="var(--muted)" font-size="4.5">+50-150ms per request (cross-region RTT)</text>
+  <text x="140" y="342" text-anchor="middle" fill="var(--muted)" font-size="4.5">Perfect accuracy | Terrible latency</text>
+
+  <!-- Approach 2: Static split -->
+  <rect x="275" y="300" width="230" height="52" rx="5" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="390" y="316" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">&#x2717; Static Split (10K / 3)</text>
+  <text x="390" y="330" text-anchor="middle" fill="var(--muted)" font-size="4.5">Each region: 3,333 fixed limit</text>
+  <text x="390" y="342" text-anchor="middle" fill="var(--muted)" font-size="4.5">Fast but wastes idle capacity</text>
+
+  <!-- Approach 3: Token Leasing (winner) -->
+  <rect x="525" y="300" width="230" height="52" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="640" y="316" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="700">&#x2713; Token Leasing (adaptive)</text>
+  <text x="640" y="330" text-anchor="middle" fill="var(--muted)" font-size="4.5">Local speed + adaptive allocation</text>
+  <text x="640" y="342" text-anchor="middle" fill="var(--g)" font-size="4.5" font-weight="600">Best trade-off: latency vs accuracy</text>
+
+  <!-- RECONCILIATION TIMELINE -->
+  <rect x="10" y="375" width="760" height="95" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="392" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Reconciliation Cycle (Every 5 seconds)</text>
+
+  <!-- Timeline -->
+  <line x1="50" y1="420" x2="730" y2="420" stroke="var(--border)" stroke-width="1"/>
+
+  <rect x="50" y="408" width="150" height="20" rx="3" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".5"/>
+  <text x="125" y="421" text-anchor="middle" fill="var(--a)" font-size="4.5">Regions report usage</text>
+
+  <rect x="220" y="408" width="150" height="20" rx="3" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".5"/>
+  <text x="295" y="421" text-anchor="middle" fill="var(--y)" font-size="4.5">Coordinator aggregates</text>
+
+  <rect x="390" y="408" width="150" height="20" rx="3" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="465" y="421" text-anchor="middle" fill="var(--g)" font-size="4.5">Rebalance leases</text>
+
+  <rect x="560" y="408" width="160" height="20" rx="3" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".5"/>
+  <text x="640" y="421" text-anchor="middle" fill="var(--o)" font-size="4.5">New leases distributed</text>
+
+  <text x="390" y="445" text-anchor="middle" fill="var(--muted)" font-size="5">Max overrun: 1 reconciliation period (5s) of excess across all regions combined</text>
+  <text x="390" y="458" text-anchor="middle" fill="var(--muted)" font-size="4.5">Total leases never exceed global limit | Safe: bounded overage | Idle regions return unused tokens</text>
+  <text x="390" y="471" text-anchor="middle" fill="var(--y)" font-size="4.5" font-weight="600">If coordinator fails: regions drain remaining lease then reject (safe degradation)</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Strategy</span></td><td>Token leasing: central coordinator grants "token budgets" to each region</td><td>Best compromise: local decisions (&lt;1ms) for most requests. Cross-region call only when lease depleted.</td></tr>
+<tr><td><span class="hi">Central store</span></td><td>Central Redis in one "home" region (or DynamoDB Global Tables)</td><td>Source of truth for global token pool. Each region requests lease from here.</td></tr>
+<tr><td><span class="hi">Lease size</span></td><td>Proportional to region traffic: busy regions get larger leases</td><td>US gets 5000/min lease, EU gets 3000, AP gets 2000. Rebalanced every 10s based on actual usage.</td></tr>
+<tr><td><span class="hi">Local enforcement</span></td><td>Regional Redis with token bucket (capacity = current lease)</td><td>No cross-region RTT on hot path. Deduct locally. Request new lease when &lt; 20% remaining.</td></tr>
+<tr><td><span class="hi">Reconciliation</span></td><td>Every 5s: regions report consumed tokens, coordinator rebalances leases</td><td>Eventually consistent. Max over-admit: one reconciliation period of excess (e.g., 5s worth).</td></tr>
+<tr><td><span class="hi">Fallback</span></td><td>If central coordinator unreachable: continue with remaining local lease, don't request more</td><td>Graceful degradation: regions drain their local lease then start rejecting. Safe: cannot exceed previously allocated budget.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Token leasing explained:</span> Central pool has 10,000 tokens/min. US region requests a lease of 5,000 tokens. Central deducts 5,000 from pool. US can now serve 5,000 requests locally without any cross-region call. When US is at 1,000 tokens remaining, it requests a new lease. Central allocates based on remaining pool.</div>
+<div class="b by"><span class="hi">The three options compared:</span> (1) <span class="hg">Central Redis</span> — perfect accuracy, +50-150ms latency per request (usually unacceptable). (2) <span class="hg">Per-region splitting (10K/3)</span> — low latency, but user in one region only gets 3,333 even if other regions are idle. (3) <span class="hg">Token leasing</span> — best of both: local speed + adaptive allocation based on actual traffic.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Static per-region split (limit/N)</span> &middot; wastes capacity in idle regions, under-provisions active regions. <span class="hr">Always call central store</span> &middot; adds 50-150ms to every request (defeats multi-region purpose). <span class="hr">No reconciliation</span> &middot; regions drift from global truth indefinitely.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Cloudflare</strong> &middot; gossip-based count sharing between PoPs. <strong>Google</strong> &middot; Chubby-like coordination for global quotas. <strong>Stripe</strong> &middot; centralized rate limiting (accepts latency trade-off for payment accuracy). <strong>AWS</strong> &middot; per-region quotas with global service quota as cap.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Central coordinator down</span></td><td>Regions can't request new leases</td><td>Continue with remaining local lease (safe). When depleted, reject. Coordinator failover via consensus (Raft/Paxos).</td></tr>
+<tr><td><span class="hr">User shifts all traffic to one region</span></td><td>That region's lease depletes fast, others idle</td><td>Fast lease rebalancing (every 5s). Idle regions return unused tokens to central pool. Active region gets larger next lease.</td></tr>
+<tr><td><span class="hr">Network partition between regions</span></td><td>Partitioned region can't reconcile</td><td>Local lease continues independently. Global limit may briefly exceed by partition's remaining lease. Acceptable: bounded overage.</td></tr>
+<tr><td><span class="hr">All regions request lease simultaneously</span></td><td>Central pool contention</td><td>Stagger lease requests. Each region requests at different offset within reconciliation period.</td></tr>
+<tr><td><span class="hr">User abuse via rapid region switching</span></td><td>User tries to exploit reconciliation delay</td><td>Token leasing prevents this: total leases never exceed global limit. User can't get more than allocated across all regions combined.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for global multi-region rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>The fundamental trade-off</strong> &middot; latency (regional) vs accuracy (central) — acknowledge this upfront<br>
+<span class="hg">2.</span> <strong>Token leasing</strong> &middot; central allocates budgets, regions spend locally, reconcile periodically<br>
+<span class="hg">3.</span> <strong>Adaptive lease sizing</strong> &middot; busy regions get larger leases, rebalanced every 5-10s<br>
+<span class="hg">4.</span> <strong>Bounded overrun</strong> &middot; worst case = one reconciliation period of overage (acceptable trade-off)<br>
+<span class="hg">5.</span> <strong>Central coordinator HA</strong> &middot; consensus-based (Raft), not single point of failure<br>
+<span class="hg">6.</span> <strong>Compare three approaches</strong> &middot; central Redis (accurate/slow) vs static split (fast/wasteful) vs token leasing (best compromise)
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Real-Time Notification Feed with WebSocket Push &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design a real-time in-app notification feed with badge counts and WebSocket push</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a real-time in-app notification feed with unread badge counts, WebSocket push for instant updates, Redis sorted set for feed storage, and cursor-based pagination for 500M users</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/04-apis.html#realtime">WebSocket</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis Sorted Set</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#pubsub">Pub/Sub Fan-out</a>
+<a href="../../system-design-cheatsheet/04-apis.html">Cursor-Based Pagination</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Connection Sharding</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How do you build the notification bell/badge that shows unread count, displays a chronological feed, supports mark-as-read, and pushes new notifications in real-time via WebSocket to 10M concurrent connections?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> In-app notification feed (the bell icon), real-time badge count updates via WebSocket, unread counter with atomic operations, cursor-based feed pagination, mark-as-read mechanics. <span class="hr">Not</span> covering push/email/SMS delivery or notification content generation.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="500" data-suffix="M" style="font-size:1.5rem;font-weight:700;color:var(--a)">500M</div>
+<div style="font-size:.72rem;color:var(--muted)">total users</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">each with notification feed</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="10" data-suffix="M" style="font-size:1.5rem;font-weight:700;color:var(--g)">10M</div>
+<div style="font-size:.72rem;color:var(--muted)">concurrent WebSocket connections</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">real-time badge push</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="50" data-prefix="&lt;" data-suffix="ms" style="font-size:1.5rem;font-weight:700;color:var(--o)">&lt;50ms</div>
+<div style="font-size:.72rem;color:var(--muted)">feed read latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">Redis sorted set lookup</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="200" data-suffix="ms" style="font-size:1.5rem;font-weight:700;color:var(--r)">200ms</div>
+<div style="font-size:.72rem;color:var(--muted)">WebSocket push latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">new notification → badge update</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the notification feed system must do &middot; core feed behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Notification feed</strong> &middot; chronological list of notifications with cursor-based pagination<br>
+  <span class="hg">2.</span> <strong>Unread badge count</strong> &middot; accurate count displayed on bell icon, atomically incremented/decremented<br>
+  <span class="hg">3.</span> <strong>Real-time push via WebSocket</strong> &middot; new notifications push badge update + feed item to connected clients<br>
+  <span class="hg">4.</span> <strong>Mark as read</strong> &middot; single notification or bulk mark-all-as-read, decrement unread counter<br>
+  <span class="hg">5.</span> <strong>Feed truncation</strong> &middot; keep last 200 notifications per user (older ones archived)<br>
+  <span class="hg">6.</span> <strong>Multi-device sync</strong> &middot; mark-as-read on one device reflects on all connected devices
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> Notification <strong>generation/aggregation</strong> (upstream service)<br>
+  <span class="hr">&#x2717;</span> <strong>Push/email/SMS</strong> delivery (separate channel workers)<br>
+  <span class="hr">&#x2717;</span> <strong>Notification preferences</strong> (opt-in/opt-out management)<br>
+  <span class="hr">&#x2717;</span> <strong>Rich media</strong> in notifications (images, action buttons)<br>
+  <span class="hr">&#x2717;</span> <strong>Notification grouping UI</strong> (client-side rendering logic)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the notification feed architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Feed Read Latency</span></td><td><span class="hg">&lt;50ms P99</span></td><td>Users expect instant feed display on bell click. Redis ZREVRANGEBYSCORE provides sub-ms response.</td></tr>
+<tr><td><span class="hi">WebSocket Push</span></td><td><span class="hg">&lt;200ms</span> end-to-end</td><td>New notification must update badge within 200ms of creation. Requires efficient connection routing.</td></tr>
+<tr><td><span class="hi">Concurrent Connections</span></td><td><span class="hg">10M WebSocket</span></td><td>Each connection holds ~10KB state. 10M × 10KB = 100GB total across WebSocket fleet.</td></tr>
+<tr><td><span class="hi">Unread Counter Consistency</span></td><td><span class="hg">Strongly consistent</span></td><td>Badge count must be accurate. Use Redis INCR/DECR atomic operations. No stale reads.</td></tr>
+<tr><td><span class="hi">Multi-Device Sync</span></td><td><span class="hg">&lt;1s propagation</span></td><td>Mark-as-read on phone must update badge on web within 1 second.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span></td><td>Notification feed is always-visible UI element. Degraded mode: show cached feed if Redis unavailable.</td></tr>
+<tr><td><span class="hi">Feed Size</span></td><td><span class="hg">200 items max</span></td><td>Bounded feed prevents unbounded Redis memory growth. ZREMRANGEBYRANK trims on each write.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Consistency vs. Availability of unread count</span>. Users are sensitive to incorrect badge counts (showing 3 when 0 unread). Solution: Redis atomic counter as source of truth, with WebSocket push propagating updates across all devices within 1s.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing from given constraints. Show this reasoning in an interview.</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>500M users</strong> &middot; <strong>10M concurrent WS connections</strong> &middot; <strong>2B notifications written/day</strong> &middot; <strong>200 feed items/user max</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Feed writes/sec</td>
+  <td>2B / 86,400s</td>
+  <td><span class="hg">~23K/sec</span></td>
+  <td>ZADD to per-user sorted set. Redis cluster handles this easily.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>WebSocket push messages/sec</td>
+  <td>23K new notifications/sec × avg 1.2 connected devices/user</td>
+  <td><span class="hg">~28K pushes/sec</span></td>
+  <td>WebSocket gateway routes by user_id → connection shard.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Redis memory (all feeds)</td>
+  <td>500M users × 200 items × 128 bytes avg</td>
+  <td><span class="hg">~12.8TB total</span></td>
+  <td>But only active users (20%) in Redis. Cold users on disk. ~2.5TB hot.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Hot user feeds in Redis</td>
+  <td>100M active users × 200 items × 128B</td>
+  <td><span class="hg">~2.5TB</span></td>
+  <td>Redis cluster: 256 shards × 10GB each. Shard by user_id hash.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>WebSocket server fleet</td>
+  <td>10M connections / 100K connections per server</td>
+  <td><span class="hg">~100 WS servers</span></td>
+  <td>Each server: 64GB RAM, handles 100K persistent connections.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Feed read QPS</td>
+  <td>500M DAU × 5 feed opens/day / 86,400s</td>
+  <td><span class="hg">~29K reads/sec</span></td>
+  <td>ZREVRANGEBYSCORE with cursor. Sub-ms per read from Redis.</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Unread counter storage</td>
+  <td>500M users × 8 bytes (integer)</td>
+  <td><span class="hg">~4GB</span></td>
+  <td>Separate Redis cluster for counters. Atomic INCR/DECR.</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Mark-as-read QPS</td>
+  <td>~50% of feed opens trigger mark-as-read = ~14.5K/sec</td>
+  <td><span class="hg">~14.5K/sec</span></td>
+  <td>Batch mark-all-as-read: single SET unread:{user_id} 0</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> The key insight is that not all 500M users need feeds in Redis. Only active users (DAU ~100M) need hot feeds. Cold users' feeds are loaded from persistent storage (DynamoDB/Cassandra) into Redis on first access. This reduces Redis memory from 12.8TB to ~2.5TB.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Notification feed endpoints &middot; REST for reads/writes, WebSocket for real-time push</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /v1/notifications/{user_id}/feed</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Retrieve paginated notification feed with cursor-based pagination</div>
+<pre><code>GET /v1/notifications/u_abc123/feed?limit=20&cursor=MTcxMDQ5NTAwMA==
+
+Response 200:
+{
+  "notifications": [
+    {
+      "id": "n_001", "type": "like_aggregated",
+      "title": "Jane and 4 others liked your post",
+      "body": "My vacation photos...",
+      "actors": [{"id": "u_456", "name": "Jane", "avatar": "..."}],
+      "entity": {"type": "post", "id": "p_789"},
+      "read": false,
+      "created_at": "2024-03-15T10:30:00Z"
+    }
+  ],
+  "next_cursor": "MTcxMDQ5NDAwMA==",
+  "has_more": true,
+  "unread_count": 7
+}</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">GET /v1/notifications/{user_id}/unread-count</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Get current unread badge count (fast path for badge display)</div>
+<pre><code>GET /v1/notifications/u_abc123/unread-count
+
+Response 200: { "unread_count": 7, "last_updated": "2024-03-15T10:30:00Z" }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--o);font-size:.85rem">PUT /v1/notifications/{user_id}/read</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Mark notifications as read (single or bulk)</div>
+<pre><code>PUT /v1/notifications/u_abc123/read
+{
+  "notification_ids": ["n_001", "n_002"],  // specific IDs, or...
+  "mark_all": false,                        // true = mark all as read
+  "read_before": null                       // mark all before timestamp
+}
+
+Response 200: { "marked_count": 2, "unread_count": 5 }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--r);font-size:.85rem">WebSocket /ws/notifications/{user_id}</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Real-time push channel for badge updates and new notifications</div>
+<pre><code>// Server → Client messages:
+{ "type": "badge_update", "unread_count": 8 }
+{ "type": "new_notification", "notification": { "id": "n_003", "title": "...", ... } }
+{ "type": "read_sync", "notification_ids": ["n_001"], "unread_count": 7 }
+
+// Client → Server messages:
+{ "type": "ack", "notification_id": "n_003" }
+{ "type": "mark_read", "notification_ids": ["n_003"] }</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Redis structures and persistent storage for the notification feed</p>
+
+<h4 style="color:var(--a)">Notification Feed (Redis Sorted Set)</h4>
+<pre><code>// Per-user feed — sorted by timestamp (score = created_at unix ms)
+// Key: feed:{user_id}
+ZADD feed:u_abc123 1710495000000 "n_001"
+ZADD feed:u_abc123 1710494000000 "n_002"
+
+// Trim to max 200 entries on each write
+ZREMRANGEBYRANK feed:u_abc123 0 -201
+
+// Pagination: cursor-based using score (timestamp)
+ZREVRANGEBYSCORE feed:u_abc123 {cursor_ts} -inf LIMIT 0 20</code></pre>
+
+<h4 style="color:var(--g)">Notification Details (Redis Hash)</h4>
+<pre><code>// Notification content stored separately (referenced by ID from feed)
+HSET notif:n_001
+  "type"        "like_aggregated"
+  "title"       "Jane and 4 others liked your post"
+  "body"        "My vacation photos..."
+  "actors"      "[{\"id\":\"u_456\",\"name\":\"Jane\"}]"
+  "entity_type" "post"
+  "entity_id"   "p_789"
+  "read"        "0"
+  "created_at"  "1710495000000"
+  "collapse_key" "like:p_789:u_abc123"
+
+EXPIRE notif:n_001 2592000  // 30 day TTL</code></pre>
+
+<h4 style="color:var(--o)">Unread Counter (Redis)</h4>
+<pre><code>// Atomic counter per user
+SET unread:u_abc123 7
+
+// On new notification:
+INCR unread:u_abc123
+
+// On mark-as-read (single):
+DECR unread:u_abc123
+
+// On mark-all-as-read:
+SET unread:u_abc123 0
+
+// Safety: counter can't go below 0
+// Use Lua script: if tonumber(redis.call('GET', key)) > 0 then redis.call('DECR', key) end</code></pre>
+
+<h4 style="color:var(--r)">WebSocket Connection Registry (Redis)</h4>
+<pre><code>// Track which WS server holds which user's connection
+// Key: ws_conn:{user_id}, Value: ws_server_id
+HSET ws_conn:u_abc123 "device_web" "ws-server-042"
+HSET ws_conn:u_abc123 "device_mobile" "ws-server-017"
+
+EXPIRE ws_conn:u_abc123 300  // 5 min TTL, refreshed by heartbeat
+
+// Reverse index: which users are on which server (for server shutdown drain)
+SADD ws_server:ws-server-042 "u_abc123" "u_def456" ...</code></pre>
+
+<h4 style="color:var(--a2)">Persistent Store (DynamoDB — cold storage)</h4>
+<pre><code>{
+  "user_id":         "u_abc123",       // partition key
+  "notification_id": "n_001",          // sort key
+  "type":            "like_aggregated",
+  "title":           "Jane and 4 others liked your post",
+  "actors":          [{"id": "u_456", "name": "Jane"}],
+  "entity":          {"type": "post", "id": "p_789"},
+  "read":            false,
+  "created_at":      "2024-03-15T10:30:00Z",
+  "ttl":             1718131200        // 90-day auto-delete
+}</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Write Path: Notification → Redis Feed + Counter → Pub/Sub → WebSocket Push<br>Read Path: Client → API → Redis ZREVRANGEBYSCORE → Paginated Response</p>
+
+<svg width="100%" viewBox="0 0 740 400" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="rf1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- WRITE PATH -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="50" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">WRITE PATH &middot; New notification arrives from upstream service</text>
+
+<rect data-dp-step="2" x="14" y="26" width="200" height="22" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="114" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Notification Service (upstream)</text>
+
+<rect data-dp-step="2" x="240" y="26" width="200" height="22" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="2" x="340" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Feed Writer (Kafka consumer)</text>
+
+<rect data-dp-step="2" x="466" y="26" width="264" height="22" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="2" x="598" y="40" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">DynamoDB (persistent write-through)</text>
+
+<line data-dp-step="3" x1="370" y1="54" x2="370" y2="68" stroke="var(--a)" stroke-width="1" marker-end="url(#rf1)"/>
+
+<!-- REDIS LAYER -->
+<rect data-dp-step="4" x="4" y="70" width="732" height="70" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="4" x="370" y="84" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">REDIS CLUSTER &middot; Feed storage + unread counters + connection registry</text>
+
+<rect data-dp-step="5" x="14" y="92" width="200" height="40" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="114" y="106" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Feed ZSET (per user)</text>
+<text data-dp-step="5" x="114" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">ZADD + ZREMRANGEBYRANK (trim 200)</text>
+<text data-dp-step="5" x="114" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">256 shards &middot; ~2.5TB hot data</text>
+
+<rect data-dp-step="5" x="230" y="92" width="160" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="5" x="310" y="106" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Unread Counter</text>
+<text data-dp-step="5" x="310" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">INCR unread:{user_id}</text>
+<text data-dp-step="5" x="310" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">Atomic &middot; ~4GB cluster</text>
+
+<rect data-dp-step="5" x="406" y="92" width="160" height="40" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="5" x="486" y="106" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Notif Detail Hash</text>
+<text data-dp-step="5" x="486" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">HSET notif:{id} (content)</text>
+<text data-dp-step="5" x="486" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">30-day TTL auto-expire</text>
+
+<rect data-dp-step="5" x="582" y="92" width="148" height="40" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="5" x="656" y="106" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">WS Connection Map</text>
+<text data-dp-step="5" x="656" y="116" text-anchor="middle" fill="var(--muted)" font-size="5">user → ws_server_id</text>
+<text data-dp-step="5" x="656" y="126" text-anchor="middle" fill="var(--muted)" font-size="5">Heartbeat refresh 5min</text>
+
+<line data-dp-step="6" x1="370" y1="140" x2="370" y2="154" stroke="var(--r)" stroke-width="1" marker-end="url(#rf1)"/>
+
+<!-- PUB/SUB + ROUTING -->
+<rect data-dp-step="7" x="4" y="156" width="732" height="55" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="7" x="370" y="170" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">PUB/SUB ROUTING &middot; Route push message to correct WebSocket server</text>
+
+<rect data-dp-step="8" x="14" y="178" width="220" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="8" x="124" y="189" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Redis Pub/Sub Channel</text>
+<text data-dp-step="8" x="124" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">PUBLISH ws_push:{server_id} {payload}</text>
+
+<rect data-dp-step="8" x="250" y="178" width="220" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="8" x="360" y="189" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Connection Lookup</text>
+<text data-dp-step="8" x="360" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">HGET ws_conn:{user_id} → target server(s)</text>
+
+<rect data-dp-step="8" x="486" y="178" width="244" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="8" x="608" y="189" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Multi-Device Fan-out</text>
+<text data-dp-step="8" x="608" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">Send to ALL connected devices for user</text>
+
+<line data-dp-step="9" x1="370" y1="211" x2="370" y2="224" stroke="var(--g)" stroke-width="1" marker-end="url(#rf1)"/>
+
+<!-- WEBSOCKET GATEWAY -->
+<rect data-dp-step="10" x="4" y="226" width="732" height="65" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="10" x="370" y="240" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">WEBSOCKET GATEWAY &middot; 100 servers × 100K connections each</text>
+
+<rect data-dp-step="11" x="14" y="250" width="140" height="32" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="11" x="84" y="263" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">WS Server 1</text>
+<text data-dp-step="11" x="84" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">100K connections</text>
+
+<rect data-dp-step="11" x="168" y="250" width="140" height="32" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="11" x="238" y="263" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">WS Server 2</text>
+<text data-dp-step="11" x="238" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">100K connections</text>
+
+<rect data-dp-step="11" x="322" y="250" width="60" height="32" rx="4" fill="rgba(200,200,200,.06)" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="3,2"/>
+<text data-dp-step="11" x="352" y="269" text-anchor="middle" fill="var(--muted)" font-size="7">...</text>
+
+<rect data-dp-step="11" x="396" y="250" width="140" height="32" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="11" x="466" y="263" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">WS Server 100</text>
+<text data-dp-step="11" x="466" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">100K connections</text>
+
+<rect data-dp-step="11" x="550" y="250" width="180" height="32" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="11" x="640" y="263" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Sticky LB (by user_id)</text>
+<text data-dp-step="11" x="640" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">Consistent hash → same server</text>
+
+<line data-dp-step="12" x1="370" y1="291" x2="370" y2="304" stroke="var(--o)" stroke-width="1" marker-end="url(#rf1)"/>
+
+<!-- READ PATH -->
+<rect data-dp-step="13" x="4" y="306" width="732" height="70" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="13" x="370" y="320" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">READ PATH &middot; Client requests feed / unread count</text>
+
+<rect data-dp-step="14" x="14" y="330" width="160" height="38" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="14" x="94" y="344" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Feed API</text>
+<text data-dp-step="14" x="94" y="354" text-anchor="middle" fill="var(--muted)" font-size="5">GET /feed → ZREVRANGEBYSCORE</text>
+<text data-dp-step="14" x="94" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Cursor = last item timestamp</text>
+
+<rect data-dp-step="14" x="190" y="330" width="160" height="38" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="14" x="270" y="344" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Badge API</text>
+<text data-dp-step="14" x="270" y="354" text-anchor="middle" fill="var(--muted)" font-size="5">GET /unread-count → GET unread:{id}</text>
+<text data-dp-step="14" x="270" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Single Redis GET &middot; O(1)</text>
+
+<rect data-dp-step="14" x="366" y="330" width="180" height="38" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="14" x="456" y="344" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Mark-Read API</text>
+<text data-dp-step="14" x="456" y="354" text-anchor="middle" fill="var(--muted)" font-size="5">DECR unread + HSET read=1</text>
+<text data-dp-step="14" x="456" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">+ publish read_sync to other devices</text>
+
+<rect data-dp-step="14" x="562" y="330" width="168" height="38" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="14" x="646" y="344" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Cold Load (cache miss)</text>
+<text data-dp-step="14" x="646" y="354" text-anchor="middle" fill="var(--muted)" font-size="5">DynamoDB → Redis hydration</text>
+<text data-dp-step="14" x="646" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">On first access for cold user</text>
+
+<!-- Annotations -->
+<rect data-dp-step="15" x="560" y="156" width="170" height="48" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="15" x="645" y="170" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">KEY INSIGHT</text>
+<text data-dp-step="15" x="645" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">Connection registry maps user →</text>
+<text data-dp-step="15" x="645" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">server. No broadcast needed. Direct</text>
+<text data-dp-step="15" x="645" y="202" text-anchor="middle" fill="var(--muted)" font-size="5">routing to correct WS server.</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs made in this architecture and their rationale</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">Feed Storage</span></td>
+  <td>List (LPUSH), Sorted Set (ZADD), Stream (XADD)</td>
+  <td><span class="hg">Redis Sorted Set</span></td>
+  <td>Score = timestamp enables cursor-based pagination via ZREVRANGEBYSCORE. O(log N) inserts. ZREMRANGEBYRANK for bounded size.</td>
+</tr>
+<tr>
+  <td><span class="hi">WebSocket Routing</span></td>
+  <td>Broadcast to all WS servers, connection registry lookup, consistent hashing</td>
+  <td><span class="hg">Connection registry + direct routing</span></td>
+  <td>Broadcasting wastes 99% of messages (user on 1 of 100 servers). Registry lookup is O(1) and routes directly to correct server.</td>
+</tr>
+<tr>
+  <td><span class="hi">Unread Counter</span></td>
+  <td>Count from feed (ZCOUNT), separate counter, client-side tracking</td>
+  <td><span class="hg">Separate atomic Redis counter</span></td>
+  <td>ZCOUNT is O(log N) on every badge render. Separate counter is O(1) GET. Trade off slight drift risk for massive read performance.</td>
+</tr>
+<tr>
+  <td><span class="hi">Pagination</span></td>
+  <td>Offset-based, cursor-based (timestamp), keyset</td>
+  <td><span class="hg">Cursor-based (timestamp score)</span></td>
+  <td>Offset breaks when new items are added mid-page. Timestamp cursor is stable — "give me 20 items before this timestamp" always works correctly.</td>
+</tr>
+<tr>
+  <td><span class="hi">Multi-Device Sync</span></td>
+  <td>Polling, WebSocket push, push notification</td>
+  <td><span class="hg">WebSocket push to all connected devices</span></td>
+  <td>Mark-as-read on phone → publish via Redis Pub/Sub → route to all WS servers holding user connections → instant badge update on web.</td>
+</tr>
+<tr>
+  <td><span class="hi">Hot/Cold Feed Strategy</span></td>
+  <td>All feeds in Redis, LRU eviction, explicit hot/cold split</td>
+  <td><span class="hg">Explicit: active users in Redis, cold in DynamoDB</span></td>
+  <td>Only 20% of users are active daily. Loading all 500M feeds into Redis wastes 10TB. Load on first access, evict after 7 days of inactivity.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why connection registry over broadcast:</span> With 100 WS servers, broadcasting "new notification for user X" to all 100 servers means 99 servers discard it (user is only on 1). Connection registry: HGET ws_conn:{user_id} → "ws-server-042". Publish directly to that server's channel. 100x more efficient.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">Cursor-based pagination with sorted sets:</span> Client passes cursor = last seen timestamp. Server does ZREVRANGEBYSCORE feed:{user_id} (cursor-1) -inf LIMIT 0 20. New notifications added AFTER the cursor don't affect pagination. Client can also pull "new items since cursor" with ZRANGEBYSCORE feed:{user_id} cursor +inf.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Unread counter drift protection:</span> The counter can drift from reality (race conditions, failed decrements). Periodic reconciliation job: ZCOUNT feed:{user_id} -inf +inf WHERE read=false vs GET unread:{user_id}. If they differ, SET counter to ZCOUNT result. Run hourly for active users.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">Graceful WebSocket server shutdown:</span> Before terminating a WS server, drain connections: notify clients to reconnect (send "reconnect" frame), update connection registry (remove entries), wait 30s for clients to re-establish on other servers. LB health check marks draining server unhealthy immediately.</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">How the notification feed system handles failures gracefully</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">WebSocket Server Crash</span></td>
+  <td>Server dies, 100K connections drop. Clients reconnect to other servers.</td>
+  <td>Client auto-reconnect with exponential backoff. On reconnect: register new connection, fetch missed notifications (diff feed since last_seen_ts).</td>
+  <td><span class="hg">&lt;5s</span> client reconnect</td>
+</tr>
+<tr>
+  <td><span class="hi">Redis Feed Cluster Down</span></td>
+  <td>Feed sorted sets unavailable. Can't read or write feed.</td>
+  <td>Fallback to DynamoDB direct read (slower, ~50ms → ~200ms). Queue writes for replay when Redis recovers. Badge count from separate counter cluster.</td>
+  <td><span class="ho">Degraded</span> (higher latency reads)</td>
+</tr>
+<tr>
+  <td><span class="hi">Counter Drift</span></td>
+  <td>Badge shows 5, but user only has 3 unread notifications.</td>
+  <td>Hourly reconciliation job for active users. On mark-all-as-read: SET counter to 0 (corrects any drift). Client can also verify on feed load.</td>
+  <td><span class="hg">Self-healing</span> within 1 hour</td>
+</tr>
+<tr>
+  <td><span class="hi">Notification Flood</span></td>
+  <td>Viral post generates 10K notifications for one user in 1 minute.</td>
+  <td>Per-user write rate limit: max 10 feed writes/minute. Excess notifications are aggregated into batch entries. Counter still increments accurately.</td>
+  <td><span class="hg">Automatic</span> rate throttling</td>
+</tr>
+<tr>
+  <td><span class="hi">Stale Connection Registry</span></td>
+  <td>User disconnected but registry still points to old server (no heartbeat cleanup).</td>
+  <td>5-minute TTL on registry entries. Heartbeat refreshes TTL. If push fails (user not found on target server), remove registry entry. Next connection re-registers.</td>
+  <td><span class="hg">&lt;5min</span> auto-cleanup</td>
+</tr>
+<tr>
+  <td><span class="hi">Cold User Activation</span></td>
+  <td>User inactive for months returns. Feed not in Redis.</td>
+  <td>Cache miss triggers DynamoDB query → hydrate Redis feed. Takes ~200ms for first load. Subsequent reads are sub-ms from Redis. Pre-warm for predicted re-engagers.</td>
+  <td><span class="hg">200ms</span> first-load penalty</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail a real-time notification feed interview</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Redis Sorted Set for Feed + Cursor Pagination</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Each user has a sorted set (score = timestamp). ZADD on new notification. ZREVRANGEBYSCORE for reverse-chronological pagination. Cursor = last item's timestamp. ZREMRANGEBYRANK keeps feed bounded to 200 items. Sub-ms reads, O(log N) writes. The sorted set IS the feed.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. Connection Registry for Direct WebSocket Routing</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Don't broadcast to all WS servers. Maintain a Redis hash mapping user_id → ws_server_id. On new notification: lookup target server, PUBLISH directly to that server's channel. Server finds the user's socket in its local connection table. O(1) routing, no wasted messages.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Atomic Unread Counter (Separate from Feed)</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Don't compute unread count by scanning the feed (O(N) on every badge render). Maintain a separate Redis counter: INCR on new notification, DECR on mark-as-read, SET 0 on mark-all-as-read. O(1) badge reads. Reconciliation job fixes drift hourly.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. Multi-Device Sync via Pub/Sub</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Mark-as-read on phone must update badge on web instantly. Solution: on mark-read, after DECR counter, PUBLISH a "read_sync" message to ALL servers holding user's connections (from registry). Each server pushes badge update via WebSocket. All devices converge within 200ms.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Hot/Cold Split — Only Active Users in Redis</strong><br>
+<span style="font-size:.82rem;color:var(--text)">500M users but only 100M DAU. Keeping all feeds in Redis = 12.8TB (wasteful). Only active users' feeds live in Redis (~2.5TB). Cold users' feeds are in DynamoDB. On first access after inactivity, hydrate from DynamoDB → Redis (200ms penalty once). Evict after 7 days of no access.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

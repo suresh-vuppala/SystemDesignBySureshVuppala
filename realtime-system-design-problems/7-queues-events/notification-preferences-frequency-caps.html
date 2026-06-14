@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification Preferences &amp; Frequency Caps &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design notification preferences with topic subscriptions, quiet hours, and frequency caps</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a preference system where users opt-in/out per topic per channel, set timezone-aware quiet hours, and the system enforces frequency caps (max 5 marketing/day) — all checked in &lt;1ms BEFORE sending</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/07-caching.html">Bloom Filter</a>
+<a href="../../system-design-cheatsheet/10-scalability.html">Sliding Window</a>
+<a href="../../system-design-cheatsheet/12-distributed-systems.html">Distributed Cache</a>
+<a href="../../system-design-cheatsheet/04-apis.html">GDPR Compliance</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html">Timezone Handling</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Users opt-in/out per topic per channel, set quiet hours (timezone-aware), and the system enforces frequency caps (max 5 marketing notifications/day). All preference checks happen BEFORE sending — on the critical path of every notification. With 500M users and 50 preference entries each, how do you check 25B preference records in &lt;1ms per notification?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Preference storage and lookup, Bloom filter for fast rejection, quiet hours with timezone handling, sliding window frequency caps. Integrates with <a href="notification-service-architecture.html#architecture">notification service channel router</a> as the gating layer before fan-out.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="25" data-suffix="B" style="font-size:1.5rem;font-weight:700;color:var(--a)">25B</div>
+<div style="font-size:.72rem;color:var(--muted)">preference records</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">500M users × 50 entries each</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="1" data-prefix="&lt;" data-suffix="ms" style="font-size:1.5rem;font-weight:700;color:var(--g)">&lt;1ms</div>
+<div style="font-size:.72rem;color:var(--muted)">preference check latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">on every notification send path</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="5" data-suffix="s" style="font-size:1.5rem;font-weight:700;color:var(--o)">&lt;5s</div>
+<div style="font-size:.72rem;color:var(--muted)">opt-out propagation</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">real-time unsubscribe effect</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="70" data-suffix="%" style="font-size:1.5rem;font-weight:700;color:var(--r)">70%</div>
+<div style="font-size:.72rem;color:var(--muted)">fast-rejected by Bloom filter</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">never hits Redis for unsubscribed</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the preference and frequency cap system must do</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Per-topic per-channel opt-in/out</strong> &middot; user subscribes/unsubscribes to "promotions" on "push" independently from "email"<br>
+  <span class="hg">2.</span> <strong>Quiet hours</strong> &middot; timezone-aware suppression window (e.g., 10pm-8am user-local time)<br>
+  <span class="hg">3.</span> <strong>Frequency caps</strong> &middot; max N notifications per category per time window (sliding window counter)<br>
+  <span class="hg">4.</span> <strong>Bloom filter fast path</strong> &middot; reject 70% of "definitely unsubscribed" checks without Redis lookup<br>
+  <span class="hg">5.</span> <strong>Real-time opt-out propagation</strong> &middot; unsubscribe takes effect within 5s across all workers<br>
+  <span class="hg">6.</span> <strong>GDPR unsubscribe-all</strong> &middot; one-click disable all non-essential notifications
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Preference UI</strong> (frontend settings page)<br>
+  <span class="hr">&#x2717;</span> <strong>Notification content</strong> (templates, rendering)<br>
+  <span class="hr">&#x2717;</span> <strong>Delivery mechanics</strong> (APNs/FCM/Twilio integration)<br>
+  <span class="hr">&#x2717;</span> <strong>Analytics</strong> (opt-out rates, engagement metrics)<br>
+  <span class="hr">&#x2717;</span> <strong>A/B testing</strong> of notification frequency<br>
+  <span class="hr">&#x2717;</span> <strong>Preference migration</strong> from legacy systems
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for the preference checking layer</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Check Latency</span></td><td><span class="hg">&lt;1ms</span> per notification</td><td>On the critical send path. At 58K notifications/sec, even 5ms adds 290 worker-seconds/sec. Must be sub-millisecond.</td></tr>
+<tr><td><span class="hi">Opt-out Propagation</span></td><td><span class="hg">&lt;5s</span> from user action</td><td>GDPR/CAN-SPAM compliance. User clicks unsubscribe → no more notifications within 5s. Pub/sub cache invalidation.</td></tr>
+<tr><td><span class="hi">False Positive Rate</span></td><td><span class="hg">&lt;0.1%</span> Bloom filter</td><td>Bloom filter may say "possibly subscribed" when actually unsubscribed (false positive → falls through to Redis). Never says "unsubscribed" when actually subscribed (no false negatives).</td></tr>
+<tr><td><span class="hi">Storage Efficiency</span></td><td><span class="hg">25B records in-memory</span></td><td>Can't store all 25B preferences in Redis. Bloom filter compresses to ~3GB for 500M users. Redis stores only active/hot preferences.</td></tr>
+<tr><td><span class="hi">GDPR Compliance</span></td><td><span class="hg">Immediate effect</span></td><td>Unsubscribe-all must propagate globally. No "we'll stop in 24 hours" — must be immediate. Bloom filter rebuilt async.</td></tr>
+<tr><td><span class="hi">Timezone Accuracy</span></td><td><span class="hg">Correct to user's offset</span></td><td>Quiet hours must respect DST transitions. Store timezone name (not offset). Calculate at check time.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Speed vs. Freshness</span>. Bloom filter gives &lt;0.1ms checks but can't be updated in real-time (rebuild takes minutes). Redis gives real-time freshness but costs 1-2ms per lookup. Solution: Bloom filter for fast rejection of 70% traffic, Redis fallback for the 30% that Bloom says "maybe subscribed".</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Sizing the preference infrastructure for 500M users</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>500M users</strong> &middot; <strong>50 preference entries/user</strong> &middot; <strong>10 topics × 4 channels + quiet hours + freq caps</strong> &middot; <strong>58K checks/sec</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Total preference records</td>
+  <td>500M users × (10 topics × 4 channels + 1 quiet_hours + 10 freq_caps)</td>
+  <td><span class="hg">25.5B records</span></td>
+  <td>Can't fit in memory. Need tiered approach: Bloom + Redis + DB.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Bloom filter size (unsubscribes)</td>
+  <td>~2B unsubscribed entries × 10 bits/entry (0.1% FPR)</td>
+  <td><span class="hg">~2.5GB</span></td>
+  <td>Fits in worker memory. Loaded on startup. Rebuilt every 15 min.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Checks/sec hitting Redis (post-Bloom)</td>
+  <td>58K × 30% pass-through</td>
+  <td><span class="hg">~17.4K Redis lookups/sec</span></td>
+  <td>Redis cluster handles 100K+ ops/sec easily. Well within capacity.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Redis memory for hot preferences</td>
+  <td>100M active users × 50 entries × 32 bytes</td>
+  <td><span class="hg">~160GB</span></td>
+  <td>Redis cluster (32 shards). LRU eviction for inactive users. Reload from DB on miss.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Frequency cap counters</td>
+  <td>100M active users × 5 categories × 32 bytes</td>
+  <td><span class="hg">~16GB</span></td>
+  <td>Redis with TTL matching window size. Sliding window via sorted set or INCR+EXPIRE.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Quiet hours check CPU</td>
+  <td>58K/sec × timezone calculation (~10μs each)</td>
+  <td><span class="hg">~0.58 CPU cores</span></td>
+  <td>Negligible. Cache timezone offset per user (recalc on DST change).</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Bloom filter rebuild time</td>
+  <td>2B entries × 10 hash operations / 1M ops/sec</td>
+  <td><span class="hg">~33 minutes</span></td>
+  <td>Background rebuild every 15 min (overlapping). Hot-swap on completion. Old filter serves during rebuild.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> The Bloom filter is the key optimization. Without it, every notification requires a Redis round-trip. With it, 70% of notifications are rejected in &lt;0.1ms (in-process memory). Only the 30% that pass the Bloom filter (possibly subscribed) hit Redis. This reduces Redis load from 58K/sec to 17K/sec — a 3.3× reduction.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Preference management and GDPR compliance endpoints</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">PUT /v1/users/{id}/preferences</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Update user notification preferences (topic + channel granularity)</div>
+<pre><code>{
+  "preferences": [
+    { "topic": "promotions", "channel": "push", "enabled": false },
+    { "topic": "promotions", "channel": "email", "enabled": true },
+    { "topic": "order_updates", "channel": "push", "enabled": true },
+    { "topic": "order_updates", "channel": "sms", "enabled": true }
+  ],
+  "quiet_hours": {
+    "enabled": true,
+    "start": "22:00",
+    "end": "08:00",
+    "timezone": "America/New_York"
+  },
+  "frequency_caps": [
+    { "category": "marketing", "max_count": 5, "window": "24h" },
+    { "category": "social", "max_count": 20, "window": "24h" }
+  ]
+}</code></pre>
+<div style="font-size:.72rem;color:var(--muted)">Response: <code>200 OK</code> &middot; Propagates to cache within 5s via pub/sub invalidation</div>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /v1/users/{id}/preferences</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Retrieve all preferences for a user (used by settings UI)</div>
+<pre><code>GET /v1/users/u_abc123/preferences
+
+Response 200:
+{
+  "user_id": "u_abc123",
+  "preferences": [...],
+  "quiet_hours": { "enabled": true, "start": "22:00", "end": "08:00", "timezone": "America/New_York" },
+  "frequency_caps": [...],
+  "global_unsubscribe": false,
+  "updated_at": "2024-01-15T10:00:00Z"
+}</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--r);font-size:.85rem">POST /v1/preferences/unsubscribe-all</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">GDPR one-click unsubscribe — disables all non-essential notifications immediately</div>
+<pre><code>{
+  "user_id": "u_abc123",
+  "reason": "user_requested",          // user_requested | gdpr_request | account_deletion
+  "retain_essential": true              // keep security/auth notifications
+}
+
+Response 200:
+{
+  "user_id": "u_abc123",
+  "global_unsubscribe": true,
+  "essential_only": true,
+  "effective_at": "2024-01-15T10:00:01Z",   // &lt;1s from request
+  "topics_disabled": 9,
+  "channels_disabled": 36
+}</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Preference storage: Bloom filter + Redis + persistent DB</p>
+
+<h4 style="color:var(--a)">Redis: Topic-Channel Preferences</h4>
+<pre><code>// Per-user per-topic per-channel preference
+// Key: preferences:{user_id}:{topic}:{channel}
+SET preferences:u_abc123:promotions:push "false"
+SET preferences:u_abc123:promotions:email "true"
+SET preferences:u_abc123:order_updates:push "true"
+
+// Alternatively, hash per user (fewer keys):
+HSET prefs:u_abc123 "promotions:push" "0" "promotions:email" "1" "order_updates:push" "1"</code></pre>
+
+<h4 style="color:var(--g)">Redis: Quiet Hours</h4>
+<pre><code>// User's quiet hours configuration
+HSET quiet_hours:u_abc123
+  enabled    "true"
+  start      "22:00"
+  end        "08:00"
+  timezone   "America/New_York"
+  utc_offset "-05:00"           // cached, recalculated on DST change</code></pre>
+
+<h4 style="color:var(--o)">Redis: Frequency Caps (Sliding Window)</h4>
+<pre><code>// Sliding window counter using sorted set
+// Key: freq_cap:{user_id}:{category}:{window}
+// Score = timestamp, Member = notification_id
+
+ZADD freq_cap:u_abc123:marketing:24h 1705312200 "n_001"
+ZADD freq_cap:u_abc123:marketing:24h 1705315800 "n_002"
+
+// Check count in window:
+ZCOUNT freq_cap:u_abc123:marketing:24h (now - 86400) +inf
+// If count >= 5, suppress notification
+
+// Cleanup expired entries:
+ZREMRANGEBYSCORE freq_cap:u_abc123:marketing:24h 0 (now - 86400)</code></pre>
+
+<h4 style="color:var(--r)">Bloom Filter Structure (In-Memory)</h4>
+<pre><code>// Bloom filter encodes "unsubscribed" entries
+// Key format: "{user_id}:{topic}:{channel}"
+// Inserted when user unsubscribes
+
+bloom.add("u_abc123:promotions:push")    // user unsubscribed from push promotions
+
+// At check time:
+if bloom.contains("u_abc123:promotions:push"):
+    return SUPPRESSED   // definitely unsubscribed (no false negatives)
+else:
+    // might be subscribed — check Redis for exact answer
+    redis.get("preferences:u_abc123:promotions:push")
+
+// Bloom filter properties:
+//   Size: 2.5GB for 2B entries
+//   Hash functions: 7 (optimal for 0.1% FPR)
+//   Rebuild: every 15 min from DB snapshot</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Notification arrives &#x2192; Bloom filter &#x2192; Redis preferences &#x2192; Quiet hours &#x2192; Frequency cap &#x2192; Allow/Suppress</p>
+
+<svg width="100%" viewBox="0 0 740 370" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="np1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- INCOMING NOTIFICATION -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="40" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">INCOMING NOTIFICATION &middot; From channel router (58K/sec)</text>
+<text data-dp-step="1" x="370" y="34" text-anchor="middle" fill="var(--muted)" font-size="6">user_id + topic + channel + category → Must check preferences before delivery</text>
+
+<line data-dp-step="2" x1="370" y1="44" x2="370" y2="58" stroke="var(--a)" stroke-width="1" marker-end="url(#np1)"/>
+
+<!-- BLOOM FILTER CHECK -->
+<rect data-dp-step="3" x="4" y="60" width="732" height="65" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="3" x="370" y="74" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">LAYER 1: BLOOM FILTER &middot; In-process memory (~0.05ms)</text>
+
+<rect data-dp-step="4" x="14" y="82" width="340" height="34" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="4" x="184" y="95" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">bloom.contains("{user_id}:{topic}:{channel}")</text>
+<text data-dp-step="4" x="184" y="109" text-anchor="middle" fill="var(--muted)" font-size="5.5">2.5GB filter &middot; 7 hash functions &middot; 0.1% false positive rate</text>
+
+<rect data-dp-step="5" x="380" y="82" width="160" height="34" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="5" x="460" y="95" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">70% FAST REJECT ✓</text>
+<text data-dp-step="5" x="460" y="109" text-anchor="middle" fill="var(--muted)" font-size="5.5">Definitely unsubscribed → suppress</text>
+
+<rect data-dp-step="5" x="560" y="82" width="160" height="34" rx="4" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="5" x="640" y="95" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">30% PASS THROUGH</text>
+<text data-dp-step="5" x="640" y="109" text-anchor="middle" fill="var(--muted)" font-size="5.5">Maybe subscribed → check Redis</text>
+
+<line data-dp-step="6" x1="640" y1="116" x2="640" y2="130" stroke="var(--y)" stroke-width="1" marker-end="url(#np1)"/>
+<line data-dp-step="6" x1="640" y1="130" x2="370" y2="138" stroke="var(--y)" stroke-width="1" marker-end="url(#np1)"/>
+
+<!-- REDIS PREFERENCE LOOKUP -->
+<rect data-dp-step="7" x="4" y="140" width="732" height="55" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="7" x="370" y="154" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">LAYER 2: REDIS PREFERENCE LOOKUP &middot; Exact check (~0.5ms)</text>
+
+<rect data-dp-step="8" x="14" y="162" width="220" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="8" x="124" y="173" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">HGET prefs:{user_id} "{topic}:{channel}"</text>
+<text data-dp-step="8" x="124" y="183" text-anchor="middle" fill="var(--muted)" font-size="5">Exact subscription status</text>
+
+<rect data-dp-step="8" x="250" y="162" width="220" height="26" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="8" x="360" y="173" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Cache miss → load from DynamoDB</text>
+<text data-dp-step="8" x="360" y="183" text-anchor="middle" fill="var(--muted)" font-size="5">Async populate cache on first access</text>
+
+<line data-dp-step="9" x1="370" y1="195" x2="370" y2="208" stroke="var(--g)" stroke-width="1" marker-end="url(#np1)"/>
+
+<!-- QUIET HOURS CHECK -->
+<rect data-dp-step="10" x="4" y="210" width="732" height="55" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="10" x="370" y="224" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">LAYER 3: QUIET HOURS CHECK &middot; Timezone-aware (~0.1ms)</text>
+
+<rect data-dp-step="11" x="14" y="232" width="340" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="11" x="184" y="243" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Convert UTC now → user local time (timezone lookup)</text>
+<text data-dp-step="11" x="184" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">If local_time ∈ [quiet_start, quiet_end] → suppress (queue for later)</text>
+
+<rect data-dp-step="11" x="380" y="232" width="346" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="11" x="553" y="243" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">DST handling: store timezone NAME not offset</text>
+<text data-dp-step="11" x="553" y="253" text-anchor="middle" fill="var(--muted)" font-size="5">"America/New_York" auto-adjusts for EST/EDT transitions</text>
+
+<line data-dp-step="12" x1="370" y1="265" x2="370" y2="278" stroke="var(--y)" stroke-width="1" marker-end="url(#np1)"/>
+
+<!-- FREQUENCY CAP CHECK -->
+<rect data-dp-step="13" x="4" y="280" width="732" height="55" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="13" x="370" y="294" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">LAYER 4: FREQUENCY CAP &middot; Sliding window counter (~0.3ms)</text>
+
+<rect data-dp-step="14" x="14" y="302" width="340" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="14" x="184" y="313" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">ZCOUNT freq_cap:{user}:{cat}:{window} (now-window) +inf</text>
+<text data-dp-step="14" x="184" y="323" text-anchor="middle" fill="var(--muted)" font-size="5">If count ≥ max_count → suppress (marketing: max 5/day)</text>
+
+<rect data-dp-step="14" x="380" y="302" width="346" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="14" x="553" y="313" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">On ALLOW: ZADD + set expire on key for cleanup</text>
+<text data-dp-step="14" x="553" y="323" text-anchor="middle" fill="var(--muted)" font-size="5">Atomic: check count + increment in one Lua script</text>
+
+<!-- FINAL DECISION -->
+<rect data-dp-step="15" x="4" y="342" width="732" height="24" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="15" x="370" y="358" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">ALL CHECKS PASS → ALLOW DELIVERY &middot; Total check time: &lt;1ms (Bloom) or &lt;2ms (Bloom miss + Redis)</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs for the preference checking layer</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">Fast Rejection</span></td>
+  <td>Redis-only, local cache, Bloom filter</td>
+  <td><span class="hg">Bloom filter + Redis fallback</span></td>
+  <td>Bloom rejects 70% in ~0.05ms (in-process). Only 30% hit Redis. Reduces Redis load 3.3× and cuts P99 latency significantly.</td>
+</tr>
+<tr>
+  <td><span class="hi">Frequency Cap Algorithm</span></td>
+  <td>Fixed window, sliding window (ZSET), sliding window log</td>
+  <td><span class="hg">Redis Sorted Set sliding window</span></td>
+  <td>True sliding window (no edge-of-window spikes). ZCOUNT is O(log N + M) but M ≤ 20 typically. Auto-cleanup via ZREMRANGEBYSCORE.</td>
+</tr>
+<tr>
+  <td><span class="hi">Quiet Hours Timezone</span></td>
+  <td>Store UTC offset, store timezone name, client-side check</td>
+  <td><span class="hg">Store timezone name (IANA)</span></td>
+  <td>"America/New_York" handles DST automatically. Offset-based breaks twice a year. Server-side check ensures enforcement.</td>
+</tr>
+<tr>
+  <td><span class="hi">Opt-out Propagation</span></td>
+  <td>DB poll, cache TTL, pub/sub invalidation</td>
+  <td><span class="hg">Redis pub/sub + Bloom rebuild</span></td>
+  <td>Pub/sub gives &lt;5s propagation to all workers. Bloom filter can't update atomically — rebuilt every 15 min. Gap covered by Redis lookup on Bloom miss.</td>
+</tr>
+<tr>
+  <td><span class="hi">GDPR Unsubscribe</span></td>
+  <td>Soft delete preferences, global flag, delete all records</td>
+  <td><span class="hg">Global flag + async cleanup</span></td>
+  <td>Setting a global flag is instant (1 Redis SET). All preference checks first check the global flag. Async job cleans up individual preferences later.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Bloom filter insight:</span> We encode UNSUBSCRIBES in the Bloom filter, not subscribes. Why? Because if the Bloom filter says "this key exists" (unsubscribed), we can suppress immediately with zero false negatives. If it says "doesn't exist" (possibly subscribed), we fall through to Redis for the exact answer. This way, the fast path handles the most common suppression case.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">Quiet hours edge case:</span> What if a notification is suppressed during quiet hours? Don't drop it. Queue it for delivery at the end of quiet hours (8:00am user local time). This requires a delayed delivery queue indexed by user timezone. The notification is "parked" and released when quiet hours end.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Frequency cap race condition:</span> Two workers check cap simultaneously, both see count=4 (below max 5), both send. User gets 6 notifications instead of 5. Solution: atomic Lua script that does ZCOUNT + ZADD in one operation. If count ≥ max, return SUPPRESSED without incrementing.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">GDPR "right to be forgotten":</span> Unsubscribe-all sets a global flag checked FIRST in the preference pipeline (before even the Bloom filter). This guarantees immediate effect. The flag is propagated via pub/sub to all worker instances within 1s. No notification can "slip through" after the flag is set.</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Failure modes in the preference checking layer</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Redis Down</span></td>
+  <td>Preference cache unavailable — can't check subscriptions.</td>
+  <td>Fail-open for transactional (still send OTP). Fail-closed for marketing (suppress if can't verify). Circuit breaker on Redis calls.</td>
+  <td><span class="hg">Graceful degradation</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Bloom Filter Stale</span></td>
+  <td>User unsubscribed 10 min ago, Bloom filter not yet rebuilt.</td>
+  <td>Bloom filter only fast-rejects. For "maybe subscribed" (pass-through), Redis always has the latest. Stale Bloom = more Redis hits, not incorrect sends.</td>
+  <td><span class="hg">Correctness maintained</span> (latency degrades)</td>
+</tr>
+<tr>
+  <td><span class="hi">DST Transition</span></td>
+  <td>Clock jumps 1 hour. Quiet hours window shifts unexpectedly.</td>
+  <td>Use IANA timezone names. Recalculate offset at check time (not cached offset). Libraries handle DST automatically.</td>
+  <td><span class="hg">Automatic</span> via timezone library</td>
+</tr>
+<tr>
+  <td><span class="hi">Frequency Cap Burst</span></td>
+  <td>Event triggers 10 notifications simultaneously for same user. All check before any increment.</td>
+  <td>Atomic Lua script: ZCOUNT + conditional ZADD. Only one notification per Lua execution can pass. Others rejected atomically.</td>
+  <td><span class="hg">Atomic enforcement</span></td>
+</tr>
+<tr>
+  <td><span class="hi">New User (Cold Start)</span></td>
+  <td>User has no preferences in Redis or Bloom filter. What are defaults?</td>
+  <td>Default preferences stored per-topic in config (not per-user). If no user preference found, apply topic default. Most topics default to "subscribed".</td>
+  <td><span class="hg">Config-based defaults</span></td>
+</tr>
+<tr>
+  <td><span class="hi">Preference Write Storm</span></td>
+  <td>Marketing campaign causes 1M users to unsubscribe simultaneously.</td>
+  <td>Write buffer: batch preference updates into 1s windows. Async propagation to Redis. Bloom filter rebuild triggered on high-write-rate.</td>
+  <td><span class="hg">&lt;10s</span> eventual propagation</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points for notification preference system design interviews</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Bloom Filter for Fast Rejection is the Key Optimization</strong><br>
+<span style="font-size:.82rem;color:var(--text)">25B preference records can't all fit in memory. But a Bloom filter encoding 2B unsubscribe entries fits in 2.5GB. It rejects 70% of notifications in &lt;0.05ms (in-process memory, no network). Only 30% need a Redis round-trip. This is the layered checking pattern: cheapest check first, expensive check only when needed.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. Sliding Window Frequency Caps (Not Fixed Window)</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Fixed window counters have the edge-of-window problem: 5 notifications at 11:59pm + 5 at 12:01am = 10 in 2 minutes. Sliding window (Redis Sorted Set with timestamp scores) ensures "max 5 in any rolling 24h period". ZCOUNT from (now - 24h) to now gives exact count. Atomic Lua script prevents race conditions.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Timezone by Name, Not Offset</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Store "America/New_York" not "-05:00". The offset changes twice a year (EST→EDT). If you store offset, quiet hours break during DST transitions. IANA timezone names automatically handle DST via standard libraries. Calculate the current offset at check time — never cache it statically.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. GDPR Compliance = Global Flag Checked First</strong><br>
+<span style="font-size:.82rem;color:var(--text)">When a user clicks "unsubscribe all", set a global flag in Redis. The preference check pipeline checks this flag BEFORE anything else. If set, suppress all non-essential notifications immediately. Propagation via pub/sub to all workers in &lt;1s. Individual preference cleanup happens async — the flag provides instant protection.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Fail-Open vs Fail-Closed Depends on Notification Type</strong><br>
+<span style="font-size:.82rem;color:var(--text)">If Redis is down, what do you do? For security/transactional (OTP, password reset): fail-OPEN — send anyway, because not delivering is worse than violating a preference. For marketing: fail-CLOSED — suppress, because sending unwanted marketing to an unsubscribed user is a compliance violation. This nuanced approach shows system thinking.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

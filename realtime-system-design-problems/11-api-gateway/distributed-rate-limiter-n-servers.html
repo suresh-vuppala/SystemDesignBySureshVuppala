@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distributed rate limiter across N app servers &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design a distributed rate limiter across 20 app servers behind a load balancer</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> You have 20 app servers behind a load balancer. Design a limiter so a user's limit holds across all of them.</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">Fault Tolerance</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#consistency-models">Consistency</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design a rate limiter that enforces a global per-user limit across 20 horizontally-scaled app servers, ensuring a user cannot exceed their quota by hitting different servers, while minimizing the per-request latency overhead of coordination.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> With N app servers and a round-robin load balancer, the same user's requests hit <span class="hr">different servers each time</span>. Local counters are useless — you need a shared counter store. But every request now pays the cost of a network hop to that store. The race condition: two servers read the same counter, both allow, both increment — user gets 2x their limit.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">20</div>
+<div style="font-size:.72rem;color:var(--muted)">app servers</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">round-robin LB</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">Race Condition</div>
+<div style="font-size:.72rem;color:var(--muted)">read-check-increment</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">must be atomic</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">&lt;2ms</div>
+<div style="font-size:.72rem;color:var(--muted)">overhead per request</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">Redis RTT budget</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Atomic</div>
+<div style="font-size:.72rem;color:var(--muted)">Lua script / INCR</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">no TOCTOU bug</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; the core distributed rate limiting behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Enforce <strong>global per-user limit</strong> across all 20 servers<br>
+  <span class="hg">2.</span> <strong>Atomic check-and-increment</strong> (no race condition between servers)<br>
+  <span class="hg">3.</span> Return standard <strong>429 response</strong> with RateLimit headers<br>
+  <span class="hg">4.</span> <strong>TTL-based counter expiry</strong> (automatic window rotation, no garbage collection)<br>
+  <span class="hg">5.</span> <strong>Fail-open fallback</strong> with local counters when Redis is unavailable
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Tiered plans</strong> (all users share same limit in this design)<br>
+  <span class="hr">&#x2717;</span> <strong>Per-endpoint limits</strong> (single global limit per user, not per route)<br>
+  <span class="hr">&#x2717;</span> <strong>Geographic distribution</strong> (single-datacenter deployment)<br>
+  <span class="hr">&#x2717;</span> <strong>DDoS protection</strong> (L3/L4 mitigation is a separate concern)<br>
+  <span class="hr">&#x2717;</span> <strong>Analytics / usage dashboards</strong> (separate metering pipeline)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">The quality constraints that shape every architectural decision</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;2ms</span> per rate check (single Redis RTT)</td><td>Rate check runs on every request. Must be invisible to end-user. Same-datacenter Redis gives sub-ms.</td></tr>
+<tr><td><span class="hi">Consistency</span></td><td><span class="hg">Exact count</span> (no race condition)</td><td>Atomic INCR eliminates TOCTOU bug. User cannot exceed limit by hitting different servers.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span> with Sentinel failover</td><td>Redis Sentinel promotes replica in ~5s. Local fallback during gap prevents total outage.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td>Support <span class="hg">200K checks/sec</span> (all 20 servers combined)</td><td>Each server does 10K req/sec. Single Redis handles 1M+ ops/sec &mdash; 5x headroom.</td></tr>
+<tr><td><span class="hi">Fault tolerance</span></td><td>Survive Redis primary failure with <span class="hg">&lt;5s failover</span></td><td>Sentinel auto-promotes. During gap: local counters enforce limit/N per server (conservative).</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Consistency vs. Availability</span>. We choose consistency (exact enforcement) during normal operation, but degrade gracefully to approximate local limits during Redis failure &mdash; accepting slightly over-conservative limiting over letting users exceed quota.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question &#x2192; derive infrastructure sizing</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>20 app servers</strong> &middot; <strong>10K req/sec per server</strong> &middot; <strong>200K total req/sec</strong> &middot; <strong>1M unique users</strong> &middot; <strong>limit = 100 req/min</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Redis ops/sec</td>
+  <td>200K INCR/sec (one atomic op per request)</td>
+  <td><span class="hg">200K ops/sec</span></td>
+  <td>Well within single Redis capacity (1M+ ops/sec). No cluster needed.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Redis memory</td>
+  <td>1M unique keys &times; ~50 bytes each (key + integer value + TTL metadata)</td>
+  <td><span class="hg">~50MB</span></td>
+  <td>Trivial memory footprint. Fits in smallest Redis instance.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Network bandwidth</td>
+  <td>200K round trips/sec &times; ~1KB each (request + response)</td>
+  <td><span class="hg">~200MB/sec</span></td>
+  <td>Standard 10Gbps link handles this. Dedicated Redis NIC recommended.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Failover local limit</td>
+  <td>Global limit (100) &divide; N servers (20)</td>
+  <td><span class="hg">5 req/min local</span></td>
+  <td>Conservative but safe. User gets degraded experience for ~5s during failover.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Lua script overhead</td>
+  <td>EVALSHA (cached) vs EVAL (retransmit) per call</td>
+  <td><span class="hg">~0.1ms</span></td>
+  <td>Pre-load script SHA on server startup. EVALSHA avoids script retransmission.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with total ops/sec (200K) to prove a single Redis can handle it. Then show the failover math (limit/N) &mdash; this demonstrates you've thought about the degraded state. The key insight: Redis single-threaded model gives you atomicity for free.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Middleware intercepts all requests &middot; Lua script provides atomic check-and-increment</p>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(108,140,255,.12);color:var(--a);border:1px solid rgba(108,140,255,.25)">MIDDLEWARE</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">Rate Limit Check (every request)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Extracts user_id from JWT token. Executes Redis Lua script atomically. Runs BEFORE request handler.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Redis Lua script (atomic INCR + EXPIRE)</span><br>
+local count = redis.call('INCR', KEYS[1])<br>
+if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end<br>
+return count<br><br>
+<span style="color:var(--muted);font-style:italic">// Server logic: if count > limit → 429</span>
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.25)">429</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">Too Many Requests Response</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Returned when INCR result exceeds user limit. Includes standard headers for client self-throttling.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Response Headers</span><br>
+HTTP/1.1 429 Too Many Requests<br>
+X-RateLimit-Limit: 100<br>
+X-RateLimit-Remaining: 0<br>
+X-RateLimit-Reset: 1705312260<br>
+Retry-After: 34
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Redis key schema + Lua script caching strategy</p>
+
+<div class="b bg" style="margin-bottom:8px"><span class="hi">Redis &middot; Atomic Counters</span></div>
+<pre><code>// Rate limit counter key
+ratelimit:{user_id}:{minute_timestamp} → INTEGER (auto-incremented)
+  Example: ratelimit:user_42:1705312200 → 73
+  TTL: 60 seconds (auto-expire at window end)
+
+// Key lifecycle:
+// 1. First request in window: INCR creates key (value=1), EXPIRE sets 60s TTL
+// 2. Subsequent requests: INCR atomically increments
+// 3. Window ends: key auto-expires via TTL (no GC needed)
+</code></pre>
+
+<div class="b bb" style="margin-bottom:8px"><span class="hi">Lua Script &middot; Cached via EVALSHA</span></div>
+<pre><code>// Script loaded on server startup → returns SHA hash
+SCRIPT LOAD "local c=redis.call('INCR',KEYS[1]) if c==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end return c"
+→ SHA: "a3f5b2c..."
+
+// Each request uses EVALSHA (avoids retransmitting script)
+EVALSHA a3f5b2c... 1 ratelimit:user_42:1705312200 60
+
+// If SHA not found (after Redis restart): EVAL full script, then cache again
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Redis Atomic Counter with Lua Script</h2>
+<p class="su">Single Redis command combines check + increment atomically — eliminates the race condition</p>
+
+<!-- --- Distributed Rate Limiter Architecture SVG --- -->
+<svg width="100%" viewBox="0 0 780 460" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Distributed Rate Limiter &middot; N Servers Architecture">
+  <defs><marker id="dr-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Distributed Rate Limiter &middot; 20 App Servers + Shared Redis</text>
+
+  <!-- LAYER 1: LOAD BALANCER -->
+  <rect x="250" y="25" width="280" height="40" rx="8" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width="1.2"/>
+  <text x="390" y="42" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="800">Load Balancer (Round Robin)</text>
+  <text x="390" y="55" text-anchor="middle" fill="var(--muted)" font-size="5">User requests distributed across all servers</text>
+
+  <!-- Arrows from LB to servers -->
+  <line x1="310" y1="65" x2="130" y2="95" stroke="var(--a2)" stroke-width=".7" marker-end="url(#dr-arr)"/>
+  <line x1="360" y1="65" x2="310" y2="95" stroke="var(--a2)" stroke-width=".7" marker-end="url(#dr-arr)"/>
+  <line x1="390" y1="65" x2="390" y2="95" stroke="var(--a2)" stroke-width=".7" marker-end="url(#dr-arr)"/>
+  <line x1="420" y1="65" x2="470" y2="95" stroke="var(--a2)" stroke-width=".7" marker-end="url(#dr-arr)"/>
+  <line x1="470" y1="65" x2="650" y2="95" stroke="var(--a2)" stroke-width=".7" marker-end="url(#dr-arr)"/>
+
+  <!-- LAYER 2: APP SERVERS -->
+  <rect x="10" y="90" width="760" height="70" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="103" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="800">APP SERVER LAYER &middot; 20 Instances</text>
+
+  <!-- Individual servers -->
+  <rect x="50" y="110" width="110" height="35" rx="4" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="105" y="125" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">Server 1</text>
+  <text x="105" y="137" text-anchor="middle" fill="var(--muted)" font-size="4.5">Rate limit middleware</text>
+
+  <rect x="180" y="110" width="110" height="35" rx="4" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="235" y="125" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">Server 2</text>
+  <text x="235" y="137" text-anchor="middle" fill="var(--muted)" font-size="4.5">Rate limit middleware</text>
+
+  <rect x="310" y="110" width="110" height="35" rx="4" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="365" y="125" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">Server ...</text>
+  <text x="365" y="137" text-anchor="middle" fill="var(--muted)" font-size="4.5">Rate limit middleware</text>
+
+  <rect x="440" y="110" width="110" height="35" rx="4" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="495" y="125" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">Server 19</text>
+  <text x="495" y="137" text-anchor="middle" fill="var(--muted)" font-size="4.5">Rate limit middleware</text>
+
+  <rect x="570" y="110" width="110" height="35" rx="4" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width=".8"/>
+  <text x="625" y="125" text-anchor="middle" fill="var(--c)" font-size="5.5" font-weight="600">Server 20</text>
+  <text x="625" y="137" text-anchor="middle" fill="var(--muted)" font-size="4.5">Rate limit middleware</text>
+
+  <!-- Arrows from all servers to Redis -->
+  <line x1="105" y1="145" x2="340" y2="185" stroke="var(--r)" stroke-width=".6" marker-end="url(#dr-arr)"/>
+  <line x1="235" y1="145" x2="360" y2="185" stroke="var(--r)" stroke-width=".6" marker-end="url(#dr-arr)"/>
+  <line x1="365" y1="145" x2="390" y2="185" stroke="var(--r)" stroke-width=".6" marker-end="url(#dr-arr)"/>
+  <line x1="495" y1="145" x2="420" y2="185" stroke="var(--r)" stroke-width=".6" marker-end="url(#dr-arr)"/>
+  <line x1="625" y1="145" x2="440" y2="185" stroke="var(--r)" stroke-width=".6" marker-end="url(#dr-arr)"/>
+
+  <!-- LAYER 3: REDIS -->
+  <rect x="200" y="180" width="380" height="65" rx="8" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="390" y="197" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">Redis &middot; Single Source of Truth</text>
+  <text x="390" y="212" text-anchor="middle" fill="var(--muted)" font-size="5.5">Atomic Lua Script: INCR + EXPIRE in one call</text>
+  <text x="390" y="225" text-anchor="middle" fill="var(--muted)" font-size="5">Key: ratelimit:{user_id}:{minute_ts} | TTL: 60s</text>
+  <text x="390" y="237" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">Single-threaded &rarr; sequential execution &rarr; no race condition</text>
+
+  <!-- THE RACE CONDITION EXPLANATION -->
+  <rect x="10" y="260" width="370" height="95" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="195" y="276" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">&#x26A0; The Race Condition (Without Atomicity)</text>
+
+  <text x="25" y="294" fill="var(--muted)" font-size="5">1. Server A reads count = 99</text>
+  <text x="25" y="307" fill="var(--muted)" font-size="5">2. Server B reads count = 99 (same moment)</text>
+  <text x="25" y="320" fill="var(--muted)" font-size="5">3. Both see 99 &lt; 100 &rarr; both ALLOW</text>
+  <text x="25" y="333" fill="var(--muted)" font-size="5">4. Both increment &rarr; count = 101</text>
+  <text x="25" y="346" fill="var(--r)" font-size="5" font-weight="600">Result: User gets 101 requests (limit was 100)</text>
+
+  <!-- THE FIX -->
+  <rect x="400" y="260" width="370" height="95" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="585" y="276" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">&#x2713; The Fix (Atomic INCR)</text>
+
+  <text x="415" y="294" fill="var(--muted)" font-size="5">1. Server A: INCR key &rarr; returns 100</text>
+  <text x="415" y="307" fill="var(--muted)" font-size="5">2. Server B: INCR key &rarr; returns 101</text>
+  <text x="415" y="320" fill="var(--muted)" font-size="5">3. Server A: 100 &le; 100 &rarr; ALLOW</text>
+  <text x="415" y="333" fill="var(--muted)" font-size="5">4. Server B: 101 &gt; 100 &rarr; DENY (429)</text>
+  <text x="415" y="346" fill="var(--g)" font-size="5" font-weight="600">Result: Exact enforcement, one RTT, no lock</text>
+
+  <!-- BOTTOM: Lua Script -->
+  <rect x="10" y="365" width="760" height="85" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="382" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Redis Lua Script (Atomic Operation)</text>
+
+  <text x="30" y="400" fill="var(--c)" font-size="5.5" font-family="monospace">local count = redis.call('INCR', KEYS[1])</text>
+  <text x="30" y="414" fill="var(--c)" font-size="5.5" font-family="monospace">if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end</text>
+  <text x="30" y="428" fill="var(--c)" font-size="5.5" font-family="monospace">return count</text>
+  <text x="30" y="443" fill="var(--muted)" font-size="4.5">Server checks: if returned count &gt; limit &rarr; 429 | First request sets TTL | Key auto-expires at window end</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Shared store</span></td><td>Redis (single-threaded, atomic operations)</td><td>Sub-ms latency. Single-threaded model guarantees sequential execution of Lua scripts.</td></tr>
+<tr><td><span class="hi">Atomicity</span></td><td>Lua script: GET + compare + INCR + EXPIRE in one call</td><td>No TOCTOU (time-of-check-time-of-use) race. One network RTT, one atomic operation.</td></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Fixed window with INCR + EXPIRE (or sliding window via sorted set)</td><td>INCR is O(1), ideal for high throughput. Sorted set for exactness if needed.</td></tr>
+<tr><td><span class="hi">Key format</span></td><td>ratelimit:{user_id}:{window_timestamp}</td><td>Automatic window rotation. Old keys expire via TTL.</td></tr>
+<tr><td><span class="hi">Fail mode</span></td><td>Fail-open with local fallback (limit/N per server)</td><td>If Redis dies, each server enforces limit/20 locally. Slightly conservative but safe.</td></tr>
+<tr><td><span class="hi">High availability</span></td><td>Redis Cluster with read replicas (write to primary only)</td><td>Counter writes always go to primary. Failover via Sentinel.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">The Lua script pattern:</span> <code>local count = redis.call('INCR', key); if count == 1 then redis.call('EXPIRE', key, window_size) end; return count</code>. Single atomic operation: increment counter, set TTL on first request of window. Server compares returned count against limit.</div>
+<div class="b by"><span class="hi">The race condition explained:</span> Without atomicity: Server A reads count=99, Server B reads count=99. Both see &lt; 100 limit. Both increment. Count becomes 101. User exceeded limit. <span class="hg">Fix:</span> Redis INCR returns the new value atomically — if returned value &gt; limit, reject (and optionally DECR to not waste quota).</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Sticky sessions</span> &middot; defeats load balancing, doesn't scale. <span class="hr">Local counters only</span> &middot; user gets N&times; their limit. <span class="hr">Read-then-write without Lua</span> &middot; TOCTOU race under concurrency. <span class="hr">Distributed lock around counter</span> &middot; too slow, creates contention.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Stripe</strong> &middot; Redis-backed sliding window, Lua scripts. <strong>GitHub</strong> &middot; Redis INCR per API token. <strong>Shopify</strong> &middot; leaky bucket in Redis (Lua). <strong>Cloudflare Workers</strong> &middot; Durable Objects for per-key counters.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Redis primary down</span></td><td>No shared counter available</td><td>Sentinel promotes replica. During failover (~5s): local counters with limit/N as conservative fallback.</td></tr>
+<tr><td><span class="hr">Network partition (app &harr; Redis)</span></td><td>Some servers can't reach Redis</td><td>Local fallback with degraded limits. Reconnect with exponential backoff.</td></tr>
+<tr><td><span class="hr">Redis latency spike</span></td><td>P99 request latency increases</td><td>Circuit breaker on Redis calls. If latency &gt; 5ms, fall back to local counters temporarily.</td></tr>
+<tr><td><span class="hr">Hot key (one user = 90% traffic)</span></td><td>Redis CPU spike on single shard</td><td>Pre-reject locally if request rate is obviously above limit (e.g., &gt; 10x). Only borderline cases hit Redis.</td></tr>
+<tr><td><span class="hr">Clock skew between servers</span></td><td>Window boundaries differ slightly</td><td>Use Redis server time (TIME command) for window calculation, not local clock.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">The 6 things to say for distributed rate limiting across N servers</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Shared Redis counter</strong> &middot; single source of truth across all app servers<br>
+<span class="hg">2.</span> <strong>Atomic Lua script</strong> &middot; INCR + EXPIRE in one command, eliminates TOCTOU race<br>
+<span class="hg">3.</span> <strong>Single network RTT</strong> &middot; one Redis call per request (&lt;1-2ms in same datacenter)<br>
+<span class="hg">4.</span> <strong>Fail-open with local fallback</strong> &middot; if Redis down, each server enforces limit/N locally<br>
+<span class="hg">5.</span> <strong>TTL-based cleanup</strong> &middot; keys auto-expire, no garbage collection needed<br>
+<span class="hg">6.</span> <strong>The race condition</strong> &middot; always explain why read-then-write fails and how INCR solves it
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

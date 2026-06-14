@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Channel Notification Fallback &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design multi-channel notification delivery with cascading fallback</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a notification system with cascading channel fallback: push → SMS → email, with configurable timeouts, state machine per notification, and guaranteed delivery via at least one channel</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">State Machine</a>
+<a href="../../system-design-cheatsheet/07-caching.html">Delayed Queue</a>
+<a href="../../system-design-cheatsheet/10-scalability.html">Cascading Fallback</a>
+<a href="../../system-design-cheatsheet/04-apis.html">Delivery Receipts</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Timeout Workers</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">If push delivery fails (app uninstalled, token expired), fall back to SMS within 30s. Chain: push → wait 30s → SMS → wait 60s → email. Each channel has different delivery guarantees. How do you ensure every notification reaches the user via at least one channel?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Cascading fallback logic, per-notification state machine, delayed queue for timeout checks, delivery receipt processing, and deduplication across channels. Differs from <a href="notification-service-architecture.html">core notification architecture</a> by focusing on <span class="hr">guaranteed delivery through channel escalation</span>.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="100" data-suffix="M/day" style="font-size:1.5rem;font-weight:700;color:var(--a)">100M/day</div>
+<div style="font-size:.72rem;color:var(--muted)">notifications with fallback</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">critical + transactional only</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="15" data-suffix="%" style="font-size:1.5rem;font-weight:700;color:var(--r)">15%</div>
+<div style="font-size:.72rem;color:var(--muted)">push failure rate</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">uninstalled / token expired</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="2" data-suffix=" min" style="font-size:1.5rem;font-weight:700;color:var(--o)">2 min</div>
+<div style="font-size:.72rem;color:var(--muted)">max end-to-end fallback</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">push(30s) + SMS(60s) + email</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="0" data-suffix=" duplicates" style="font-size:1.5rem;font-weight:700;color:var(--g)">0</div>
+<div style="font-size:.72rem;color:var(--muted)">duplicate deliveries</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">once delivered, stop escalation</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the fallback system must do &middot; guaranteed delivery via channel escalation</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Configurable fallback chain</strong> per notification type (push→SMS→email)<br>
+  <span class="hg">2.</span> <strong>State machine</strong> per notification tracking current channel attempt and status<br>
+  <span class="hg">3.</span> <strong>Timeout-based escalation</strong> &middot; if no delivery receipt within window, try next channel<br>
+  <span class="hg">4.</span> <strong>Delivery receipt processing</strong> &middot; ingest provider webhooks (APNs, Twilio, SendGrid)<br>
+  <span class="hg">5.</span> <strong>Immediate stop on delivery</strong> &middot; cancel pending fallback timers once confirmed delivered<br>
+  <span class="hg">6.</span> <strong>No duplicate sends</strong> &middot; race condition between delivery receipt and timeout must be handled atomically
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>User preference management</strong> (handled by preference service)<br>
+  <span class="hr">&#x2717;</span> <strong>Template rendering</strong> (done before entering fallback pipeline)<br>
+  <span class="hr">&#x2717;</span> <strong>Cost optimization</strong> (SMS cheaper at certain hours)<br>
+  <span class="hr">&#x2717;</span> <strong>Channel-specific content adaptation</strong> (truncation for SMS)<br>
+  <span class="hr">&#x2717;</span> <strong>Analytics</strong> (fallback funnel analysis, channel success rates)<br>
+  <span class="hr">&#x2717;</span> <strong>Priority queue</strong> logic (upstream of this system)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for cascading fallback delivery</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Guaranteed Delivery</span></td><td><span class="hg">99.9%</span> via at least one channel</td><td>Fallback chain ensures if push fails, SMS catches it. If SMS fails, email is near-guaranteed. Must never silently drop.</td></tr>
+<tr><td><span class="hi">Max Fallback Time</span></td><td><span class="hg">&lt;2 minutes</span> end-to-end</td><td>Push timeout 30s + SMS timeout 60s + email send = ~2 min worst case. User gets notification within 2 min regardless.</td></tr>
+<tr><td><span class="hi">Zero Duplicates</span></td><td><span class="hg">0 duplicate deliveries</span></td><td>Atomic state transitions. If delivery receipt arrives while timeout fires, only one wins. Distributed lock on state transition.</td></tr>
+<tr><td><span class="hi">State Consistency</span></td><td><span class="hg">Exactly one active attempt</span></td><td>At any moment, only one channel attempt is active per notification. State machine enforces this invariant.</td></tr>
+<tr><td><span class="hi">Receipt Processing</span></td><td><span class="hg">&lt;1s</span> from provider webhook</td><td>Fast receipt processing cancels pending timers quickly, preventing unnecessary escalation to costlier channels.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td><span class="hg">100M notifications/day</span></td><td>15M fallback to SMS daily (15% failure). State stored in Redis for sub-ms transitions.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Speed vs. Cost</span>. Shorter timeout catches failures faster but may trigger SMS before push actually delivers (provider delay ≠ delivery failure). Too long, and the user waits unnecessarily. 30s is the sweet spot — most push deliveries complete within 5s, so 30s gives adequate margin.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive fallback infrastructure sizing from constraints</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>100M notifications/day with fallback</strong> &middot; <strong>15% push failure</strong> &middot; <strong>30s push timeout</strong> &middot; <strong>60s SMS timeout</strong> &middot; <strong>5% SMS failure</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Notifications needing fallback/day</td>
+  <td>100M &times; 15% push failure</td>
+  <td><span class="hg">15M fall to SMS/day</span></td>
+  <td>SMS worker pool must handle 15M/day = ~174/sec additional load</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>SMS failures needing email</td>
+  <td>15M &times; 5% SMS failure</td>
+  <td><span class="hg">750K fall to email/day</span></td>
+  <td>Email is last resort — nearly 100% delivery rate via SendGrid/SES</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Concurrent pending timers</td>
+  <td>~1,157 notif/sec &times; 30s window</td>
+  <td><span class="hg">~35K pending timers</span></td>
+  <td>Redis sorted set with score=expire_time. Timer worker polls every 1s.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>State transitions/sec</td>
+  <td>1,157 new + 174 escalations + 1,157 receipts</td>
+  <td><span class="hg">~2,500 transitions/sec</span></td>
+  <td>Redis atomic operations (WATCH/MULTI or Lua script) for consistency</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>State storage (Redis)</td>
+  <td>35K active &times; 512 bytes per state object</td>
+  <td><span class="hg">~18MB active state</span></td>
+  <td>Fits easily in single Redis instance. Cluster for HA, not capacity.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Delivery receipt webhook volume</td>
+  <td>100M deliveries/day &times; 80% provide receipt</td>
+  <td><span class="hg">~926 webhooks/sec</span></td>
+  <td>Webhook ingestion service with Kafka buffer for spike absorption</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Cost impact of fallback</td>
+  <td>15M SMS &times; $0.01/SMS + 750K emails &times; $0.001</td>
+  <td><span class="hr">$150K+/day SMS cost</span></td>
+  <td>Optimize push reliability first. Every 1% push improvement saves $10K/day.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with the failure rate (15% push failure is realistic), show the cascading math, then highlight the cost implications. The interviewer wants to see that you understand why minimizing fallback is critical — it's not just latency, it's $150K/day in SMS costs.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Endpoints for fallback-enabled notification delivery and status tracking</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">POST /v1/notifications/send</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Send notification with fallback chain configuration</div>
+<pre><code>{
+  "user_id": "u_abc123",
+  "template_id": "otp_code",
+  "params": { "code": "847291" },
+  "fallback_chain": [
+    { "channel": "push", "timeout_sec": 30 },
+    { "channel": "sms", "timeout_sec": 60 },
+    { "channel": "email", "timeout_sec": null }
+  ],
+  "dedup_key": "otp:u_abc123:847291",
+  "max_ttl_sec": 300
+}</code></pre>
+<div style="font-size:.72rem;color:var(--muted)">Response: <code>202 Accepted</code> &middot; <code>{ "notification_id": "n_fb001", "state": "push_pending" }</code></div>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /v1/notifications/{id}/status</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Get current state and attempt history for a notification</div>
+<pre><code>GET /v1/notifications/n_fb001/status
+
+Response 200:
+{
+  "notification_id": "n_fb001",
+  "current_state": "delivered",
+  "delivered_via": "sms",
+  "attempts": [
+    { "channel": "push", "status": "timeout", "started_at": "...", "ended_at": "..." },
+    { "channel": "sms", "status": "delivered", "started_at": "...", "delivered_at": "..." }
+  ],
+  "total_time_ms": 34521
+}</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--o);font-size:.85rem">POST /v1/webhooks/delivery-receipt</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Webhook endpoint for provider delivery confirmations</div>
+<pre><code>// APNs delivery receipt
+{ "provider": "apns", "notification_id": "n_fb001", "status": "delivered", "timestamp": "..." }
+
+// Twilio status callback
+{ "provider": "twilio", "MessageSid": "SM...", "MessageStatus": "delivered", "To": "+1..." }
+
+// SendGrid event
+{ "provider": "sendgrid", "event": "delivered", "sg_message_id": "...", "timestamp": ... }</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">State machine storage and delivery tracking structures</p>
+
+<h4 style="color:var(--a)">notification_state (Redis Hash)</h4>
+<pre><code>HSET notification_state:{notification_id} 
+  user_id           "u_abc123"
+  current_state     "sms_pending"        // pending|push_sent|push_failed|sms_sent|sms_failed|email_sent|delivered|expired
+  current_channel   "sms"
+  attempt_index     1                    // which step in fallback_chain
+  fallback_chain    '[{"channel":"push","timeout_sec":30},{"channel":"sms","timeout_sec":60},{"channel":"email"}]'
+  created_at        "1705312200000"
+  last_transition   "1705312230000"
+  delivered_at      ""
+  dedup_key         "otp:u_abc123:847291"
+
+EXPIRE notification_state:{notification_id} 600   // TTL = max_ttl_sec + buffer</code></pre>
+
+<h4 style="color:var(--g)">delayed_queue (Redis Sorted Set)</h4>
+<pre><code>// Score = Unix timestamp when timeout fires
+// Member = notification_id
+ZADD delayed_queue 1705312230 "n_fb001"    // fires at created_at + 30s (push timeout)
+ZADD delayed_queue 1705312290 "n_fb002"    // fires at created_at + 60s (sms timeout)
+
+// Timer worker polls every second:
+ZRANGEBYSCORE delayed_queue 0 {current_timestamp} LIMIT 0 100
+// Process expired entries, then ZREM them</code></pre>
+
+<h4 style="color:var(--o)">delivery_attempts (Cassandra — audit log)</h4>
+<pre><code>CREATE TABLE delivery_attempts (
+  notification_id   UUID,
+  attempt_num       INT,
+  channel           TEXT,          -- push | sms | email
+  status            TEXT,          -- sent | delivered | failed | timeout
+  provider          TEXT,          -- apns | fcm | twilio | sendgrid
+  provider_msg_id   TEXT,
+  error_code        TEXT,
+  started_at        TIMESTAMP,
+  completed_at      TIMESTAMP,
+  PRIMARY KEY ((notification_id), attempt_num)
+) WITH default_time_to_live = 2592000;  -- 30 days</code></pre>
+
+<h4 style="color:var(--r)">State Machine Transitions</h4>
+<pre><code>// Valid state transitions (enforced by Lua script):
+pending       → push_sent      (push worker picks up)
+push_sent     → delivered      (delivery receipt received)
+push_sent     → push_timeout   (30s timer fires, no receipt)
+push_timeout  → sms_sent       (sms worker picks up)
+sms_sent      → delivered      (delivery receipt received)
+sms_sent      → sms_timeout    (60s timer fires, no receipt)
+sms_timeout   → email_sent     (email worker picks up)
+email_sent    → delivered      (delivery receipt received)
+*             → expired        (max_ttl exceeded)</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Notification created &#x2192; Push attempt &#x2192; Timer &#x2192; Check status &#x2192; Escalate or confirm delivery</p>
+
+<svg width="100%" viewBox="0 0 740 380" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="nf1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- STATE MACHINE VISUALIZATION -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="110" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">NOTIFICATION STATE MACHINE &middot; Per-notification lifecycle</text>
+
+<!-- States -->
+<rect data-dp-step="2" x="14" y="30" width="80" height="28" rx="14" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="2" x="54" y="43" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">PENDING</text>
+<text data-dp-step="2" x="54" y="53" text-anchor="middle" fill="var(--muted)" font-size="4.5">created</text>
+
+<line data-dp-step="3" x1="94" y1="44" x2="118" y2="44" stroke="var(--y)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<rect data-dp-step="4" x="120" y="30" width="86" height="28" rx="14" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="4" x="163" y="43" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">PUSH_SENT</text>
+<text data-dp-step="4" x="163" y="53" text-anchor="middle" fill="var(--muted)" font-size="4.5">waiting 30s</text>
+
+<line data-dp-step="5" x1="206" y1="36" x2="240" y2="30" stroke="var(--g)" stroke-width="1" marker-end="url(#nf1)"/>
+<text data-dp-step="5" x="223" y="28" fill="var(--g)" font-size="4.5">receipt ✓</text>
+
+<line data-dp-step="5" x1="206" y1="52" x2="240" y2="60" stroke="var(--r)" stroke-width="1" marker-end="url(#nf1)"/>
+<text data-dp-step="5" x="223" y="66" fill="var(--r)" font-size="4.5">timeout 30s</text>
+
+<!-- Delivered (from push) -->
+<rect data-dp-step="6" x="242" y="16" width="80" height="24" rx="12" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.2"/>
+<text data-dp-step="6" x="282" y="31" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERED</text>
+
+<!-- Push timeout → SMS -->
+<rect data-dp-step="7" x="242" y="52" width="90" height="28" rx="14" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="7" x="287" y="65" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">PUSH_TIMEOUT</text>
+<text data-dp-step="7" x="287" y="75" text-anchor="middle" fill="var(--muted)" font-size="4.5">escalate</text>
+
+<line data-dp-step="8" x1="332" y1="66" x2="356" y2="66" stroke="var(--o)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<rect data-dp-step="9" x="358" y="52" width="86" height="28" rx="14" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="9" x="401" y="65" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">SMS_SENT</text>
+<text data-dp-step="9" x="401" y="75" text-anchor="middle" fill="var(--muted)" font-size="4.5">waiting 60s</text>
+
+<line data-dp-step="10" x1="444" y1="58" x2="478" y2="30" stroke="var(--g)" stroke-width="1" marker-end="url(#nf1)"/>
+<text data-dp-step="10" x="468" y="40" fill="var(--g)" font-size="4.5">receipt ✓</text>
+
+<line data-dp-step="10" x1="444" y1="74" x2="478" y2="84" stroke="var(--r)" stroke-width="1" marker-end="url(#nf1)"/>
+<text data-dp-step="10" x="460" y="86" fill="var(--r)" font-size="4.5">timeout 60s</text>
+
+<!-- Delivered (from SMS) -->
+<rect data-dp-step="11" x="480" y="16" width="80" height="24" rx="12" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.2"/>
+<text data-dp-step="11" x="520" y="31" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERED</text>
+
+<!-- SMS timeout → Email -->
+<rect data-dp-step="12" x="480" y="76" width="90" height="28" rx="14" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="12" x="525" y="89" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">SMS_TIMEOUT</text>
+<text data-dp-step="12" x="525" y="99" text-anchor="middle" fill="var(--muted)" font-size="4.5">last resort</text>
+
+<line data-dp-step="13" x1="570" y1="90" x2="594" y2="90" stroke="var(--a2)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<rect data-dp-step="14" x="596" y="76" width="86" height="28" rx="14" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="14" x="639" y="89" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">EMAIL_SENT</text>
+<text data-dp-step="14" x="639" y="99" text-anchor="middle" fill="var(--muted)" font-size="4.5">final attempt</text>
+
+<line data-dp-step="15" x1="682" y1="82" x2="700" y2="30" stroke="var(--g)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<rect data-dp-step="16" x="690" y="16" width="40" height="24" rx="12" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1.2"/>
+<text data-dp-step="16" x="710" y="31" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="700">&#x2714;</text>
+
+<!-- PIPELINE FLOW -->
+<rect data-dp-step="17" x="4" y="120" width="732" height="120" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="17" x="370" y="134" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">DELIVERY PIPELINE &middot; Workers + Timer + Receipt Processor</text>
+
+<!-- Push attempt -->
+<rect data-dp-step="18" x="14" y="146" width="130" height="40" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="18" x="79" y="160" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Push Worker</text>
+<text data-dp-step="18" x="79" y="172" text-anchor="middle" fill="var(--muted)" font-size="5">Send to APNs/FCM</text>
+<text data-dp-step="18" x="79" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">Set timer: now + 30s</text>
+
+<line data-dp-step="19" x1="144" y1="166" x2="168" y2="166" stroke="var(--a)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<!-- Timer service -->
+<rect data-dp-step="20" x="170" y="146" width="130" height="40" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="20" x="235" y="160" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Timer Service</text>
+<text data-dp-step="20" x="235" y="172" text-anchor="middle" fill="var(--muted)" font-size="5">Redis ZSET poll every 1s</text>
+<text data-dp-step="20" x="235" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">Fires on timeout expiry</text>
+
+<line data-dp-step="21" x1="300" y1="166" x2="324" y2="166" stroke="var(--y)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<!-- State checker -->
+<rect data-dp-step="22" x="326" y="146" width="130" height="40" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="22" x="391" y="160" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">State Transition</text>
+<text data-dp-step="22" x="391" y="172" text-anchor="middle" fill="var(--muted)" font-size="5">Lua script: check state</text>
+<text data-dp-step="22" x="391" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">If still pending → escalate</text>
+
+<line data-dp-step="23" x1="456" y1="166" x2="480" y2="166" stroke="var(--o)" stroke-width="1" marker-end="url(#nf1)"/>
+
+<!-- Next channel -->
+<rect data-dp-step="24" x="482" y="146" width="130" height="40" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="24" x="547" y="160" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">SMS Worker</text>
+<text data-dp-step="24" x="547" y="172" text-anchor="middle" fill="var(--muted)" font-size="5">Send via Twilio</text>
+<text data-dp-step="24" x="547" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">Set timer: now + 60s</text>
+
+<!-- Receipt processor (parallel path) -->
+<rect data-dp-step="25" x="14" y="198" width="598" height="34" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="25" x="313" y="212" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">DELIVERY RECEIPT PROCESSOR &middot; Webhooks from providers (APNs, Twilio, SendGrid)</text>
+<text data-dp-step="25" x="313" y="224" text-anchor="middle" fill="var(--muted)" font-size="5">On receipt: atomic CAS (compare-and-swap) state to "delivered" → cancel pending timer → stop escalation chain</text>
+
+<!-- RACE CONDITION HANDLING -->
+<rect data-dp-step="26" x="4" y="248" width="732" height="120" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="26" x="370" y="262" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">RACE CONDITION: Timer fires vs. Receipt arrives simultaneously</text>
+
+<rect data-dp-step="27" x="14" y="274" width="350" height="86" rx="4" fill="rgba(251,191,36,.04)" stroke="var(--y)" stroke-width=".6"/>
+<text data-dp-step="27" x="189" y="288" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">PROBLEM</text>
+<text data-dp-step="27" x="189" y="302" text-anchor="middle" fill="var(--muted)" font-size="5.5">T=30.0s: Timer fires, reads state = "push_sent"</text>
+<text data-dp-step="27" x="189" y="314" text-anchor="middle" fill="var(--muted)" font-size="5.5">T=30.1s: APNs receipt arrives, sets state = "delivered"</text>
+<text data-dp-step="27" x="189" y="326" text-anchor="middle" fill="var(--muted)" font-size="5.5">T=30.2s: Timer proceeds to send SMS (DUPLICATE!)</text>
+<text data-dp-step="27" x="189" y="342" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Without atomic transition: user gets push AND SMS</text>
+
+<rect data-dp-step="28" x="378" y="274" width="350" height="86" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+<text data-dp-step="28" x="553" y="288" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">SOLUTION: Redis Lua Atomic CAS</text>
+<text data-dp-step="28" x="553" y="302" text-anchor="middle" fill="var(--muted)" font-size="5.5">Lua script: if state == "push_sent" then set "sms_pending"</text>
+<text data-dp-step="28" x="553" y="314" text-anchor="middle" fill="var(--muted)" font-size="5.5">Both timer and receipt use same CAS operation</text>
+<text data-dp-step="28" x="553" y="326" text-anchor="middle" fill="var(--muted)" font-size="5.5">Only ONE wins the transition — loser gets "already_transitioned"</text>
+<text data-dp-step="28" x="553" y="342" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Guarantee: exactly one channel delivers per notification</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs for cascading fallback architecture</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">State Storage</span></td>
+  <td>PostgreSQL, DynamoDB, Redis</td>
+  <td><span class="hg">Redis with Lua scripts</span></td>
+  <td>Atomic CAS required for race condition safety. Sub-ms transitions. TTL for auto-cleanup. State is ephemeral (max 5 min).</td>
+</tr>
+<tr>
+  <td><span class="hi">Timer Mechanism</span></td>
+  <td>OS timers, SQS delay, Redis ZSET</td>
+  <td><span class="hg">Redis Sorted Set</span></td>
+  <td>Score = expiry timestamp. Poll every 1s with ZRANGEBYSCORE. Survives worker restart. Easy to cancel (ZREM).</td>
+</tr>
+<tr>
+  <td><span class="hi">Timeout Duration</span></td>
+  <td>10s/30s/60s, 30s/60s/∞, adaptive</td>
+  <td><span class="hg">30s push / 60s SMS</span></td>
+  <td>95% of push deliveries complete in &lt;5s. 30s gives margin for provider delays without excessive wait. SMS is slower (carrier delay).</td>
+</tr>
+<tr>
+  <td><span class="hi">Duplicate Prevention</span></td>
+  <td>Distributed lock, optimistic concurrency, CAS</td>
+  <td><span class="hg">Lua CAS (compare-and-swap)</span></td>
+  <td>Single Redis command, no external lock service. Atomic read-check-write in one operation. No deadlock risk.</td>
+</tr>
+<tr>
+  <td><span class="hi">Receipt Processing</span></td>
+  <td>Synchronous webhook, async queue</td>
+  <td><span class="hg">Kafka-buffered async</span></td>
+  <td>Provider webhooks can burst. Kafka absorbs spikes. Consumer processes receipts and updates state. Retry on failure.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why not just retry the same channel?</span> Push failure often means "app uninstalled" — retrying push 10 times won't help. The insight is that channel escalation (push→SMS→email) crosses different delivery infrastructure. SMS reaches the phone even when the app is gone. This is why fallback beats retry for notification delivery.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">Timer precision matters:</span> If your timer fires at 30.5s but the delivery receipt arrived at 30.1s, you still escalate unnecessarily. Solution: the timer doesn't directly send to the next channel. It first checks state via atomic CAS. If state already transitioned to "delivered", the timer is a no-op. This makes the system correct regardless of timing.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Cost explosion risk:</span> At 15% push failure rate and 100M notifications/day, you're sending 15M SMS per day ($150K+). Monitor this rate. If push failure spikes to 30% (bad app update), SMS costs double. Set circuit breaker: if fallback rate exceeds 25%, alert on-call and optionally queue SMS instead of immediate send.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">Idempotent escalation:</span> The timer might fire twice (worker crash + restart). The Lua CAS script ensures only the first transition succeeds. Second attempt sees state ≠ expected, returns "already_transitioned", and the worker skips sending. This makes the entire pipeline idempotent despite at-least-once processing semantics.</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Failure modes specific to cascading fallback delivery</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Late Delivery Receipt</span></td>
+  <td>Push delivered at T=29s but receipt arrives at T=31s (after timeout). SMS already triggered.</td>
+  <td>CAS in Lua script: timer checks state before escalating. If push was delivered between timer fire and CAS, escalation is cancelled.</td>
+  <td><span class="hg">Zero duplicates</span> via atomic CAS</td>
+</tr>
+<tr>
+  <td><span class="hi">Provider Webhook Down</span></td>
+  <td>Twilio can't reach our webhook — delivery receipt never arrives.</td>
+  <td>Don't rely solely on receipts. After max_ttl (5 min), mark as "presumed_delivered" if provider returned 200 on send. Reconcile async.</td>
+  <td><span class="ho">Eventual consistency</span> via reconciliation</td>
+</tr>
+<tr>
+  <td><span class="hi">All Channels Fail</span></td>
+  <td>Push token expired, phone number invalid, email bounced.</td>
+  <td>After exhausting all channels in chain, mark as "undeliverable". Publish event for user health service. Flag user for contact info update.</td>
+  <td><span class="hr">Undeliverable</span> → user flagged</td>
+</tr>
+<tr>
+  <td><span class="hi">Redis Failover</span></td>
+  <td>Redis primary fails, state lost during failover window.</td>
+  <td>Redis Sentinel with min-slaves-to-write=1. State also written to Kafka (event log). On recovery, replay Kafka events to rebuild state.</td>
+  <td><span class="hg">&lt;5s</span> failover + replay</td>
+</tr>
+<tr>
+  <td><span class="hi">Timer Worker Crash</span></td>
+  <td>Timer worker dies, pending timers not polled.</td>
+  <td>Multiple timer workers compete on ZRANGEBYSCORE with LIMIT + ZREM (atomic claim). Any worker can process any timer. No single-worker dependency.</td>
+  <td><span class="hg">&lt;2s</span> other worker picks up</td>
+</tr>
+<tr>
+  <td><span class="hi">Notification Expired</span></td>
+  <td>OTP code only valid for 5 min. Fallback chain takes 2 min. What if user reads at T=4 min?</td>
+  <td>Include expiry_at in notification content. Client-side: don't display expired notifications. Server-side: max_ttl cancels remaining chain on expiry.</td>
+  <td><span class="hg">Auto-expire</span> at max_ttl</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points for notification fallback design interviews</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. State Machine is the Core Abstraction</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Each notification has a finite state machine: pending → push_sent → (delivered | push_timeout → sms_sent → ...). This makes the system debuggable, auditable, and correct. At any point, you know exactly where a notification is in its lifecycle. State transitions are atomic via Redis Lua scripts.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. The Race Condition is THE Hard Problem</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Timer fires at T=30s. Delivery receipt arrives at T=30.1s. If both proceed, user gets duplicate notifications on different channels. Solution: Redis Lua compare-and-swap — both timer and receipt use the same CAS operation. Only one wins. Loser sees "already_transitioned" and becomes a no-op. This is the key insight interviewers are looking for.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Delayed Queue for Timeouts (Not OS Timers)</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Don't use in-memory timers or setTimeout — they die with the process. Use Redis Sorted Set with score = expiry_timestamp. A timer worker polls ZRANGEBYSCORE every second. Advantages: survives crashes, multiple workers can compete, easy to cancel (ZREM), scales horizontally.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. Cost Awareness: Fallback = Money</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Each escalation step costs more: push ($0) → SMS ($0.01) → email ($0.001). At 15% push failure and 100M notifications/day, fallback costs $150K+/day in SMS. This means: (a) optimize push reliability aggressively, (b) set circuit breakers on fallback rate, (c) consider batching non-urgent fallbacks.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Not All Notifications Need Fallback</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Only critical notifications (OTP, security alerts, payment confirmations) warrant the cost and complexity of cascading fallback. Marketing notifications should NOT escalate to SMS — that's a terrible user experience and expensive. Make fallback_chain configurable per notification type. Most notifications use single-channel delivery.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

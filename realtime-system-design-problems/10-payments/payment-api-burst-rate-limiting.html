@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment API rate limiting allowing bursts &middot; Token Bucket &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design rate limiting for a payments API where clients run batch settlements (sudden bursts) but must average 100 req/sec</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design rate limiting for a payments API: allow controlled bursts for batch settlements while capping the average at 100 req/sec</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/04-apis.html#idempotent-apis">Idempotency</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/09-consistency.html#transactions">Transactions</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design rate limiting for a payment API where merchants run batch settlements (e.g., 500 charges at once at end-of-day) as sudden bursts, but must average 100 requests/second over time. The system must deliberately allow controlled bursts while capping the sustained average rate.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> The merchant's legitimate use case <span class="hr">requires</span> bursting. End-of-day batch settlement sends 500 payment requests in 5 seconds. A strict sliding window (100/sec) would reject 400 of those. You need an algorithm that <span class="hr">accumulates capacity over idle periods</span> and allows spending it in bursts — while still preventing sustained abuse above the average.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">100</div>
+<div style="font-size:.72rem;color:var(--muted)">req/sec average</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">sustained rate</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">500</div>
+<div style="font-size:.72rem;color:var(--muted)">burst capacity</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">max instantaneous</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Token Bucket</div>
+<div style="font-size:.72rem;color:var(--muted)">capacity vs refill</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">textbook use case</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--c)">5s</div>
+<div style="font-size:.72rem;color:var(--muted)">to refill burst</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">500 / 100 = 5s</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; burst-tolerant rate limiting for payment APIs</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Allow controlled bursts</strong> up to bucket capacity (500 requests instantly)<br>
+  <span class="hg">2.</span> <strong>Cap sustained average rate</strong> at 100 req/sec over any time period<br>
+  <span class="hg">3.</span> <strong>Lazy refill</strong> (no background timer) &middot; calculate on each request<br>
+  <span class="hg">4.</span> <strong>Idempotency key exemption</strong> &middot; retries with same key do NOT consume additional tokens<br>
+  <span class="hg">5.</span> <strong>Per-merchant API key</strong> &middot; each merchant has independent token bucket<br>
+  <span class="hg">6.</span> <strong>Standard rate limit headers</strong> &middot; X-RateLimit-Limit, Remaining, Burst, Retry-After
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Payment processing logic</strong> (charge, capture, refund flows)<br>
+  <span class="hr">&#x2717;</span> <strong>Fraud detection</strong> (risk scoring engine)<br>
+  <span class="hr">&#x2717;</span> <strong>Currency conversion</strong> (exchange rate service)<br>
+  <span class="hr">&#x2717;</span> <strong>Multi-region distribution</strong> (geo-routing layer)<br>
+  <span class="hr">&#x2717;</span> <strong>Per-endpoint differentiation</strong> (uniform rate across all payment endpoints)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the token bucket design</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Burst</span></td><td><span class="hg">Allow up to 500 requests instantly</span></td><td>Batch settlement sends 500 charges at end-of-day. Must not be rejected.</td></tr>
+<tr><td><span class="hi">Average</span></td><td><span class="hg">Sustained rate &le; 100 req/sec</span></td><td>Long-term throughput cap. Prevents sustained abuse above contracted rate.</td></tr>
+<tr><td><span class="hi">Recovery</span></td><td><span class="hg">Full burst restored after 5s idle</span></td><td>500 tokens / 100 per sec refill = 5 seconds to full capacity.</td></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;2ms per rate check</span></td><td>Redis atomic Lua script. Rate limit check must not add meaningful latency to payment flow.</td></tr>
+<tr><td><span class="hi">Idempotency</span></td><td><span class="hg">Same key = no additional token cost</span></td><td>Payment retries are legitimate. Charging a token for retries would unfairly penalize reliable clients.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Burst Tolerance vs. Abuse Prevention</span>. Allowing bursts means a malicious client could hammer the API with 500 requests instantly. Mitigation: capacity is finite (500), refill is slow (100/sec), and each merchant has a separate bucket. Abuse requires burning your own burst budget.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing from merchant traffic patterns</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>10K merchants</strong> &middot; <strong>Average 50 req/sec each</strong> &middot; <strong>Peak burst 500 req at end-of-day settlement</strong> &middot; <strong>Bucket capacity 500, refill 100/sec</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Worst-case peak (all burst simultaneously)</td>
+  <td>10K merchants &times; 500 burst = 5M requests</td>
+  <td><span class="hr">5M (theoretical, unlikely)</span></td>
+  <td>Staggered in practice. Settlement times vary by timezone and merchant.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Realistic peak</td>
+  <td>100 merchants settle at same time &times; 500</td>
+  <td><span class="hg">50K req/sec burst</span></td>
+  <td>Redis handles easily. Horizontal sharding of rate limit keys if needed.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Redis memory for rate limits</td>
+  <td>10K keys &times; 2 fields (tokens, last_ts) &times; 50 bytes</td>
+  <td><span class="hg">~1MB total</span></td>
+  <td>Trivial memory. Single Redis instance sufficient for rate limit state.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Refill calculation per request</td>
+  <td>tokens_added = elapsed_since_last &times; 100 (capped at 500)</td>
+  <td><span class="hg">O(1) per request</span></td>
+  <td>Lazy refill: no background timer. Two fields stored, one calculation on each check.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Idempotency cache size</td>
+  <td>10K merchants &times; 100 req/sec &times; 24hr TTL &times; 200 bytes</td>
+  <td><span class="hg">~17GB for full cache</span></td>
+  <td>Redis cluster with TTL eviction. Only store idempotency keys, not full responses.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Lead with the refill math (step 4) &middot; it shows you understand lazy token bucket internals. Then mention idempotency exemption &middot; it's the payment-specific twist that separates this from generic rate limiting. The 1MB memory footprint shows the solution is lightweight.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Payment API rate limiting interfaces and response headers</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px">
+<h4 style="color:var(--g);margin-bottom:4px">Token Bucket Middleware (All Payment Endpoints)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <strong>Applied to:</strong> All /v1/charges, /v1/refunds, /v1/payouts endpoints<br>
+  <strong>Identification:</strong> API key in Authorization header &rarr; maps to merchant bucket<br>
+  <strong>Response headers:</strong> X-RateLimit-Limit: 100, X-RateLimit-Burst: 500, X-RateLimit-Remaining: {tokens}<br>
+  <strong>429 response:</strong> Retry-After: {(needed_tokens - available) / refill_rate} seconds
+</div>
+</div>
+<div class="d-panel" style="padding:10px">
+<h4 style="color:var(--a);margin-bottom:4px">Idempotency Key Bypass</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <strong>Header:</strong> Idempotency-Key: {unique_key}<br>
+  <strong>Behavior:</strong> If same key seen before &rarr; return cached response, bypass rate limit<br>
+  <strong>Cache TTL:</strong> 24 hours (covers retry windows for failed payments)<br>
+  <strong>Key format:</strong> idempotency:{api_key}:{idem_key} &rarr; stored response
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Storage structures for token bucket state and idempotency cache</p>
+<pre><code>// Redis HASH per merchant: token bucket state
+// Key: ratelimit:merchant:{api_key}
+HSET ratelimit:merchant:sk_live_abc123 tokens 350 last_refill 1705312200.123
+
+// Lua script (atomic check + refill + deduct):
+-- 1. Read current tokens and last_refill timestamp
+-- 2. Calculate: elapsed = now - last_refill
+-- 3. Add tokens: new_tokens = min(capacity, tokens + elapsed * refill_rate)
+-- 4. If new_tokens >= 1: deduct 1, update timestamp, return ALLOWED
+-- 5. Else: return DENIED + time_until_next_token
+
+// Idempotency cache
+// Key: idempotency:{api_key}:{idempotency_key}
+SET idempotency:sk_live_abc123:idem_xyz "{cached_response}" EX 86400
+
+// Check flow:
+// 1. Check idempotency cache → if hit, return cached (no token cost)
+// 2. Check token bucket → if denied, return 429
+// 3. Process request → store in idempotency cache → return response
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Token Bucket (Capacity vs Refill Rate)</h2>
+<p class="su">Bucket capacity = burst size. Refill rate = average rate. Idle periods accumulate tokens for burst spending.</p>
+
+<!-- --- Token Bucket Architecture SVG --- -->
+<svg width="100%" viewBox="0 0 780 430" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Payment API Token Bucket Rate Limiting Architecture">
+  <defs><marker id="tb-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Token Bucket &middot; Burst Capacity + Average Rate Control</text>
+
+  <!-- TOKEN BUCKET VISUALIZATION -->
+  <rect x="250" y="30" width="280" height="200" rx="12" fill="rgba(34,211,238,.03)" stroke="var(--c)" stroke-width="2"/>
+  <text x="390" y="48" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">TOKEN BUCKET</text>
+
+  <!-- Capacity indicator -->
+  <text x="390" y="65" text-anchor="middle" fill="var(--muted)" font-size="5.5">Capacity: 500 tokens (max burst)</text>
+
+  <!-- Token level (filled portion) -->
+  <rect x="270" y="130" width="240" height="80" rx="6" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width="1"/>
+  <text x="390" y="165" text-anchor="middle" fill="var(--g)" font-size="10" font-weight="800">350 tokens</text>
+  <text x="390" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">Available for immediate use</text>
+  <text x="390" y="196" text-anchor="middle" fill="var(--muted)" font-size="4.5">After 3.5s idle: 350 tokens accumulated</text>
+
+  <!-- Empty portion (top) -->
+  <rect x="270" y="74" width="240" height="56" rx="6" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".5" stroke-dasharray="3,2"/>
+  <text x="390" y="100" text-anchor="middle" fill="var(--muted)" font-size="5">150 empty slots</text>
+  <text x="390" y="114" text-anchor="middle" fill="var(--muted)" font-size="4.5">(refilling at 100/sec)</text>
+
+  <!-- REFILL arrow (coming in from top) -->
+  <line x1="390" y1="20" x2="390" y2="30" stroke="var(--g)" stroke-width="1.5" marker-end="url(#tb-arr)"/>
+  <text x="540" y="43" fill="var(--g)" font-size="6" font-weight="700">Refill: +100 tokens/sec</text>
+  <text x="540" y="56" fill="var(--muted)" font-size="5">(= sustained average rate)</text>
+  <text x="540" y="69" fill="var(--muted)" font-size="4.5">Capped at capacity 500</text>
+
+  <!-- REQUEST CONSUMPTION (going out from bottom) -->
+  <line x1="390" y1="230" x2="390" y2="260" stroke="var(--r)" stroke-width="1.5" marker-end="url(#tb-arr)"/>
+  <text x="390" y="250" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">-1 token per request</text>
+
+  <!-- SCENARIOS -->
+  <rect x="10" y="265" width="760" height="75" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="280" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">SCENARIOS &middot; How Token Bucket Handles Bursts</text>
+
+  <!-- Scenario 1: Burst after idle -->
+  <rect x="25" y="290" width="230" height="38" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="140" y="305" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Batch Settlement (after 5s idle)</text>
+  <text x="140" y="318" text-anchor="middle" fill="var(--muted)" font-size="4.5">500 tokens saved &rarr; send 500 instantly &#x2713;</text>
+
+  <!-- Scenario 2: Steady state -->
+  <rect x="275" y="290" width="230" height="38" rx="4" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="390" y="305" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Steady Traffic (100/sec sustained)</text>
+  <text x="390" y="318" text-anchor="middle" fill="var(--muted)" font-size="4.5">Bucket stays near 0, refill = drain &#x2713;</text>
+
+  <!-- Scenario 3: Over-burst -->
+  <rect x="525" y="290" width="230" height="38" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="640" y="305" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Burst Exceeds Capacity (600 req)</text>
+  <text x="640" y="318" text-anchor="middle" fill="var(--muted)" font-size="4.5">500 allowed, 100 get 429 + Retry-After &#x2717;</text>
+
+  <!-- TIME REFILL VISUALIZATION -->
+  <rect x="10" y="350" width="760" height="70" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="367" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Token Accumulation Over Time</text>
+
+  <!-- Timeline -->
+  <line x1="50" y1="390" x2="730" y2="390" stroke="var(--border)" stroke-width="1"/>
+
+  <!-- Time markers -->
+  <line x1="50" y1="387" x2="50" y2="393" stroke="var(--muted)" stroke-width=".8"/>
+  <text x="50" y="403" text-anchor="middle" fill="var(--muted)" font-size="4.5">t=0 (burst)</text>
+  <text x="50" y="385" text-anchor="middle" fill="var(--r)" font-size="5" font-weight="600">0 tokens</text>
+
+  <line x1="185" y1="387" x2="185" y2="393" stroke="var(--muted)" stroke-width=".8"/>
+  <text x="185" y="403" text-anchor="middle" fill="var(--muted)" font-size="4.5">t=1s</text>
+  <text x="185" y="385" text-anchor="middle" fill="var(--y)" font-size="5">100 tokens</text>
+
+  <line x1="320" y1="387" x2="320" y2="393" stroke="var(--muted)" stroke-width=".8"/>
+  <text x="320" y="403" text-anchor="middle" fill="var(--muted)" font-size="4.5">t=2s</text>
+  <text x="320" y="385" text-anchor="middle" fill="var(--y)" font-size="5">200 tokens</text>
+
+  <line x1="455" y1="387" x2="455" y2="393" stroke="var(--muted)" stroke-width=".8"/>
+  <text x="455" y="403" text-anchor="middle" fill="var(--muted)" font-size="4.5">t=3s</text>
+  <text x="455" y="385" text-anchor="middle" fill="var(--y)" font-size="5">300 tokens</text>
+
+  <line x1="590" y1="387" x2="590" y2="393" stroke="var(--muted)" stroke-width=".8"/>
+  <text x="590" y="403" text-anchor="middle" fill="var(--muted)" font-size="4.5">t=5s</text>
+  <text x="590" y="385" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">500 (FULL)</text>
+
+  <line x1="730" y1="387" x2="730" y2="393" stroke="var(--muted)" stroke-width=".8"/>
+  <text x="730" y="403" text-anchor="middle" fill="var(--muted)" font-size="4.5">t=10s</text>
+  <text x="730" y="385" text-anchor="middle" fill="var(--g)" font-size="5">500 (capped)</text>
+
+  <!-- Capacity vs Refill labels -->
+  <text x="50" y="30" fill="var(--o)" font-size="6" font-weight="700">Key Parameters:</text>
+  <text x="50" y="44" fill="var(--muted)" font-size="5">Capacity = 500 (burst)</text>
+  <text x="50" y="57" fill="var(--muted)" font-size="5">Refill = 100/sec (average)</text>
+  <text x="50" y="70" fill="var(--muted)" font-size="5">Recovery = 5s to full</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Token bucket: capacity=500, refill_rate=100/sec</td><td>Allows instant burst of 500. After burst, limited to 100/sec until bucket refills. Average never exceeds 100/sec.</td></tr>
+<tr><td><span class="hi">Capacity (burst size)</span></td><td>500 tokens (5 seconds of accumulated capacity)</td><td>Matches batch settlement size. Merchant can send 500 at once after 5+ seconds of inactivity.</td></tr>
+<tr><td><span class="hi">Refill rate</span></td><td>100 tokens per second</td><td>This IS the average rate. After a burst, bucket refills at 100/sec. Sustained traffic cannot exceed this.</td></tr>
+<tr><td><span class="hi">Implementation</span></td><td>Lazy refill: on each request, calculate tokens_added = elapsed_since_last &times; refill_rate</td><td>No background timer needed. O(1) per request. Store only: {token_count, last_request_time}.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>Redis: HASH with tokens_remaining + last_refill_ts per API key</td><td>Atomic check-deduct via Lua. Shared across all app servers.</td></tr>
+<tr><td><span class="hi">Headers</span></td><td>X-RateLimit-Limit: 100, X-RateLimit-Remaining: {tokens}, X-RateLimit-Burst: 500</td><td>Client knows both their sustained limit and remaining burst capacity.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Token bucket mechanics:</span> Bucket starts full at 500 tokens. Each request removes 1 token. Every second, 100 tokens are added (up to max 500). After a 500-request burst: bucket = 0. Must wait 1 second to get 100 more tokens. Full burst capacity restored after 5 seconds idle.</div>
+<div class="b by"><span class="hi">Capacity vs refill rate — the key insight:</span> <span class="hg">Capacity</span> = maximum burst size (how many requests can fire instantly). <span class="hg">Refill rate</span> = sustained average (long-term throughput). These are two independent knobs. You can have high burst with low average, or low burst with high average.</div>
+<div class="b br"><span class="hi">Why NOT sliding window:</span> Sliding window counter says "100 per second" — period. It <span class="hr">rejects</span> request #101 in any 1-second span, even if the previous 10 seconds were idle. No burst tolerance. The batch settlement would be rejected. Token bucket is the correct choice when bursts are legitimate.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Stripe</strong> &middot; 100 req/sec with 200 burst (token bucket). <strong>AWS API Gateway</strong> &middot; token bucket with configurable burst + rate. <strong>Shopify</strong> &middot; leaky bucket with 40-request bucket size. <strong>PayPal</strong> &middot; per-endpoint rate with burst allowance.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Merchant sends burst larger than capacity</span></td><td>Requests beyond 500 get 429 immediately</td><td>Client-side batching: split into chunks of 500, wait refill time between chunks. Return Retry-After header with exact wait time.</td></tr>
+<tr><td><span class="hr">Sustained traffic at exactly 100/sec (no idle)</span></td><td>Bucket never refills above 100, no burst available</td><td>Correct behavior. Sustained rate is the cap. If merchant needs burst + sustained, increase capacity (plan upgrade).</td></tr>
+<tr><td><span class="hr">Clock drift in lazy refill</span></td><td>Incorrect token calculations</td><td>Use Redis TIME for consistent clock. Cap refill at capacity (prevent overflow on large time gaps).</td></tr>
+<tr><td><span class="hr">Concurrent requests drain bucket simultaneously</span></td><td>Race condition: both see tokens=1, both deduct</td><td>Atomic Lua script: read + deduct + return new level in one operation.</td></tr>
+<tr><td><span class="hr">Payment processing requires idempotency</span></td><td>Retried requests shouldn't double-charge</td><td>Idempotency keys bypass rate limiting for retries (same idempotency key = same request, don't deduct again).</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for burst-allowing rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Token bucket</strong> &middot; capacity (burst) + refill rate (average) are two independent parameters<br>
+<span class="hg">2.</span> <strong>Capacity = max burst</strong> &middot; how many requests can fire instantly after idle period<br>
+<span class="hg">3.</span> <strong>Refill rate = sustained average</strong> &middot; long-term throughput cannot exceed this<br>
+<span class="hg">4.</span> <strong>Lazy refill</strong> &middot; no timer needed, calculate on each request: elapsed &times; rate (cap at capacity)<br>
+<span class="hg">5.</span> <strong>Keyword: "allow bursts but cap average"</strong> &middot; this is the textbook token bucket signal<br>
+<span class="hg">6.</span> <strong>Idempotency key exemption</strong> &middot; retried payments with same key don't consume additional tokens
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design rate limiting for a public API with tiered plans &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design rate limiting for a public API with tiered plans (free: 100 req/min, paid: 2,000 req/min)</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design rate limiting for a public REST API where free users get 100 req/min and paid users 2,000 req/min, keyed by API key</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#api-gateway">API Gateway</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/04-apis.html#rest">REST APIs</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#consistent-hashing">Consistent Hashing</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design a rate limiter for a public REST API that enforces different limits based on subscription tier (free: 100 req/min, paid: 2,000 req/min), keyed by API key, while being fair at scale and providing clear feedback to clients.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Multiple tiers mean the limiter must <span class="hr">look up tier config per request</span>, apply per-key counters with different thresholds, and handle tier upgrades/downgrades in real-time without restarting services or losing counter state.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">100</div>
+<div style="font-size:.72rem;color:var(--muted)">req/min (free tier)</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">2,000</div>
+<div style="font-size:.72rem;color:var(--muted)">req/min (paid tier)</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">API Key</div>
+<div style="font-size:.72rem;color:var(--muted)">rate limit key</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--c)">429</div>
+<div style="font-size:.72rem;color:var(--muted)">Too Many Requests</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; the core rate limiting behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Enforce <strong>per-key rate limits</strong> based on API key identity<br>
+  <span class="hg">2.</span> Support <strong>tiered plans</strong> (free: 100 req/min, paid: 2,000 req/min, enterprise: 10K req/min)<br>
+  <span class="hg">3.</span> Return <strong>standard rate limit headers</strong> (X-RateLimit-Limit, Remaining, Reset)<br>
+  <span class="hg">4.</span> Reject excess requests with <strong>429 Too Many Requests</strong> + Retry-After<br>
+  <span class="hg">5.</span> <strong>Real-time tier change propagation</strong> when billing tier is upgraded/downgraded
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>DDoS mitigation</strong> (L3/L4 volumetric attack protection)<br>
+  <span class="hr">&#x2717;</span> <strong>Geographic distribution</strong> (multi-region rate limiting coordination)<br>
+  <span class="hr">&#x2717;</span> <strong>Per-endpoint limits</strong> (this design is per-key only, not per-route)<br>
+  <span class="hr">&#x2717;</span> <strong>Billing / usage analytics</strong> (separate metering pipeline)<br>
+  <span class="hr">&#x2717;</span> <strong>IP-based rate limiting</strong> (complementary but separate concern)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">The quality constraints that shape every architectural decision</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;2ms</span> overhead per request</td><td>Redis RTT in same datacenter. Rate check must be invisible to end-user experience.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">100K+</span> rate-check operations/sec</td><td>Every inbound API request hits the rate limiter. Must handle full platform traffic.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span> (fail-open if Redis down)</td><td>Rate limiter failure must not become a platform outage. Fail-open with degraded local limits.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">&plusmn;1 request</span> at window boundaries</td><td>Sliding window counter provides near-exact enforcement without memory cost of full log.</td></tr>
+<tr><td><span class="hi">Scalability</span></td><td>Linear with number of <span class="hg">unique API keys</span></td><td>Redis sharding by key hash. Each shard handles a subset of keys independently.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Availability vs. Accuracy</span>. We choose availability &middot; if Redis is unreachable, allow traffic through (fail-open) rather than blocking legitimate customers. Sliding window counter trades perfect accuracy for memory efficiency.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question &#x2192; derive infrastructure sizing</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>100K active API keys</strong> &middot; <strong>50% free (100 req/min)</strong> &middot; <strong>40% paid (2,000 req/min)</strong> &middot; <strong>10% enterprise (10K req/min)</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Peak rate checks/sec</td>
+  <td>100K keys checking simultaneously (worst case)</td>
+  <td><span class="hg">~150K peak</span></td>
+  <td>Single Redis instance handles 1M ops/sec &middot; comfortable headroom</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Average rate checks/sec</td>
+  <td>50K free + 40K paid + 10K enterprise, weighted by activity</td>
+  <td><span class="hg">~50K avg</span></td>
+  <td>No need for Redis Cluster at this scale &middot; single primary + replica</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Redis memory</td>
+  <td>100K keys &times; 3 fields (count, prev_count, window_ts) &times; ~100 bytes</td>
+  <td><span class="hg">~10MB</span></td>
+  <td>Trivial memory footprint. Fits in any Redis instance easily.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Redis ops/sec</td>
+  <td>150K INCR/sec at peak</td>
+  <td><span class="hg">150K ops/sec</span></td>
+  <td>Well within single Redis capacity (1M+ ops/sec). No sharding needed yet.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Network bandwidth</td>
+  <td>150K round trips/sec &times; ~200 bytes each</td>
+  <td><span class="hg">~30MB/sec</span></td>
+  <td>Standard 1Gbps link handles this easily.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with the number of unique API keys (defines memory), then derive peak ops/sec (defines Redis throughput needs). The key insight: rate limiting is extremely lightweight per-key &mdash; a single Redis instance can handle millions of keys.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Rate limit middleware intercepts all API requests &middot; transparent to endpoint handlers</p>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(108,140,255,.12);color:var(--a);border:1px solid rgba(108,140,255,.25)">ANY</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/* (all endpoints)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Rate limit middleware intercepts BEFORE handler execution. Extracts API key from Authorization header or X-API-Key header.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Response headers (always included)</span><br>
+X-RateLimit-Limit: 2000<br>
+X-RateLimit-Remaining: 1847<br>
+X-RateLimit-Reset: 1705312260<br>
+Retry-After: 12 <span style="color:var(--muted);font-style:italic">// only on 429</span>
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.25)">429</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">Too Many Requests</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Returned when sliding window count exceeds tier limit. Client should back off and retry after the specified time.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// 429 Response Body</span><br>
+{<br>
+&nbsp;&nbsp;"error": "rate_limit_exceeded",<br>
+&nbsp;&nbsp;"message": "API rate limit exceeded for your plan",<br>
+&nbsp;&nbsp;"limit": 100,<br>
+&nbsp;&nbsp;"reset_at": "2025-01-15T10:31:00Z",<br>
+&nbsp;&nbsp;"upgrade_url": "https://api.example.com/billing/upgrade"<br>
+}
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Redis key schemas for rate counters + config DB for tier lookup</p>
+
+<div class="b bg" style="margin-bottom:8px"><span class="hi">Redis &middot; Sliding Window Counters</span></div>
+<pre><code>// Current window counter (TTL: 120s — covers current + overlap period)
+ratelimit:{api_key}:{window_minute} → INTEGER (curr_count)
+  Example: ratelimit:sk_free_abc:1705312200 → 47
+
+// Previous window counter (TTL: 120s)
+ratelimit:{api_key}:prev → INTEGER (prev_count)
+  Example: ratelimit:sk_free_abc:prev → 92
+
+// Weighted calculation: curr + prev × (1 - elapsed/60)
+</code></pre>
+
+<div class="b bb" style="margin-bottom:8px"><span class="hi">Config DB &middot; Tier Configuration</span></div>
+<pre><code>// api_keys table
++-----------+------------+--------+-----------+------------+------------+
+| api_key   | account_id | tier   | limit_rpm | burst_size | created_at |
++-----------+------------+--------+-----------+------------+------------+
+| sk_free_* | acc_123    | free   | 100       | 20         | 2025-01-01 |
+| sk_paid_* | acc_456    | paid   | 2000      | 200        | 2025-01-05 |
+| sk_ent_*  | acc_789    | enterprise | 10000 | 1000       | 2025-01-10 |
++-----------+------------+--------+-----------+------------+------------+
+
+// Cached in-memory per gateway (refreshed every 30s or on billing event)
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Sliding Window Counter with Tier Lookup</h2>
+<p class="su">Per-key sliding window counters backed by Redis, with tier config loaded from a rules cache</p>
+
+<!-- --- Tiered API Rate Limiting Architecture SVG --- -->
+<svg width="100%" viewBox="0 0 780 420" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tiered API Rate Limiting Architecture">
+  <defs><marker id="ta-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Tiered API Rate Limiting &middot; End-to-End Flow</text>
+
+  <!-- LAYER 1: CLIENTS -->
+  <rect x="10" y="25" width="760" height="75" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">API CLIENTS</text>
+
+  <!-- Free tier client -->
+  <rect x="50" y="48" width="150" height="40" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="125" y="63" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Free Tier Client</text>
+  <text x="125" y="75" text-anchor="middle" fill="var(--muted)" font-size="5">API-KEY: sk_free_abc</text>
+  <text x="125" y="84" text-anchor="middle" fill="var(--r)" font-size="4.5">Limit: 100 req/min</text>
+
+  <!-- Paid tier client -->
+  <rect x="315" y="48" width="150" height="40" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="390" y="63" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Paid Tier Client</text>
+  <text x="390" y="75" text-anchor="middle" fill="var(--muted)" font-size="5">API-KEY: sk_paid_xyz</text>
+  <text x="390" y="84" text-anchor="middle" fill="var(--g)" font-size="4.5">Limit: 2,000 req/min</text>
+
+  <!-- Enterprise client -->
+  <rect x="580" y="48" width="150" height="40" rx="5" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="655" y="63" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Enterprise Client</text>
+  <text x="655" y="75" text-anchor="middle" fill="var(--muted)" font-size="5">API-KEY: sk_ent_def</text>
+  <text x="655" y="84" text-anchor="middle" fill="var(--a2)" font-size="4.5">Limit: 10,000 req/min</text>
+
+  <!-- Arrows down to gateway -->
+  <line x1="125" y1="95" x2="125" y2="120" stroke="var(--r)" stroke-width=".8" marker-end="url(#ta-arr)"/>
+  <line x1="390" y1="95" x2="390" y2="120" stroke="var(--g)" stroke-width=".8" marker-end="url(#ta-arr)"/>
+  <line x1="655" y1="95" x2="655" y2="120" stroke="var(--a2)" stroke-width=".8" marker-end="url(#ta-arr)"/>
+
+  <!-- LAYER 2: API GATEWAY + RATE LIMITER -->
+  <rect x="10" y="115" width="760" height="140" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="390" y="130" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">API GATEWAY &middot; Rate Limit Middleware</text>
+
+  <!-- Step 1: Extract API Key -->
+  <rect x="30" y="140" width="140" height="50" rx="5" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width="1"/>
+  <text x="100" y="155" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">1. Extract Key</text>
+  <text x="100" y="168" text-anchor="middle" fill="var(--muted)" font-size="5">Authorization header</text>
+  <text x="100" y="179" text-anchor="middle" fill="var(--muted)" font-size="4.5">or X-API-Key header</text>
+
+  <!-- Arrow -->
+  <line x1="170" y1="165" x2="195" y2="165" stroke="#8b8fa3" stroke-width=".8" marker-end="url(#ta-arr)"/>
+
+  <!-- Step 2: Tier Lookup -->
+  <rect x="195" y="140" width="140" height="50" rx="5" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width="1"/>
+  <text x="265" y="155" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">2. Tier Lookup</text>
+  <text x="265" y="168" text-anchor="middle" fill="var(--muted)" font-size="5">In-memory config cache</text>
+  <text x="265" y="179" text-anchor="middle" fill="var(--y)" font-size="4.5">key &rarr; {tier, limit}</text>
+
+  <!-- Arrow -->
+  <line x1="335" y1="165" x2="360" y2="165" stroke="#8b8fa3" stroke-width=".8" marker-end="url(#ta-arr)"/>
+
+  <!-- Step 3: Sliding Window Check -->
+  <rect x="360" y="140" width="165" height="50" rx="5" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width="1"/>
+  <text x="442" y="155" text-anchor="middle" fill="var(--c)" font-size="6" font-weight="700">3. Sliding Window Check</text>
+  <text x="442" y="168" text-anchor="middle" fill="var(--muted)" font-size="5">weighted = curr + prev&middot;overlap</text>
+  <text x="442" y="179" text-anchor="middle" fill="var(--c)" font-size="4.5">if weighted &ge; limit &rarr; DENY</text>
+
+  <!-- Arrow -->
+  <line x1="525" y1="165" x2="550" y2="165" stroke="#8b8fa3" stroke-width=".8" marker-end="url(#ta-arr)"/>
+
+  <!-- Step 4: Decision -->
+  <rect x="550" y="140" width="100" height="50" rx="5" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width="1"/>
+  <text x="600" y="157" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">4. Allow</text>
+  <text x="600" y="170" text-anchor="middle" fill="var(--muted)" font-size="5">&rarr; Origin</text>
+
+  <rect x="660" y="140" width="100" height="50" rx="5" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width="1"/>
+  <text x="710" y="157" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">4. Deny</text>
+  <text x="710" y="170" text-anchor="middle" fill="var(--muted)" font-size="5">&rarr; 429</text>
+
+  <!-- Redis store underneath -->
+  <rect x="280" y="200" width="220" height="45" rx="5" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="390" y="215" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Redis &middot; Shared Counter Store</text>
+  <text x="390" y="228" text-anchor="middle" fill="var(--muted)" font-size="5">ratelimit:{api_key}:{window} &rarr; count</text>
+  <text x="390" y="239" text-anchor="middle" fill="var(--muted)" font-size="4.5">Atomic INCR + EXPIRE | TTL = window_size</text>
+
+  <!-- Dashed line from sliding window to Redis -->
+  <line x1="442" y1="190" x2="420" y2="200" stroke="var(--r)" stroke-width=".6" stroke-dasharray="3,2"/>
+
+  <!-- LAYER 3: RESPONSE -->
+  <rect x="10" y="265" width="760" height="70" rx="8" fill="rgba(52,211,153,.02)" stroke="var(--g)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="278" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="800">RESPONSE HEADERS</text>
+
+  <rect x="50" y="288" width="200" height="35" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="150" y="302" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">200 OK (within limit)</text>
+  <text x="150" y="314" text-anchor="middle" fill="var(--muted)" font-size="4.5">RateLimit-Remaining: 1,847</text>
+
+  <rect x="290" y="288" width="200" height="35" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="390" y="302" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">429 Too Many Requests</text>
+  <text x="390" y="314" text-anchor="middle" fill="var(--muted)" font-size="4.5">Retry-After: 12s | Remaining: 0</text>
+
+  <rect x="530" y="288" width="200" height="35" rx="4" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".6"/>
+  <text x="630" y="302" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Response Headers (always)</text>
+  <text x="630" y="314" text-anchor="middle" fill="var(--muted)" font-size="4.5">X-RateLimit-Limit | Reset | Remaining</text>
+
+  <!-- BOTTOM: Config/Rules panel -->
+  <rect x="10" y="345" width="760" height="65" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="360" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Tier Configuration (refreshed every 30s)</text>
+
+  <rect x="50" y="370" width="180" height="28" rx="3" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".5"/>
+  <text x="140" y="387" text-anchor="middle" fill="var(--r)" font-size="5.5">FREE: 100 req/min | burst: 20</text>
+
+  <rect x="260" y="370" width="180" height="28" rx="3" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="350" y="387" text-anchor="middle" fill="var(--g)" font-size="5.5">PAID: 2,000 req/min | burst: 200</text>
+
+  <rect x="470" y="370" width="180" height="28" rx="3" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width=".5"/>
+  <text x="560" y="387" text-anchor="middle" fill="var(--a2)" font-size="5.5">ENTERPRISE: 10K req/min | burst: 1K</text>
+
+  <text x="390" y="408" text-anchor="middle" fill="var(--muted)" font-size="4.5">Source: Config DB / Admin API | Cached in-memory per gateway instance | Force-refresh on billing tier change event</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Sliding window counter (weighted two-bucket)</td><td>Smooth limiting without boundary burst. Simple to implement, memory-efficient.</td></tr>
+<tr><td><span class="hi">Key</span></td><td>API key (from header or query param)</td><td>Per-customer identity. Maps 1:1 to billing tier.</td></tr>
+<tr><td><span class="hi">Tier lookup</span></td><td>In-memory rules cache (refreshed every 30s from config DB)</td><td>Fast lookup without per-request DB hit. Tier changes propagate within 30s.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>Redis HASH per key: {curr_count, prev_count, window_start}</td><td>Atomic operations, TTL-based cleanup, shared across app servers.</td></tr>
+<tr><td><span class="hi">Response</span></td><td>429 + RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After</td><td>RFC 6585 compliant. Client can self-throttle.</td></tr>
+<tr><td><span class="hi">Fairness</span></td><td>Per-key isolation (one key's traffic never affects another)</td><td>Free tier abuse cannot degrade paid tier experience.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Sliding window counter:</span> For a 1-minute window — maintain two buckets (current minute, previous minute). Weighted count = current_count + previous_count &times; (1 &minus; elapsed_seconds/60). If weighted &ge; tier_limit &rarr; reject with 429.</div>
+<div class="b by"><span class="hi">Token bucket alternative:</span> If the API needs burst tolerance (e.g., paid users can burst to 200 req in first second), token bucket is better. Capacity = burst size, refill rate = steady limit. But for strict "100 per minute" semantics, sliding window is cleaner.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Fixed window</span> &middot; allows 2&times; limit at boundary (200 free requests in 2 seconds spanning two minutes). <span class="hr">In-memory counters without shared store</span> &middot; user can rotate across servers to bypass. <span class="hr">Hardcoded limits</span> &middot; can't change tiers without deployment.</div>
+<div class="b bb"><span class="hi">Real-world examples:</span> <strong>Stripe</strong> &middot; 100 req/sec (test), 10K req/sec (live). <strong>GitHub</strong> &middot; 60 req/hr (unauth), 5000 req/hr (auth). <strong>OpenAI</strong> &middot; tier-based RPM + TPM. <strong>Twilio</strong> &middot; per-account concurrency limits.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Redis down</span></td><td>Cannot check/increment counters</td><td>Fail-open with degraded local counters. Alert on Redis health. Circuit breaker on Redis calls.</td></tr>
+<tr><td><span class="hr">Tier config stale</span></td><td>Upgraded user still rate-limited at old tier</td><td>30s cache TTL. Force-refresh endpoint for billing system to call on tier change.</td></tr>
+<tr><td><span class="hr">API key rotation</span></td><td>New key has fresh counters (bypass)</td><td>Rate limit by account_id as secondary key. Key rotation doesn't reset counter.</td></tr>
+<tr><td><span class="hr">Burst at window edge</span></td><td>Sliding window smooths this naturally</td><td>Weighted calculation handles boundary precisely.</td></tr>
+<tr><td><span class="hr">Hot key (one API key = massive traffic)</span></td><td>Redis hotspot on that key's shard</td><td>Local pre-check with approximate counter. Only hit Redis when near threshold.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for tiered API rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Sliding window counter</strong> &middot; two-bucket weighted sum prevents boundary burst<br>
+<span class="hg">2.</span> <strong>Redis as shared counter store</strong> &middot; atomic INCR, TTL-based expiry, works across all app servers<br>
+<span class="hg">3.</span> <strong>Tier lookup from config cache</strong> &middot; in-memory rules refreshed every 30s, no per-request DB call<br>
+<span class="hg">4.</span> <strong>Per-key isolation</strong> &middot; one customer's abuse never affects another's quota<br>
+<span class="hg">5.</span> <strong>Standard headers</strong> &middot; RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset + Retry-After<br>
+<span class="hg">6.</span> <strong>Graceful tier changes</strong> &middot; cache refresh propagates upgrades within seconds, counter resets optional
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

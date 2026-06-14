@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -20,163 +20,32 @@
 <div class="sd sd-4"><span class="e">🗄️</span> 7 · CACHING</div>
 
 <div class="T" id="caching">
-<h2>Caching Strategies</h2>
+<h2>Caching</h2>
 <p class="su">
-  Store frequently accessed data in a fast layer to improve 
-  <span class="hg">latency</span> (serve from cache → faster), 
-  <span class="hg">throughput</span> (reduce backend load), and 
-  <span class="hg">cost efficiency</span> (fewer DB calls), 
-  with trade-offs in 
-  <span class="hg">consistency</span> (stale data risk), 
-  <span class="hg">invalidation</span> (hard to update/expire), and 
-  <span class="hg">memory usage</span> (extra storage).
+  Storing data in a faster storage layer (typically RAM) so frequently requested data can be served without repeatedly accessing the source of truth. This reduces 
+  <span class="hg">latency</span> (faster responses), increases 
+  <span class="hg">throughput</span> (fewer backend/database operations per request), and improves 
+  <span class="hg">cost efficiency</span> (less infrastructure needed to handle the same traffic), 
+  while introducing trade-offs around 
+  <span class="hr">consistency</span> (may have stale data), 
+  <span class="hr">cache invalidation</span> complexity, and additional 
+  <span class="hr">memory overhead</span>.
 </p>
-<!-- ═══ 5 Strategy Flow Diagrams (clean horizontal layout) ═══ -->
-<div class="d-grid tri" style="margin:4px 0">
-
-<!-- 1. Cache-Aside -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--g)">Cache-Aside (Lazy)</h4>
-<svg width="100%" viewBox="0 0 180 76" style="max-width:180px;display:block;margin:0 auto">
-  <defs><marker id="ca1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
-  <!-- Actors in a row -->
-  <rect x="4" y="4" width="36" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
-  <text x="22" y="16" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">App</text>
-  <rect x="72" y="4" width="36" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="90" y="16" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Cache</text>
-  <rect x="140" y="4" width="36" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="158" y="16" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">DB</text>
-  <line x1="40" y1="10" x2="70" y2="10" stroke="var(--a)" stroke-width=".8" marker-end="url(#ca1)"/>
-  <line x1="72" y1="16" x2="42" y2="16" stroke="var(--r)" stroke-width=".8" marker-end="url(#ca1)" stroke-dasharray="2,2"/>
-  <!-- Steps as text list -->
-  <text x="8" y="34" fill="var(--text)" font-size="6.5"><tspan fill="var(--g)" font-weight="700">①</tspan> App reads Cache</text>
-  <text x="8" y="44" fill="var(--text)" font-size="6.5"><tspan fill="var(--r)" font-weight="700">②</tspan> Cache miss!</text>
-  <text x="8" y="54" fill="var(--text)" font-size="6.5"><tspan fill="var(--a)" font-weight="700">③</tspan> App reads DB</text>
-  <text x="8" y="64" fill="var(--text)" font-size="6.5"><tspan fill="var(--g)" font-weight="700">④</tspan> DB returns data</text>
-  <text x="8" y="74" fill="var(--text)" font-size="6.5"><tspan fill="var(--y)" font-weight="700">⑤</tspan> App writes to Cache</text>
-</svg>
-<div style="font-size:.7rem;line-height:1.3;margin-top:2px">
-  <span class="tg">Pro</span> App controls logic, only requested data cached<br>
-  <span class="tr">Con</span> Miss = 3 round trips, stale if DB updated directly
-</div>
-</div>
-
-<!-- 2. Read-Through -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--a)">Read-Through</h4>
-<svg width="100%" viewBox="0 0 180 76" style="max-width:180px;display:block;margin:0 auto">
-  <rect x="4" y="4" width="36" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
-  <text x="22" y="16" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">App</text>
-  <rect x="72" y="4" width="36" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="90" y="16" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Cache</text>
-  <rect x="140" y="4" width="36" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="158" y="16" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">DB</text>
-  <line x1="40" y1="13" x2="70" y2="13" stroke="var(--a)" stroke-width=".8" marker-end="url(#ca1)"/>
-  <text x="8" y="34" fill="var(--text)" font-size="6.5"><tspan fill="var(--g)" font-weight="700">①</tspan> App reads Cache</text>
-  <text x="8" y="44" fill="var(--text)" font-size="6.5"><tspan fill="var(--r)" font-weight="700">②</tspan> Cache miss</text>
-  <text x="8" y="54" fill="var(--text)" font-size="6.5"><tspan fill="var(--c)" font-weight="700">③</tspan> Cache reads DB <tspan fill="var(--muted)">(auto)</tspan></text>
-  <text x="8" y="64" fill="var(--text)" font-size="6.5"><tspan fill="var(--g)" font-weight="700">④</tspan> Cache stores result</text>
-  <text x="8" y="74" fill="var(--text)" font-size="6.5"><tspan fill="var(--g)" font-weight="700">⑤</tspan> Cache returns to App</text>
-</svg>
-<div style="font-size:.7rem;line-height:1.3;margin-top:2px">
-  <span class="tg">Pro</span> Simple app code — cache auto-fetches from DB<br>
-  <span class="tr">Con</span> Cache library dependency, needs DB plugin
-</div>
-</div>
-
-<!-- 3. Write-Around (Cache-Aside write) -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--c)">Write-Around</h4>
-<svg width="100%" viewBox="0 0 180 76" style="max-width:180px;display:block;margin:0 auto">
-  <rect x="4" y="4" width="36" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
-  <text x="22" y="16" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">App</text>
-  <rect x="72" y="4" width="36" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="90" y="16" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Cache</text>
-  <rect x="140" y="4" width="36" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="158" y="16" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">DB</text>
-  <line x1="40" y1="13" x2="138" y2="13" stroke="var(--g)" stroke-width="1" marker-end="url(#ca1)"/>
-  <text x="8" y="34" fill="var(--text)" font-size="6.5"><tspan fill="var(--g)" font-weight="700">①</tspan> App writes DB directly</text>
-  <text x="8" y="44" fill="var(--text)" font-size="6.5"><tspan fill="var(--a)" font-weight="700">②</tspan> Later: App reads Cache</text>
-  <text x="8" y="54" fill="var(--text)" font-size="6.5"><tspan fill="var(--r)" font-weight="700">③</tspan> Miss → read DB</text>
-  <text x="8" y="64" fill="var(--text)" font-size="6.5"><tspan fill="var(--y)" font-weight="700">④</tspan> Update Cache with result</text>
-  <text x="8" y="74" fill="var(--muted)" font-size="6.5">Cache only populated on read</text>
-</svg>
-<div style="font-size:.7rem;line-height:1.3;margin-top:2px">
-  <span class="tg">Pro</span> DB is source of truth, no stale writes in cache<br>
-  <span class="tr">Con</span> Cache may be stale until next read miss
-</div>
-</div>
-</div>
-
-<!-- Row 2: Write-Back + Write-Through -->
-<div class="d-grid" style="margin:6px 0">
-
-<!-- 4. Write-Back (Write-Behind) -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--r)">Write-Back (Write-Behind)</h4>
-<svg width="100%" viewBox="0 0 240 50" style="max-width:240px;display:block;margin:0 auto">
-  <rect x="4" y="4" width="44" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
-  <text x="26" y="16" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">App</text>
-  <rect x="90" y="4" width="44" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="112" y="16" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Cache</text>
-  <rect x="186" y="4" width="44" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="208" y="16" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">DB</text>
-  <line x1="48" y1="13" x2="88" y2="13" stroke="var(--r)" stroke-width="1.2" marker-end="url(#ca1)"/>
-  <text x="68" y="8" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">① write</text>
-  <line x1="134" y1="13" x2="184" y2="13" stroke="var(--g)" stroke-width="1" marker-end="url(#ca1)" stroke-dasharray="4,2"/>
-  <text x="159" y="8" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="600">② async flush</text>
-  <text x="120" y="34" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="600">⚠ Data loss if cache dies before flush</text>
-  <text x="120" y="46" text-anchor="middle" fill="var(--muted)" font-size="6.5">Fastest writes — DB updated later in background</text>
-</svg>
-<div style="font-size:.7rem;line-height:1.3;margin-top:2px">
-  <span class="tg">Pro</span> Lowest write latency, cache+DB eventually consistent<br>
-  <span class="tr">Con</span> <span class="hr">Data loss risk</span> if cache crashes before DB sync
-</div>
-</div>
-
-<!-- 5. Write-Through -->
-<div class="d-panel" style="padding:8px">
-<h4 style="color:var(--y)">Write-Through</h4>
-<svg width="100%" viewBox="0 0 240 50" style="max-width:240px;display:block;margin:0 auto">
-  <rect x="4" y="4" width="44" height="18" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
-  <text x="26" y="16" text-anchor="middle" fill="var(--a)" font-size="7.5" font-weight="700">App</text>
-  <rect x="90" y="4" width="44" height="18" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.2"/>
-  <text x="112" y="16" text-anchor="middle" fill="var(--r)" font-size="7.5" font-weight="700">Cache</text>
-  <rect x="186" y="4" width="44" height="18" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
-  <text x="208" y="16" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">DB</text>
-  <line x1="48" y1="13" x2="88" y2="13" stroke="var(--r)" stroke-width="1.2" marker-end="url(#ca1)"/>
-  <text x="68" y="8" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">① write</text>
-  <line x1="134" y1="13" x2="184" y2="13" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ca1)"/>
-  <text x="159" y="8" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">② sync to DB</text>
-  <text x="120" y="34" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">✓ Cache + DB always in sync</text>
-  <text x="120" y="46" text-anchor="middle" fill="var(--muted)" font-size="6.5">Write latency doubles (waits for DB confirmation)</text>
-</svg>
-  <line x1="134" y1="24" x2="184" y2="30" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ca1)"/>
-  <circle cx="158" cy="22" r="7" fill="var(--g)"/><text x="158" y="25" text-anchor="middle" fill="#fff" font-size="6" font-weight="700">2</text>
-  <text x="158" y="14" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">sync immediately</text>
-  <!-- Guarantee -->
-  <text x="120" y="52" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">✓ Cache + DB always in sync</text>
-  <text x="120" y="64" text-anchor="middle" fill="var(--muted)" font-size="6.5">Higher write latency (waits for DB)</text>
-</svg>
-<div style="font-size:.7rem;line-height:1.3;margin-top:2px">
-  <span class="tg">Pro</span> Reads always fresh, cache+DB in sync<br>
-  <span class="tr">Con</span> Write latency doubles, infrequent data cached too
-</div>
-</div>
-</div>
-
 <!-- Compact comparison -->
-<table style="margin-top:4px">
-<tr><th>Strategy</th><th>Read Path</th><th>Write Path</th><th>Consistency</th><th>Best For</th></tr>
-<tr><td><span class="hi">Cache-Aside</span></td><td>App → Cache → DB on miss</td><td>App → DB (cache invalidated)</td><td>Eventual</td><td>General purpose (most common)</td></tr>
-<tr><td><span class="hi">Read-Through</span></td><td>App → Cache (auto-fetches DB)</td><td>—</td><td>Eventual</td><td>Simpler app code</td></tr>
-<tr><td><span class="hi">Write-Around</span></td><td>App → Cache → DB on miss</td><td>App → DB directly</td><td>Eventual</td><td>Write-heavy, read-rarely data</td></tr>
-<tr><td><span class="hi">Write-Back</span></td><td>App → Cache</td><td>App → Cache → <span class="hr">async</span> DB</td><td><span class="hr">Eventual</span></td><td>High write throughput</td></tr>
-<tr><td><span class="hi">Write-Through</span></td><td>App → Cache</td><td>App → Cache → <span class="hg">sync</span> DB</td><td><span class="hg">Strong</span></td><td>Read-heavy, consistency needed</td></tr>
+<div class="d-title"><span class="num d-green">&#x25B8;</span> Caching Strategies</div>
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin:6px 0">
+<table style="min-width:1000px;margin-top:4px">
+<tr><th>Strategy</th><th>Flow (Read &#x2022; Write)</th><th>Consistency</th><th>Strong Reason to Choose</th><th>Why Other Strategies Are Not Ideal</th><th>Real-World</th></tr>
+<tr><td><span class="hi">Cache-Aside</span><br><span style="font-size:.7rem;color:var(--g)">&#x2192; Hot reads</span><br><span style="font-size:.65rem;color:var(--muted);font-style:italic">Hot, frequently read data</span></td><td><div class="dp-panel dp-auto"><svg width="240" height="90" viewBox="0 0 240 90"><rect x="2" y="30" width="44" height="30" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/><text x="24" y="48" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text><rect x="98" y="4" width="44" height="26" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/><text x="120" y="20" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Cache</text><rect x="98" y="54" width="44" height="26" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/><text x="120" y="70" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">DB</text><line x1="48" y1="38" x2="96" y2="16" stroke="var(--a)" stroke-width=".8"/><text x="68" y="22" fill="var(--a)" font-size="5.5" font-weight="600">1 read</text><line x1="96" y1="22" x2="48" y2="40" stroke="var(--r)" stroke-width=".8" stroke-dasharray="2,1"/><text x="68" y="36" fill="var(--r)" font-size="5.5">2 miss</text><line x1="48" y1="52" x2="96" y2="62" stroke="var(--g)" stroke-width=".8"/><text x="68" y="60" fill="var(--g)" font-size="5.5">3 read DB</text><line x1="96" y1="70" x2="48" y2="56" stroke="var(--g)" stroke-width=".8"/><text x="68" y="72" fill="var(--g)" font-size="5.5">4 data</text><line x1="48" y1="44" x2="96" y2="26" stroke="var(--y)" stroke-width=".8"/><text x="68" y="48" fill="var(--y)" font-size="5.5">5 set cache</text><text x="160" y="14" fill="var(--o)" font-size="6" font-weight="700">Write:</text><text x="160" y="26" fill="var(--muted)" font-size="5.5">App&#x2192;DB</text><text x="160" y="38" fill="var(--r)" font-size="5.5">DEL cache key</text><text x="160" y="56" fill="var(--muted)" font-size="5">(next read</text><text x="160" y="66" fill="var(--muted)" font-size="5">repopulates)</text></svg><div style="font-size:.68rem;line-height:1.4;margin-top:4px"><span class="tg">Pro</span> App controls, only hot data cached<br><span class="tr">Con</span> Miss = 3 round trips, stale if DB updated directly</div><div class="dp-ctrls"><button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">&#x26F6;</button></div></div></td><td>Eventual</td><td><span class="hg">App controls</span> what's cached &#x2014; same data viewed repeatedly; cache only popular content</td><td><span class="hr">Write-Through</span> wastes RAM on unread data. <span class="hr">Read-Through</span> needs library plugin.</td><td><strong>Twitter Timeline</strong> &#x2192; read-heavy, eventual OK<br><strong>GitHub Repos</strong> &#x2192; mostly reads, infrequent updates<br><strong>Shopify Products</strong> &#x2192; high traffic, rare changes<br><strong>YouTube Video Metadata</strong> &#x2192; billions of reads, rare edits<br><strong>Zoom Meeting Metadata</strong> &#x2192; fetched on every join<br><strong>Netflix Movie Catalog</strong> &#x2192; browse-heavy, titles rarely change</td></tr>
+<tr><td><span class="hi">Read-Through</span><br><span style="font-size:.7rem;color:var(--g)">&#x2192; Auto reads</span><br><span style="font-size:.65rem;color:var(--muted);font-style:italic">Simple application code</span></td><td><div class="dp-panel dp-auto"><svg width="220" height="70" viewBox="0 0 220 70"><rect x="2" y="20" width="44" height="30" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/><text x="24" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text><rect x="80" y="10" width="60" height="50" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/><text x="110" y="28" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Cache</text><text x="110" y="40" text-anchor="middle" fill="var(--muted)" font-size="5">auto-fetch</text><text x="110" y="50" text-anchor="middle" fill="var(--muted)" font-size="5">on miss</text><rect x="168" y="20" width="44" height="30" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/><text x="190" y="38" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">DB</text><line x1="48" y1="32" x2="78" y2="28" stroke="var(--a)" stroke-width=".8"/><text x="62" y="24" fill="var(--a)" font-size="5.5">1 read</text><line x1="142" y1="35" x2="166" y2="35" stroke="var(--g)" stroke-width=".8"/><text x="152" y="30" fill="var(--g)" font-size="5">2 fetch</text><line x1="78" y1="40" x2="48" y2="42" stroke="var(--g)" stroke-width=".8"/><text x="62" y="50" fill="var(--g)" font-size="5.5">3 return</text></svg><div style="font-size:.68rem;line-height:1.4;margin-top:4px"><span class="tg">Pro</span> Simple app code, cache auto-fetches<br><span class="tr">Con</span> Needs cache library/plugin for DB</div><div class="dp-ctrls"><button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">&#x26F6;</button></div></div></td><td>Eventual</td><td><span class="hg">Simple app code</span> &#x2014; cache automatically fetches missing data from the source</td><td><span class="hr">Cache-Aside</span> requires manual miss-handling logic in every call.</td><td><strong>AWS DynamoDB DAX</strong> &#x2192; reads auto-fetched from DynamoDB<br><strong>Cloudflare CDN</strong> &#x2192; edge auto-fetches origin on miss<br><strong>Google Calendar Events</strong> &#x2192; calendar service reads through cache layer<br><strong>Spotify Playlist Metadata</strong> &#x2192; catalog service auto-populates<br><strong>LinkedIn Profile Views</strong> &#x2192; profile cache auto-fills from DB</td></tr>
+<tr><td><span class="hi">Write-Around</span><br><span style="font-size:.7rem;color:var(--g)">&#x2192; Cold writes</span><br><span style="font-size:.65rem;color:var(--muted);font-style:italic">Avoid caching cold data</span></td><td><div class="dp-panel dp-auto"><svg width="220" height="80" viewBox="0 0 220 80"><rect x="2" y="24" width="44" height="30" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/><text x="24" y="42" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text><rect x="98" y="4" width="44" height="24" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/><text x="120" y="19" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">Cache</text><rect x="98" y="48" width="44" height="24" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/><text x="120" y="63" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">DB</text><line x1="48" y1="46" x2="96" y2="58" stroke="var(--g)" stroke-width="1.2"/><text x="68" y="58" fill="var(--g)" font-size="5.5" font-weight="600">1 write DB</text><line x1="48" y1="32" x2="96" y2="16" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="2,1"/><text x="68" y="22" fill="var(--muted)" font-size="5">2 read (miss)</text><line x1="96" y1="68" x2="48" y2="50" stroke="var(--g)" stroke-width=".6"/><text x="68" y="68" fill="var(--muted)" font-size="5">3 fetch DB</text><line x1="48" y1="36" x2="96" y2="22" stroke="var(--y)" stroke-width=".6" stroke-dasharray="2,1"/><text x="160" y="20" fill="var(--muted)" font-size="5">4 set cache</text><text x="160" y="40" fill="var(--muted)" font-size="5">Cache only on</text><text x="160" y="50" fill="var(--muted)" font-size="5">future read-miss</text></svg><div style="font-size:.68rem;line-height:1.4;margin-top:4px"><span class="tg">Pro</span> DB is source of truth, no cache pollution<br><span class="tr">Con</span> Higher write latency, cache may be stale</div><div class="dp-ctrls"><button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">&#x26F6;</button></div></div></td><td>Eventual</td><td><span class="hg">Writes skip cache</span> &#x2014; huge write volume; most records are never read again</td><td><span class="hr">Write-Through</span> caches every write (wastes RAM). <span class="hr">Write-Back</span> risks loss.</td><td><strong>CloudWatch / Datadog Logs</strong> &#x2192; write millions/sec, rarely re-read<br><strong>Compliance Audit Trails</strong> &#x2192; write-once, query only on investigation<br><strong>IoT Sensor Telemetry</strong> &#x2192; massive ingest, batch analytics later<br><strong>Clickstream Events</strong> &#x2192; firehose writes, only aggregated later<br><strong>Email Send Logs</strong> &#x2192; stored for compliance, seldom opened</td></tr>
+<tr><td><span class="hi">Write-Back</span><br><span style="font-size:.7rem;color:var(--g)">&#x2192; Fast writes</span><br><span style="font-size:.65rem;color:var(--muted);font-style:italic">Maximum write throughput</span></td><td><div class="dp-panel dp-auto"><svg width="220" height="80" viewBox="0 0 220 80"><rect x="2" y="10" width="44" height="30" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/><text x="24" y="28" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text><rect x="88" y="4" width="50" height="42" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/><text x="113" y="20" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Cache</text><text x="113" y="32" text-anchor="middle" fill="var(--muted)" font-size="5">buffers</text><text x="113" y="42" text-anchor="middle" fill="var(--muted)" font-size="5">writes</text><rect x="168" y="10" width="44" height="30" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/><text x="190" y="28" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">DB</text><line x1="48" y1="16" x2="86" y2="12" stroke="var(--a)" stroke-width=".7"/><line x1="48" y1="22" x2="86" y2="20" stroke="var(--a)" stroke-width=".7"/><line x1="48" y1="28" x2="86" y2="28" stroke="var(--a)" stroke-width=".7"/><text x="66" y="10" fill="var(--a)" font-size="5.5" font-weight="600">1 write xN</text><line x1="140" y1="25" x2="166" y2="25" stroke="var(--g)" stroke-width=".8" stroke-dasharray="3,2"/><text x="152" y="20" fill="var(--o)" font-size="5">2 async</text><text x="80" y="58" fill="var(--a)" font-size="5.5">Read: App&#x2192;Cache</text><text x="80" y="68" fill="var(--g)" font-size="5.5">(always HIT)</text><text x="80" y="78" fill="var(--r)" font-size="5">&#x26A0; loss if crash</text></svg><div style="font-size:.68rem;line-height:1.4;margin-top:4px"><span class="tg">Pro</span> Lowest write latency, reads always HIT<br><span class="tr">Con</span> Data loss risk if cache crashes</div><div class="dp-ctrls"><button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">&#x26F6;</button></div></div></td><td><span class="hr">Eventual</span></td><td><span class="hg">Fastest writes</span> &#x2014; absorb massive write traffic before persisting to DB</td><td><span class="hr">Write-Through</span> doubles latency. <span class="hr">Cache-Aside</span> hits DB on every write.</td><td><strong>Gaming Leaderboards</strong> &#x2192; 100K score updates/sec<br><strong>Uber Driver Location</strong> &#x2192; GPS pings every 4s, batch to DB<br><strong>IoT Device Heartbeats</strong> &#x2192; buffer 5s, flush batch to DB<br><strong>View Counters (YouTube)</strong> &#x2192; increment in cache, persist periodically<br><strong>Chat Typing Indicators</strong> &#x2192; ephemeral, never hits DB</td></tr>
+<tr><td><span class="hi">Write-Through</span><br><span style="font-size:.7rem;color:var(--g)">&#x2192; Fresh reads after writes</span><br><span style="font-size:.65rem;color:var(--muted);font-style:italic">Strong consistency after writes</span></td><td><div class="dp-panel dp-auto"><svg width="220" height="70" viewBox="0 0 220 70"><rect x="2" y="14" width="44" height="28" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/><text x="24" y="31" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="700">App</text><rect x="86" y="8" width="50" height="38" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/><text x="111" y="22" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Cache</text><text x="111" y="34" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">sync</text><rect x="166" y="14" width="44" height="28" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/><text x="188" y="31" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">DB</text><line x1="48" y1="28" x2="84" y2="24" stroke="var(--a)" stroke-width="1"/><text x="66" y="18" fill="var(--a)" font-size="5.5" font-weight="600">1 write</text><line x1="138" y1="27" x2="164" y2="27" stroke="var(--g)" stroke-width="1"/><text x="150" y="22" fill="var(--g)" font-size="5" font-weight="600">2 sync DB</text><text x="10" y="56" fill="var(--a)" font-size="5.5">Read: always FRESH</text><text x="10" y="66" fill="var(--g)" font-size="5">cache = DB (in sync)</text></svg><div style="font-size:.68rem;line-height:1.4;margin-top:4px"><span class="tg">Pro</span> Reads always fresh, zero stale window<br><span class="tr">Con</span> Write latency doubles, cold data cached</div><div class="dp-ctrls"><button class="dp-ctrl dp-expand" onclick="dpExpand(this.closest('.dp-panel'))" title="Expand diagram">&#x26F6;</button></div></div></td><td><span class="hg">Strong</span></td><td><span class="hg">Zero stale window</span> &#x2014; users expect updates to be visible immediately on next read</td><td><span class="hr">Cache-Aside</span> has stale gap. <span class="hr">Write-Back</span> can lose data.</td><td><strong>Facebook TAO</strong> &#x2192; friend list visible instantly after add<br><strong>Google Calendar (writes)</strong> &#x2192; new event visible to all invitees immediately<br><strong>Stripe Payment State</strong> &#x2192; charge status fresh on next API call<br><strong>Slack Channel Membership</strong> &#x2192; join/leave reflected instantly<br><strong>Amazon Cart</strong> &#x2192; add-to-cart must show on next page load</td></tr>
 </table>
+</div>
 
 <div class="b bb"><span class="hi">Invalidation:</span> <span class="hg">TTL</span> (simple, stale until expiry) · <span class="hg">Event-driven</span> (CDC/app triggers delete, near real-time) · <span class="hg">Version key</span> (new version = auto miss). <span class="hi">Eviction:</span> LRU (most common) · LFU · FIFO.</div>
-<div class="b by"><span class="hi">Thundering Herd:</span> Cache expires → thousands hit DB simultaneously. Fix: <span class="hg">mutex on cache miss</span>, probabilistic early expiration, stale-while-revalidate.</div>
+<div class="b by"><span class="hi">Thundering Herd/cache stampede:</span> Cache expires → thousands hit DB simultaneously. Fix: <span class="hg">mutex on cache miss</span>, Request coalescing / single-flight, probabilistic early expiration, stale-while-revalidate.</div>
 <div class="b bo"><span class="hi">Real-world:</span> <strong>Facebook</strong> uses Memcached (TAO). <strong>Twitter</strong> caches timelines in Redis. Target: <span class="hg">cache hit rate &gt;95%</span>.</div>
 </div>
 
@@ -352,14 +221,14 @@
 <h2>Redis — Data Structures</h2><p class="su"><span class="hg">In-memory</span> data store — <span class="hi">sub-ms latency, 100K–1M ops/sec</span>. Cache + data structures + messaging</p>
 <table>
 <tr><th>Structure</th><th>Commands</th><th>Use Case</th></tr>
-<tr><td><span class="hi">String</span></td><td>SET/GET/INCR/SETNX/EXPIRE</td><td><span class="hg">Counters</span> · <span class="hg">Session tokens</span> · <span class="hg">Cache</span> · <span class="hg">Distributed lock</span> (SETNX) · <span class="hg">Feature flags</span></td></tr>
-<tr><td><span class="hi">Hash</span></td><td>HSET/HGET/HGETALL/HDEL/HINCRBY</td><td><span class="hg">User profiles</span> · <span class="hg">Cache objects</span> · <span class="hg">Shopping cart</span> · <span class="hg">Config store</span></td></tr>
-<tr><td><span class="hi">List</span></td><td>LPUSH/RPOP/LRANGE/LLEN/BRPOP</td><td><span class="hg">Job queues</span> · <span class="hg">Activity feeds</span> · <span class="hg">Recent history</span> · <span class="hg">Blocking queue</span></td></tr>
-<tr><td><span class="hi">Set</span></td><td>SADD/SMEMBERS/SINTER/SUNION/SISMEMBER</td><td><span class="hg">Unique visitors</span> · <span class="hg">Tags</span> · <span class="hg">Deduplication</span> · <span class="hg">Common friends</span> · <span class="hg">Online users</span></td></tr>
-<tr><td><span class="hi">Sorted Set</span></td><td>ZADD/ZRANGE/ZRANK/ZREVRANK/ZINCRBY</td><td><span class="hg">Leaderboards</span> · <span class="hg">Rate limiting</span> (sliding window) · <span class="hg">Priority queues</span> · <span class="hg">Trending topics</span> · <span class="hg">Delayed jobs</span></td></tr>
-<tr><td><span class="hi">HyperLogLog</span></td><td>PFADD/PFCOUNT/PFMERGE</td><td><span class="hg">Approximate unique count</span> with <span class="hg">0.81% error</span> at fixed <span class="hg">12KB memory</span> · <span class="hg">DAU</span> · <span class="hg">Unique page views</span></td></tr>
-<tr><td><span class="hi">Geo</span></td><td>GEOADD/GEODIST/GEORADIUS/GEOPOS/GEOSEARCH</td><td><span class="hg">Nearby drivers</span> (Uber/Lyft) · <span class="hg">Store locator</span> · <span class="hg">Location tracking</span> · Uses <span class="hg">Sorted Set with Geohash</span></td></tr>
-<tr><td><span class="hi">Stream</span></td><td>XADD/XREAD/XREADGROUP/XACK/XRANGE</td><td><span class="hg">Event log</span> · <span class="hg">Consumer groups</span> · <span class="hg">Lightweight Kafka</span> · <span class="hg">Audit trail</span></td></tr>
+<tr><td><span class="hi">String</span></td><td>SET/GET/INCR/SETNX/EXPIRE<br><code style="font-size:.65rem;color:var(--muted)">SET session:tok_abc123 '{"user_id":"u42","role":"admin"}' EX 3600</code><br><code style="font-size:.65rem;color:var(--muted)">INCR ratelimit:user42:1705312200</code><br><code style="font-size:.65rem;color:var(--muted)">SET lock:order:ORD-9876 "worker-3" NX EX 30</code></td><td><span class="hg">Counters</span> · <span class="hg">Session tokens</span> · <span class="hg">Cache</span> · <span class="hg">Distributed lock</span> (SETNX) · <span class="hg">Feature flags</span></td></tr>
+<tr><td><span class="hi">Hash</span></td><td>HSET/HGET/HGETALL/HDEL/HINCRBY<br><code style="font-size:.65rem;color:var(--muted)">HSET user:u42 name "John" city "NYC" plan "pro"</code><br><code style="font-size:.65rem;color:var(--muted)">HINCRBY cart:sess_abc item:sku_001 2</code><br><code style="font-size:.65rem;color:var(--muted)">HGETALL config:feature-flags</code></td><td><span class="hg">User profiles</span> · <span class="hg">Cache objects</span> · <span class="hg">Shopping cart</span> · <span class="hg">Config store</span></td></tr>
+<tr><td><span class="hi">List</span></td><td>LPUSH/RPOP/LRANGE/LLEN/BRPOP<br><code style="font-size:.65rem;color:var(--muted)">LPUSH queue:email:send '{"to":"a@b.com","tmpl":"welcome"}'</code><br><code style="font-size:.65rem;color:var(--muted)">BRPOP queue:email:send 30</code><br><code style="font-size:.65rem;color:var(--muted)">LRANGE feed:user42 0 19</code></td><td><span class="hg">Job queues</span> · <span class="hg">Activity feeds</span> · <span class="hg">Recent history</span> · <span class="hg">Blocking queue</span></td></tr>
+<tr><td><span class="hi">Set</span></td><td>SADD/SMEMBERS/SINTER/SUNION/SISMEMBER<br><code style="font-size:.65rem;color:var(--muted)">SADD channel:general:online "u42" "u87" "u103"</code><br><code style="font-size:.65rem;color:var(--muted)">SINTER friends:u42 friends:u87</code><br><code style="font-size:.65rem;color:var(--muted)">SISMEMBER blocklist:ip "203.0.113.5"</code></td><td><span class="hg">Unique visitors</span> · <span class="hg">Tags</span> · <span class="hg">Deduplication</span> · <span class="hg">Common friends</span> · <span class="hg">Online users</span></td></tr>
+<tr><td><span class="hi">Sorted Set</span></td><td>ZADD/ZRANGE/ZRANK/ZREVRANK/ZINCRBY<br><code style="font-size:.65rem;color:var(--muted)">ZADD leaderboard:weekly 4850 "player:u42"</code><br><code style="font-size:.65rem;color:var(--muted)">ZREVRANGE leaderboard:weekly 0 9 WITHSCORES</code><br><code style="font-size:.65rem;color:var(--muted)">ZADD delayed_jobs 1705312260 "job:send_report:u42"</code></td><td><span class="hg">Leaderboards</span> · <span class="hg">Rate limiting</span> (sliding window) · <span class="hg">Priority queues</span> · <span class="hg">Trending topics</span> · <span class="hg">Delayed jobs</span></td></tr>
+<tr><td><span class="hi">HyperLogLog</span></td><td>PFADD/PFCOUNT/PFMERGE<br><code style="font-size:.65rem;color:var(--muted)">PFADD dau:2025-01-15 "u42" "u87" "u103"</code><br><code style="font-size:.65rem;color:var(--muted)">PFCOUNT dau:2025-01-15</code><br><code style="font-size:.65rem;color:var(--muted)">PFMERGE mau:2025-01 dau:2025-01-01 dau:2025-01-02 ...</code></td><td><span class="hg">Approximate unique count</span> with <span class="hg">0.81% error</span> at fixed <span class="hg">12KB memory</span> · <span class="hg">DAU</span> · <span class="hg">Unique page views</span></td></tr>
+<tr><td><span class="hi">Geo</span></td><td>GEOADD/GEODIST/GEORADIUS/GEOPOS/GEOSEARCH<br><code style="font-size:.65rem;color:var(--muted)">GEOADD drivers:nyc -73.9857 40.7484 "driver:d001"</code><br><code style="font-size:.65rem;color:var(--muted)">GEOSEARCH drivers:nyc FROMLONLAT -73.98 40.75 BYRADIUS 2 km ASC COUNT 10</code><br><code style="font-size:.65rem;color:var(--muted)">GEODIST drivers:nyc "driver:d001" "rider:r042" km</code></td><td><span class="hg">Nearby drivers</span> (Uber/Lyft) · <span class="hg">Store locator</span> · <span class="hg">Location tracking</span> · Uses <span class="hg">Sorted Set with Geohash</span></td></tr>
+<tr><td><span class="hi">Stream</span></td><td>XADD/XREAD/XREADGROUP/XACK/XRANGE<br><code style="font-size:.65rem;color:var(--muted)">XADD orders:events * user_id u42 action placed amount 49.99</code><br><code style="font-size:.65rem;color:var(--muted)">XREADGROUP GROUP workers consumer-1 COUNT 10 BLOCK 5000 STREAMS orders:events ></code><br><code style="font-size:.65rem;color:var(--muted)">XACK orders:events workers 1705312200000-0</code></td><td><span class="hg">Event log</span> · <span class="hg">Consumer groups</span> · <span class="hg">Lightweight Kafka</span> · <span class="hg">Audit trail</span></td></tr>
 </table>
 </div>
 
@@ -391,18 +260,97 @@ Bottleneck = NETWORK, not CPU → single thread is enough</code></pre>
 </div>
 
 <div class="T" id="redis-pubsub">
-<h2>Redis Pub/Sub &amp; Streams</h2><p class="su">Real-time messaging built into Redis — from fire-and-forget broadcast to durable event logs</p>
+<h2>Redis Pub/Sub</h2><p class="su">Fire-and-forget <span class="hg">real-time broadcast</span> — every subscriber gets every message instantly, but <span class="hr">no history, no replay, no persistence</span></p>
 
-<div class="d-title"><span class="num d-orange">▸</span> Pub/Sub — Real-Time Broadcast</div>
+<!-- ═══ Pub/Sub SVG ═══ -->
+<svg width="100%" viewBox="0 0 720 110" style="max-width:720px;display:block;margin:6px auto 10px">
+  <defs><marker id="rps1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--o)"/></marker></defs>
+  <!-- Publisher -->
+  <rect x="20" y="30" width="100" height="50" rx="8" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="70" y="50" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="800">Publisher</text>
+  <text x="70" y="66" text-anchor="middle" fill="var(--muted)" font-size="6.5">PUBLISH chat:room1 "Hello"</text>
+  <!-- Channel -->
+  <rect x="200" y="26" width="120" height="58" rx="8" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width="2"/>
+  <text x="260" y="46" text-anchor="middle" fill="var(--o)" font-size="9" font-weight="800">Channel</text>
+  <text x="260" y="60" text-anchor="middle" fill="var(--muted)" font-size="7">chat:room1</text>
+  <text x="260" y="74" text-anchor="middle" fill="var(--r)" font-size="6">no storage — instant delivery</text>
+  <!-- Arrow pub to channel -->
+  <line x1="122" y1="55" x2="198" y2="55" stroke="var(--a)" stroke-width="1.5" marker-end="url(#rps1)"/>
+  <!-- Subscribers -->
+  <line x1="322" y1="38" x2="398" y2="26" stroke="var(--o)" stroke-width="1.2" marker-end="url(#rps1)"/>
+  <line x1="322" y1="50" x2="398" y2="50" stroke="var(--o)" stroke-width="1.2" marker-end="url(#rps1)"/>
+  <line x1="322" y1="62" x2="398" y2="74" stroke="var(--o)" stroke-width="1.2" marker-end="url(#rps1)"/>
+  <rect x="400" y="14" width="100" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="450" y="30" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Sub A (App Server 1)</text>
+  <rect x="400" y="42" width="100" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="450" y="58" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Sub B (App Server 2)</text>
+  <rect x="400" y="70" width="100" height="24" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="450" y="86" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Sub C (App Server 3)</text>
+  <!-- Late joiner -->
+  <rect x="530" y="42" width="170" height="30" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="615" y="56" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">Late subscriber? Message already gone.</text>
+  <text x="615" y="68" text-anchor="middle" fill="var(--r)" font-size="6">No history. No replay. Fire-and-forget.</text>
+  <!-- Key facts -->
+  <text x="260" y="100" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="600">PSUBSCRIBE chat:* &#x2192; pattern matching across channels</text>
+</svg>
+
 <pre><code>PUBLISH  chat:room1 "Hello!"           → sends to all current subscribers
 SUBSCRIBE chat:room1                   → receives "Hello!" instantly
-PSUBSCRIBE chat:*                      → pattern match — all chat channels
-Subscriber joins later → NO history   → messages already gone</code></pre>
+PSUBSCRIBE chat:*                      → pattern match — all chat channels</code></pre>
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Real-time delivery</span> (&lt;1ms). <span class="hg">Fan-out</span> to all subscribers. <span class="hg">Pattern matching</span>.</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">No persistence</span>. <span class="hr">No replay</span>. <span class="hr">No acknowledgment</span>. <span class="hr">No consumer groups</span>. Fire-and-forget only.</div>
 <div class="b by"><span class="hi">Use cases:</span> <strong>Figma</strong> — real-time collaboration signals. <strong>Slack</strong> — online presence indicators. Cache invalidation across app servers. Chat typing indicators.</div>
+</div>
 
-<div class="d-title"><span class="num d-green">▸</span> Streams — Durable Event Log (Lightweight Kafka)</div>
+<div class="T" id="redis-streams">
+<h2>Redis Streams</h2><p class="su">Durable, replayable <span class="hg">append-only event log</span> with consumer groups — a <span class="hg">lightweight Kafka</span> built into Redis</p>
+
+<!-- ═══ Streams SVG ═══ -->
+<svg width="100%" viewBox="0 0 720 130" style="max-width:720px;display:block;margin:6px auto 10px">
+  <defs><marker id="rst1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--g)"/></marker></defs>
+  <!-- Producer -->
+  <rect x="20" y="20" width="90" height="40" rx="8" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.5"/>
+  <text x="65" y="38" text-anchor="middle" fill="var(--a)" font-size="9" font-weight="800">Producer</text>
+  <text x="65" y="52" text-anchor="middle" fill="var(--muted)" font-size="6">XADD orders * ...</text>
+  <!-- Arrow to stream -->
+  <line x1="112" y1="40" x2="148" y2="40" stroke="var(--a)" stroke-width="1.5" marker-end="url(#rst1)"/>
+  <!-- Stream (log) -->
+  <rect x="150" y="14" width="300" height="52" rx="8" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="2"/>
+  <text x="300" y="30" text-anchor="middle" fill="var(--g)" font-size="9" font-weight="800">Stream: orders</text>
+  <rect x="162" y="38" width="36" height="20" rx="3" fill="var(--g)" opacity=".15" stroke="var(--g)" stroke-width=".6"/>
+  <text x="180" y="52" text-anchor="middle" fill="var(--g)" font-size="6">msg-1</text>
+  <rect x="204" y="38" width="36" height="20" rx="3" fill="var(--g)" opacity=".2" stroke="var(--g)" stroke-width=".6"/>
+  <text x="222" y="52" text-anchor="middle" fill="var(--g)" font-size="6">msg-2</text>
+  <rect x="246" y="38" width="36" height="20" rx="3" fill="var(--g)" opacity=".25" stroke="var(--g)" stroke-width=".6"/>
+  <text x="264" y="52" text-anchor="middle" fill="var(--g)" font-size="6">msg-3</text>
+  <rect x="288" y="38" width="36" height="20" rx="3" fill="var(--g)" opacity=".3" stroke="var(--g)" stroke-width=".6"/>
+  <text x="306" y="52" text-anchor="middle" fill="var(--g)" font-size="6">msg-4</text>
+  <rect x="330" y="38" width="36" height="20" rx="3" fill="var(--g)" opacity=".35" stroke="var(--g)" stroke-width=".6"/>
+  <text x="348" y="52" text-anchor="middle" fill="var(--g)" font-size="6">msg-5</text>
+  <rect x="372" y="38" width="36" height="20" rx="3" fill="var(--g)" opacity=".4" stroke="var(--g)" stroke-width=".6"/>
+  <text x="390" y="52" text-anchor="middle" fill="var(--g)" font-size="6">msg-6</text>
+  <text x="430" y="52" fill="var(--g)" font-size="8">&#x2192;</text>
+  <text x="300" y="74" text-anchor="middle" fill="var(--muted)" font-size="6.5">Append-only. Never deleted. Replayable from any point.</text>
+  <!-- Consumer Groups -->
+  <line x1="300" y1="68" x2="300" y2="84" stroke="var(--g)" stroke-width="1" marker-end="url(#rst1)"/>
+  <line x1="250" y1="68" x2="250" y2="84" stroke="var(--a2)" stroke-width="1" marker-end="url(#rst1)"/>
+  <rect x="210" y="86" width="90" height="30" rx="5" fill="rgba(167,139,250,.08)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="255" y="100" text-anchor="middle" fill="var(--a2)" font-size="7" font-weight="700">Group A</text>
+  <text x="255" y="112" text-anchor="middle" fill="var(--muted)" font-size="5.5">payment-service</text>
+  <rect x="310" y="86" width="90" height="30" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="355" y="100" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Group B</text>
+  <text x="355" y="112" text-anchor="middle" fill="var(--muted)" font-size="5.5">analytics-service</text>
+  <!-- Key properties -->
+  <rect x="480" y="14" width="220" height="106" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".8"/>
+  <text x="500" y="30" fill="var(--g)" font-size="7" font-weight="700">&#x2714; Persistent (survives restart)</text>
+  <text x="500" y="44" fill="var(--g)" font-size="7" font-weight="700">&#x2714; Replay (XRANGE from any offset)</text>
+  <text x="500" y="58" fill="var(--g)" font-size="7" font-weight="700">&#x2714; Consumer Groups (competing)</text>
+  <text x="500" y="72" fill="var(--g)" font-size="7" font-weight="700">&#x2714; At-least-once (XACK)</text>
+  <text x="500" y="86" fill="var(--g)" font-size="7" font-weight="700">&#x2714; Blocking reads (XREADGROUP)</text>
+  <text x="500" y="104" fill="var(--r)" font-size="6.5">&#x2717; &lt;100K/sec (vs Kafka millions)</text>
+  <text x="500" y="116" fill="var(--r)" font-size="6.5">&#x2717; RAM-bound, no cross-cluster replication</text>
+</svg>
+
 <pre><code>XADD   orders * customer_id 5 amount 100 status "pending"  → 1704067200000-0
 XGROUP CREATE orders payment-service 0                      → create consumer group
 XREADGROUP GROUP payment-service consumer1 STREAMS orders > → read unprocessed
@@ -411,20 +359,20 @@ XRANGE orders - +                                           → replay all entri
 <div class="b bg"><span class="hi">Guarantees:</span> <span class="hg">Persistence</span> (survives restart). <span class="hg">Replay</span> (XRANGE from any point). <span class="hg">Consumer groups</span> (competing consumers). <span class="hg">At-least-once delivery</span>. <span class="hg">Blocking reads</span> (XREADGROUP BLOCK).</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">Single node throughput</span> — &lt;100K events/sec (vs Kafka millions). <span class="hr">RAM-bound</span>. <span class="hr">No cross-cluster replication</span>. Best as <span class="hg">lightweight Kafka</span> when you already have Redis.</div>
 
-<div class="d-title"><span class="num d-cyan">▸</span> Cache vs Pub/Sub vs Streams — When to Use What</div>
+<div class="d-title"><span class="num d-cyan">&#x25B8;</span> Pub/Sub vs Streams — When to Use What</div>
 <table>
-<tr><th>Feature</th><th>Cache</th><th>Pub/Sub</th><th>Streams</th></tr>
-<tr><td>Purpose</td><td><span class="hg">Read acceleration</span></td><td><span class="hg">Real-time broadcast</span></td><td><span class="hg">Durable event log</span></td></tr>
-<tr><td>Persistence</td><td>TTL-based</td><td><span class="hr">None</span></td><td><span class="hg">Yes (AOF/RDB)</span></td></tr>
-<tr><td>Replay</td><td>❌</td><td>❌</td><td><span class="hg">✅ XRANGE</span></td></tr>
-<tr><td>Fan-out</td><td>❌</td><td><span class="hg">✅ All subscribers</span></td><td><span class="hg">✅ Consumer groups</span></td></tr>
-<tr><td>Acknowledgment</td><td>❌</td><td><span class="hr">❌ Fire-and-forget</span></td><td><span class="hg">✅ XACK</span></td></tr>
-<tr><td>Best For</td><td>DB offload, sessions</td><td>Presence, signals, invalidation</td><td>Order pipelines, audit, IoT</td></tr>
+<tr><th>Feature</th><th>Pub/Sub</th><th>Streams</th></tr>
+<tr><td>Purpose</td><td><span class="hg">Real-time broadcast</span></td><td><span class="hg">Durable event log</span></td></tr>
+<tr><td>Persistence</td><td><span class="hr">None</span></td><td><span class="hg">Yes (AOF/RDB)</span></td></tr>
+<tr><td>Replay</td><td><span class="hr">&#x2717;</span></td><td><span class="hg">&#x2714; XRANGE</span></td></tr>
+<tr><td>Consumer Groups</td><td><span class="hr">&#x2717;</span></td><td><span class="hg">&#x2714; Competing consumers</span></td></tr>
+<tr><td>Acknowledgment</td><td><span class="hr">&#x2717; Fire-and-forget</span></td><td><span class="hg">&#x2714; XACK</span></td></tr>
+<tr><td>Best For</td><td>Presence, typing indicators, cache invalidation</td><td>Order pipelines, audit logs, IoT events</td></tr>
 </table>
 </div>
 
 <div class="T" id="redis-ha">
-<h2>Redis Persistence &amp; High Availability</h2><p class="su">From single-node to sharded cluster — persistence, replication, and failover</p>
+<h2>Redis Persistence &amp; High Availability</h2><p class="su">How Redis survives crashes — <span class="hg">RDB snapshots</span> for fast recovery, <span class="hg">AOF</span> for minimal data loss, <span class="hg">replication</span> for failover</p>
 
 <!-- ═══ Persistence Visual ═══ -->
 <div class="d-title"><span class="num d-yellow">▸</span> Persistence: RDB vs AOF</div>
@@ -444,8 +392,8 @@ XRANGE orders - +                                           → replay all entri
   <rect x="158" y="8" width="50" height="24" rx="5" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1"/>
   <text x="183" y="18" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">.rdb file</text>
   <text x="183" y="28" text-anchor="middle" fill="var(--muted)" font-size="6">on disk</text>
-  <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="7">On crash: load .rdb → fast restore</text>
-  <text x="110" y="60" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">⚠ Data since last snapshot is lost</text>
+  <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="7">On crash: load .rdb &#x2192; fast restore</text>
+  <text x="110" y="60" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="600">&#x26A0; Data since last snapshot is lost</text>
 </svg>
 </div>
 <div class="d-panel" style="padding:8px">
@@ -456,7 +404,7 @@ XRANGE orders - +                                           → replay all entri
   <line x1="60" y1="20" x2="82" y2="20" stroke="var(--g)" stroke-width="1" marker-end="url(#rd1)"/>
   <text x="71" y="14" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="600">every write</text>
   <rect x="84" y="4" width="70" height="32" rx="5" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
-  <text x="119" y="16" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">1, 2, 3, 4, … N</text>
+  <text x="119" y="16" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="600">1, 2, 3, 4, &#x2026; N</text>
   <text x="119" y="28" text-anchor="middle" fill="var(--muted)" font-size="6">append-only file</text>
   <rect x="160" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".3"/>
   <rect x="170" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".4"/>
@@ -464,14 +412,35 @@ XRANGE orders - +                                           → replay all entri
   <rect x="190" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".6"/>
   <rect x="200" y="10" width="8" height="8" rx="1" fill="var(--g)" opacity=".7"/>
   <text x="190" y="30" text-anchor="middle" fill="var(--muted)" font-size="6">persisted</text>
-  <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="7">On crash: replay AOF → near-zero data loss</text>
-  <text x="110" y="60" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">✓ Hybrid (RDB + AOF) = best of both (Redis 4.0+)</text>
+  <text x="110" y="48" text-anchor="middle" fill="var(--muted)" font-size="7">On crash: replay AOF &#x2192; near-zero data loss</text>
+  <text x="110" y="60" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">&#x2714; Hybrid (RDB + AOF) = best of both (Redis 4.0+)</text>
 </svg>
 </div>
 </div>
 
-<!-- ═══ Deployment Modes ═══ -->
-<div class="d-title"><span class="num d-blue">▸</span> Redis Deployment Modes</div>
+<!-- Persistence comparison table -->
+<table>
+<tr><th></th><th>RDB (Snapshot)</th><th>AOF (Append-Only)</th><th>Hybrid (RDB + AOF)</th></tr>
+<tr><td><span class="hi">How</span></td><td>fork() &#x2192; child writes .rdb to disk</td><td>Log every write command to file</td><td>AOF for durability, RDB for fast restart</td></tr>
+<tr><td><span class="hi">Data loss</span></td><td><span class="hr">Up to last snapshot interval</span> (1-15 min typical)</td><td><span class="hg">&#x2264; 1 second</span> (with appendfsync everysec)</td><td><span class="hg">&#x2264; 1 second</span></td></tr>
+<tr><td><span class="hi">Restart speed</span></td><td><span class="hg">Fast</span> — load binary dump</td><td><span class="hr">Slow</span> — replay all commands</td><td><span class="hg">Fast</span> — load RDB + replay recent AOF</td></tr>
+<tr><td><span class="hi">Disk I/O</span></td><td>Low (periodic bulk write)</td><td>High (continuous fsync)</td><td>Medium</td></tr>
+<tr><td><span class="hi">File size</span></td><td>Compact binary</td><td>Large (AOF rewrite compacts)</td><td>Both files maintained</td></tr>
+<tr><td><span class="hi">Best for</span></td><td>Backups, disaster recovery</td><td>Durability-critical data</td><td><span class="hg">Production default (Redis 4.0+)</span></td></tr>
+</table>
+
+<div class="b bg"><span class="hi">AOF fsync options:</span> <code>always</code> (every write — slowest, zero loss) &#x2022; <code>everysec</code> (flush once/sec — <span class="hg">recommended</span>, &#x2264;1s loss) &#x2022; <code>no</code> (OS decides — fastest, unpredictable loss). AOF rewrite: periodic compaction removes redundant commands.</div>
+
+<!-- Replication -->
+<div class="d-title"><span class="num d-blue">▸</span> Replication &amp; Failover</div>
+<div class="b by"><span class="hi">Replication:</span> <span class="hg">Async by default</span> — master streams commands to replicas. Replicas serve reads (read scaling). <span class="hr">Async = data loss possible</span> on master crash (writes not yet replicated). Use <code>WAIT numreplicas timeout</code> for semi-sync (waits for N replicas to ACK).</div>
+<div class="b by"><span class="hi">Sentinel (auto-failover):</span> 3+ Sentinel processes monitor master. If master unreachable (quorum agrees), Sentinel promotes a replica to master and reconfigures clients. Failover takes <span class="hg">~5-15 seconds</span>. Sentinels themselves use Raft-like leader election.</div>
+<div class="b br"><span class="hi">Failover data loss:</span> If master accepted writes that weren't replicated before crash, those writes are <span class="hr">permanently lost</span>. Mitigation: <code>min-replicas-to-write 1</code> + <code>min-replicas-max-lag 10</code> — master refuses writes if no replica is within 10s of sync.</div>
+</div>
+
+<div class="T" id="redis-cluster">
+<h2>Redis Deployment Modes</h2><p class="su">From single-node dev cache to globally sharded production cluster</p>
+
 <table>
 <tr><th>Mode</th><th>Architecture</th><th>Sharding</th><th>HA</th><th>Use Case</th></tr>
 <tr><td><span class="hi">Single Node</span></td><td>One instance</td><td>No</td><td><span class="hr">No (SPOF)</span></td><td>Dev, small cache, non-critical</td></tr>
@@ -480,10 +449,85 @@ XRANGE orders - +                                           → replay all entri
 <tr><td><span class="hi">Managed</span></td><td>ElastiCache / MemoryDB / Upstash</td><td>Yes</td><td>Yes</td><td>Production — no ops overhead</td></tr>
 </table>
 
-<div class="b bg"><span class="hi">Cluster details:</span> <span class="hg">16,384 hash slots</span> distributed across masters. Key → CRC16(key) % 16384 → slot → node. Each master has 1+ replicas. <span class="hg">Gossip protocol</span> for node discovery. <span class="hg">MOVED/ASK</span> redirects for client routing. Multi-key ops only within same slot (use hash tags: <code>{user:123}.profile</code>).</div>
-<div class="b by"><span class="hi">Redlock (distributed lock):</span> Acquire lock on <span class="hg">majority (N/2+1)</span> of independent Redis nodes. Set TTL to prevent deadlock. Validate lock still held before critical section. <span class="hr">Controversial</span> — Martin Kleppmann argues it's unsafe (clock drift). Alternative: use <span class="hg">etcd/ZooKeeper</span> for strong locks.</div>
+<div class="b bg"><span class="hi">Cluster details:</span> <span class="hg">16,384 hash slots</span> distributed across masters. Key &#x2192; CRC16(key) % 16384 &#x2192; slot &#x2192; node. Each master has 1+ replicas. <span class="hg">Gossip protocol</span> for node discovery. <span class="hg">MOVED/ASK</span> redirects for client routing. Multi-key ops only within same slot (use hash tags: <code>{user:123}.profile</code>).</div>
 <div class="b br"><span class="hi">Limitations:</span> <span class="hr">RAM-bound</span> — all data must fit in memory. <span class="hr">Single-threaded core</span> — one slow command blocks everything. <span class="hr">Not a primary DB</span> — use as cache/accelerator. <span class="hr">Async replication</span> — data loss possible on failover (use WAIT for sync).</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Twitter</strong> — timeline cache (Redis Cluster). <strong>GitHub</strong> — job queues (Resque/Sidekiq). <strong>Snapchat</strong> — rate limiting. <strong>Pinterest</strong> — graph storage (billions of edges in Redis). <strong>Discord</strong> — presence, message cache.</div>
+</div>
+
+<div class="T" id="redis-locks">
+<h2>Redis Distributed Locks — Redlock &amp; Its Dangers</h2><p class="su">Redis SETNX gives <span class="hg">simple locking</span> — but <span class="hr">Redlock is controversial</span>. Know when it's safe and when it breaks.</p>
+
+<div class="d-title"><span class="num d-green">&#x25B8;</span> Simple Lock (Single Redis)</div>
+<pre><code>SET lock:order:123 "worker-A" NX EX 30    # Acquire: set if not exists, TTL 30s
+# ... do critical work ...
+# Safer release with Lua (atomic check-and-delete):
+EVAL "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end" 1 lock:order:123 "worker-A"</code></pre>
+<div class="b bg"><span class="hi">When single-node SETNX is fine:</span> <span class="hg">Rate limiting</span>, <span class="hg">deduplication</span>, <span class="hg">idempotency keys</span>. Acceptable when rare double-execution is tolerable.</div>
+
+<div class="d-title"><span class="num d-red">&#x25B8;</span> Why Redlock Breaks — GC Pause Attack</div>
+<div class="d-panel" style="padding:10px">
+<svg width="100%" viewBox="0 0 560 130" style="max-width:560px;display:block;margin:0 auto">
+  <line x1="40" y1="40" x2="540" y2="40" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="290" y="14" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="600">TIME &#x2192;</text>
+  <rect x="50" y="26" width="70" height="28" rx="4" fill="rgba(52,211,153,.1)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="85" y="38" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Client A</text>
+  <text x="85" y="48" text-anchor="middle" fill="var(--g)" font-size="5.5">acquires lock</text>
+  <rect x="130" y="22" width="110" height="36" rx="4" fill="rgba(248,113,113,.1)" stroke="var(--r)" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="185" y="36" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">GC PAUSE 30s+</text>
+  <text x="185" y="48" text-anchor="middle" fill="var(--r)" font-size="5.5">Client A frozen</text>
+  <text x="185" y="56" text-anchor="middle" fill="var(--muted)" font-size="5">doesn't know lock expired</text>
+  <line x1="215" y1="58" x2="215" y2="70" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="215" y="80" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">TTL expires!</text>
+  <rect x="260" y="26" width="70" height="28" rx="4" fill="rgba(108,140,255,.1)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="295" y="38" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Client B</text>
+  <text x="295" y="48" text-anchor="middle" fill="var(--a)" font-size="5.5">acquires lock</text>
+  <rect x="350" y="22" width="180" height="36" rx="5" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1.5"/>
+  <text x="440" y="34" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">BOTH IN CRITICAL SECTION</text>
+  <text x="440" y="46" text-anchor="middle" fill="var(--r)" font-size="5.5">Client A resumes + Client B active</text>
+  <text x="440" y="56" text-anchor="middle" fill="var(--r)" font-size="5.5">DATA CORRUPTION</text>
+  <rect x="80" y="92" width="400" height="28" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width="1"/>
+  <text x="280" y="105" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Lock holder CANNOT know its lock is still valid after a pause</text>
+  <text x="280" y="116" text-anchor="middle" fill="var(--muted)" font-size="6">GC, page fault, context switch, or network delay can all cause this</text>
+</svg>
+</div>
+
+<div class="d-title"><span class="num d-green">&#x25B8;</span> The Fix: Fencing Tokens</div>
+<div class="d-panel" style="padding:10px">
+<svg width="100%" viewBox="0 0 520 100" style="max-width:520px;display:block;margin:0 auto">
+  <rect x="10" y="10" width="70" height="22" rx="4" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="45" y="20" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Client A</text>
+  <text x="45" y="28" text-anchor="middle" fill="var(--g)" font-size="5">token = 33</text>
+  <rect x="10" y="42" width="70" height="22" rx="4" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1"/>
+  <text x="45" y="52" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Client B</text>
+  <text x="45" y="60" text-anchor="middle" fill="var(--a)" font-size="5">token = 34</text>
+  <rect x="200" y="20" width="100" height="32" rx="5" fill="rgba(251,146,60,.08)" stroke="var(--o)" stroke-width="1.5"/>
+  <text x="250" y="34" text-anchor="middle" fill="var(--o)" font-size="7" font-weight="700">Storage / DB</text>
+  <text x="250" y="46" text-anchor="middle" fill="var(--muted)" font-size="5.5">last_token = 34</text>
+  <line x1="80" y1="56" x2="198" y2="40" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="140" y="46" fill="var(--a)" font-size="5.5">write(token=34) &#x2714;</text>
+  <line x1="80" y1="24" x2="198" y2="36" stroke="var(--r)" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="140" y="24" fill="var(--r)" font-size="5.5">write(token=33) &#x2717; REJECTED</text>
+  <rect x="330" y="10" width="180" height="56" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1"/>
+  <text x="420" y="26" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="700">Fencing = monotonic counter</text>
+  <text x="420" y="40" text-anchor="middle" fill="var(--muted)" font-size="5.5">Storage rejects token &#x2264; last seen</text>
+  <text x="420" y="52" text-anchor="middle" fill="var(--muted)" font-size="5.5">Even if A's lock "expired", its stale</text>
+  <text x="420" y="62" text-anchor="middle" fill="var(--muted)" font-size="5.5">token is rejected. Data safe.</text>
+  <rect x="60" y="74" width="400" height="18" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="260" y="86" text-anchor="middle" fill="var(--g)" font-size="6.5" font-weight="600">etcd / ZooKeeper provide fencing tokens natively. Redis does not.</text>
+</svg>
+</div>
+
+<table>
+<tr><th>Failure Mode</th><th>Redlock Safe?</th><th>With Fencing Token</th></tr>
+<tr><td><span class="hi">GC / Process Pause</span></td><td><span class="hr">&#x2717; UNSAFE</span> — both in critical section</td><td><span class="hg">&#x2714; Safe</span> — stale token rejected</td></tr>
+<tr><td><span class="hi">Clock Drift (NTP jump)</span></td><td><span class="hr">&#x2717; UNSAFE</span> — TTL expires early</td><td><span class="hg">&#x2714; Safe</span> — token not time-based</td></tr>
+<tr><td><span class="hi">Network Partition</span></td><td><span class="hr">&#x2717; UNSAFE</span> — split brain</td><td><span class="hg">&#x2714; Safe</span> — highest token wins</td></tr>
+<tr><td><span class="hi">Redis Failover</span></td><td><span class="hr">&#x2717; UNSAFE</span> — lock lost on promotion</td><td><span class="hg">&#x2714; Safe</span> — fencing protects storage</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">When to use what:</span> <span class="hg">Redis SETNX</span> for efficiency locks (dedup, rate limiting, idempotency). <span class="hg">etcd / ZooKeeper + fencing</span> for correctness locks (payments, inventory). <span class="hg">Optimistic concurrency (CAS)</span> when you can avoid locks entirely.</div>
+<div class="b br"><span class="hi">Kleppmann's verdict:</span> "Redlock is <span class="hr">not safe for correctness</span>. It's fine for efficiency. For correctness, use consensus-based locks (etcd, ZooKeeper, Chubby) with fencing tokens."</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Google Chubby</strong> — Paxos + sequencer. <strong>etcd</strong> — Raft + revision numbers. <strong>ZooKeeper</strong> — ephemeral znodes. <strong>Stripe</strong> uses Redis for idempotency (efficiency) but DB constraints for payment correctness.</div>
 </div>
 
 <div class="T" id="memcached-vs-redis">

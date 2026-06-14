@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design rate limiting for /login to stop credential stuffing &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design rate limiting for /login to stop credential stuffing attacks</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design rate limiting for a login endpoint to prevent brute-force and credential stuffing attacks</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/03-security.html#authentication">Authentication</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#api-gateway">API Gateway</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design rate limiting for the /login endpoint to stop credential stuffing attacks, using dual keys (per-account and per-IP), strict exactness with no edge burst tolerance, progressive lockout/backoff behavior, and fail-closed policy.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> Login rate limiting is <span class="hr">fail-closed</span> (unlike most rate limiters). A false-negative (letting an attacker through) is worse than a false-positive (temporarily locking a legitimate user). Dual keying is essential: per-IP catches botnets rotating usernames; per-account catches distributed attacks targeting one account.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">5</div>
+<div style="font-size:.72rem;color:var(--muted)">attempts per account</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">per 15 minutes</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">20</div>
+<div style="font-size:.72rem;color:var(--muted)">attempts per IP</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">per 15 minutes</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Dual Key</div>
+<div style="font-size:.72rem;color:var(--muted)">per-account + per-IP</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">both must pass</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Fail-Closed</div>
+<div style="font-size:.72rem;color:var(--muted)">security &gt; availability</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">block on uncertainty</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; the core login protection behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Dual-key rate limiting</strong> (per-account + per-IP) &mdash; both must pass<br>
+  <span class="hg">2.</span> <strong>Progressive lockout</strong> escalation (15min &rarr; 1hr &rarr; 24hr &rarr; manual unlock)<br>
+  <span class="hg">3.</span> <strong>Fail-closed policy</strong> &mdash; deny on uncertainty (opposite of normal rate limiters)<br>
+  <span class="hg">4.</span> <strong>Timing-safe responses</strong> &mdash; same latency for valid/invalid accounts (prevent enumeration)<br>
+  <span class="hg">5.</span> Successful login <strong>resets per-account counter</strong> (legitimate user recovery)<br>
+  <span class="hg">6.</span> <strong>Email alert</strong> to account owner on persistent attack (Level 3+)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>CAPTCHA implementation</strong> (triggered by this system, implemented separately)<br>
+  <span class="hr">&#x2717;</span> <strong>MFA flows</strong> (complementary but separate authentication layer)<br>
+  <span class="hr">&#x2717;</span> <strong>Device fingerprinting ML</strong> (behavioral analysis pipeline)<br>
+  <span class="hr">&#x2717;</span> <strong>Geographic anomaly detection</strong> (IP reputation / impossible travel)<br>
+  <span class="hr">&#x2717;</span> <strong>Password breach database checks</strong> (separate credential hygiene service)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">The quality constraints that shape every architectural decision &mdash; security-first</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">EXACT count</span> (zero tolerance for boundary burst)</td><td>Security critical. Even 1 extra attempt = 20% increase in attack surface on a 5-attempt limit.</td></tr>
+<tr><td><span class="hi">Fail mode</span></td><td><span class="hr">Fail-CLOSED</span> (deny on uncertainty)</td><td>Opposite of normal rate limiters. A missed attacker is worse than briefly locking a legitimate user.</td></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;5ms</span> overhead acceptable</td><td>Security &gt; speed for /login. Users expect login to take ~500ms anyway. 5ms is invisible.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>Redis <span class="hg">Sorted Set</span> (timestamps, not counters)</td><td>Sorted set of exact timestamps enables precise sliding window. No approximation allowed.</td></tr>
+<tr><td><span class="hi">Privacy</span></td><td><span class="hg">No password logging</span></td><td>Only attempt timestamps stored. No actual credentials, no password hashes in rate limit store.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Security vs. Availability</span>. We choose security &middot; if Redis is unreachable, DENY all login attempts (fail-closed). Better to briefly lock everyone than let attackers through during an outage. This is the opposite of API rate limiting which fails open.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question &#x2192; derive infrastructure sizing for login protection</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>10M users</strong> &middot; <strong>1% login per hour</strong> = <strong>100K login attempts/hour</strong> &middot; <strong>peak 10x</strong> = <strong>280/sec normal, attack: 100K attempts/sec</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Normal login rate</td>
+  <td>10M users &times; 1% per hour &divide; 3600</td>
+  <td><span class="hg">~28 req/sec</span></td>
+  <td>Baseline is trivial. The design must handle attack traffic, not normal traffic.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Peak normal rate</td>
+  <td>28 req/sec &times; 10x peak factor</td>
+  <td><span class="hg">~280 req/sec</span></td>
+  <td>Still very manageable for Redis. Size for attack scenario instead.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Attack scenario ops</td>
+  <td>100K attempts/sec from botnet</td>
+  <td><span class="hr">100K ops/sec</span></td>
+  <td>Each attempt = ZREMRANGEBYSCORE + ZADD + ZCARD = ~3 Redis ops. Total: 300K ops/sec.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Redis memory (per-account)</td>
+  <td>Sorted Set with max 15 entries &times; 8 bytes per entry (timestamp)</td>
+  <td><span class="hg">~120 bytes/key</span></td>
+  <td>For 1M attacked accounts: 1M &times; 120 bytes = ~120MB. Comfortable for Redis.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Redis memory (per-IP)</td>
+  <td>100K unique IPs &times; 20 entries &times; 8 bytes</td>
+  <td><span class="hg">~16MB</span></td>
+  <td>Trivial. Even 1M IPs would only be 160MB.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start with normal traffic (trivial), then jump to attack scenario. Show the Redis ops math under attack conditions &mdash; this proves the system can handle a botnet without breaking. The key insight: sorted sets have slightly higher memory than counters but give you exact window enforcement.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Rate limit check runs BEFORE authentication logic &middot; prevents password verification under attack</p>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.25)">POST</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/login</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Rate limit check executes BEFORE password verification. On failure: increment both per-account and per-IP counters. On success: reset per-account counter only (ZREMRANGEBYSCORE).</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Request</span><br>
+POST /login<br>
+{ "email": "user@example.com", "password": "..." }<br><br>
+<span style="color:var(--muted);font-style:italic">// Flow: rate_check → authenticate → response</span><br>
+<span style="color:var(--muted);font-style:italic">// If rate limited before auth:</span><br>
+HTTP 429 + Retry-After: 900 (escalating)
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.25)">429</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">Rate Limited Response (same format as auth failure)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Returns same error format as authentication failure to prevent account enumeration. Retry-After escalates with lockout level.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Response (identical format to wrong-password response)</span><br>
+HTTP 429<br>
+Retry-After: 900 <span style="color:var(--muted);font-style:italic">// escalates: 30 → 60 → 300 → 900</span><br>
+{<br>
+&nbsp;&nbsp;"error": "authentication_failed",<br>
+&nbsp;&nbsp;"message": "Invalid credentials" <span style="color:var(--muted);font-style:italic">// same msg as wrong password!</span><br>
+}<br>
+<span style="color:var(--muted);font-style:italic">// Note: response time is constant (timing-safe) regardless of reason</span>
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Redis Sorted Sets for exact timestamp tracking + lockout state</p>
+
+<div class="b bg" style="margin-bottom:8px"><span class="hi">Redis &middot; Sliding Window Logs (Sorted Sets)</span></div>
+<pre><code>// Per-account attempt log (score = timestamp, member = timestamp)
+login:account:{email_hash} → SORTED SET
+  Example: login:account:a1b2c3 → { 1705312100, 1705312130, 1705312145 }
+  Trim: ZREMRANGEBYSCORE key -inf (now - 900)  // 15-min window
+
+// Per-IP attempt log
+login:ip:{ip_or_subnet} → SORTED SET
+  Example: login:ip:203.0.113.0/48 → { 1705312100, 1705312101, ... }
+  Trim: ZREMRANGEBYSCORE key -inf (now - 900)  // 15-min window
+
+// Check: ZCARD key → if count ≥ threshold → DENY
+</code></pre>
+
+<div class="b bb" style="margin-bottom:8px"><span class="hi">Redis &middot; Lockout State</span></div>
+<pre><code>// Progressive lockout level (STRING with TTL)
+login:lockout:{email_hash} → "1" | "2" | "3" | "4"
+  TTL: Level 1 = 900s, Level 2 = 3600s, Level 3 = 86400s, Level 4 = none (manual)
+  Example: login:lockout:a1b2c3 → "2" (TTL: 3600)
+
+// On successful login:
+//   DEL login:account:{email_hash}   ← reset per-account
+//   DEL login:lockout:{email_hash}   ← clear lockout
+//   (per-IP counter NOT reset — still protects against horizontal attacks)
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Sliding Window Log with Progressive Lockout</h2>
+<p class="su">Exact timestamp tracking per attempt — no approximation allowed for security-critical paths</p>
+
+<!-- --- Login Brute Force Rate Limiting Architecture SVG --- -->
+<svg width="100%" viewBox="0 0 780 440" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Login Brute Force Rate Limiting Architecture">
+  <defs><marker id="bf-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Login Rate Limiting &middot; Dual-Key with Progressive Lockout</text>
+
+  <!-- ATTACKER LAYER -->
+  <rect x="10" y="25" width="760" height="65" rx="8" fill="rgba(248,113,113,.02)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="800">ATTACKER PATTERNS</text>
+
+  <!-- Brute force -->
+  <rect x="30" y="48" width="170" height="32" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="115" y="62" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Brute Force (1 account)</text>
+  <text x="115" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">1000 passwords from 1 IP</text>
+
+  <!-- Credential stuffing -->
+  <rect x="220" y="48" width="170" height="32" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="305" y="62" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Credential Stuffing</text>
+  <text x="305" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">1 password &times; 10K accounts</text>
+
+  <!-- Distributed botnet -->
+  <rect x="410" y="48" width="170" height="32" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+  <text x="495" y="62" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="600">Distributed Botnet</text>
+  <text x="495" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">10K IPs &times; 1 attempt each</text>
+
+  <!-- Legit user -->
+  <rect x="600" y="48" width="150" height="32" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="675" y="62" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Legitimate User</text>
+  <text x="675" y="73" text-anchor="middle" fill="var(--muted)" font-size="4.5">Forgot password (3 tries)</text>
+
+  <!-- Arrow down -->
+  <line x1="390" y1="85" x2="390" y2="105" stroke="#8b8fa3" stroke-width=".8" marker-end="url(#bf-arr)"/>
+
+  <!-- DUAL KEY LAYER -->
+  <rect x="10" y="100" width="760" height="130" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="390" y="115" text-anchor="middle" fill="var(--c)" font-size="8" font-weight="800">DUAL-KEY RATE LIMITER &middot; Both Must Pass</text>
+
+  <!-- Per-Account check -->
+  <rect x="40" y="125" width="320" height="55" rx="6" fill="rgba(251,146,60,.04)" stroke="var(--o)" stroke-width="1"/>
+  <text x="200" y="141" text-anchor="middle" fill="var(--o)" font-size="6.5" font-weight="700">KEY 1: Per-Account (login:{email})</text>
+  <text x="200" y="156" text-anchor="middle" fill="var(--muted)" font-size="5">Redis Sorted Set of timestamps (exact log)</text>
+  <text x="200" y="168" text-anchor="middle" fill="var(--o)" font-size="5" font-weight="600">Limit: 5 failed attempts per 15 minutes</text>
+  <text x="200" y="178" text-anchor="middle" fill="var(--muted)" font-size="4.5">Catches: distributed attacks on one account</text>
+
+  <!-- Per-IP check -->
+  <rect x="400" y="125" width="350" height="55" rx="6" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="575" y="141" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">KEY 2: Per-IP (login:{ip} or /48 subnet)</text>
+  <text x="575" y="156" text-anchor="middle" fill="var(--muted)" font-size="5">Redis Sorted Set of timestamps (exact log)</text>
+  <text x="575" y="168" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">Limit: 20 failed attempts per 15 minutes</text>
+  <text x="575" y="178" text-anchor="middle" fill="var(--muted)" font-size="4.5">Catches: credential stuffing across accounts</text>
+
+  <!-- AND gate -->
+  <rect x="320" y="190" width="140" height="25" rx="12" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1"/>
+  <text x="390" y="207" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">BOTH must pass &rarr; Allow</text>
+
+  <!-- PROGRESSIVE LOCKOUT -->
+  <rect x="10" y="240" width="760" height="90" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="255" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">PROGRESSIVE LOCKOUT ESCALATION</text>
+
+  <!-- Level 1 -->
+  <rect x="30" y="265" width="155" height="50" rx="4" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="107" y="280" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Level 1: 5 fails</text>
+  <text x="107" y="293" text-anchor="middle" fill="var(--muted)" font-size="5">Lock 15 minutes</text>
+  <text x="107" y="305" text-anchor="middle" fill="var(--muted)" font-size="4.5">Retry-After: 900s</text>
+
+  <!-- Arrow -->
+  <line x1="185" y1="290" x2="210" y2="290" stroke="var(--y)" stroke-width=".7" marker-end="url(#bf-arr)"/>
+
+  <!-- Level 2 -->
+  <rect x="210" y="265" width="155" height="50" rx="4" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width=".7"/>
+  <text x="287" y="280" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Level 2: 10 fails</text>
+  <text x="287" y="293" text-anchor="middle" fill="var(--muted)" font-size="5">Lock 1 hour</text>
+  <text x="287" y="305" text-anchor="middle" fill="var(--muted)" font-size="4.5">Require CAPTCHA</text>
+
+  <!-- Arrow -->
+  <line x1="365" y1="290" x2="390" y2="290" stroke="var(--o)" stroke-width=".7" marker-end="url(#bf-arr)"/>
+
+  <!-- Level 3 -->
+  <rect x="390" y="265" width="155" height="50" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".7"/>
+  <text x="467" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Level 3: 15 fails</text>
+  <text x="467" y="293" text-anchor="middle" fill="var(--muted)" font-size="5">Lock 24 hours</text>
+  <text x="467" y="305" text-anchor="middle" fill="var(--muted)" font-size="4.5">Email alert to owner</text>
+
+  <!-- Arrow -->
+  <line x1="545" y1="290" x2="570" y2="290" stroke="var(--r)" stroke-width=".7" marker-end="url(#bf-arr)"/>
+
+  <!-- Level 4 -->
+  <rect x="570" y="265" width="180" height="50" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1"/>
+  <text x="660" y="280" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Level 4: Persistent</text>
+  <text x="660" y="293" text-anchor="middle" fill="var(--muted)" font-size="5">Manual unlock only</text>
+  <text x="660" y="305" text-anchor="middle" fill="var(--muted)" font-size="4.5">Security team notified</text>
+
+  <!-- BOTTOM: Fail-closed -->
+  <rect x="10" y="340" width="760" height="90" rx="5" fill="rgba(248,113,113,.02)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="390" y="358" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">FAIL-CLOSED POLICY (Opposite of normal rate limiters)</text>
+
+  <rect x="40" y="370" width="340" height="45" rx="4" fill="rgba(248,113,113,.04)" stroke="var(--r)" stroke-width=".6"/>
+  <text x="210" y="387" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">If Redis unavailable &rarr; DENY all login attempts</text>
+  <text x="210" y="401" text-anchor="middle" fill="var(--muted)" font-size="4.5">Security &gt; Availability for authentication paths</text>
+  <text x="210" y="413" text-anchor="middle" fill="var(--muted)" font-size="4.5">Better to briefly lock everyone than let attackers through</text>
+
+  <rect x="410" y="370" width="340" height="45" rx="4" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".6"/>
+  <text x="580" y="387" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Successful login &rarr; Reset per-account counter</text>
+  <text x="580" y="401" text-anchor="middle" fill="var(--muted)" font-size="4.5">Legitimate user recovery without support intervention</text>
+  <text x="580" y="413" text-anchor="middle" fill="var(--muted)" font-size="4.5">Per-IP counter NOT reset (still protects against horizontal attack)</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Sliding window log (sorted set of timestamps)</td><td>Exact count — no boundary burst possible. Security requires precision over memory efficiency.</td></tr>
+<tr><td><span class="hi">Keys</span></td><td>Dual: login:{account_id} + login:{ip_address}</td><td>Per-account catches distributed attacks on one user. Per-IP catches credential stuffing across many accounts.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>Redis Sorted Set (ZADD timestamp, ZRANGEBYSCORE for window)</td><td>Exact timestamps, O(log N) insert, window trim via ZREMRANGEBYSCORE.</td></tr>
+<tr><td><span class="hi">Lockout</span></td><td>Progressive: 5 fails &rarr; 15min lock, 10 fails &rarr; 1hr, 15 fails &rarr; 24hr + email alert</td><td>Escalating penalty deters persistent attackers. Email notification enables account recovery.</td></tr>
+<tr><td><span class="hi">Fail mode</span></td><td>Fail-closed (deny on uncertainty)</td><td>If Redis is unreachable, reject login attempts. Security-critical path cannot be permissive.</td></tr>
+<tr><td><span class="hi">Reset</span></td><td>Successful login resets per-account counter (not per-IP)</td><td>Legitimate owner recovers their account. IP counter still protects against horizontal attacks.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Sliding window log:</span> Store each failed attempt timestamp in a Redis sorted set. On new attempt: ZREMRANGEBYSCORE to trim entries older than window, ZCARD to count remaining. If count &ge; threshold &rarr; reject. <span class="hg">Exact</span> — no approximation, no edge burst.</div>
+<div class="b by"><span class="hi">Progressive backoff response:</span> Don't just return 429. Return increasing Retry-After values: 30s &rarr; 60s &rarr; 300s &rarr; 900s. After threshold, require CAPTCHA or email verification to unlock. <span class="hg">Never reveal</span> whether the account exists (timing-safe response).</div>
+<div class="b br"><span class="hi">Why NOT sliding window counter here:</span> <span class="hr">Approximate counters</span> can allow 1-2 extra attempts at window boundaries — unacceptable for security. With 5-attempt limit, even 1 extra attempt is a 20% increase in attack surface. Sliding window log guarantees exactness.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>Auth0</strong> &middot; anomaly detection + brute-force protection (10 attempts/account). <strong>Cloudflare</strong> &middot; WAF rules for login paths. <strong>GitHub</strong> &middot; progressive lockout with CAPTCHA. <strong>AWS Cognito</strong> &middot; configurable lockout policies.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Redis down</span></td><td>Cannot verify attempt count</td><td>Fail-closed: reject all login attempts. Alert ops team. Fallback to local in-memory store with conservative limits.</td></tr>
+<tr><td><span class="hr">Distributed botnet (10K IPs)</span></td><td>Per-IP limit ineffective (1 attempt per IP)</td><td>Per-account limit still catches it. Add CAPTCHA after 3 failed per-account. Device fingerprinting as additional signal.</td></tr>
+<tr><td><span class="hr">Legitimate user locked out</span></td><td>Can't login after forgotten password attempts</td><td>Email unlock link. Phone SMS verification. Support override with identity verification.</td></tr>
+<tr><td><span class="hr">Account enumeration via timing</span></td><td>Attacker discovers valid accounts</td><td>Constant-time response for all login attempts. Same error message for invalid user vs wrong password.</td></tr>
+<tr><td><span class="hr">IPv6 rotation</span></td><td>Attacker rotates /64 prefix</td><td>Rate limit by /48 or /56 subnet prefix for IPv6, not individual addresses.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for login rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Sliding window log</strong> &middot; exact timestamps, no boundary burst (security demands precision)<br>
+<span class="hg">2.</span> <strong>Dual keying</strong> &middot; per-account AND per-IP — both must pass for login to proceed<br>
+<span class="hg">3.</span> <strong>Fail-closed</strong> &middot; if rate limiter is unavailable, deny login (opposite of most rate limiters)<br>
+<span class="hg">4.</span> <strong>Progressive lockout</strong> &middot; escalating penalties: 15min &rarr; 1hr &rarr; 24hr + email alert<br>
+<span class="hg">5.</span> <strong>Timing-safe responses</strong> &middot; same latency/message for valid vs invalid accounts (prevent enumeration)<br>
+<span class="hg">6.</span> <strong>Successful login resets per-account counter</strong> &middot; legitimate user recovery doesn't require support intervention
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

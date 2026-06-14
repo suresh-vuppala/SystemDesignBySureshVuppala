@@ -828,9 +828,75 @@
 <div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">No edge protection</span> — origin directly exposed. <span class="hr">On-demand only</span> — takes 10+ min to activate during attack. <span class="hr">Single-region</span> — no geographic distribution to absorb. <span class="hr">Exposing origin IP</span> — attackers bypass CDN directly.</div>
 <div class="b bb"><span class="hi">Real-world:</span> <strong>Cloudflare</strong> — mitigated 71M RPS attack (2023). <strong>AWS Shield Advanced</strong> — auto-mitigates with DDoS Response Team. <strong>Google Cloud Armor</strong> — adaptive protection with ML. <strong>GitHub</strong> — survived 1.35 Tbps memcached amplification (2018).</div>
 </div>
+
+<div class="T" id="event-loop">
+<h2>Event Loop &amp; I/O Multiplexing</h2><p class="su">How <span class="hg">one thread handles 100K+ connections</span> — the engine behind Redis, Nginx, and Node.js</p>
+
+<div class="d-panel" style="padding:10px">
+<svg width="100%" viewBox="0 0 520 150" style="max-width:520px;display:block;margin:0 auto">
+  <defs><marker id="ev1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="var(--a)"/></marker></defs>
+  <!-- Connections on left -->
+  <rect x="10" y="10" width="80" height="130" rx="6" fill="rgba(108,140,255,.04)" stroke="var(--a)" stroke-width="1"/>
+  <text x="50" y="24" text-anchor="middle" fill="var(--a)" font-size="6.5" font-weight="700">10,000 Sockets</text>
+  <rect x="18" y="30" width="64" height="8" rx="2" fill="var(--g)" opacity=".5"/><text x="50" y="36" text-anchor="middle" fill="#fff" font-size="4">fd:1 READY</text>
+  <rect x="18" y="42" width="64" height="8" rx="2" fill="var(--muted)" opacity=".15"/><text x="50" y="48" text-anchor="middle" fill="var(--muted)" font-size="4">fd:2 waiting</text>
+  <rect x="18" y="54" width="64" height="8" rx="2" fill="var(--g)" opacity=".5"/><text x="50" y="60" text-anchor="middle" fill="#fff" font-size="4">fd:3 READY</text>
+  <rect x="18" y="66" width="64" height="8" rx="2" fill="var(--muted)" opacity=".15"/><text x="50" y="72" text-anchor="middle" fill="var(--muted)" font-size="4">fd:4 waiting</text>
+  <rect x="18" y="78" width="64" height="8" rx="2" fill="var(--muted)" opacity=".15"/><text x="50" y="84" text-anchor="middle" fill="var(--muted)" font-size="4">fd:5 waiting</text>
+  <rect x="18" y="90" width="64" height="8" rx="2" fill="var(--g)" opacity=".5"/><text x="50" y="96" text-anchor="middle" fill="#fff" font-size="4">fd:6 READY</text>
+  <text x="50" y="110" text-anchor="middle" fill="var(--muted)" font-size="5">... 9,997 more</text>
+  <text x="50" y="122" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">Only 3 ready</text>
+  <text x="50" y="132" text-anchor="middle" fill="var(--muted)" font-size="5">right now</text>
+
+  <!-- epoll -->
+  <line x1="92" y1="75" x2="130" y2="75" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ev1)"/>
+  <rect x="132" y="50" width="80" height="50" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="172" y="66" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="700">epoll_wait()</text>
+  <text x="172" y="78" text-anchor="middle" fill="var(--muted)" font-size="5.5">"which fds are</text>
+  <text x="172" y="88" text-anchor="middle" fill="var(--muted)" font-size="5.5">ready NOW?"</text>
+  <text x="172" y="108" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">O(1) per ready fd</text>
+  <text x="172" y="118" text-anchor="middle" fill="var(--muted)" font-size="5">kernel watches all</text>
+
+  <!-- Arrow to event loop -->
+  <line x1="214" y1="75" x2="250" y2="75" stroke="var(--a)" stroke-width="1.2" marker-end="url(#ev1)"/>
+  <text x="232" y="68" text-anchor="middle" fill="var(--muted)" font-size="5">ready list</text>
+
+  <!-- Event Loop -->
+  <rect x="252" y="30" width="120" height="90" rx="8" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width="1.5"/>
+  <text x="312" y="46" text-anchor="middle" fill="var(--g)" font-size="7.5" font-weight="700">Event Loop</text>
+  <text x="312" y="60" text-anchor="middle" fill="var(--muted)" font-size="5.5">while(true) {</text>
+  <text x="312" y="70" text-anchor="middle" fill="var(--muted)" font-size="5.5">  events = epoll_wait()</text>
+  <text x="312" y="80" text-anchor="middle" fill="var(--muted)" font-size="5.5">  for (e in events)</text>
+  <text x="312" y="90" text-anchor="middle" fill="var(--muted)" font-size="5.5">    handle(e) // non-blocking</text>
+  <text x="312" y="100" text-anchor="middle" fill="var(--muted)" font-size="5.5">}</text>
+  <text x="312" y="126" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">1 thread, never blocks</text>
+
+  <!-- Output -->
+  <line x1="374" y1="75" x2="410" y2="75" stroke="var(--g)" stroke-width="1.2" marker-end="url(#ev1)"/>
+  <rect x="412" y="40" width="100" height="70" rx="6" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="462" y="54" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">Handlers</text>
+  <text x="462" y="66" text-anchor="middle" fill="var(--muted)" font-size="5.5">read(fd:1) &#x2192; parse</text>
+  <text x="462" y="76" text-anchor="middle" fill="var(--muted)" font-size="5.5">read(fd:3) &#x2192; execute</text>
+  <text x="462" y="86" text-anchor="middle" fill="var(--muted)" font-size="5.5">write(fd:6) &#x2192; respond</text>
+  <text x="462" y="100" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="600">Only process ready fds</text>
+</svg>
 </div>
 
-<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+<table>
+<tr><th>Multiplexer</th><th>OS</th><th>Scalability</th><th>Used By</th></tr>
+<tr><td><span class="hi">select</span></td><td>All</td><td><span class="hr">O(n)</span> scan, max 1024 fds</td><td>Legacy, portable</td></tr>
+<tr><td><span class="hi">poll</span></td><td>All</td><td><span class="hr">O(n)</span> scan, no fd limit</td><td>Slightly better select</td></tr>
+<tr><td><span class="hi">epoll</span></td><td>Linux</td><td><span class="hg">O(1)</span> per ready fd, millions of fds</td><td>Redis, Nginx, Node.js</td></tr>
+<tr><td><span class="hi">kqueue</span></td><td>BSD/macOS</td><td><span class="hg">O(1)</span> per ready fd</td><td>Nginx (macOS), FreeBSD</td></tr>
+<tr><td><span class="hi">io_uring</span></td><td>Linux 5.1+</td><td><span class="hg">O(1)</span> + zero-copy, async submission</td><td>Next-gen (Tigerbeetle, Seastar)</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">The reactor pattern:</span> Register interest in events (read/write ready) &#x2192; <span class="hg">epoll_wait()</span> blocks until events fire &#x2192; dispatch to handlers &#x2192; loop. One thread handles thousands of concurrent connections because it <span class="hg">never waits</span> on any single one.</div>
+<div class="b by"><span class="hi">Interview application:</span> When explaining why Redis/Nginx are fast with one thread, say: <em>"It uses epoll-based I/O multiplexing — the kernel notifies which sockets have data, so the thread only processes ready connections and never blocks. This gives concurrency without threads."</em></div>
+</div>
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&#x2191;</button>
 <script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <link rel="stylesheet" href="../css/dp-engine.css">
 <script src="../js/dp-engine.js"></script>

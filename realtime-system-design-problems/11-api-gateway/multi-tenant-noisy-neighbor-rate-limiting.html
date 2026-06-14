@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-tenant rate limiting &middot; Noisy neighbor protection &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design rate limiting so one tenant can't degrade service for others on shared infrastructure</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design multi-tenant rate limiting: per-tenant fairness + global capacity protection + hot-key handling for large tenants</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#load-balancer">Load Balancer</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#backpressure">Backpressure</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Sharding</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design rate limiting for a multi-tenant SaaS platform where one tenant's traffic spike cannot degrade service quality for others. The system must enforce per-tenant limits, protect global shared capacity, and handle "whale" tenants (10-100x average traffic) without dedicated infrastructure per tenant.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> The <span class="hr">noisy neighbor problem</span>: one tenant sends 100x normal traffic, saturating shared database connections, CPU, and memory. Other tenants experience latency spikes and timeouts. You can't provision dedicated infrastructure for every tenant (cost-prohibitive), so you need <span class="hr">fair scheduling + admission control</span> on shared resources.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">1000+</div>
+<div style="font-size:.72rem;color:var(--muted)">tenants</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">shared infrastructure</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">Noisy Neighbor</div>
+<div style="font-size:.72rem;color:var(--muted)">1 tenant saturates</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">shared resources</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Two-Layer</div>
+<div style="font-size:.72rem;color:var(--muted)">per-tenant + global</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">both must pass</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Fair Share</div>
+<div style="font-size:.72rem;color:var(--muted)">weighted scheduling</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">proportional to plan</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; multi-tenant fairness and capacity protection</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Per-tenant admission control</strong> &middot; each tenant limited to their plan's rate<br>
+  <span class="hg">2.</span> <strong>Global capacity protection</strong> &middot; total system throughput cannot exceed shared infra limits<br>
+  <span class="hg">3.</span> <strong>Weighted fair queueing</strong> when at capacity &middot; remaining throughput shared proportional to plan tier<br>
+  <span class="hg">4.</span> <strong>Whale tenant detection + isolation</strong> &middot; tenants exceeding 20% total throughput routed to isolated pool<br>
+  <span class="hg">5.</span> <strong>Self-service usage dashboard</strong> &middot; tenants see their own consumption and limits<br>
+  <span class="hg">6.</span> <strong>Two distinct 429 error codes</strong> &middot; tenant_limit_exceeded vs system_capacity_exceeded
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Billing/invoicing</strong> (separate billing service)<br>
+  <span class="hr">&#x2717;</span> <strong>SLA enforcement/credits</strong> (business logic layer)<br>
+  <span class="hr">&#x2717;</span> <strong>Tenant provisioning</strong> (onboarding workflow)<br>
+  <span class="hr">&#x2717;</span> <strong>Data isolation</strong> (separate concern &middot; row-level security)<br>
+  <span class="hr">&#x2717;</span> <strong>Per-endpoint limits within tenant</strong> (finer-grained throttling)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the multi-tenant rate limiting design</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Isolation</span></td><td><span class="hg">One tenant&rsquo;s spike must NOT degrade others&rsquo; P99 latency</span></td><td>Per-tenant limits + whale isolation pool prevents noisy neighbor effect.</td></tr>
+<tr><td><span class="hi">Capacity</span></td><td><span class="hg">100K req/sec total</span> across all tenants</td><td>Shared infrastructure ceiling. Global limiter prevents aggregate overload.</td></tr>
+<tr><td><span class="hi">Detection</span></td><td><span class="hg">Whale identified within 5 seconds</span></td><td>Tenant exceeding 20% total throughput triggers dynamic isolation routing.</td></tr>
+<tr><td><span class="hi">Fairness</span></td><td><span class="hg">Proportional to plan tier</span> when at capacity</td><td>Remaining throughput shared by weighted fair queueing. Enterprise &gt; Pro &gt; Free.</td></tr>
+<tr><td><span class="hi">Adaptive</span></td><td><span class="hg">Limits tighten when load &gt; 80%</span></td><td>Dynamic throttling prevents cascading failures during system stress.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Per-Tenant Fairness vs. Global Capacity</span>. Even if every tenant is within their individual limit, the sum of all tenants can exceed system capacity. Two layers are required: per-tenant (their fault) and global (system overloaded) &middot; with different error codes for each.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing and isolation thresholds from tenant distribution</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>1000 tenants</strong> &middot; <strong>System capacity 100K req/sec</strong> &middot; <strong>Whale tenant can spike to 50K req/sec</strong> &middot; <strong>500 DB connections total</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Normal distribution</td>
+  <td>900 small (100 req/sec each) + 90 medium (2K each)</td>
+  <td><span class="hg">90K + 180K potential = exceeds capacity</span></td>
+  <td>Global limiter required even if each tenant is within their own limit</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>DB connection per-tenant max</td>
+  <td>500 total pool / 10 (safety factor)</td>
+  <td><span class="hg">50 connections max per tenant</span></td>
+  <td>Prevents single tenant from starving others of DB connections</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Whale threshold</td>
+  <td>20% of 100K = 20K req/sec from single tenant</td>
+  <td><span class="hr">20K req/sec triggers isolation</span></td>
+  <td>Auto-route whale to dedicated worker pool when threshold exceeded</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Isolated pool capacity</td>
+  <td>Reserve 30% of system capacity for whale overflow</td>
+  <td><span class="hg">30K req/sec isolated pool</span></td>
+  <td>Whale gets dedicated resources, shared pool protected for other 999 tenants</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Redis counter memory</td>
+  <td>1000 tenants &times; 10 windows &times; 64 bytes per counter</td>
+  <td><span class="hg">~640KB for all rate counters</span></td>
+  <td>Trivial memory footprint. Redis handles easily with INCR + TTL.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Start by identifying the whale problem (step 3) &middot; one tenant consuming 50% of capacity is the core challenge. Then show two-layer defense: per-tenant limits (their fault) + global capacity guard (system overloaded). The distinct error codes show maturity.</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Rate limit enforcement interfaces and tenant monitoring</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:10px">
+<h4 style="color:var(--g);margin-bottom:4px">Rate Limit Middleware (All Requests)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <strong>Header:</strong> X-Tenant-Id identifies the tenant on every request<br>
+  <strong>Layer 1 check:</strong> Per-tenant counter &lt; plan limit? &rarr; pass or 429<br>
+  <strong>Layer 2 check:</strong> Global counter &lt; system capacity? &rarr; pass or 429<br>
+  <strong>429 (tenant):</strong> {"error": "tenant_limit_exceeded", "retry_after": 1}<br>
+  <strong>429 (system):</strong> {"error": "system_capacity_exceeded", "retry_after": 5}
+</div>
+</div>
+<div class="d-panel" style="padding:10px">
+<h4 style="color:var(--a);margin-bottom:4px">Admin API: Tenant Monitoring</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <strong>GET /admin/tenants/{id}/usage</strong> &middot; Real-time request count, limit, % used<br>
+  <strong>GET /admin/system/capacity</strong> &middot; Global load %, active whale tenants<br>
+  <strong>POST /admin/tenants/{id}/isolate</strong> &middot; Manual whale isolation trigger<br>
+  <strong>PUT /admin/tenants/{id}/limit</strong> &middot; Override tenant rate limit
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Storage structures for per-tenant counters, global tracking, and isolation state</p>
+<pre><code>// Per-tenant rate counter (sliding window)
+// Redis key: tenant:{id}:counter:{window_timestamp}
+INCR tenant:acme:counter:1705312200     // Current window count
+EXPIRE tenant:acme:counter:1705312200 60 // Auto-cleanup after window
+
+// Global aggregate counter
+INCR system:total:1705312200             // Total requests this window
+
+// Whale tenant isolation flag
+SET tenant:acme:isolated true EX 300     // Flag expires after 5 min
+GET tenant:acme:isolated                 // Check before routing
+
+// Tenant configuration (PostgreSQL)
+CREATE TABLE tenants (
+  tenant_id       VARCHAR(64) PRIMARY KEY,
+  plan            VARCHAR(20),          -- free, pro, enterprise
+  limit_rps       INT,                  -- requests per second limit
+  burst_capacity  INT,                  -- token bucket burst size
+  isolation_threshold FLOAT DEFAULT 0.2 -- % of system capacity
+);
+
+// Real-time metrics (Redis Sorted Set)
+ZADD tenant:throughput 45000 "acme"     // Score = current req/sec
+ZRANGEBYSCORE tenant:throughput 20000 +inf  // Find whales
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Two-Layer Rate Limiting</h2>
+<p class="su">Layer 1: per-tenant admission control. Layer 2: global capacity protection. Both enforce independently.</p>
+
+<!-- --- Multi-Tenant Rate Limiting Architecture SVG --- -->
+<svg width="100%" viewBox="0 0 780 450" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Multi-Tenant Noisy Neighbor Rate Limiting Architecture">
+  <defs><marker id="mt-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">Multi-Tenant Rate Limiting &middot; Two-Layer Noisy Neighbor Protection</text>
+
+  <!-- TENANT TRAFFIC -->
+  <rect x="10" y="25" width="760" height="70" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="38" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">TENANT TRAFFIC (1000+ Tenants on Shared Infra)</text>
+
+  <!-- Small tenants -->
+  <rect x="30" y="48" width="130" height="35" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="95" y="63" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">900 Small Tenants</text>
+  <text x="95" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">10-100 req/sec each</text>
+
+  <!-- Medium tenants -->
+  <rect x="180" y="48" width="130" height="35" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+  <text x="245" y="63" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">90 Medium Tenants</text>
+  <text x="245" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">500-2000 req/sec each</text>
+
+  <!-- Whale tenant -->
+  <rect x="330" y="48" width="160" height="35" rx="4" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="410" y="63" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="700">WHALE TENANT</text>
+  <text x="410" y="76" text-anchor="middle" fill="var(--r)" font-size="4.5">50,000 req/sec (spike)</text>
+
+  <!-- System capacity indicator -->
+  <rect x="520" y="48" width="230" height="35" rx="4" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="635" y="63" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">System Capacity: 100K req/sec total</text>
+  <text x="635" y="76" text-anchor="middle" fill="var(--muted)" font-size="4.5">Shared DB, CPU, Memory, Connections</text>
+
+  <!-- Arrow down -->
+  <line x1="390" y1="88" x2="390" y2="108" stroke="#8b8fa3" stroke-width=".8" marker-end="url(#mt-arr)"/>
+
+  <!-- LAYER 1: PER-TENANT -->
+  <rect x="10" y="103" width="370" height="110" rx="8" fill="rgba(34,211,238,.02)" stroke="var(--c)" stroke-width="1.5"/>
+  <text x="195" y="118" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="800">LAYER 1: Per-Tenant Limits</text>
+
+  <rect x="25" y="128" width="160" height="35" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="105" y="143" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Small: 200 req/sec</text>
+  <text x="105" y="156" text-anchor="middle" fill="var(--muted)" font-size="4.5">Token bucket per tenant</text>
+
+  <rect x="200" y="128" width="160" height="35" rx="4" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="280" y="143" text-anchor="middle" fill="var(--a)" font-size="5" font-weight="600">Medium: 5K req/sec</text>
+  <text x="280" y="156" text-anchor="middle" fill="var(--muted)" font-size="4.5">Token bucket per tenant</text>
+
+  <text x="195" y="180" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Each tenant counted independently &middot; one tenant's traffic never affects another's quota</text>
+  <text x="195" y="193" text-anchor="middle" fill="var(--muted)" font-size="4.5">If tenant exceeds own limit &rarr; 429 (their fault) | Other tenants unaffected</text>
+
+  <!-- LAYER 2: GLOBAL -->
+  <rect x="400" y="103" width="370" height="110" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="585" y="118" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">LAYER 2: Global Capacity Guard</text>
+
+  <rect x="415" y="128" width="340" height="35" rx="4" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="585" y="143" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Total throughput: 80K req/sec (80% of capacity)</text>
+  <text x="585" y="156" text-anchor="middle" fill="var(--muted)" font-size="4.5">If breached: weighted fair queueing by tier</text>
+
+  <text x="585" y="180" text-anchor="middle" fill="var(--y)" font-size="5" font-weight="600">Prevents: 100 tenants each at 80% = system overload</text>
+  <text x="585" y="193" text-anchor="middle" fill="var(--muted)" font-size="4.5">If global limit hit &rarr; 429 (system overloaded) | shed by priority tier</text>
+
+  <!-- WHALE ISOLATION -->
+  <rect x="10" y="225" width="760" height="80" rx="8" fill="rgba(248,113,113,.02)" stroke="var(--r)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="240" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="800">WHALE TENANT ISOLATION (Dynamic)</text>
+
+  <rect x="30" y="250" width="220" height="42" rx="4" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="140" y="266" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Detection: tenant &gt; 20% of total</text>
+  <text x="140" y="279" text-anchor="middle" fill="var(--muted)" font-size="4.5">Real-time monitoring of per-tenant volume</text>
+
+  <!-- Arrow -->
+  <line x1="250" y1="271" x2="280" y2="271" stroke="var(--r)" stroke-width=".7" marker-end="url(#mt-arr)"/>
+
+  <rect x="280" y="250" width="220" height="42" rx="4" fill="rgba(251,146,60,.05)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="390" y="266" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Route to dedicated worker pool</text>
+  <text x="390" y="279" text-anchor="middle" fill="var(--muted)" font-size="4.5">Isolated DB connections + CPU + memory</text>
+
+  <!-- Arrow -->
+  <line x1="500" y1="271" x2="530" y2="271" stroke="var(--o)" stroke-width=".7" marker-end="url(#mt-arr)"/>
+
+  <rect x="530" y="250" width="220" height="42" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="640" y="266" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Shared pool protected</text>
+  <text x="640" y="279" text-anchor="middle" fill="var(--muted)" font-size="4.5">Other 999 tenants unaffected</text>
+
+  <!-- ADAPTIVE THROTTLING -->
+  <rect x="10" y="315" width="760" height="65" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="332" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Adaptive Throttling (Dynamic Limit Adjustment)</text>
+
+  <rect x="40" y="342" width="210" height="28" rx="3" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".5"/>
+  <text x="145" y="360" text-anchor="middle" fill="var(--g)" font-size="5">Load &lt; 60%: Full tenant limits</text>
+
+  <rect x="270" y="342" width="210" height="28" rx="3" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".5"/>
+  <text x="375" y="360" text-anchor="middle" fill="var(--y)" font-size="5">Load 60-80%: Reduce limits 20%</text>
+
+  <rect x="500" y="342" width="250" height="28" rx="3" fill="rgba(248,113,113,.05)" stroke="var(--r)" stroke-width=".5"/>
+  <text x="625" y="360" text-anchor="middle" fill="var(--r)" font-size="5">Load &gt; 80%: Reduce 50% + shed low-priority</text>
+
+  <!-- BOTTOM SUMMARY -->
+  <text x="390" y="400" text-anchor="middle" fill="var(--muted)" font-size="5">Request flow: Tenant request &rarr; Layer 1 check (per-tenant) &rarr; Layer 2 check (global) &rarr; Whale detection &rarr; Process or 429</text>
+  <text x="390" y="415" text-anchor="middle" fill="var(--muted)" font-size="4.5">Two different 429 error codes: TENANT_LIMIT_EXCEEDED vs SYSTEM_CAPACITY_EXCEEDED (helps tenant understand if it's their fault or system-wide)</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Layer 1</span></td><td>Per-tenant token bucket (capacity = plan limit)</td><td>Each tenant gets their contracted rate. Burst allowed up to bucket capacity.</td></tr>
+<tr><td><span class="hi">Layer 2</span></td><td>Global capacity limiter (total system throughput cap)</td><td>Even if all tenants are within their individual limits, total cannot exceed system capacity.</td></tr>
+<tr><td><span class="hi">Fairness</span></td><td>Weighted fair queueing when global limit is hit</td><td>If system is at 90% capacity, remaining capacity is shared proportionally to plan tier.</td></tr>
+<tr><td><span class="hi">Hot tenant</span></td><td>Isolated processing lane for whale tenants</td><td>Tenant consuming &gt; 20% of capacity gets routed to dedicated worker pool. Prevents shared-pool saturation.</td></tr>
+<tr><td><span class="hi">Backpressure</span></td><td>Adaptive: tighten tenant limits when global load &gt; 80%</td><td>Dynamic throttling: when system is stressed, temporarily reduce all tenant limits proportionally.</td></tr>
+<tr><td><span class="hi">Visibility</span></td><td>Per-tenant usage dashboards + 429 breakdown by tenant</td><td>Self-service: tenants see their own usage, can upgrade before hitting limits.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Two-layer design:</span> Request arrives &rarr; Layer 1 checks per-tenant limit (fast, Redis INCR) &rarr; if passes, Layer 2 checks global capacity (shared semaphore/counter) &rarr; if both pass, request is processed. If either fails, return 429 with appropriate Retry-After.</div>
+<div class="b by"><span class="hi">Whale tenant handling:</span> Monitor per-tenant traffic volume in real-time. When a tenant exceeds 20% of total throughput, dynamically route their requests to an isolated worker pool. This pool has its own DB connection pool, preventing the whale from starving other tenants of connections.</div>
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Only per-tenant limits</span> &middot; 100 tenants each at 80% of their limit can still overwhelm the system (100&times;80% = 8000% of capacity). <span class="hr">Only global limits</span> &middot; one fast tenant consumes all shared capacity. <span class="hr">Equal limits for all plans</span> &middot; enterprise customers subsidize free tier abuse.</div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>AWS</strong> &middot; per-account service quotas + regional capacity. <strong>Salesforce</strong> &middot; API call limits per org per 24hr rolling window. <strong>Datadog</strong> &middot; per-org ingest rate limits. <strong>Snowflake</strong> &middot; virtual warehouse isolation for noisy tenants.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">Whale tenant sudden spike</span></td><td>Saturates shared DB connections before rate limiter kicks in</td><td>Connection pool per-tenant quotas. Admission control at connection checkout, not just request level.</td></tr>
+<tr><td><span class="hr">All tenants spike simultaneously (event-driven)</span></td><td>Global capacity hit, everyone degraded equally</td><td>Priority tiers: enterprise tenants shed last. Auto-scale with pre-warming. Queue excess with fair ordering.</td></tr>
+<tr><td><span class="hr">New tenant onboards with massive backfill</span></td><td>Initial data import floods the system</td><td>Onboarding rate limit (lower than steady-state). Dedicated import pipeline. Background job queue with throttling.</td></tr>
+<tr><td><span class="hr">Rate limit counter storage failure</span></td><td>Cannot enforce per-tenant limits</td><td>Local approximate counters as fallback. Conservative local limit = global_capacity / active_tenants.</td></tr>
+<tr><td><span class="hr">Tenant complaint about unfair limiting</span></td><td>Tenant claims they're within their plan but getting 429s</td><td>Distinguish per-tenant 429 (their fault) from global-capacity 429 (system overloaded). Different error codes/messages.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for multi-tenant rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Two-layer design</strong> &middot; per-tenant limit AND global capacity limit (both must pass)<br>
+<span class="hg">2.</span> <strong>Noisy neighbor isolation</strong> &middot; whale tenants get dedicated worker pools when they exceed threshold<br>
+<span class="hg">3.</span> <strong>Weighted fair queueing</strong> &middot; when at capacity, remaining throughput shared proportional to plan tier<br>
+<span class="hg">4.</span> <strong>Adaptive throttling</strong> &middot; dynamically tighten all limits when system load &gt; 80%<br>
+<span class="hg">5.</span> <strong>Connection-level quotas</strong> &middot; rate limiting requests is not enough — also limit DB connections per tenant<br>
+<span class="hg">6.</span> <strong>Self-service visibility</strong> &middot; tenants see their own usage dashboard + 429 breakdown
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

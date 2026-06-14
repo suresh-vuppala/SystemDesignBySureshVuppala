@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification Deduplication &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design notification deduplication to prevent duplicate sends at scale</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design a deduplication layer that prevents sending the same notification twice to a user, handling at-least-once delivery guarantees upstream, retry storms, and multiple event sources — all with &lt;0.5ms check overhead at 5B notifications/day</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">Idempotency</a>
+<a href="../../system-design-cheatsheet/07-caching.html">Content Hashing</a>
+<a href="../../system-design-cheatsheet/10-scalability.html">SETNX Atomic Operations</a>
+<a href="../../system-design-cheatsheet/04-apis.html">Exactly-Once Semantics</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html">TTL-Based Expiry</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Multiple triggers can fire the same notification: producer retries after timeout, multiple event sources for the same business event, Kafka consumer rebalance replaying messages. How do you prevent sending the same notification twice to a user while maintaining at-least-once processing guarantees from the queue?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Dedup key generation (content-hash based), atomic check-and-set via Redis SETNX, TTL-based dedup window management, handling retry paths safely. Complements <a href="notification-service-architecture.html">notification service architecture</a> as middleware on the send path — transparent to upstream producers.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="5" data-suffix="B/day" style="font-size:1.5rem;font-weight:700;color:var(--a)">5B/day</div>
+<div style="font-size:.72rem;color:var(--muted)">notifications processed</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">each needs dedup check</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="24" data-suffix="hr" style="font-size:1.5rem;font-weight:700;color:var(--g)">24hr</div>
+<div style="font-size:.72rem;color:var(--muted)">dedup window</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">TTL on dedup keys</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="0" data-suffix=".1%" style="font-size:1.5rem;font-weight:700;color:var(--o)">0.1%</div>
+<div style="font-size:.72rem;color:var(--muted)">target duplicate rate</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">from 2-5% raw incoming dupes</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="0" data-suffix=".5ms" style="font-size:1.5rem;font-weight:700;color:var(--r)">&lt;0.5ms</div>
+<div style="font-size:.72rem;color:var(--muted)">dedup check latency</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">single Redis SETNX call</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the deduplication layer must do</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Content-hash dedup key</strong> &middot; generate deterministic key from user_id + template_id + params_hash<br>
+  <span class="hg">2.</span> <strong>Atomic check-and-set</strong> &middot; Redis SETNX ensures only first sender wins (no race conditions)<br>
+  <span class="hg">3.</span> <strong>TTL-based window</strong> &middot; dedup keys expire after 24 hours (configurable per notification type)<br>
+  <span class="hg">4.</span> <strong>Transparent middleware</strong> &middot; workers call dedup check before send, no upstream changes needed<br>
+  <span class="hg">5.</span> <strong>Custom dedup key override</strong> &middot; producers can specify explicit dedup_key for custom semantics<br>
+  <span class="hg">6.</span> <strong>Safe retry handling</strong> &middot; retries of the same notification use same dedup_key → safely rejected
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> <strong>Upstream deduplication</strong> (Kafka exactly-once, producer idempotency)<br>
+  <span class="hr">&#x2717;</span> <strong>Content-level dedup</strong> (same message different template → different notification)<br>
+  <span class="hr">&#x2717;</span> <strong>Cross-channel dedup</strong> (push + email for same event is intentional, not duplicate)<br>
+  <span class="hr">&#x2717;</span> <strong>Historical dedup</strong> (prevent "same promo sent last week" — that's frequency capping)<br>
+  <span class="hr">&#x2717;</span> <strong>User-facing dedup UI</strong> (settings for dedup preferences)<br>
+  <span class="hr">&#x2717;</span> <strong>Dedup analytics</strong> (how many duplicates were suppressed)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints for the deduplication middleware</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Zero Duplicates</span></td><td><span class="hg">0 duplicate sends to user</span></td><td>User must never receive the same notification twice. SETNX is atomic — only one worker can win. Losers silently skip.</td></tr>
+<tr><td><span class="hi">Check Latency</span></td><td><span class="hg">&lt;0.5ms</span></td><td>Single Redis SETNX command. On the critical send path — every extra ms multiplied by 58K/sec = significant CPU time.</td></tr>
+<tr><td><span class="hi">Dedup Window</span></td><td><span class="hg">24 hours</span></td><td>Covers all retry scenarios (max retry window is typically 1 hour). 24h gives large safety margin. TTL auto-cleans.</td></tr>
+<tr><td><span class="hi">Memory Efficiency</span></td><td><span class="hg">~500GB</span> for 5B keys/day</td><td>5B keys × 100 bytes avg = 500GB. Redis cluster with 64 shards. TTL ensures steady-state (not growing unbounded).</td></tr>
+<tr><td><span class="hi">Exactly-Once Semantics</span></td><td><span class="hg">From user's perspective</span></td><td>System is at-least-once internally (retries on failure). Dedup layer converts to exactly-once from user's view.</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span></td><td>If dedup layer is down, decision: fail-open (risk duplicates) or fail-closed (risk dropping). Transactional → fail-open.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Memory vs. Window Size</span>. Longer dedup window = more protection but more memory. 24h window means storing all 5B daily keys simultaneously (~500GB). Shorter window (1h) uses ~20GB but misses duplicates from delayed retries. 24h is the standard for financial/transactional notifications.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Sizing the dedup infrastructure for 5B notifications/day</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>5B notifications/day</strong> &middot; <strong>24h dedup window</strong> &middot; <strong>2-5% raw duplicate rate</strong> &middot; <strong>0.1% target after dedup</strong> &middot; <strong>&lt;0.5ms per check</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Dedup checks/sec</td>
+  <td>5B / 86,400s</td>
+  <td><span class="hg">~58K checks/sec</span></td>
+  <td>Redis cluster handles 100K+ SETNX/sec per shard. 64 shards = 6.4M ops/sec capacity.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Active dedup keys (steady state)</td>
+  <td>5B keys × 24h window / 24h = 5B active</td>
+  <td><span class="hg">5B active keys</span></td>
+  <td>At any moment, 5B keys exist in Redis (rolling 24h window).</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Memory for dedup keys</td>
+  <td>5B keys × 100 bytes (key + overhead)</td>
+  <td><span class="hg">~500GB</span></td>
+  <td>Redis cluster: 64 shards × 8GB each. Each shard holds ~78M keys.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Duplicates suppressed/day</td>
+  <td>5B × 3% raw duplicate rate</td>
+  <td><span class="hg">~150M dupes blocked/day</span></td>
+  <td>Without dedup: 150M duplicate notifications sent. With dedup: ~0.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Dedup key size</td>
+  <td>SHA-256(user_id + template_id + params) = 32 bytes + prefix</td>
+  <td><span class="hg">~50 bytes per key</span></td>
+  <td>Use SHA-256 truncated to 128 bits (16 bytes) for space efficiency. Collision probability negligible at 5B.</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>TTL expiration rate</td>
+  <td>5B keys expire per day = ~58K expirations/sec</td>
+  <td><span class="hg">58K expires/sec</span></td>
+  <td>Redis lazy expiration handles this. No explicit cleanup needed. Active expiration runs in background.</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Hash computation overhead</td>
+  <td>SHA-256 at ~500MB/sec throughput, 200 bytes input</td>
+  <td><span class="hg">~0.4μs per hash</span></td>
+  <td>Negligible CPU overhead. Compute hash in-process before Redis call.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> The memory calculation is the "aha" moment. 5B keys × 100 bytes = 500GB is significant. If the interviewer pushes back on cost, discuss: (a) truncated hashes (50 bytes saves 50%), (b) shorter TTL for non-critical (1h instead of 24h), (c) probabilistic dedup (Bloom filter — accepts some false positives, meaning some notifications are wrongly suppressed).</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Deduplication is internal middleware — not user-facing. Integrated into the send path.</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">POST /v1/notifications/send (with dedup_key)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Send notification with optional explicit dedup_key override for custom dedup logic</div>
+<pre><code>{
+  "user_id": "u_abc123",
+  "template_id": "order_shipped",
+  "params": { "order_id": "ORD-9876" },
+  "channels": ["push", "email"],
+  "dedup_key": "order_shipped:ORD-9876:u_abc123",   // explicit override
+  // If dedup_key omitted, system generates: SHA256(user_id + template_id + sorted(params))
+  "dedup_ttl_sec": 86400                             // optional: custom TTL (default 24h)
+}
+
+// Response when first send:
+202 Accepted: { "notification_id": "n_001", "status": "queued", "dedup": "new" }
+
+// Response when duplicate detected:
+200 OK: { "notification_id": "n_001", "status": "already_sent", "dedup": "duplicate", "original_sent_at": "..." }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">Internal: Dedup Middleware (worker-level)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Called by every delivery worker before sending to provider</div>
+<pre><code>// Pseudocode — runs inside every worker before send
+function checkDedup(notification):
+    dedup_key = notification.dedup_key 
+                || sha256(notification.user_id + notification.template_id + sortedHash(notification.params))
+    
+    // Atomic: SET if NOT EXISTS, with TTL
+    result = redis.SET("dedup:" + dedup_key, notification.id, NX=true, EX=86400)
+    
+    if result == OK:
+        return PROCEED      // first time seeing this key → send notification
+    else:
+        return SKIP         // key already exists → duplicate → skip silently
+        log.info("Dedup suppressed", {dedup_key, original: redis.GET("dedup:" + dedup_key)})</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--o);font-size:.85rem">Internal: Dedup Key Generation</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Deterministic key generation — same input always produces same key</div>
+<pre><code>function generateDedupKey(user_id, template_id, params):
+    // Sort params for deterministic hashing (order-independent)
+    sorted_params = JSON.stringify(sortKeys(params))
+    
+    // Concatenate with separator to avoid collisions
+    input = user_id + "|" + template_id + "|" + sorted_params
+    
+    // SHA-256 truncated to 128 bits (sufficient for 5B daily notifications)
+    hash = sha256(input).substring(0, 32)  // 32 hex chars = 128 bits
+    
+    return "dedup:" + hash
+    
+// Example:
+// user_id: "u_abc123", template: "order_shipped", params: {"order_id": "ORD-9876"}
+// → "dedup:a7f3b2c1d4e5f6a7b8c9d0e1f2a3b4c5"</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Minimal storage — just the dedup key and metadata</p>
+
+<h4 style="color:var(--a)">Redis: Dedup Keys (Primary Store)</h4>
+<pre><code>// Each dedup key is a simple Redis key with TTL
+// Key: dedup:{hash}
+// Value: notification_id (for audit/debugging)
+// TTL: 24 hours (86400 seconds)
+
+SET dedup:a7f3b2c1d4e5f6a7b8c9d0e1f2a3b4c5 "n_001" NX EX 86400
+
+// NX = Set only if Not eXists (atomic check-and-set)
+// EX = Expire in seconds
+// Returns OK if set (first time) or nil if already exists (duplicate)
+
+// Memory per key:
+//   Key: "dedup:" + 32 chars = 38 bytes
+//   Value: notification_id ~20 bytes
+//   Redis overhead: ~40 bytes (dict entry, expire entry)
+//   Total: ~100 bytes per key</code></pre>
+
+<h4 style="color:var(--g)">delivery_log (Cassandra — audit trail)</h4>
+<pre><code>CREATE TABLE delivery_log (
+  notification_id   UUID PRIMARY KEY,
+  user_id           TEXT,
+  template_id       TEXT,
+  dedup_key         TEXT,            -- the hash used for dedup
+  status            TEXT,            -- sent | dedup_suppressed
+  attempts          INT,             -- how many times this dedup_key was seen
+  first_seen_at     TIMESTAMP,
+  last_seen_at      TIMESTAMP,
+  sent_via          TEXT             -- channel that actually delivered
+);
+
+// Query: "How many duplicates were suppressed for notification N?"
+// SELECT attempts FROM delivery_log WHERE notification_id = ?</code></pre>
+
+<h4 style="color:var(--o)">Redis: Active Dedup Keys (SET for monitoring)</h4>
+<pre><code>// Optional: track active dedup keys per user for debugging
+// Sorted set: score = timestamp, member = dedup_key
+ZADD active_dedup:u_abc123 1705312200 "a7f3b2c1d4e5f6a7b8c9d0e1f2a3b4c5"
+
+// Cleanup: ZREMRANGEBYSCORE active_dedup:{user_id} 0 (now - 86400)
+// Usage: "Show me all dedup keys for this user in last 24h"
+// Useful for support debugging: "Why didn't my notification arrive?"</code></pre>
+
+<h4 style="color:var(--r)">Dedup Key Composition</h4>
+<pre><code>// The dedup key uniquely identifies "same notification to same user"
+// Components:
+//   1. user_id      → same user
+//   2. template_id  → same notification type
+//   3. params_hash  → same parameters (order_id, etc.)
+
+// Examples of SAME dedup key (duplicates):
+//   Send #1: user="u_abc", template="order_shipped", params={order: "ORD-9876"}
+//   Send #2: user="u_abc", template="order_shipped", params={order: "ORD-9876"}  ← DUPLICATE
+
+// Examples of DIFFERENT dedup keys (not duplicates):
+//   user="u_abc", template="order_shipped", params={order: "ORD-9876"}
+//   user="u_abc", template="order_shipped", params={order: "ORD-9877"}  ← different order
+//   user="u_def", template="order_shipped", params={order: "ORD-9876"}  ← different user</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Event &#x2192; Generate dedup_key &#x2192; Redis SETNX &#x2192; If new: send &#x2192; If exists: skip</p>
+
+<svg width="100%" viewBox="0 0 740 370" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="nd1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- INCOMING EVENTS (with duplicates) -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="55" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">INCOMING EVENTS &middot; May contain duplicates (2-5% rate)</text>
+
+<rect data-dp-step="2" x="14" y="28" width="140" height="24" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="84" y="39" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Original Event</text>
+<text data-dp-step="2" x="84" y="49" text-anchor="middle" fill="var(--muted)" font-size="5">order_shipped:ORD-9876</text>
+
+<rect data-dp-step="2" x="170" y="28" width="140" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="2" x="240" y="39" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Producer Retry ⚠️</text>
+<text data-dp-step="2" x="240" y="49" text-anchor="middle" fill="var(--muted)" font-size="5">same event, timeout retry</text>
+
+<rect data-dp-step="2" x="326" y="28" width="140" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="2" x="396" y="39" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Consumer Rebalance ⚠️</text>
+<text data-dp-step="2" x="396" y="49" text-anchor="middle" fill="var(--muted)" font-size="5">Kafka replays message</text>
+
+<rect data-dp-step="2" x="482" y="28" width="140" height="24" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="2" x="552" y="39" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Duplicate Source ⚠️</text>
+<text data-dp-step="2" x="552" y="49" text-anchor="middle" fill="var(--muted)" font-size="5">two services fire same event</text>
+
+<line data-dp-step="3" x1="370" y1="59" x2="370" y2="72" stroke="var(--a)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<!-- DEDUP KEY GENERATION -->
+<rect data-dp-step="4" x="4" y="74" width="732" height="55" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="4" x="370" y="88" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">STEP 1: GENERATE DEDUP KEY &middot; Deterministic content hash</text>
+
+<rect data-dp-step="5" x="14" y="96" width="220" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="5" x="124" y="107" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Input: user_id + template_id + params</text>
+<text data-dp-step="5" x="124" y="117" text-anchor="middle" fill="var(--muted)" font-size="5">Sort params for deterministic output</text>
+
+<line data-dp-step="6" x1="234" y1="109" x2="258" y2="109" stroke="var(--y)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<rect data-dp-step="7" x="260" y="96" width="180" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="7" x="350" y="107" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">SHA-256 → truncate to 128 bits</text>
+<text data-dp-step="7" x="350" y="117" text-anchor="middle" fill="var(--muted)" font-size="5">~0.4μs computation</text>
+
+<line data-dp-step="8" x1="440" y1="109" x2="464" y2="109" stroke="var(--o)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<rect data-dp-step="9" x="466" y="96" width="200" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="9" x="566" y="107" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">dedup_key = "dedup:a7f3b2c1..."</text>
+<text data-dp-step="9" x="566" y="117" text-anchor="middle" fill="var(--muted)" font-size="5">Same input always → same key</text>
+
+<line data-dp-step="10" x1="370" y1="129" x2="370" y2="142" stroke="var(--y)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<!-- REDIS SETNX (ATOMIC CHECK) -->
+<rect data-dp-step="11" x="4" y="144" width="732" height="75" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="11" x="370" y="158" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">STEP 2: REDIS SETNX &middot; Atomic check-and-set (~0.3ms)</text>
+
+<rect data-dp-step="12" x="14" y="166" width="300" height="44" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="12" x="164" y="180" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">SET dedup:a7f3... "n_001" NX EX 86400</text>
+<text data-dp-step="12" x="164" y="194" text-anchor="middle" fill="var(--muted)" font-size="5.5">NX = only if not exists | EX = 24h TTL</text>
+<text data-dp-step="12" x="164" y="204" text-anchor="middle" fill="var(--muted)" font-size="5">Single atomic command — no read-then-write race</text>
+
+<!-- Two outcomes -->
+<line data-dp-step="13" x1="314" y1="180" x2="370" y2="172" stroke="var(--g)" stroke-width="1" marker-end="url(#nd1)"/>
+<line data-dp-step="13" x1="314" y1="198" x2="370" y2="206" stroke="var(--r)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<rect data-dp-step="14" x="372" y="162" width="176" height="24" rx="4" fill="rgba(52,211,153,.10)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="14" x="460" y="177" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Result: OK → FIRST (send it!)</text>
+
+<rect data-dp-step="15" x="372" y="194" width="176" height="24" rx="4" fill="rgba(248,113,113,.10)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="15" x="460" y="209" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Result: nil → DUPLICATE (skip!)</text>
+
+<!-- Annotation -->
+<rect data-dp-step="16" x="570" y="162" width="158" height="48" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="16" x="649" y="176" text-anchor="middle" fill="var(--a2)" font-size="5.5" font-weight="700">WHY SETNX IS PERFECT</text>
+<text data-dp-step="16" x="649" y="188" text-anchor="middle" fill="var(--muted)" font-size="5">Atomic: no window between</text>
+<text data-dp-step="16" x="649" y="198" text-anchor="middle" fill="var(--muted)" font-size="5">check and set. Two workers</text>
+<text data-dp-step="16" x="649" y="208" text-anchor="middle" fill="var(--muted)" font-size="5">racing → only one wins.</text>
+
+<line data-dp-step="17" x1="460" y1="174" x2="460" y2="232" stroke="var(--g)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<!-- SEND NOTIFICATION -->
+<rect data-dp-step="18" x="4" y="234" width="360" height="55" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="18" x="184" y="248" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">FIRST TIME → SEND</text>
+
+<rect data-dp-step="19" x="14" y="256" width="160" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="19" x="94" y="267" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Deliver to Provider</text>
+<text data-dp-step="19" x="94" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">APNs / FCM / SendGrid / Twilio</text>
+
+<rect data-dp-step="19" x="190" y="256" width="160" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="19" x="270" y="267" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Log delivery_log</text>
+<text data-dp-step="19" x="270" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">status: "sent", dedup_key</text>
+
+<!-- SKIP (DUPLICATE) -->
+<rect data-dp-step="20" x="380" y="234" width="356" height="55" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="20" x="558" y="248" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">DUPLICATE → SKIP SILENTLY</text>
+
+<rect data-dp-step="21" x="390" y="256" width="160" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="21" x="470" y="267" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">ACK Kafka offset</text>
+<text data-dp-step="21" x="470" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">Don't reprocess this message</text>
+
+<rect data-dp-step="21" x="566" y="256" width="160" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="21" x="646" y="267" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Log suppression</text>
+<text data-dp-step="21" x="646" y="277" text-anchor="middle" fill="var(--muted)" font-size="5">metric: dedup.suppressed++</text>
+
+<!-- RETRY PATH -->
+<rect data-dp-step="22" x="4" y="300" width="732" height="60" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="22" x="370" y="314" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">RETRY PATH &middot; Same dedup_key → safely rejected</text>
+
+<rect data-dp-step="23" x="14" y="322" width="220" height="30" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="23" x="124" y="335" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Worker crashes after send, before ACK</text>
+<text data-dp-step="23" x="124" y="347" text-anchor="middle" fill="var(--muted)" font-size="5">Kafka re-delivers same message to another worker</text>
+
+<line data-dp-step="24" x1="234" y1="337" x2="258" y2="337" stroke="var(--a2)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<rect data-dp-step="25" x="260" y="322" width="200" height="30" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="25" x="360" y="335" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">New worker generates same dedup_key</text>
+<text data-dp-step="25" x="360" y="347" text-anchor="middle" fill="var(--muted)" font-size="5">Same user + template + params → same hash</text>
+
+<line data-dp-step="26" x1="460" y1="337" x2="484" y2="337" stroke="var(--y)" stroke-width="1" marker-end="url(#nd1)"/>
+
+<rect data-dp-step="27" x="486" y="322" width="240" height="30" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="27" x="606" y="335" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">SETNX returns nil → SKIP ✓ (safe!)</text>
+<text data-dp-step="27" x="606" y="347" text-anchor="middle" fill="var(--muted)" font-size="5">Notification already sent by first worker. No duplicate.</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs for deduplication at scale</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">Dedup Check Location</span></td>
+  <td>At producer, at queue, at worker (consumer)</td>
+  <td><span class="hg">At worker (just before send)</span></td>
+  <td>Catches ALL duplicate sources: producer retries, Kafka replays, multiple sources. Latest possible check = highest accuracy.</td>
+</tr>
+<tr>
+  <td><span class="hi">Hash Algorithm</span></td>
+  <td>MD5, SHA-256, MurmurHash3, xxHash</td>
+  <td><span class="hg">SHA-256 truncated to 128 bits</span></td>
+  <td>Cryptographic strength unnecessary but SHA-256 is universally available. 128 bits = collision probability ~10⁻¹⁸ at 5B keys.</td>
+</tr>
+<tr>
+  <td><span class="hi">Storage Backend</span></td>
+  <td>Redis, Memcached, DynamoDB, Bloom filter</td>
+  <td><span class="hg">Redis with SETNX + TTL</span></td>
+  <td>SETNX is atomic (no race conditions). TTL provides automatic cleanup. Persistence optional (dedup is ephemeral). Sub-ms latency.</td>
+</tr>
+<tr>
+  <td><span class="hi">Dedup Window</span></td>
+  <td>1 hour, 6 hours, 24 hours, 7 days</td>
+  <td><span class="hg">24 hours (configurable)</span></td>
+  <td>Covers all retry windows with margin. Max retry backoff is typically 1 hour. 24h handles delayed event sources too.</td>
+</tr>
+<tr>
+  <td><span class="hi">Failure Mode</span></td>
+  <td>Fail-open (send anyway), fail-closed (suppress)</td>
+  <td><span class="hg">Fail-open for transactional, fail-closed for marketing</span></td>
+  <td>If Redis is down: better to send a possible duplicate OTP than miss delivery. But duplicate marketing email is worse than missing one.</td>
+</tr>
+<tr>
+  <td><span class="hi">Key Composition</span></td>
+  <td>notification_id only, user+template+params, custom key</td>
+  <td><span class="hg">user + template + params (with custom override)</span></td>
+  <td>notification_id is unique per attempt (useless for dedup). Content-based key catches semantically identical notifications from different sources.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why content-hash and not notification_id?</span> Each retry generates a new notification_id. But the CONTENT is the same (same user, same template, same params). The dedup key must be derived from what the USER sees, not from internal IDs. Two different notification_ids with the same content-hash are duplicates from the user's perspective.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">The send-then-crash problem:</span> Worker sends notification to APNs (success) → crashes before ACKing Kafka → Kafka redelivers to another worker → second worker generates same dedup_key → SETNX returns nil → skips. The user receives exactly one notification despite the crash. This is the core value of dedup at the worker level.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Dedup key collision risk:</span> With 128-bit hash and 5B daily notifications, collision probability per day is ~5B² / 2¹²⁸ ≈ 10⁻²⁰. Even over 10 years, the probability of any collision is negligible. If the interviewer asks, explain the birthday paradox: you'd need ~2⁶⁴ entries for a 50% collision chance with 128-bit hash.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">Cross-channel dedup is intentional:</span> "Order shipped" sent to BOTH push AND email is NOT a duplicate. The dedup key includes the channel OR the dedup is checked per-channel-worker. Design decision: if the user subscribed to both push and email for order updates, they get both. Same notification, different channels = different user experience.</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">Edge cases specific to deduplication at scale</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Redis Cluster Failover</span></td>
+  <td>Redis primary fails, some dedup keys lost during failover window (~1-5s).</td>
+  <td>Accept brief duplicate risk during failover. Redis Sentinel promotes replica. Lost keys = potential duplicates for ~5s window only. Acceptable trade-off vs. blocking all sends.</td>
+  <td><span class="ho">~5s exposure</span> window</td>
+</tr>
+<tr>
+  <td><span class="hi">Param Order Sensitivity</span></td>
+  <td>{a:1, b:2} and {b:2, a:1} produce different hashes → missed dedup.</td>
+  <td>Sort params keys before hashing. JSON.stringify(sortKeys(params)) guarantees same hash regardless of key order in the input object.</td>
+  <td><span class="hg">Deterministic</span> by design</td>
+</tr>
+<tr>
+  <td><span class="hi">TTL Too Short</span></td>
+  <td>Dedup key expires at 24h. Delayed retry at 25h creates a duplicate.</td>
+  <td>TTL should exceed max possible retry window. If retries can happen after 24h, extend TTL to 48h (at 2× memory cost). Monitor max retry delay.</td>
+  <td><span class="hg">Extend TTL</span> based on retry policy</td>
+</tr>
+<tr>
+  <td><span class="hi">Legitimate Re-send</span></td>
+  <td>User requests "resend OTP" — same template, same user, same params (new code differs).</td>
+  <td>OTP code is part of params → different params = different dedup_key. Or: producer sends explicit dedup_key with timestamp component for "allow re-send" semantics.</td>
+  <td><span class="hg">Natural</span> — params differ</td>
+</tr>
+<tr>
+  <td><span class="hi">Memory Pressure</span></td>
+  <td>Redis approaching memory limit with 5B active keys.</td>
+  <td>Redis maxmemory with volatile-ttl eviction policy. Evicts keys closest to expiry first. Add shards if consistent pressure. Monitor key count vs. capacity.</td>
+  <td><span class="hg">Auto-evict</span> oldest keys first</td>
+</tr>
+<tr>
+  <td><span class="hi">Dedup Across Regions</span></td>
+  <td>Multi-region deployment — same notification processed in US and EU simultaneously.</td>
+  <td>Global Redis cluster (high latency) OR accept brief regional dedup only (most duplicates are same-region retries). Cross-region dedup adds ~50ms — usually not worth it.</td>
+  <td><span class="ho">Regional-only</span> dedup (accepted risk)</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points for notification deduplication design interviews</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Content-Hash Key is the Core Insight</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Don't use notification_id for dedup — each retry gets a new ID. Use SHA-256(user_id + template_id + sorted_params). This catches duplicates regardless of source: producer retries, Kafka replays, multiple event sources. Same content to same user = same hash = duplicate detected.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. SETNX is Atomic — No Race Condition Possible</strong><br>
+<span style="font-size:.82rem;color:var(--text)">The naive approach (GET key, if not exists SET key, then send) has a race window between GET and SET where two workers both see "not exists" and both send. Redis SETNX (SET if Not eXists) is a single atomic command — exactly one worker wins. Combined with EX (TTL), it's a one-liner: <code>SET key value NX EX 86400</code>.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Dedup at Worker Level Catches Everything</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Dedup at the producer only catches producer retries. Dedup at the queue only catches queue-level replays. Dedup at the worker (just before calling the delivery provider) catches ALL sources of duplicates because it's the last gate before the irreversible send action. This is the only position that guarantees zero duplicates to the user.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. Memory Math: 500GB for 24h Window is Real</strong><br>
+<span style="font-size:.82rem;color:var(--text)">5B notifications/day × 100 bytes/key = 500GB Redis. This is expensive but justified for transactional notifications. Optimization levers: (a) shorter TTL for non-critical (1h = 20GB), (b) truncated hash (50 bytes saves 250GB), (c) Bloom filter for probabilistic dedup (3GB total but accepts ~0.1% false positive suppression).</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Exactly-Once from User's Perspective (Not System's)</strong><br>
+<span style="font-size:.82rem;color:var(--text)">The system processes at-least-once (Kafka retries, worker retries). The dedup layer converts this to exactly-once from the user's perspective. This is the standard pattern: accept at-least-once internally for reliability, then dedup at the edge (just before external delivery) for user experience. Don't try to build true exactly-once end-to-end — it's impossibly expensive.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

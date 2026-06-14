@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token-based rate limiting for an LLM API &middot; System Design</title>
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design rate limiting for an LLM API where requests vary wildly in cost — limit by tokens, not request count</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x2794;?</span> Design token/cost-based rate limiting for an AI API where each request consumes variable units (1 request = 10 to 100,000 tokens)</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/10-scalability.html#rate-limiting">Rate Limiting</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#api-gateway">API Gateway</a>
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Redis</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#backpressure">Backpressure</a>
+</div>
+</details>
+
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">Design rate limiting for an LLM API where requests vary wildly in cost. A simple request might use 50 tokens while a complex one uses 100,000 tokens. Limiting by request count is meaningless — you must limit by total tokens consumed per minute (TPM), using a token bucket with weighted cost per request.</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Core challenge:</span> The fundamental assumption of most rate limiters — <span class="hr">"1 request = 1 unit of consumption"</span> — is broken. A user sending 10 requests at 100K tokens each consumes 1000x more resources than a user sending 10 requests at 100 tokens each. You must <span class="hr">weight each request by its actual cost</span> and deduct from a shared budget.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--o)">90K</div>
+<div style="font-size:.72rem;color:var(--muted)">TPM (tokens/min)</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">tier-1 limit</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--r)">Variable</div>
+<div style="font-size:.72rem;color:var(--muted)">cost per request</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">10 to 100K tokens</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--a)">Dual Limit</div>
+<div style="font-size:.72rem;color:var(--muted)">TPM + RPM</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">both enforced</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div style="font-size:1.5rem;font-weight:700;color:var(--g)">Token Bucket</div>
+<div style="font-size:.72rem;color:var(--muted)">with weighted cost</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">deduct N per request</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the system must do &middot; token/cost-based rate limiting for LLM APIs</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Rate limit by <strong>tokens consumed</strong> (not request count)<br>
+  <span class="hg">2.</span> <strong>Dual limits</strong>: TPM (tokens per minute) + RPM (requests per minute)<br>
+  <span class="hg">3.</span> <strong>Reserve-then-refund</strong> for unknown output token costs<br>
+  <span class="hg">4.</span> <strong>Per-model weight multiplier</strong> (GPT-4 token = 10x GPT-3.5 budget)<br>
+  <span class="hg">5.</span> Standard <strong>response headers</strong> with token counts and reset times<br>
+  <span class="hg">6.</span> <strong>Streaming support</strong> &mdash; deduct tokens incrementally during streaming responses
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> Request <strong>queuing/scheduling</strong> (priority queues, fairness)<br>
+  <span class="hr">&#x2717;</span> <strong>Model selection logic</strong> (routing to appropriate model)<br>
+  <span class="hr">&#x2717;</span> <strong>Cost/billing calculation</strong> (pricing, invoicing)<br>
+  <span class="hr">&#x2717;</span> <strong>Prompt caching</strong> (semantic dedup, cache hits)<br>
+  <span class="hr">&#x2717;</span> <strong>Content moderation</strong> (safety filters, policy enforcement)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the token-based rate limiting design</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">Exact token accounting</span> (input + output)</td><td>Deduct actual tokens consumed. No approximation &mdash; users pay per token, limits must be precise.</td></tr>
+<tr><td><span class="hi">Latency</span></td><td><span class="hg">&lt;3ms</span> per admission check (pre-flight reserve)</td><td>Reserve check happens before inference. Must not add perceptible latency to API response time.</td></tr>
+<tr><td><span class="hi">Recovery</span></td><td>Refund unused tokens within <span class="hg">1s</span> of response completion</td><td>Reserved max_tokens but used less. Refund difference immediately to avoid unfairly starving user budget.</td></tr>
+<tr><td><span class="hi">Streaming</span></td><td>Deduct tokens <span class="hg">incrementally</span> during streaming</td><td>Long streaming responses (30s+) need progressive accounting. Can't wait until stream ends.</td></tr>
+<tr><td><span class="hi">Model Weights</span></td><td>GPT-4 token costs <span class="hg">10x GPT-3.5</span> from same budget</td><td>Expensive models consume more budget per token. Unified budget across models with weight multipliers.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Pre-flight reservation vs. Actual cost</span>. You don't know output tokens until generation completes. Must reserve estimated max upfront and refund unused &mdash; or risk over-serving users who exceed their budget.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Given numbers from the question &#x2192; derive infrastructure sizing</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given (from question):</span>
+  <strong>90K TPM per user</strong> &middot; <strong>500 RPM per user</strong> &middot; <strong>average request uses 2K tokens</strong> (input + output)
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Requests before TPM limit</td>
+  <td>90K TPM &divide; 2K avg tokens/request</td>
+  <td><span class="hg">~45 requests</span> (if all average-sized)</td>
+  <td>But variable: 1 request at 90K tokens = entire budget consumed.</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Redis memory per user</td>
+  <td>per-user bucket state = 3 fields &times; 64 bytes</td>
+  <td><span class="hg">~200 bytes/user</span></td>
+  <td>Trivial per-user footprint. Token bucket + request counter + reservation.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Total memory (1M users)</td>
+  <td>1M users &times; 200 bytes</td>
+  <td><span class="hg">~200MB</span></td>
+  <td>Well within single Redis instance. Fits comfortably in memory.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Peak Redis ops</td>
+  <td>500 RPM &times; 1M users &divide; 60 seconds</td>
+  <td><span class="hr">~8.3M checks/sec</span></td>
+  <td>Requires Redis Cluster at peak. Shard by user_id.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Refund operations</td>
+  <td>Same frequency as requests (one refund per completed response)</td>
+  <td><span class="hg">~8.3M refunds/sec at peak</span></td>
+  <td>Refund is async (post-response). Can batch or pipeline.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> Show the variance problem first (step 1) &mdash; "45 requests if average, but 1 request can consume entire budget." This proves why request counting is meaningless. Then show Redis can handle the scale (step 3-4).</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Rate limit check runs BEFORE inference &middot; response headers inform client of remaining budget</p>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.25)">POST</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">/v1/chat/completions</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Rate check executes before inference. Reserve estimated tokens (input + max_tokens), then refund unused after completion.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// Success response headers</span><br>
+x-ratelimit-limit-tokens: 90000<br>
+x-ratelimit-remaining-tokens: 58000<br>
+x-ratelimit-reset-tokens: 2025-01-15T10:31:00Z<br><br>
+<span style="color:var(--muted);font-style:italic">// Request-based limits (also enforced)</span><br>
+x-ratelimit-limit-requests: 500<br>
+x-ratelimit-remaining-requests: 423
+</div>
+</div>
+
+<div class="api-card" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<span style="font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.25)">429</span>
+<span style="font-family:monospace;font-size:.82rem;color:var(--text);font-weight:600">Too Many Requests (Token or Request limit hit)</span>
+</div>
+<div style="font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Returned when TPM or RPM limit exceeded. Body indicates which limit was hit.</div>
+<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:.72rem;line-height:1.6;color:var(--text-2)">
+<span style="color:var(--muted);font-style:italic">// 429 response body</span><br>
+{ "error": { "type": "tokens", "message": "Rate limit exceeded: TPM" } }<br>
+<span style="color:var(--muted);font-style:italic">// or</span><br>
+{ "error": { "type": "requests", "message": "Rate limit exceeded: RPM" } }
+</div>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Redis token bucket state + request counter + reservation tracking</p>
+
+<div class="b bg" style="margin-bottom:8px"><span class="hi">Redis &middot; Token Bucket (TPM)</span></div>
+<pre><code>// Token bucket per user (refills at 1,500 tokens/sec)
+ratelimit:tokens:{user_id} → HASH {
+  bucket_level: 58000,       // current tokens available
+  last_refill: 1705312200,   // timestamp of last refill calculation
+  capacity: 90000,           // max bucket size (TPM limit)
+  refill_rate: 1500          // tokens added per second
+}
+</code></pre>
+
+<div class="b bb" style="margin-bottom:8px"><span class="hi">Redis &middot; Request Counter (RPM)</span></div>
+<pre><code>// Fixed window request counter per user
+ratelimit:requests:{user_id} → HASH {
+  count: 77,                 // requests in current window
+  window_start: 1705312200   // current window start timestamp
+}
+</code></pre>
+
+<div class="b by" style="margin-bottom:8px"><span class="hi">Redis &middot; Reservation Tracking</span></div>
+<pre><code>// Active reservation per in-flight request
+reservation:{request_id} → {
+  reserved_tokens: 5000,     // tokens reserved (input + max_tokens)
+  user_id: "u_42",
+  created_at: 1705312205
+}
+TTL: 120s (auto-expire if response never completes)
+
+// On completion: deduct actual, refund (reserved - actual) back to bucket
+// Actual: 1K input + 800 output = 1,800 tokens
+// Refund: 5,000 - 1,800 = +3,200 back to bucket_level
+</code></pre>
+</div>
+
+<div class="T" id="architecture">
+<h2>Architecture &middot; Token Bucket with Variable Deduction</h2>
+<p class="su">Each request deducts its token cost from the bucket — large requests consume more of the budget</p>
+
+<!-- --- LLM Token-Based Rate Limiting SVG --- -->
+<svg width="100%" viewBox="0 0 780 440" style="max-width:780px;display:block;margin:6px auto 10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LLM Token-Based Rate Limiting Architecture">
+  <defs><marker id="tk-arr" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+  <!-- TITLE -->
+  <text x="390" y="14" text-anchor="middle" fill="var(--muted)" font-size="8" font-weight="800">LLM Token-Based Rate Limiting &middot; Variable Cost per Request</text>
+
+  <!-- REQUEST COMPARISON -->
+  <rect x="10" y="25" width="760" height="80" rx="8" fill="rgba(108,140,255,.02)" stroke="var(--a)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="40" text-anchor="middle" fill="var(--a)" font-size="7" font-weight="800">REQUESTS WITH WILDLY DIFFERENT COSTS</text>
+
+  <!-- Small request -->
+  <rect x="30" y="50" width="160" height="42" rx="5" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="110" y="65" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">Small Request</text>
+  <text x="110" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">"Translate: hello" &rarr; 50 tokens</text>
+  <text x="110" y="88" text-anchor="middle" fill="var(--g)" font-size="4.5">Cost: 50 from budget</text>
+
+  <!-- Medium request -->
+  <rect x="210" y="50" width="160" height="42" rx="5" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+  <text x="290" y="65" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">Medium Request</text>
+  <text x="290" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">"Summarize article" &rarr; 2K tokens</text>
+  <text x="290" y="88" text-anchor="middle" fill="var(--y)" font-size="4.5">Cost: 2,000 from budget</text>
+
+  <!-- Large request -->
+  <rect x="390" y="50" width="180" height="42" rx="5" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+  <text x="480" y="65" text-anchor="middle" fill="var(--o)" font-size="5.5" font-weight="600">Large Request</text>
+  <text x="480" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">"Write essay from book" &rarr; 30K tokens</text>
+  <text x="480" y="88" text-anchor="middle" fill="var(--o)" font-size="4.5">Cost: 30,000 from budget</text>
+
+  <!-- Huge request -->
+  <rect x="590" y="50" width="160" height="42" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="670" y="65" text-anchor="middle" fill="var(--r)" font-size="5.5" font-weight="600">Huge Request</text>
+  <text x="670" y="78" text-anchor="middle" fill="var(--muted)" font-size="5">"Analyze 128K context" &rarr; 100K tokens</text>
+  <text x="670" y="88" text-anchor="middle" fill="var(--r)" font-size="4.5">Cost: 100,000 from budget</text>
+
+  <!-- Arrows down -->
+  <line x1="110" y1="96" x2="280" y2="125" stroke="var(--g)" stroke-width=".6" marker-end="url(#tk-arr)"/>
+  <line x1="290" y1="96" x2="330" y2="125" stroke="var(--y)" stroke-width=".6" marker-end="url(#tk-arr)"/>
+  <line x1="480" y1="96" x2="420" y2="125" stroke="var(--o)" stroke-width=".6" marker-end="url(#tk-arr)"/>
+  <line x1="670" y1="96" x2="500" y2="125" stroke="var(--r)" stroke-width=".6" marker-end="url(#tk-arr)"/>
+
+  <!-- TOKEN BUDGET BUCKET -->
+  <rect x="200" y="120" width="380" height="110" rx="10" fill="rgba(34,211,238,.03)" stroke="var(--c)" stroke-width="2"/>
+  <text x="390" y="138" text-anchor="middle" fill="var(--c)" font-size="7" font-weight="800">TOKEN BUDGET (per user per minute)</text>
+  <text x="390" y="153" text-anchor="middle" fill="var(--muted)" font-size="5.5">Capacity: 90,000 TPM | Refill: 1,500 tokens/sec</text>
+
+  <!-- Budget level -->
+  <rect x="220" y="162" width="340" height="25" rx="4" fill="rgba(255,255,255,.03)" stroke="var(--border)" stroke-width=".5"/>
+  <rect x="220" y="162" width="220" height="25" rx="4" fill="rgba(52,211,153,.12)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="390" y="178" text-anchor="middle" fill="var(--muted)" font-size="5">Remaining: 58,000 / 90,000 tokens (64%)</text>
+
+  <!-- Deduction examples -->
+  <text x="390" y="202" text-anchor="middle" fill="var(--c)" font-size="5" font-weight="600">Deduction: small = -50 | medium = -2,000 | large = -30,000 | huge = -100,000 (DENIED: exceeds remaining)</text>
+  <text x="390" y="216" text-anchor="middle" fill="var(--muted)" font-size="4.5">Variable weight per request &middot; breaks "1 request = 1 unit" assumption</text>
+
+  <!-- DUAL LIMIT ENFORCEMENT -->
+  <rect x="10" y="240" width="760" height="85" rx="8" fill="rgba(251,191,36,.02)" stroke="var(--y)" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="390" y="255" text-anchor="middle" fill="var(--y)" font-size="7" font-weight="800">DUAL LIMITS: TPM + RPM (Both Enforced Independently)</text>
+
+  <!-- TPM bucket -->
+  <rect x="30" y="265" width="340" height="48" rx="6" fill="rgba(34,211,238,.05)" stroke="var(--c)" stroke-width="1"/>
+  <text x="200" y="282" text-anchor="middle" fill="var(--c)" font-size="6.5" font-weight="700">TPM: 90,000 tokens/min</text>
+  <text x="200" y="296" text-anchor="middle" fill="var(--muted)" font-size="5">Protects GPU compute resources</text>
+  <text x="200" y="308" text-anchor="middle" fill="var(--c)" font-size="4.5">Each request deducts actual_input + actual_output tokens</text>
+
+  <!-- RPM bucket -->
+  <rect x="400" y="265" width="340" height="48" rx="6" fill="rgba(167,139,250,.05)" stroke="var(--a2)" stroke-width="1"/>
+  <text x="570" y="282" text-anchor="middle" fill="var(--a2)" font-size="6.5" font-weight="700">RPM: 500 requests/min</text>
+  <text x="570" y="296" text-anchor="middle" fill="var(--muted)" font-size="5">Protects connection/scheduling resources</text>
+  <text x="570" y="308" text-anchor="middle" fill="var(--a2)" font-size="4.5">Each request deducts exactly 1 (regardless of token count)</text>
+
+  <!-- RESERVE-REFUND PATTERN -->
+  <rect x="10" y="335" width="760" height="95" rx="5" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".5"/>
+  <text x="390" y="352" text-anchor="middle" fill="var(--muted)" font-size="7" font-weight="700">Reserve &rarr; Generate &rarr; Refund Pattern (Output Tokens Unknown Upfront)</text>
+
+  <!-- Step 1: Reserve -->
+  <rect x="30" y="362" width="200" height="55" rx="4" fill="rgba(251,191,36,.05)" stroke="var(--y)" stroke-width=".7"/>
+  <text x="130" y="378" text-anchor="middle" fill="var(--y)" font-size="5.5" font-weight="600">1. RESERVE (pre-flight)</text>
+  <text x="130" y="392" text-anchor="middle" fill="var(--muted)" font-size="5">Reserve: input_tokens + max_tokens</text>
+  <text x="130" y="405" text-anchor="middle" fill="var(--muted)" font-size="4.5">e.g., 1K input + 4K max = reserve 5K</text>
+
+  <!-- Arrow -->
+  <line x1="230" y1="390" x2="260" y2="390" stroke="var(--y)" stroke-width=".7" marker-end="url(#tk-arr)"/>
+
+  <!-- Step 2: Generate -->
+  <rect x="260" y="362" width="200" height="55" rx="4" fill="rgba(108,140,255,.05)" stroke="var(--a)" stroke-width=".7"/>
+  <text x="360" y="378" text-anchor="middle" fill="var(--a)" font-size="5.5" font-weight="600">2. GENERATE (processing)</text>
+  <text x="360" y="392" text-anchor="middle" fill="var(--muted)" font-size="5">LLM generates response...</text>
+  <text x="360" y="405" text-anchor="middle" fill="var(--muted)" font-size="4.5">Actual output: 800 tokens (not 4K)</text>
+
+  <!-- Arrow -->
+  <line x1="460" y1="390" x2="490" y2="390" stroke="var(--a)" stroke-width=".7" marker-end="url(#tk-arr)"/>
+
+  <!-- Step 3: Refund -->
+  <rect x="490" y="362" width="250" height="55" rx="4" fill="rgba(52,211,153,.05)" stroke="var(--g)" stroke-width=".7"/>
+  <text x="615" y="378" text-anchor="middle" fill="var(--g)" font-size="5.5" font-weight="600">3. REFUND (post-completion)</text>
+  <text x="615" y="392" text-anchor="middle" fill="var(--muted)" font-size="5">Actual cost: 1K + 800 = 1,800 tokens</text>
+  <text x="615" y="405" text-anchor="middle" fill="var(--g)" font-size="5" font-weight="600">Refund: 5,000 - 1,800 = +3,200 back to bucket</text>
+</svg>
+
+<table>
+<tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+<tr><td><span class="hi">Algorithm</span></td><td>Token bucket with variable deduction (deduct N tokens per request, not 1)</td><td>Natural fit: bucket holds TPM budget, each request removes its token count. Refills at TPM/60 per second.</td></tr>
+<tr><td><span class="hi">Dual limits</span></td><td>TPM (tokens per minute) + RPM (requests per minute)</td><td>TPM prevents resource exhaustion. RPM prevents connection exhaustion (even cheap requests have connection overhead).</td></tr>
+<tr><td><span class="hi">Pre-check vs post-check</span></td><td>Pre-check with estimated cost (input tokens), post-deduct with actual cost (input + output)</td><td>Can't know output tokens before generation. Pre-reserve estimate, adjust after completion.</td></tr>
+<tr><td><span class="hi">Estimation</span></td><td>Estimate output tokens from model + max_tokens param</td><td>Reserve max_tokens at admission. Refund unused tokens after response completes.</td></tr>
+<tr><td><span class="hi">Storage</span></td><td>Redis: bucket level + last_refill_timestamp per user</td><td>Atomic check-and-deduct via Lua script. Refill calculated lazily on each request.</td></tr>
+<tr><td><span class="hi">Overflow</span></td><td>429 with tokens_remaining, tokens_reset headers</td><td>Client knows exactly when they can retry and how many tokens they have left.</td></tr>
+</table>
+
+<div class="b bg"><span class="hi">Token bucket with weighted cost:</span> Bucket capacity = 90,000 (TPM limit). Refill rate = 1,500 tokens/sec. Request arrives needing 5,000 tokens &rarr; check if bucket &ge; 5,000 &rarr; if yes, deduct 5,000 and process &rarr; if no, return 429 with retry time = (5000 - current_level) / refill_rate.</div>
+<div class="b by"><span class="hi">The estimation problem:</span> You don't know how many output tokens a request will use until generation completes. Two strategies: (1) <span class="hg">Reserve max_tokens</span> upfront, refund unused after completion. (2) <span class="hg">Post-deduct only</span> — risk over-serving but simpler. OpenAI uses strategy 1 for strict enforcement.</div>
+<div class="b br"><span class="hi">Why request counting fails:</span> User A sends 10 requests &times; 100K tokens = 1M tokens (massive GPU cost). User B sends 10 requests &times; 100 tokens = 1K tokens. Both "used 10 requests" but A consumed 1000x more compute. <span class="hr">Request-based limiting is meaningless for variable-cost APIs.</span></div>
+<div class="b bb"><span class="hi">Real-world:</span> <strong>OpenAI</strong> &middot; TPM + RPM dual limits per tier. <strong>Anthropic</strong> &middot; tokens per minute per model. <strong>Google Vertex AI</strong> &middot; requests + characters per minute. <strong>AWS Bedrock</strong> &middot; tokens per minute per model per account.</div>
+</div>
+
+<div class="T" id="resilience">
+<h2>Resilience &amp; Edge Cases</h2>
+<table>
+<tr><th>Failure</th><th>Impact</th><th>Recovery</th></tr>
+<tr><td><span class="hr">User sends max_tokens=100K but response is 50 tokens</span></td><td>Reserved 100K, used 50 — budget unfairly consumed</td><td>Refund unused tokens after response completes. Bucket level += (reserved - actual).</td></tr>
+<tr><td><span class="hr">Streaming response (tokens arrive over 30s)</span></td><td>Can't know final cost until stream ends</td><td>Reserve estimated amount. Deduct actual incrementally. If reservation runs out mid-stream, allow completion but mark over-budget.</td></tr>
+<tr><td><span class="hr">Batch API (100 requests in one call)</span></td><td>Single request consumes entire TPM budget</td><td>Pre-estimate total batch cost. Reject if batch would exceed remaining budget. Or split batch across multiple windows.</td></tr>
+<tr><td><span class="hr">Model cost varies (GPT-4 vs GPT-3.5)</span></td><td>Same tokens, different compute cost</td><td>Weighted tokens by model: GPT-4 token = 10x GPT-3.5 token in budget terms. Or separate budgets per model.</td></tr>
+<tr><td><span class="hr">Concurrent requests drain budget simultaneously</span></td><td>All get admitted, total exceeds budget</td><td>Atomic reservation in Redis Lua. If 5 concurrent requests each need 20K and budget is 90K, 5th gets 429.</td></tr>
+</table>
+</div>
+
+<div class="T" id="cheatsheet" style="border-left:3px solid var(--g)">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">Key points for token/cost-based rate limiting</p>
+<div style="font-size:.82rem;line-height:1.8">
+<span class="hg">1.</span> <strong>Token bucket with variable deduction</strong> &middot; deduct N tokens per request, not 1 (breaks "1 req = 1 unit" assumption)<br>
+<span class="hg">2.</span> <strong>Dual limits: TPM + RPM</strong> &middot; tokens for resource cost, requests for connection cost<br>
+<span class="hg">3.</span> <strong>Reserve-then-refund pattern</strong> &middot; reserve max_tokens upfront, refund unused after response completes<br>
+<span class="hg">4.</span> <strong>Lazy refill calculation</strong> &middot; on each request: elapsed_since_last &times; refill_rate added to bucket<br>
+<span class="hg">5.</span> <strong>Model-weighted tokens</strong> &middot; expensive models cost more tokens from the same budget<br>
+<span class="hg">6.</span> <strong>Response headers</strong> &middot; x-ratelimit-remaining-tokens, x-ratelimit-reset-tokens for client self-throttling
+</div>
+</div>
+
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/dp-engine.js"></script>
+<script src="../../js/header.js"></script><script src="../../js/nav-realtime.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/auth.js"></script>
+</body>
+</html>

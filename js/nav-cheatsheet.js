@@ -9,10 +9,10 @@ const navHTML = `
 </div>
 <div class="ng" id="topicNav">
   <div class="nc"><h3 style="color:var(--c)">1. Foundations</h3><div class="lk">
-    <a href="01-foundations.html#sd-framework">Framework</a><a href="01-foundations.html#fr-nfr">FR vs NFR</a><a href="01-foundations.html#nfr-metrics">NFR Metrics</a><a href="01-foundations.html#scaling-basics">Scaling</a><a href="01-foundations.html#stateless-stateful">Stateless/Stateful</a><a href="01-foundations.html#serialization">Serialization</a>
+    <a href="01-foundations.html#sd-framework">Framework</a><a href="01-foundations.html#fr-nfr">FR vs NFR</a><a href="01-foundations.html#nfr-metrics">NFR Metrics</a><a href="01-foundations.html#scaling-basics">Scaling</a><a href="01-foundations.html#stateless-stateful">Stateless/Stateful</a><a href="01-foundations.html#serialization">Serialization</a><a href="01-foundations.html#concurrency-io">Concurrency &amp; I/O</a>
   </div></div>
   <div class="nc"><h3 style="color:var(--c)">2. Networking</h3><div class="lk">
-    <a href="02-networking.html#web-request">URL Journey</a><a href="02-networking.html#osi">OSI Model</a><a href="02-networking.html#tcp-udp">TCP/UDP</a><a href="02-networking.html#http-https">HTTP/HTTPS</a><a href="02-networking.html#dns">DNS</a><a href="02-networking.html#ip-cidr">IP/CIDR</a><a href="02-networking.html#key-ports">Ports</a><a href="02-networking.html#firewalls">Firewalls</a><a href="02-networking.html#zero-trust">Zero Trust</a><a href="02-networking.html#ddos-defense">DDoS</a>
+    <a href="02-networking.html#web-request">URL Journey</a><a href="02-networking.html#osi">OSI Model</a><a href="02-networking.html#tcp-udp">TCP/UDP</a><a href="02-networking.html#http-https">HTTP/HTTPS</a><a href="02-networking.html#dns">DNS</a><a href="02-networking.html#ip-cidr">IP/CIDR</a><a href="02-networking.html#key-ports">Ports</a><a href="02-networking.html#firewalls">Firewalls</a><a href="02-networking.html#zero-trust">Zero Trust</a><a href="02-networking.html#ddos-defense">DDoS</a><a href="02-networking.html#event-loop">Event Loop</a>
   </div></div>
   <div class="nc"><h3 style="color:var(--r)">3. Security</h3><div class="lk">
     <a href="03-security.html#authentication">Auth</a><a href="03-security.html#authorization">AuthZ</a><a href="03-security.html#encryption">Encryption</a>
@@ -35,7 +35,7 @@ const navHTML = `
   <div class="nc"><h3 style="color:var(--y)">7. Caching</h3>
     <div class="sg"><a href="07-caching.html#caching">Strategies</a><a href="07-caching.html#cache-invalidation">Invalidation</a><a href="07-caching.html#cdn">CDN</a></div>
     <div class="sg"><a href="07-caching.html#redis">Redis</a><a href="07-caching.html#redis-fast">Why Redis Fast</a><a href="07-caching.html#redis-cache">Redis Cache</a></div>
-    <div class="sg"><a href="07-caching.html#redis-pubsub">Pub/Sub &amp; Streams</a><a href="07-caching.html#redis-ha">Persistence/HA</a><a href="07-caching.html#memcached-vs-redis">Memcached vs Redis</a></div>
+    <div class="sg"><a href="07-caching.html#redis-pubsub">Pub/Sub</a><a href="07-caching.html#redis-streams">Streams</a><a href="07-caching.html#redis-ha">Persistence</a><a href="07-caching.html#redis-cluster">Deployment</a><a href="07-caching.html#redis-locks">Distributed Locks</a><a href="07-caching.html#memcached-vs-redis">Memcached vs Redis</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--o)">8. Messaging</h3>
     <div class="sg"><a href="08-messaging.html#message-queues">Queues</a><a href="08-messaging.html#kafka">Kafka</a><a href="08-messaging.html#pubsub">Pub/Sub</a></div>

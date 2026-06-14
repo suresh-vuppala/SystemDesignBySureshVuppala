@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2105,13 +2105,110 @@
 
 <!-- Comparison table -->
 <table style="margin-top:4px">
-<tr><th>Algorithm</th><th>Burst?</th><th>Memory</th><th>Accuracy</th><th>Best For</th></tr>
-<tr><td><span class="hi">Fixed Window</span></td><td><span class="hr">2× at edge</span></td><td><span class="hg">Low</span></td><td>Approximate</td><td>Simple, low-stakes</td></tr>
-<tr><td><span class="hi">Sliding Window</span></td><td><span class="hg">No</span></td><td><span class="hg">Low</span></td><td><span class="hg">Accurate</span></td><td>Production APIs (most balanced)</td></tr>
-<tr><td><span class="hi">Token Bucket</span></td><td><span class="hg">Yes (controlled)</span></td><td>Low</td><td>Good</td><td><span class="hg">Most common</span> (AWS, Stripe, NGINX)</td></tr>
-<tr><td><span class="hi">Leaky Bucket</span></td><td><span class="hg">No</span></td><td>Queue size</td><td>Exact</td><td>Smooth output (traffic shaping)</td></tr>
+<tr><th>Algorithm</th><th>How It Works</th><th>Burst?</th><th>Memory</th><th>Accuracy</th><th>Best For</th><th>Real-World</th></tr>
+<tr><td><span class="hi">Fixed Window</span><br><span style="font-size:.65rem;color:var(--g)">&#x2192; Simple but unfair</span></td><td>Counter resets every N seconds (e.g., every minute). Simple <code>INCR</code> + <code>EXPIRE</code>.</td><td><span class="hr">2&#xD7; at edge</span> &#x2014; user sends max at end of window + start of next</td><td><span class="hg">Low</span> &#x2014; 1 counter per key</td><td>Approximate</td><td>Quick to implement, acceptable when occasional unfairness at window edges is fine</td><td><strong>Twitter/X</strong> &#x2192; 300 tweets/3hr<br><strong>Basic NGINX</strong> limit_req zone</td></tr>
+<tr><td><span class="hi">Sliding Window Log</span><br><span style="font-size:.65rem;color:var(--g)">&#x2192; Fair and exact</span></td><td>Store timestamp of each request in sorted set. Count entries within last N seconds.</td><td><span class="hg">No</span></td><td><span class="hr">High</span> &#x2014; stores every request timestamp</td><td><span class="hg">Exact</span></td><td>Must guarantee exact count per user &#x2014; no one gets even 1 extra request through</td><td><strong>Financial APIs</strong> &#x2192; strict per-second limits<br><strong>Auth endpoints</strong> &#x2192; brute-force prevention</td></tr>
+<tr><td><span class="hi">Sliding Window Counter</span><br><span style="font-size:.65rem;color:var(--g)">&#x2192; Fair and scalable</span></td><td>Weighted blend: prev_window &#xD7; overlap% + current_window count</td><td><span class="hg">No</span></td><td><span class="hg">Low</span> &#x2014; 2 counters per key</td><td><span class="hg">Accurate</span> (approx)</td><td>Need fair enforcement without storing every timestamp &#x2014; best tradeoff for high-volume APIs</td><td><strong>GitHub API</strong> &#x2192; 5000 req/hr<br><strong>Shopify</strong> &#x2192; 40 req/sec per app</td></tr>
+<tr><td><span class="hi">Token Bucket</span><br><span style="font-size:.65rem;color:var(--g)">&#x2192; Controlled bursts</span></td><td>Bucket fills at fixed rate. Each request consumes 1 token. Empty = reject.</td><td><span class="hg">Yes (controlled)</span> &#x2014; burst up to bucket capacity</td><td><span class="hg">Low</span> &#x2014; 2 values (tokens + last_refill)</td><td>Good</td><td>Allow short spikes while enforcing average rate &#x2014; users can burst then slow down naturally</td><td><strong>AWS API Gateway</strong> &#x2192; token bucket per stage<br><strong>Stripe</strong> &#x2192; 100/sec burst allowed<br><strong>NGINX</strong> limit_req with burst param</td></tr>
+<tr><td><span class="hi">Leaky Bucket</span><br><span style="font-size:.65rem;color:var(--g)">&#x2192; Smooth output</span></td><td>FIFO queue drains at fixed rate. Overflow = reject. Smooths output.</td><td><span class="hg">No</span> &#x2014; perfectly smooth output</td><td>Queue size</td><td>Exact</td><td>Downstream service needs steady traffic, not spikes &#x2014; protect fragile backends from bursts</td><td><strong>Uber</strong> &#x2192; dispatch queue (smooth ride assignment)<br><strong>Twilio</strong> &#x2192; SMS sending at fixed rate<br><strong>Network routers</strong> &#x2192; QoS shaping</td></tr>
 </table>
-<div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Stripe</strong> — 100 req/sec per API key (token bucket). <strong>GitHub</strong> — 5000 req/hour (sliding window). Apply at: <span class="hg">API Gateway</span> (preferred), reverse proxy, or Redis (<code>INCR</code>+<code>EXPIRE</code>).</div>
+
+<!-- ═══ 1. What Are We Limiting? ═══ -->
+<div class="d-title"><span class="num d-yellow">&#x25B8;</span> 1. What Are We Limiting?</div>
+<table>
+<tr><th>Granularity</th><th>Key Pattern</th><th>Where Applied</th><th>Example</th><th>Why This Level</th></tr>
+<tr><td><span class="hi">Per User</span></td><td><code>rate_limit:user:123</code></td><td>Application / Gateway</td><td><strong>Instagram</strong> &#x2192; 100 posts/day per user</td><td>One user shouldn't spam. Others unaffected.</td></tr>
+<tr><td><span class="hi">Per IP</span></td><td><code>rate_limit:ip:1.2.3.4</code></td><td>Edge / CDN / Gateway</td><td><strong>Login page</strong> &#x2192; 5 attempts/min per IP</td><td>User identity unknown (pre-auth). Used for login, OTP, signup.</td></tr>
+<tr><td><span class="hi">Per API Key</span></td><td><code>rate_limit:apikey:abc123</code></td><td>API Gateway</td><td><strong>Stripe</strong> &#x2192; Partner A: 1000/sec, Partner B: 100/sec</td><td>Each customer pays differently. Tied to billing tier.</td></tr>
+<tr><td><span class="hi">Per Endpoint</span></td><td><code>rate_limit:endpoint:/generate</code></td><td>Application / Gateway</td><td><strong>AI image gen</strong> &#x2192; /profile: 1000/min, /generate: 10/min</td><td>Not all APIs cost the same. Expensive endpoints need stricter limits.</td></tr>
+<tr><td><span class="hi">Global</span></td><td><code>rate_limit:service:total</code></td><td>Load Balancer / Gateway</td><td><strong>DB protection</strong> &#x2192; entire service max 50K req/sec</td><td>Protect backend from total overload regardless of who sends.</td></tr>
+</table>
+
+<!-- ═══ 2. What's the Rule? ═══ -->
+<div class="d-title"><span class="num d-blue">&#x25B8;</span> 2. What's the Rule?</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">Single Rule</h4>
+<div style="font-size:.78rem;line-height:1.5"><code>100 requests/minute</code><br><span class="hi">Example:</span> Weather API, public read endpoints<br>Simple. One counter, one threshold.</div>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--y)">Stacked Rules (Multi-Window)</h4>
+<div style="font-size:.78rem;line-height:1.5"><code>10/sec + 100/min + 1000/hour</code><br><span class="hi">Example:</span> GitHub API<br>Prevents both: <span class="hr">short spikes</span> (10/sec) AND <span class="hr">long-term abuse</span> (1000/hr).<br>User can't send 100 instantly OR run forever at high rate.</div>
+</div>
+</div>
+
+<!-- ═══ 3. What Happens When Limit Hits? ═══ -->
+<div class="d-title"><span class="num d-red">&#x25B8;</span> 3. What Happens When Limit Hits?</div>
+<table>
+<tr><th>Response</th><th>Behavior</th><th>Example</th><th>When to Use</th></tr>
+<tr><td><span class="hi">Reject (429)</span></td><td>Immediately return <span class="hr">429 Too Many Requests</span></td><td><strong>GitHub</strong>, <strong>Stripe</strong>, public APIs</td><td>Simple, cheap, predictable. Client retries with backoff.</td></tr>
+<tr><td><span class="hi">Queue</span></td><td>Accept request, process later from queue</td><td><strong>Twilio SMS</strong>, email sending (100K emails queued)</td><td>User wants eventual delivery. Not time-critical.</td></tr>
+<tr><td><span class="hi">Throttle</span></td><td>Degrade quality instead of failing</td><td><strong>Netflix</strong> &#x2192; reduce video bitrate instead of stopping</td><td>Better UX than hard rejection. Graceful degradation.</td></tr>
+</table>
+
+<!-- ═══ 4. Different Tiers? ═══ -->
+<div class="d-title"><span class="num d-green">&#x25B8;</span> 4. Tier-Based Limits</div>
+<div class="b by"><span class="hi">Limits tied to revenue:</span> <span class="hg">Free</span> &#x2192; 100 req/hr &#x2022; <span class="hg">Premium</span> &#x2192; 10,000 req/hr &#x2022; <span class="hg">Enterprise</span> &#x2192; 100,000 req/hr. Common in: SaaS APIs, AI platforms (OpenAI, Anthropic), cloud services (AWS). Store tier in user profile, look up at gateway.</div>
+
+<!-- ═══ 5. NFR Decision Guide ═══ -->
+<div class="d-title"><span class="num d-orange">&#x25B8;</span> 5. How to Pick the Right Algorithm</div>
+<table>
+<tr><th>NFR Question</th><th>If This...</th><th>Then Choose...</th><th>Why</th></tr>
+<tr><td><span class="hi">Scale?</span></td><td>Small (100 users, internal)</td><td>Sliding Window Log</td><td>Exact, simple, memory is fine</td></tr>
+<tr><td></td><td>Huge (10M+ users)</td><td>Sliding Counter or Token Bucket</td><td>Log stores every timestamp &#x2192; memory explosion at scale</td></tr>
+<tr><td><span class="hi">Single or Distributed?</span></td><td>One server</td><td>In-memory counter</td><td>No network hop needed</td></tr>
+<tr><td></td><td>Multiple servers (Uber, Netflix)</td><td>Redis (shared state)</td><td>All nodes must see same count</td></tr>
+<tr><td><span class="hi">Accuracy?</span></td><td>Security-critical (login, OTP)</td><td>Sliding Window Log</td><td>Even 2 extra attempts matter</td></tr>
+<tr><td></td><td>Approximate fine (social posting)</td><td>Sliding Counter / Token Bucket</td><td>101 instead of 100 &#x2192; not a disaster</td></tr>
+<tr><td><span class="hi">Latency budget?</span></td><td>Ultra-sensitive (HFT, gaming)</td><td>Local in-memory limiter</td><td>Redis lookup adds 2-5ms</td></tr>
+<tr><td></td><td>Normal APIs (e-commerce, SaaS)</td><td>Redis</td><td>2-5ms acceptable</td></tr>
+<tr><td><span class="hi">Limiter store fails?</span></td><td><span class="hg">Fail-Open</span> (allow traffic)</td><td>Public APIs, product catalog, news</td><td>Availability > protection. Risk abuse over downtime.</td></tr>
+<tr><td></td><td><span class="hr">Fail-Closed</span> (reject traffic)</td><td>Bank login, OTP, admin portal</td><td>Security > availability. Block all over unlimited attacks.</td></tr>
+</table>
+
+<!-- ═══ 6. Implementation: Redis-based Rate Limiting ═══ -->
+<div class="d-title"><span class="num d-red">&#x25B8;</span> 6. Implementation (Distributed — Redis)</div>
+<svg width="100%" viewBox="0 0 720 150" style="max-width:720px;display:block;margin:4px auto 8px">
+  <defs><marker id="rl2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+  <rect x="10" y="40" width="80" height="40" rx="6" fill="rgba(108,140,255,.08)" stroke="var(--a)" stroke-width="1.2"/>
+  <text x="50" y="56" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="700">Client</text>
+  <text x="50" y="68" text-anchor="middle" fill="var(--muted)" font-size="6">API key: sk_live_...</text>
+  <line x1="92" y1="60" x2="130" y2="60" stroke="var(--a)" stroke-width="1.2" marker-end="url(#rl2)"/>
+  <rect x="132" y="30" width="100" height="60" rx="6" fill="rgba(251,191,36,.08)" stroke="var(--y)" stroke-width="1.5"/>
+  <text x="182" y="48" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="700">API Gateway</text>
+  <text x="182" y="60" text-anchor="middle" fill="var(--muted)" font-size="6">NGINX / Kong / Envoy</text>
+  <text x="182" y="72" text-anchor="middle" fill="var(--muted)" font-size="6">rate limit middleware</text>
+  <line x1="182" y1="92" x2="182" y2="110" stroke="var(--r)" stroke-width="1" marker-end="url(#rl2)"/>
+  <rect x="142" y="112" width="80" height="28" rx="5" fill="rgba(248,113,113,.08)" stroke="var(--r)" stroke-width="1.2"/>
+  <text x="182" y="126" text-anchor="middle" fill="var(--r)" font-size="7" font-weight="700">Redis</text>
+  <text x="182" y="136" text-anchor="middle" fill="var(--muted)" font-size="5.5">INCR + EXPIRE (atomic)</text>
+  <line x1="234" y1="55" x2="290" y2="45" stroke="var(--g)" stroke-width="1.2" marker-end="url(#rl2)"/>
+  <text x="260" y="42" fill="var(--g)" font-size="7" font-weight="600">&#x2714; allow</text>
+  <rect x="292" y="30" width="90" height="40" rx="6" fill="rgba(52,211,153,.08)" stroke="var(--g)" stroke-width="1.2"/>
+  <text x="337" y="48" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="700">Backend</text>
+  <text x="337" y="62" text-anchor="middle" fill="var(--muted)" font-size="6">process request</text>
+  <line x1="234" y1="65" x2="290" y2="80" stroke="var(--r)" stroke-width="1" marker-end="url(#rl2)" stroke-dasharray="3,2"/>
+  <text x="260" y="78" fill="var(--r)" font-size="7" font-weight="600">&#x2717; 429</text>
+  <rect x="292" y="74" width="90" height="28" rx="5" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+  <text x="337" y="86" text-anchor="middle" fill="var(--r)" font-size="6.5" font-weight="700">429 Too Many Requests</text>
+  <text x="337" y="97" text-anchor="middle" fill="var(--muted)" font-size="5.5">Retry-After: 30</text>
+  <rect x="420" y="20" width="280" height="70" rx="6" fill="rgba(255,255,255,.02)" stroke="var(--border)" stroke-width=".8"/>
+  <text x="440" y="34" fill="var(--r)" font-size="7" font-weight="700">Redis Sliding Window (Lua atomic):</text>
+  <text x="440" y="48" fill="var(--muted)" font-size="6.5" font-family="monospace">MULTI</text>
+  <text x="440" y="60" fill="var(--muted)" font-size="6.5" font-family="monospace">  ZREMRANGEBYSCORE key 0 (now - window)</text>
+  <text x="440" y="72" fill="var(--muted)" font-size="6.5" font-family="monospace">  ZADD key now now</text>
+  <text x="440" y="84" fill="var(--muted)" font-size="6.5" font-family="monospace">  ZCARD key   &#x2192; count &gt; limit? reject</text>
+  <rect x="420" y="98" width="280" height="44" rx="6" fill="rgba(52,211,153,.04)" stroke="var(--g)" stroke-width=".8"/>
+  <text x="440" y="112" fill="var(--g)" font-size="7" font-weight="700">Response Headers (RFC 6585):</text>
+  <text x="440" y="124" fill="var(--muted)" font-size="6.5">X-RateLimit-Limit: 100</text>
+  <text x="580" y="124" fill="var(--muted)" font-size="6.5">X-RateLimit-Remaining: 23</text>
+  <text x="440" y="136" fill="var(--muted)" font-size="6.5">X-RateLimit-Reset: 1704067260</text>
+  <text x="580" y="136" fill="var(--muted)" font-size="6.5">Retry-After: 30</text>
+</svg>
+<div class="b bg"><span class="hi">Distributed challenges:</span> <span class="hg">Race conditions</span> &#x2014; two nodes check simultaneously. Fix: Redis Lua script (atomic). <span class="hg">Clock skew</span> &#x2014; use Redis server time. <span class="hg">Redis failure</span> &#x2014; fail-open (allow) for public APIs, fail-closed (block) for security-critical.</div>
+
+<div class="b br"><span class="hi">Anti-patterns:</span> <span class="hr">Rate limit only at app layer</span> &#x2014; DDoS bypasses. <span class="hr">No Retry-After header</span> &#x2014; clients hammer blindly. <span class="hr">Same limit for all endpoints</span> &#x2014; /login needs stricter limits than /search. <span class="hr">No differentiation</span> &#x2014; paid users get same limits as free.</div>
+<div class="b bb"><span class="hi">Interview tip:</span> <em>"I'd put rate limiting at the API Gateway layer using Redis sorted sets for a sliding window. Per-user limits with API key, per-IP limits for unauthenticated. Return 429 with Retry-After header. Fail-open on Redis failure to avoid blocking all traffic."</em></div>
 </div><!-- ═══ Scalability: separate compact lessons ═══ -->
 <div class="T" id="backpressure">
 <h2>Backpressure</h2><p class="su">When the <span class="hr">consumer can't keep up</span> with the producer — the system must decide: <span class="hg">slow down</span>, <span class="hg">buffer</span>, or <span class="hg">shed load</span></p>

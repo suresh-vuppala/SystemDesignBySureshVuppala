@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delayed/Scheduled Notifications with Timezone-Aware Delivery &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design delayed/scheduled notifications with timezone-aware delivery timing</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design delayed/scheduled notifications with timezone-aware delivery timing — schedule 100M notifications/day for future delivery at user-local optimal times with &lt;1 second precision</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/07-caching.html#redis">Delayed Queue (Redis Sorted Set)</a>
+<a href="../../system-design-cheatsheet/05-infrastructure.html#multi-region">Timezone-Aware Delivery</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#message-queues">Batch Scheduling</a>
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">Cron-like Recurrence</a>
+<a href="../../system-design-cheatsheet/10-scalability.html#sharding">Sharded Timer Wheels</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How do you schedule notifications for future delivery at the optimal time per user's timezone — "send at 9am user-local-time" means different UTC times for each user — with &lt;1 second precision at fire time?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Delayed queue architecture, timezone offset calculation, batch scheduling (group by target minute), cron-like recurrence for repeating notifications. <span class="hr">Not</span> covering notification content rendering or channel delivery (handled by downstream notification service).</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="100" data-suffix="M/day" style="font-size:1.5rem;font-weight:700;color:var(--a)">100M/day</div>
+<div style="font-size:.72rem;color:var(--muted)">scheduled notifications</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">timezone-aware delivery</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="24" data-suffix=" TZ" style="font-size:1.5rem;font-weight:700;color:var(--g)">24</div>
+<div style="font-size:.72rem;color:var(--muted)">timezone offsets</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">UTC-12 to UTC+14</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="1" data-prefix="&lt;" data-suffix="s" style="font-size:1.5rem;font-weight:700;color:var(--o)">&lt;1s</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery precision</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">fire at exact scheduled second</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="1157" data-suffix="/sec" style="font-size:1.5rem;font-weight:700;color:var(--r)">1157/sec</div>
+<div style="font-size:.72rem;color:var(--muted)">avg scheduling rate</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">100M / 86400s</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the scheduled notification system must do &middot; core scheduling behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> Accept notification with <strong>schedule_at</strong> time (absolute UTC or relative "in 2 hours")<br>
+  <span class="hg">2.</span> <strong>Timezone-aware scheduling</strong> &middot; "send at 9am user-local-time" converts to per-user UTC fire time<br>
+  <span class="hg">3.</span> <strong>Delayed queue</strong> &middot; Redis sorted set with fire-time as score, poll every 100ms<br>
+  <span class="hg">4.</span> <strong>Batch scheduling</strong> &middot; group notifications by target minute to amortize dispatch overhead<br>
+  <span class="hg">5.</span> <strong>Cancel/reschedule</strong> &middot; cancel a scheduled notification before fire time<br>
+  <span class="hg">6.</span> <strong>Cron-like recurrence</strong> &middot; repeating schedules (daily at 9am, weekly Monday 8am)
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> Notification <strong>content rendering</strong> (template engine)<br>
+  <span class="hr">&#x2717;</span> <strong>Channel delivery</strong> (push/email/SMS workers)<br>
+  <span class="hr">&#x2717;</span> <strong>Preference checking</strong> (opt-out, quiet hours)<br>
+  <span class="hr">&#x2717;</span> <strong>Analytics</strong> (delivery rates, timing effectiveness)<br>
+  <span class="hr">&#x2717;</span> <strong>DST edge cases</strong> beyond basic offset (e.g., skipped hours)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the delayed scheduling architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Delivery Precision</span></td><td><span class="hg">&lt;1 second</span></td><td>Notifications must fire within 1 second of scheduled time. Requires sub-second polling of delay queues.</td></tr>
+<tr><td><span class="hi">Throughput</span></td><td><span class="hg">100M schedules/day</span></td><td>~1,157/sec avg, 10K/sec burst during peak scheduling hours. Sharded sorted sets handle this.</td></tr>
+<tr><td><span class="hi">Durability</span></td><td><span class="hg">Zero lost schedules</span></td><td>Every scheduled notification must fire. Redis AOF + backup to persistent store (DynamoDB).</td></tr>
+<tr><td><span class="hi">Availability</span></td><td><span class="hg">99.99%</span></td><td>Scheduling service is on the critical path. Multi-AZ Redis with automatic failover.</td></tr>
+<tr><td><span class="hi">Timezone Accuracy</span></td><td><span class="hg">All IANA zones</span></td><td>Handle DST transitions, half-hour offsets (India UTC+5:30), and 45-minute offsets (Nepal UTC+5:45).</td></tr>
+<tr><td><span class="hi">Cancel Latency</span></td><td><span class="hg">&lt;100ms</span></td><td>Cancellation must propagate before fire time. ZREM from sorted set is O(log N).</td></tr>
+<tr><td><span class="hi">Recurrence</span></td><td><span class="hg">Infinite series</span></td><td>Recurring notifications generate next occurrence after each fire. No pre-materialization of infinite series.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Precision vs. Throughput</span>. Polling every 100ms for sub-second precision means high Redis load. Solved by sharding sorted sets by minute-bucket (shard key = target_minute % 64) and distributing pollers across shards.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing from given constraints. Show this reasoning in an interview.</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>100M scheduled notifications/day</strong> &middot; <strong>24 timezones</strong> &middot; <strong>&lt;1s precision</strong> &middot; <strong>avg schedule-ahead: 4 hours</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Avg schedules/sec</td>
+  <td>100M / 86,400s</td>
+  <td><span class="hg">~1,157/sec</span></td>
+  <td>Single Redis cluster handles ingestion easily</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Avg fires/sec</td>
+  <td>100M / 86,400s (uniform distribution)</td>
+  <td><span class="hg">~1,157/sec</span></td>
+  <td>But 9am local = heavy burst. Peak at 10x = 11.5K/sec fire rate</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Peak fire burst (9am across TZs)</td>
+  <td>~40% of daily volume concentrated in 8am-10am local = 40M in 2h &times; 1TZ</td>
+  <td><span class="hg">~5,500/sec per TZ peak</span></td>
+  <td>But spread across 24 TZs, so UTC 9am peaks are staggered</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>In-flight sorted set size</td>
+  <td>Avg 4h ahead &times; 1,157/sec = 16.6M entries in sorted set</td>
+  <td><span class="hg">~17M entries</span></td>
+  <td>Each entry ~200 bytes = 3.4GB. Fits in Redis cluster with room.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Sorted set shards needed</td>
+  <td>17M entries / 500K per shard (for O(log N) perf)</td>
+  <td><span class="hg">~34 shards</span></td>
+  <td>Use 64 shards (power of 2) for even distribution via hash</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Poller instances</td>
+  <td>64 shards / 4 shards per poller</td>
+  <td><span class="hg">~16 poller pods</span></td>
+  <td>Each poller checks ZRANGEBYSCORE every 100ms on 4 sorted sets</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>Redis memory total</td>
+  <td>17M entries &times; 200B + overhead</td>
+  <td><span class="hg">~5GB</span></td>
+  <td>Redis cluster with 8 nodes, 1GB each (with replication headroom)</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Recurrence metadata store</td>
+  <td>10M recurring schedules &times; 512B each</td>
+  <td><span class="hg">~5GB</span></td>
+  <td>DynamoDB table for recurrence rules. Generate next fire on each trigger.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> The key insight is that "send at 9am" creates a thundering herd across each timezone. Since timezones are staggered by 1 hour, the actual UTC fire times spread naturally. The real challenge is when one timezone has 10x more users (e.g., US Eastern = largest single-TZ cohort).</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Scheduling service endpoints &middot; create, cancel, and query scheduled notifications</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">POST /v1/notifications/schedule</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Schedule a notification for future delivery at a specific time or user-local time</div>
+<pre><code>{
+  "user_id": "u_abc123",
+  "template_id": "daily_digest",
+  "schedule_type": "user_local_time",   // absolute_utc | relative | user_local_time
+  "schedule_at": "09:00",               // for user_local_time: HH:MM
+  "schedule_date": "2024-03-15",        // optional: specific date (null = today)
+  "timezone": "America/New_York",       // IANA timezone (from user profile if not provided)
+  "channels": ["push", "email"],
+  "params": { "digest_count": 12 },
+  "dedup_key": "daily_digest:u_abc123:2024-03-15",
+  "recurrence": {                       // optional: for recurring schedules
+    "pattern": "daily",                 // daily | weekly | monthly | cron
+    "cron_expr": null,                  // "0 9 * * 1" for cron pattern
+    "end_after": 90                     // stop after N occurrences (null = infinite)
+  }
+}</code></pre>
+<div style="font-size:.72rem;color:var(--muted)">Response: <code>201 Created</code> &middot; <code>{ "schedule_id": "sch_xyz789", "fire_at_utc": "2024-03-15T14:00:00Z", "status": "scheduled" }</code></div>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--r);font-size:.85rem">DELETE /v1/notifications/schedule/{schedule_id}</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Cancel a scheduled notification before it fires</div>
+<pre><code>DELETE /v1/notifications/schedule/sch_xyz789
+
+Response 200: { "schedule_id": "sch_xyz789", "status": "cancelled", "was_fired": false }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /v1/notifications/schedule/{user_id}/pending</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">List pending scheduled notifications for a user</div>
+<pre><code>GET /v1/notifications/schedule/u_abc123/pending?limit=20
+
+Response 200:
+{
+  "schedules": [
+    { "schedule_id": "sch_xyz789", "template_id": "daily_digest", "fire_at_utc": "2024-03-15T14:00:00Z", "recurrence": "daily" }
+  ],
+  "total_pending": 3
+}</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Core tables and Redis structures for the scheduling pipeline</p>
+
+<h4 style="color:var(--a)">scheduled_notifications (DynamoDB — persistent store)</h4>
+<pre><code>{
+  "schedule_id":    "sch_xyz789",       // partition key
+  "user_id":        "u_abc123",
+  "template_id":    "daily_digest",
+  "fire_at_utc":    "2024-03-15T14:00:00Z",
+  "user_timezone":  "America/New_York",
+  "user_local_time":"09:00",
+  "channels":       ["push", "email"],
+  "params":         { "digest_count": 12 },
+  "dedup_key":      "daily_digest:u_abc123:2024-03-15",
+  "status":         "scheduled",        // scheduled | fired | cancelled | failed
+  "recurrence":     { "pattern": "daily", "next_fire": "2024-03-16T14:00:00Z" },
+  "created_at":     "2024-03-14T10:00:00Z",
+  "fired_at":       null
+}</code></pre>
+
+<h4 style="color:var(--g)">recurrence_rules (DynamoDB)</h4>
+<pre><code>{
+  "recurrence_id":  "rec_001",          // partition key
+  "user_id":        "u_abc123",
+  "template_id":    "daily_digest",
+  "pattern":        "daily",            // daily | weekly | monthly | cron
+  "cron_expr":      null,
+  "user_timezone":  "America/New_York",
+  "local_time":     "09:00",
+  "channels":       ["push", "email"],
+  "params":         { "digest_count": 12 },
+  "next_fire_utc":  "2024-03-16T14:00:00Z",
+  "occurrences":    45,
+  "max_occurrences": 90,
+  "active":         true
+}</code></pre>
+
+<h4 style="color:var(--r)">Redis Structures (Delayed Queue)</h4>
+<pre><code>// Delayed queue — sorted set, score = fire_time_unix_ms
+// Sharded by: schedule_id hash % 64
+ZADD delayed_queue:{shard_id} {fire_time_unix_ms} "{schedule_id}:{user_id}:{template_id}"
+
+// Cancel set — tombstones for cancelled schedules (checked before fire)
+SADD cancelled_schedules "{schedule_id}"
+EXPIRE cancelled_schedules:{schedule_id} 86400   // 24h TTL
+
+// Timezone offset cache
+HSET tz_offsets "America/New_York" "-18000"      // offset in seconds from UTC
+HSET tz_offsets "Asia/Kolkata" "19800"
+
+// Per-minute batch bucket (for batch dispatch optimization)
+SADD fire_bucket:{minute_unix} "{schedule_id_1}" "{schedule_id_2}" ...
+EXPIRE fire_bucket:{minute_unix} 120              // 2 min TTL after target minute</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Schedule API &#x2192; Timezone Resolver &#x2192; Delayed Queue (Redis ZSET) &#x2192; Poller &#x2192; Dispatcher &#x2192; Notification Service</p>
+
+<svg width="100%" viewBox="0 0 740 380" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="ds1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- SCHEDULE INGESTION LAYER -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="55" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">SCHEDULE INGESTION &middot; Accept and resolve timezone-aware schedules</text>
+
+<rect data-dp-step="2" x="14" y="26" width="160" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="94" y="37" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Schedule API</text>
+<text data-dp-step="2" x="94" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">POST /schedule &middot; validate &middot; dedup</text>
+
+<rect data-dp-step="2" x="200" y="26" width="160" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="2" x="280" y="37" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Timezone Resolver</text>
+<text data-dp-step="2" x="280" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">IANA tz &#x2192; UTC fire_time conversion</text>
+
+<rect data-dp-step="2" x="386" y="26" width="160" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="2" x="466" y="37" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Recurrence Engine</text>
+<text data-dp-step="2" x="466" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">Generate next fire from cron/pattern</text>
+
+<rect data-dp-step="2" x="572" y="26" width="156" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="2" x="650" y="37" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">DynamoDB (Persistent)</text>
+<text data-dp-step="2" x="650" y="47" text-anchor="middle" fill="var(--muted)" font-size="5">Durable schedule record</text>
+
+<line data-dp-step="3" x1="370" y1="59" x2="370" y2="72" stroke="var(--a)" stroke-width="1" marker-end="url(#ds1)"/>
+
+<!-- DELAYED QUEUE LAYER -->
+<rect data-dp-step="4" x="4" y="74" width="732" height="70" rx="6" fill="rgba(248,113,113,.03)" stroke="var(--r)" stroke-width="1"/>
+<text data-dp-step="4" x="370" y="88" text-anchor="middle" fill="var(--r)" font-size="8" font-weight="800">DELAYED QUEUE &middot; Redis Sorted Sets sharded by minute-bucket</text>
+
+<rect data-dp-step="5" x="14" y="96" width="108" height="38" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="68" y="110" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Shard 0</text>
+<text data-dp-step="5" x="68" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">ZSET score=fire_ms</text>
+<text data-dp-step="5" x="68" y="129" text-anchor="middle" fill="var(--muted)" font-size="5">~265K entries</text>
+
+<rect data-dp-step="5" x="136" y="96" width="108" height="38" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="190" y="110" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Shard 1</text>
+<text data-dp-step="5" x="190" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">ZSET score=fire_ms</text>
+<text data-dp-step="5" x="190" y="129" text-anchor="middle" fill="var(--muted)" font-size="5">~265K entries</text>
+
+<rect data-dp-step="5" x="258" y="96" width="108" height="38" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="312" y="110" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Shard 2</text>
+<text data-dp-step="5" x="312" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">ZSET score=fire_ms</text>
+<text data-dp-step="5" x="312" y="129" text-anchor="middle" fill="var(--muted)" font-size="5">~265K entries</text>
+
+<rect data-dp-step="5" x="380" y="96" width="60" height="38" rx="4" fill="rgba(200,200,200,.06)" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="3,2"/>
+<text data-dp-step="5" x="410" y="118" text-anchor="middle" fill="var(--muted)" font-size="7">...</text>
+
+<rect data-dp-step="5" x="454" y="96" width="108" height="38" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="508" y="110" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Shard 63</text>
+<text data-dp-step="5" x="508" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">ZSET score=fire_ms</text>
+<text data-dp-step="5" x="508" y="129" text-anchor="middle" fill="var(--muted)" font-size="5">~265K entries</text>
+
+<rect data-dp-step="5" x="580" y="96" width="148" height="38" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="5" x="654" y="110" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Cancel Tombstones</text>
+<text data-dp-step="5" x="654" y="120" text-anchor="middle" fill="var(--muted)" font-size="5">SET cancelled:{id} &middot; 24h TTL</text>
+<text data-dp-step="5" x="654" y="129" text-anchor="middle" fill="var(--muted)" font-size="5">Check before dispatch</text>
+
+<line data-dp-step="6" x1="370" y1="144" x2="370" y2="158" stroke="var(--r)" stroke-width="1" marker-end="url(#ds1)"/>
+
+<!-- POLLER LAYER -->
+<rect data-dp-step="7" x="4" y="160" width="732" height="55" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="7" x="370" y="174" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">TIMER POLLERS &middot; ZRANGEBYSCORE every 100ms per shard</text>
+
+<rect data-dp-step="8" x="14" y="182" width="170" height="26" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="8" x="99" y="193" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Poller Pod (16 instances)</text>
+<text data-dp-step="8" x="99" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">Each owns 4 shards &middot; leader election</text>
+
+<rect data-dp-step="8" x="200" y="182" width="170" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="8" x="285" y="193" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">ZRANGEBYSCORE 0 {now_ms}</text>
+<text data-dp-step="8" x="285" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">Fetch all entries with score &le; now</text>
+
+<rect data-dp-step="8" x="386" y="182" width="170" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="8" x="471" y="193" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Cancel Check</text>
+<text data-dp-step="8" x="471" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">SISMEMBER cancelled:{id} &middot; skip if true</text>
+
+<rect data-dp-step="8" x="572" y="182" width="156" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="8" x="650" y="193" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">ZREM (atomic dequeue)</text>
+<text data-dp-step="8" x="650" y="203" text-anchor="middle" fill="var(--muted)" font-size="5">Remove from ZSET after fetch</text>
+
+<line data-dp-step="9" x1="370" y1="215" x2="370" y2="228" stroke="var(--y)" stroke-width="1" marker-end="url(#ds1)"/>
+
+<!-- DISPATCHER LAYER -->
+<rect data-dp-step="10" x="4" y="230" width="732" height="55" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="10" x="370" y="244" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">BATCH DISPATCHER &middot; Group by minute &middot; Emit to notification service</text>
+
+<rect data-dp-step="11" x="14" y="252" width="220" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="11" x="124" y="263" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Batch Grouper</text>
+<text data-dp-step="11" x="124" y="273" text-anchor="middle" fill="var(--muted)" font-size="5">Group fired notifications by target minute for efficiency</text>
+
+<rect data-dp-step="11" x="250" y="252" width="220" height="26" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="11" x="360" y="263" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Kafka Producer</text>
+<text data-dp-step="11" x="360" y="273" text-anchor="middle" fill="var(--muted)" font-size="5">Emit to notification-service priority queue</text>
+
+<rect data-dp-step="11" x="486" y="252" width="244" height="26" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="11" x="608" y="263" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Recurrence Regenerator</text>
+<text data-dp-step="11" x="608" y="273" text-anchor="middle" fill="var(--muted)" font-size="5">After fire: compute next_fire, ZADD back to delayed queue</text>
+
+<line data-dp-step="12" x1="370" y1="285" x2="370" y2="298" stroke="var(--g)" stroke-width="1" marker-end="url(#ds1)"/>
+
+<!-- DOWNSTREAM -->
+<rect data-dp-step="13" x="4" y="300" width="732" height="55" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="13" x="370" y="314" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">DOWNSTREAM &middot; Notification Service (existing architecture)</text>
+
+<rect data-dp-step="14" x="14" y="322" width="200" height="26" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="14" x="114" y="333" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Priority Queue (Kafka)</text>
+<text data-dp-step="14" x="114" y="343" text-anchor="middle" fill="var(--muted)" font-size="5">Scheduled notifications enter as P1/P2</text>
+
+<rect data-dp-step="14" x="230" y="322" width="200" height="26" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="14" x="330" y="333" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Channel Router + Workers</text>
+<text data-dp-step="14" x="330" y="343" text-anchor="middle" fill="var(--muted)" font-size="5">Standard delivery pipeline</text>
+
+<rect data-dp-step="14" x="446" y="322" width="200" height="26" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="14" x="546" y="333" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Delivery Providers</text>
+<text data-dp-step="14" x="546" y="343" text-anchor="middle" fill="var(--muted)" font-size="5">Push / Email / SMS / In-App</text>
+
+<!-- Annotations -->
+<rect data-dp-step="15" x="580" y="160" width="150" height="50" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="15" x="655" y="174" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">KEY INSIGHT</text>
+<text data-dp-step="15" x="655" y="186" text-anchor="middle" fill="var(--muted)" font-size="5">ZRANGEBYSCORE + ZREM is atomic</text>
+<text data-dp-step="15" x="655" y="196" text-anchor="middle" fill="var(--muted)" font-size="5">via Lua script. No double-fire</text>
+<text data-dp-step="15" x="655" y="206" text-anchor="middle" fill="var(--muted)" font-size="5">even with multiple pollers.</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs made in this architecture and their rationale</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">Delayed Queue</span></td>
+  <td>Database polling, RabbitMQ delayed exchange, Redis sorted set</td>
+  <td><span class="hg">Redis Sorted Set</span></td>
+  <td>O(log N) insert/remove. ZRANGEBYSCORE fetches all ready items in one call. Sub-ms latency. Sharding handles scale.</td>
+</tr>
+<tr>
+  <td><span class="hi">Timezone Handling</span></td>
+  <td>Store UTC only, store local+offset, resolve at fire time</td>
+  <td><span class="hg">Resolve to UTC at schedule time</span></td>
+  <td>Convert to UTC fire_time immediately. Store original TZ for DST recalculation on recurring schedules. Pollers only compare UTC.</td>
+</tr>
+<tr>
+  <td><span class="hi">Polling Interval</span></td>
+  <td>1s polling, 100ms polling, event-driven (Redis keyspace notifications)</td>
+  <td><span class="hg">100ms polling per shard</span></td>
+  <td>Keyspace notifications are unreliable under load. 100ms gives &lt;1s precision with acceptable Redis load (10 ops/sec/shard).</td>
+</tr>
+<tr>
+  <td><span class="hi">Cancellation</span></td>
+  <td>ZREM immediately, tombstone set, soft-delete in DB</td>
+  <td><span class="hg">Tombstone SET + lazy ZREM</span></td>
+  <td>ZREM requires knowing the shard. Tombstone is O(1) lookup at fire time. Cancelled entries cleaned up on next poll or by background sweep.</td>
+</tr>
+<tr>
+  <td><span class="hi">Recurrence</span></td>
+  <td>Pre-materialize all occurrences, generate next on fire, hybrid</td>
+  <td><span class="hg">Generate next on fire</span></td>
+  <td>Infinite recurrence can't be pre-materialized. After each fire, compute next UTC fire time (accounting for DST changes) and ZADD.</td>
+</tr>
+<tr>
+  <td><span class="hi">Durability</span></td>
+  <td>Redis only, Redis + DB, DB as source of truth with Redis as acceleration</td>
+  <td><span class="hg">DynamoDB source of truth + Redis for active window</span></td>
+  <td>Redis handles the hot path (next 4 hours). DynamoDB persists all schedules. Recovery: replay DynamoDB → Redis on failure.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why Redis sorted set over database polling:</span> Database polling at 100ms intervals across 100M pending records would crush the DB. Redis ZRANGEBYSCORE(0, now) on a sorted set returns only ready items in O(log N + M) where M is the result count. With sharding, each shard holds ~265K entries — sub-ms response.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">DST transition handling:</span> When clocks spring forward (2am → 3am), a notification scheduled for 2:30am local never fires that day — reschedule to 3:00am. When clocks fall back (2am → 1am), deduplicate to prevent double-fire. Recurrence engine recalculates UTC offset on each occurrence.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">Thundering herd at popular times:</span> "Send at 9am" is the most common schedule. US Eastern alone may have 10M notifications firing at UTC 14:00:00. Solution: jitter within a configurable window (±30s) to spread the burst. Users don't notice 30s variance but infrastructure avoids 10M/sec spike.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">Atomic poll-and-dequeue:</span> Use a Lua script: <code>ZRANGEBYSCORE + ZREM</code> in a single atomic operation. This prevents two pollers from both claiming the same entry. The Lua script returns removed entries to the caller — if ZREM returns 0, another poller already claimed it.</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">How the scheduling system handles failures gracefully</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Redis Node Failure</span></td>
+  <td>Shard goes down, entries for that shard are inaccessible.</td>
+  <td>Redis Cluster with replicas. Automatic failover to replica (&lt;5s). DynamoDB has all schedules for full rebuild if needed.</td>
+  <td><span class="hg">&lt;5s</span> automatic failover</td>
+</tr>
+<tr>
+  <td><span class="hi">Poller Crash</span></td>
+  <td>Poller dies, its assigned shards go unpolled.</td>
+  <td>Leader election (ZooKeeper/etcd). Surviving pollers detect failure via heartbeat and take over orphaned shards within 10s.</td>
+  <td><span class="hg">&lt;10s</span> re-assignment</td>
+</tr>
+<tr>
+  <td><span class="hi">Clock Skew</span></td>
+  <td>Poller's clock drifts, fires notifications early or late.</td>
+  <td>NTP sync enforced. Health check rejects pollers with &gt;100ms drift. Use Redis server time (TIME command) as reference, not local clock.</td>
+  <td><span class="hg">Automatic</span> via Redis TIME</td>
+</tr>
+<tr>
+  <td><span class="hi">Massive Cancel Storm</span></td>
+  <td>Campaign cancelled — 5M scheduled notifications need cancellation.</td>
+  <td>Bulk cancel API writes tombstones asynchronously. Entries remain in ZSET but are skipped at fire time. Background cleanup sweeps old tombstones.</td>
+  <td><span class="hg">&lt;1s</span> effective cancellation</td>
+</tr>
+<tr>
+  <td><span class="hi">DST Recurrence Bug</span></td>
+  <td>Recurring schedule crosses DST boundary, fires at wrong time.</td>
+  <td>Recurrence engine always recalculates from user_local_time + current UTC offset (not previous UTC fire time). IANA tz database updated monthly.</td>
+  <td><span class="hg">Correct</span> after next fire</td>
+</tr>
+<tr>
+  <td><span class="hi">Redis Full Rebuild</span></td>
+  <td>Complete Redis cluster loss (catastrophic failure).</td>
+  <td>DynamoDB scan: all records with status=scheduled AND fire_at_utc within next 4 hours → ZADD to new Redis. Background job completes in ~10 minutes.</td>
+  <td><span class="ho">~10 min</span> full rebuild</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail a delayed scheduling system interview</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Redis Sorted Set as Delayed Queue</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Score = fire_time_unix_ms. ZRANGEBYSCORE(0, now) returns all ready entries. Atomic Lua script does ZRANGEBYSCORE + ZREM to prevent double-fire. Shard by schedule_id hash % 64 to distribute load. Each shard holds ~265K entries — sub-ms poll response.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. Timezone Resolution at Schedule Time</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Convert "9am America/New_York" to UTC immediately at schedule creation. Store both the UTC fire_time (for the sorted set) and the original timezone+local_time (for DST recalculation on recurring schedules). Pollers never deal with timezones — they only compare UTC milliseconds.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Recurrence: Generate Next on Fire</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Never pre-materialize infinite recurring schedules. After each fire, compute the next occurrence from the recurrence rule + user timezone (accounting for DST). ZADD the next fire time back to the sorted set. This keeps the sorted set size bounded to one entry per active recurrence.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. Cancellation via Tombstones</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Don't ZREM on cancel (requires knowing exact shard and member value). Instead, write a tombstone: SET cancelled:{schedule_id} 1 EX 86400. At fire time, poller checks SISMEMBER before dispatching. Lazy cleanup removes cancelled entries from ZSET during regular polling sweeps.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Jitter for Thundering Herd</strong><br>
+<span style="font-size:.82rem;color:var(--text)">"Send at 9am" is the #1 scheduled time. Without jitter, one timezone cohort (10M+ users) all fire at the exact same second. Add ±30s configurable jitter on non-time-critical notifications. Users never notice 30s variance but the system avoids a 10M/sec spike that would overwhelm downstream notification workers.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>

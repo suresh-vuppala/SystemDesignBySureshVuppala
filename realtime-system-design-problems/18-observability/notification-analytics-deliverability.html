@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification Analytics &amp; Deliverability &middot; System Design</title>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/diagrams.css">
+</head>
+<body>
+<div class="hero" id="top"><h1><span>System Design Case Study</span></h1><p>Design notification analytics — open rates, click-through, bounce handling, feedback loops</p></div>
+<div class="ct">
+<div class="sd sd-5"><span class="e">&#x1F3AF;</span> Design notification analytics — track delivery metrics (sent, delivered, opened, clicked, bounced, unsubscribed), compute per-template effectiveness, handle ISP feedback loops, and enable A/B comparison at 5B notifications/day</div>
+
+<details class="concepts-involved">
+<summary>Concepts Involved</summary>
+<div class="concepts-involved-pills">
+<a href="../../system-design-cheatsheet/13-observability.html#tracing">Tracking Pixel</a>
+<a href="../../system-design-cheatsheet/11-data-pipelines.html#stream-processing">Stream Processing</a>
+<a href="../../system-design-cheatsheet/08-messaging.html#kafka">Event Streaming</a>
+<a href="../../system-design-cheatsheet/13-observability.html#metrics">Real-Time Metrics</a>
+<a href="../../system-design-cheatsheet/12-distributed-systems.html#fault-tolerance">ISP Feedback Loops</a>
+</div>
+</details>
+
+<!-- --- PROBLEM STATEMENT --- -->
+<div class="T" id="problem">
+<h2>Problem Statement</h2>
+<p class="su">How do you track notification delivery metrics at 5B notifications/day — measuring sent, delivered, opened, clicked, bounced, and unsubscribed — using tracking pixels for email opens, redirect URLs for clicks, and ISP feedback loop processing for spam complaints?</p>
+<div class="b br" style="margin:4px 0"><span class="hi">Scope:</span> Tracking pixel infrastructure, redirect URL click tracking, bounce/complaint processing from ISPs, real-time per-template metric aggregation, A/B effectiveness comparison dashboards. <span class="hr">Not</span> covering notification delivery mechanics or content generation.</div>
+
+<div class="d-grid quad" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="5" data-suffix="B/day" style="font-size:1.5rem;font-weight:700;color:var(--a)">5B/day</div>
+<div style="font-size:.72rem;color:var(--muted)">notifications tracked</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">across push, email, SMS, in-app</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="6" data-suffix=" states" style="font-size:1.5rem;font-weight:700;color:var(--g)">6</div>
+<div style="font-size:.72rem;color:var(--muted)">delivery states tracked</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">sent→delivered→opened→clicked→bounced→unsubscribed</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="30" data-suffix="s" style="font-size:1.5rem;font-weight:700;color:var(--o)">30s</div>
+<div style="font-size:.72rem;color:var(--muted)">metric freshness</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">real-time aggregation latency</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:center">
+<div class="stat-num" data-target="500" data-suffix="K" style="font-size:1.5rem;font-weight:700;color:var(--r)">500K</div>
+<div style="font-size:.72rem;color:var(--muted)">tracking pixel requests/sec</div>
+<div style="font-size:.68rem;color:var(--muted);margin-top:2px">peak email open tracking load</div>
+</div>
+</div>
+</div>
+
+<!-- --- FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="functional-requirements">
+<h2>Functional Requirements</h2>
+<p class="su">What the analytics system must do &middot; core tracking behaviours</p>
+<div class="d-grid" style="margin:6px 0">
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--g)">Must Have (Core)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hg">1.</span> <strong>Email open tracking</strong> &middot; 1×1 transparent pixel embedded in email HTML, logs open on fetch<br>
+  <span class="hg">2.</span> <strong>Click tracking</strong> &middot; redirect URLs that log click then 302 redirect to destination<br>
+  <span class="hg">3.</span> <strong>Bounce processing</strong> &middot; handle hard bounces (invalid email) and soft bounces (mailbox full)<br>
+  <span class="hg">4.</span> <strong>ISP feedback loops</strong> &middot; process spam complaint reports (ARF format) from ISPs<br>
+  <span class="hg">5.</span> <strong>Per-template metrics</strong> &middot; open rate, CTR, bounce rate, unsubscribe rate per template<br>
+  <span class="hg">6.</span> <strong>Real-time dashboards</strong> &middot; live delivery funnel visualization with &lt;30s freshness
+</div>
+</div>
+<div class="d-panel" style="padding:8px;text-align:left">
+<h4 style="color:var(--y)">Out of Scope (this design)</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hr">&#x2717;</span> Notification <strong>delivery infrastructure</strong> (sending mechanics)<br>
+  <span class="hr">&#x2717;</span> <strong>Content generation</strong> and template authoring<br>
+  <span class="hr">&#x2717;</span> <strong>User-facing analytics</strong> (creator insights, engagement stats)<br>
+  <span class="hr">&#x2717;</span> <strong>ML-based send-time optimization</strong><br>
+  <span class="hr">&#x2717;</span> <strong>Deliverability scoring</strong> (domain reputation management)
+</div>
+</div>
+</div>
+</div>
+
+<!-- --- NON-FUNCTIONAL REQUIREMENTS --- -->
+<div class="T" id="nonfunctional-requirements">
+<h2>Non-Functional Requirements</h2>
+<p class="su">Quality constraints shaping the analytics architecture</p>
+<table>
+<tr><th>Property</th><th>Target</th><th>Why It Matters / Design Impact</th></tr>
+<tr><td><span class="hi">Tracking Pixel Latency</span></td><td><span class="hg">&lt;50ms response</span></td><td>Pixel request must return 1×1 GIF immediately. Log asynchronously. Never block email rendering.</td></tr>
+<tr><td><span class="hi">Click Redirect Latency</span></td><td><span class="hg">&lt;100ms to redirect</span></td><td>User should never perceive click tracking. Log click, 302 redirect within 100ms. CDN-edge handling.</td></tr>
+<tr><td><span class="hi">Event Volume</span></td><td><span class="hg">5B events/day (58K/sec)</span></td><td>Each notification generates 2-4 tracking events (sent, delivered, opened, clicked). Total ~15B events/day.</td></tr>
+<tr><td><span class="hi">Metric Freshness</span></td><td><span class="hg">&lt;30s</span></td><td>Dashboard shows near-real-time delivery rates. Stream processing with micro-batch aggregation.</td></tr>
+<tr><td><span class="hi">Data Retention</span></td><td><span class="hg">90 days hot, 2 years cold</span></td><td>Hot data (last 90 days) for real-time queries. Cold data (2 years) in columnar storage for historical analysis.</td></tr>
+<tr><td><span class="hi">Bounce Processing</span></td><td><span class="hg">&lt;5 min from ISP report</span></td><td>Hard bounces must suppress future sends within 5 minutes. Prevents further reputation damage.</td></tr>
+<tr><td><span class="hi">Accuracy</span></td><td><span class="hg">±0.1% on aggregates</span></td><td>Approximate counting (HyperLogLog) acceptable for unique opens. Exact counts for sent/bounced.</td></tr>
+</table>
+<div class="b by"><span class="hi">Key tension:</span> <span class="hg">Tracking Accuracy vs. User Privacy</span>. Email open tracking relies on pixel loads — but Apple Mail Privacy Protection pre-fetches all images, inflating open rates. Solution: weight Apple Mail opens at 0.5x and use click-through as more reliable engagement signal.</div>
+</div>
+
+<!-- --- SCALE ESTIMATION --- -->
+<div class="T" id="numbers">
+<h2>Scale Estimation</h2>
+<p class="su">Derive infrastructure sizing from given constraints. Show this reasoning in an interview.</p>
+
+<div class="b bb" style="margin-bottom:10px">
+  <span class="hi">Given:</span>
+  <strong>5B notifications/day</strong> &middot; <strong>40% email</strong> &middot; <strong>25% open rate</strong> &middot; <strong>5% CTR</strong> &middot; <strong>2% bounce rate</strong>
+</div>
+
+<table>
+<tr><th>Step</th><th>What to Derive</th><th>Calculation</th><th>Result</th><th>Design Decision</th></tr>
+<tr>
+  <td><span class="hi">1</span></td>
+  <td>Email notifications/day</td>
+  <td>5B × 40%</td>
+  <td><span class="hg">2B emails/day</span></td>
+  <td>Primary channel for open/click tracking</td>
+</tr>
+<tr>
+  <td><span class="hi">2</span></td>
+  <td>Tracking pixel loads/day</td>
+  <td>2B × 25% open rate</td>
+  <td><span class="hg">500M pixel loads/day</span></td>
+  <td>~5,800/sec avg, 500K/sec peak. CDN-edge pixel serving required.</td>
+</tr>
+<tr>
+  <td><span class="hi">3</span></td>
+  <td>Click redirect requests/day</td>
+  <td>2B × 5% CTR</td>
+  <td><span class="hg">100M clicks/day</span></td>
+  <td>~1,157/sec avg. Redirect service at edge with async logging.</td>
+</tr>
+<tr>
+  <td><span class="hi">4</span></td>
+  <td>Bounce events/day</td>
+  <td>2B × 2% bounce rate</td>
+  <td><span class="hg">40M bounces/day</span></td>
+  <td>Must process and suppress within 5 minutes. Feed into suppression list.</td>
+</tr>
+<tr>
+  <td><span class="hi">5</span></td>
+  <td>Total tracking events/day</td>
+  <td>5B sent + 500M opens + 100M clicks + 40M bounces + delivery receipts</td>
+  <td><span class="hg">~8B events/day</span></td>
+  <td>Kafka: 256 partitions, 7-day retention for replay</td>
+</tr>
+<tr>
+  <td><span class="hi">6</span></td>
+  <td>Event storage/day</td>
+  <td>8B events × 200 bytes avg</td>
+  <td><span class="hg">~1.6TB/day</span></td>
+  <td>ClickHouse for hot queries (90 days). S3/Parquet for cold (2 years).</td>
+</tr>
+<tr>
+  <td><span class="hi">7</span></td>
+  <td>ISP feedback volume</td>
+  <td>2B emails × 0.05% complaint rate</td>
+  <td><span class="hg">~1M complaints/day</span></td>
+  <td>Process ARF reports. Auto-unsubscribe complainants. Track per-domain complaint rate.</td>
+</tr>
+<tr>
+  <td><span class="hi">8</span></td>
+  <td>Dashboard query load</td>
+  <td>~100 templates × per-minute aggregation × 10 metrics</td>
+  <td><span class="hg">~1,000 metric series</span></td>
+  <td>Pre-aggregated in Redis counters. Dashboard reads from Redis, not raw events.</td>
+</tr>
+</table>
+
+<div class="b by"><span class="hi">Interview tip:</span> The tracking pixel is served from CDN edge (Cloudflare Worker / CloudFront Lambda@Edge). It returns a cached 1×1 GIF immediately and logs the open event asynchronously. The pixel URL encodes notification_id as a path parameter — no query strings (some email clients strip them).</div>
+</div>
+
+<!-- --- APIs --- -->
+<div class="T" id="apis">
+<h2>APIs</h2>
+<p class="su">Tracking endpoints (pixel/click) and analytics query APIs</p>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--g);font-size:.85rem">GET /t/o/{notification_id}.gif (Tracking Pixel — CDN Edge)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">1×1 transparent GIF that logs email open event</div>
+<pre><code>GET /t/o/n_abc123_v2.gif
+
+Response: 200 OK
+Headers:
+  Content-Type: image/gif
+  Content-Length: 43
+  Cache-Control: no-cache, no-store, must-revalidate
+Body: [1x1 transparent GIF bytes]
+
+Side effect: Emit event to Kafka
+  { "type": "open", "notification_id": "n_abc123", "variant": "v2",
+    "timestamp": "2024-03-15T10:30:00Z", "user_agent": "...", "ip": "..." }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--a);font-size:.85rem">GET /t/c/{notification_id}/{link_id} (Click Redirect)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Log click event then 302 redirect to destination URL</div>
+<pre><code>GET /t/c/n_abc123/link_cta_1
+
+Response: 302 Found
+Headers:
+  Location: https://example.com/product/123?utm_source=notification
+  Cache-Control: no-cache
+
+Side effect: Emit event to Kafka
+  { "type": "click", "notification_id": "n_abc123", "link_id": "link_cta_1",
+    "destination": "https://example.com/product/123",
+    "timestamp": "2024-03-15T10:31:00Z" }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--o);font-size:.85rem">POST /v1/webhooks/bounce (ISP Bounce Webhook)</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Receive bounce/complaint notifications from email providers (SendGrid, SES)</div>
+<pre><code>{
+  "event_type": "bounce",              // bounce | complaint | unsubscribe
+  "bounce_type": "hard",               // hard | soft
+  "email": "user@example.com",
+  "notification_id": "n_abc123",
+  "provider": "sendgrid",
+  "reason": "550 User not found",
+  "timestamp": "2024-03-15T10:32:00Z"
+}
+
+Response: 200 OK { "processed": true, "suppression_added": true }</code></pre>
+</div>
+
+<div class="api-card" style="margin:8px 0">
+<div style="font-weight:700;color:var(--r);font-size:.85rem">GET /v1/analytics/metrics/{template_id}</div>
+<div style="font-size:.75rem;color:var(--muted);margin:4px 0">Query aggregated metrics for a notification template</div>
+<pre><code>GET /v1/analytics/metrics/order_shipped?period=24h&channel=email
+
+Response 200:
+{
+  "template_id": "order_shipped",
+  "channel": "email",
+  "period": "24h",
+  "metrics": {
+    "sent": 2450000,
+    "delivered": 2401000,    "delivery_rate": 0.98,
+    "opened": 612000,        "open_rate": 0.255,
+    "clicked": 122000,       "ctr": 0.05,
+    "bounced": 49000,        "bounce_rate": 0.02,
+    "complained": 1200,      "complaint_rate": 0.0005,
+    "unsubscribed": 4800,    "unsub_rate": 0.002
+  },
+  "variants": {
+    "v1": { "open_rate": 0.24, "ctr": 0.045 },
+    "v2": { "open_rate": 0.27, "ctr": 0.055 }
+  }
+}</code></pre>
+</div>
+</div>
+
+<!-- --- DATA MODEL --- -->
+<div class="T" id="data-model">
+<h2>Data Model</h2>
+<p class="su">Event store, aggregation tables, and suppression lists</p>
+
+<h4 style="color:var(--a)">tracking_events (Kafka → ClickHouse)</h4>
+<pre><code>CREATE TABLE tracking_events (
+  event_id          String,
+  notification_id   String,
+  user_id           String,
+  template_id       String,
+  channel           Enum8('push'=1, 'email'=2, 'sms'=3, 'inapp'=4),
+  event_type        Enum8('sent'=1, 'delivered'=2, 'opened'=3, 'clicked'=4, 'bounced'=5, 'complained'=6, 'unsubscribed'=7),
+  variant           Nullable(String),   -- A/B test variant
+  metadata          String,             -- JSON: user_agent, ip, link_id, bounce_reason
+  event_time        DateTime64(3),
+  ingestion_time    DateTime64(3)
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMMDD(event_time)
+ORDER BY (template_id, channel, event_type, event_time)
+TTL event_time + INTERVAL 90 DAY;</code></pre>
+
+<h4 style="color:var(--g)">template_metrics_realtime (Redis — pre-aggregated counters)</h4>
+<pre><code>// Per-template, per-channel, per-hour counters
+// Key pattern: metrics:{template_id}:{channel}:{hour_bucket}:{metric}
+INCR metrics:order_shipped:email:2024031510:sent
+INCR metrics:order_shipped:email:2024031510:delivered
+INCR metrics:order_shipped:email:2024031510:opened
+INCR metrics:order_shipped:email:2024031510:clicked
+
+// Per-variant counters (for A/B testing)
+INCR metrics:order_shipped:email:2024031510:v1:opened
+INCR metrics:order_shipped:email:2024031510:v2:opened
+
+EXPIRE metrics:order_shipped:email:2024031510:sent 604800  // 7-day TTL (hot window)</code></pre>
+
+<h4 style="color:var(--o)">suppression_list (Redis + DynamoDB)</h4>
+<pre><code>// Hard bounced emails — never send again
+SADD suppression:hard_bounce "user@example.com" "invalid@gone.com"
+
+// Complaint suppressions — auto-unsubscribe
+SADD suppression:complaint "annoyed@user.com"
+
+// Persistent store (DynamoDB)
+{
+  "email":          "user@example.com",     // partition key
+  "reason":         "hard_bounce",          // hard_bounce | complaint | unsubscribe
+  "source":         "sendgrid",
+  "notification_id": "n_abc123",
+  "suppressed_at":  "2024-03-15T10:32:00Z",
+  "ttl":            null                    // permanent for hard bounces
+}</code></pre>
+
+<h4 style="color:var(--r)">delivery_funnel (ClickHouse — materialized view)</h4>
+<pre><code>CREATE MATERIALIZED VIEW delivery_funnel
+ENGINE = SummingMergeTree()
+ORDER BY (template_id, channel, event_type, hour_bucket)
+AS SELECT
+  template_id,
+  channel,
+  event_type,
+  toStartOfHour(event_time) AS hour_bucket,
+  count() AS event_count,
+  uniqHLL12(user_id) AS unique_users
+FROM tracking_events
+GROUP BY template_id, channel, event_type, hour_bucket;</code></pre>
+</div>
+
+<!-- --- ARCHITECTURE --- -->
+<div class="T" id="architecture">
+<h2>Architecture Overview</h2>
+<p class="su">Tracking Endpoints (Edge) &#x2192; Kafka &#x2192; Stream Processor &#x2192; ClickHouse + Redis Counters &#x2192; Dashboard</p>
+
+<svg width="100%" viewBox="0 0 740 400" style="max-width:740px;display:block;margin:4px auto 8px">
+<defs><marker id="an1" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="#8b8fa3"/></marker></defs>
+
+<!-- TRACKING ENDPOINTS (EDGE) -->
+<rect data-dp-step="1" x="4" y="4" width="732" height="60" rx="6" fill="rgba(108,140,255,.03)" stroke="var(--a)" stroke-width="1"/>
+<text data-dp-step="1" x="370" y="18" text-anchor="middle" fill="var(--a)" font-size="8" font-weight="800">TRACKING ENDPOINTS &middot; CDN Edge (Cloudflare Workers / Lambda@Edge)</text>
+
+<rect data-dp-step="2" x="14" y="28" width="200" height="28" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="2" x="114" y="40" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">Tracking Pixel Server</text>
+<text data-dp-step="2" x="114" y="51" text-anchor="middle" fill="var(--muted)" font-size="5">GET /t/o/{id}.gif → 1×1 GIF + log event</text>
+
+<rect data-dp-step="2" x="230" y="28" width="200" height="28" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="2" x="330" y="40" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Click Redirect Server</text>
+<text data-dp-step="2" x="330" y="51" text-anchor="middle" fill="var(--muted)" font-size="5">GET /t/c/{id}/{link} → 302 + log click</text>
+
+<rect data-dp-step="2" x="446" y="28" width="140" height="28" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="2" x="516" y="40" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Delivery Webhooks</text>
+<text data-dp-step="2" x="516" y="51" text-anchor="middle" fill="var(--muted)" font-size="5">Provider callbacks (sent/delivered)</text>
+
+<rect data-dp-step="2" x="602" y="28" width="128" height="28" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="2" x="666" y="40" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">ISP Feedback (ARF)</text>
+<text data-dp-step="2" x="666" y="51" text-anchor="middle" fill="var(--muted)" font-size="5">Bounce + complaint reports</text>
+
+<line data-dp-step="3" x1="370" y1="64" x2="370" y2="78" stroke="var(--a)" stroke-width="1" marker-end="url(#an1)"/>
+
+<!-- KAFKA EVENT BUS -->
+<rect data-dp-step="4" x="4" y="80" width="732" height="50" rx="6" fill="rgba(251,191,36,.03)" stroke="var(--y)" stroke-width="1"/>
+<text data-dp-step="4" x="370" y="94" text-anchor="middle" fill="var(--y)" font-size="8" font-weight="800">KAFKA EVENT BUS &middot; 256 partitions &middot; 7-day retention &middot; ~93K events/sec</text>
+
+<rect data-dp-step="5" x="14" y="100" width="170" height="22" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="5" x="99" y="114" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Topic: tracking-events</text>
+
+<rect data-dp-step="5" x="200" y="100" width="170" height="22" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="5" x="285" y="114" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Topic: bounce-events</text>
+
+<rect data-dp-step="5" x="386" y="100" width="170" height="22" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="5" x="471" y="114" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Topic: complaint-events</text>
+
+<rect data-dp-step="5" x="572" y="100" width="158" height="22" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="5" x="651" y="114" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Topic: delivery-receipts</text>
+
+<line data-dp-step="6" x1="370" y1="130" x2="370" y2="144" stroke="var(--y)" stroke-width="1" marker-end="url(#an1)"/>
+
+<!-- STREAM PROCESSORS -->
+<rect data-dp-step="7" x="4" y="146" width="732" height="65" rx="6" fill="rgba(52,211,153,.03)" stroke="var(--g)" stroke-width="1"/>
+<text data-dp-step="7" x="370" y="160" text-anchor="middle" fill="var(--g)" font-size="8" font-weight="800">STREAM PROCESSORS &middot; Real-time aggregation + suppression</text>
+
+<rect data-dp-step="8" x="14" y="168" width="200" height="34" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="8" x="114" y="181" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">Metrics Aggregator (Flink)</text>
+<text data-dp-step="8" x="114" y="191" text-anchor="middle" fill="var(--muted)" font-size="5">Per-template counters &middot; 30s windows</text>
+<text data-dp-step="8" x="114" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">→ Redis counters + ClickHouse</text>
+
+<rect data-dp-step="8" x="230" y="168" width="200" height="34" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="8" x="330" y="181" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Bounce Processor</text>
+<text data-dp-step="8" x="330" y="191" text-anchor="middle" fill="var(--muted)" font-size="5">Hard bounce → add to suppression list</text>
+<text data-dp-step="8" x="330" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">Soft bounce → retry count tracking</text>
+
+<rect data-dp-step="8" x="446" y="168" width="200" height="34" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="8" x="546" y="181" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Complaint Processor</text>
+<text data-dp-step="8" x="546" y="191" text-anchor="middle" fill="var(--muted)" font-size="5">ARF report → auto-unsubscribe user</text>
+<text data-dp-step="8" x="546" y="199" text-anchor="middle" fill="var(--muted)" font-size="5">Track per-domain complaint rate</text>
+
+<rect data-dp-step="8" x="662" y="168" width="68" height="34" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="8" x="696" y="181" text-anchor="middle" fill="var(--a2)" font-size="5" font-weight="700">A/B</text>
+<text data-dp-step="8" x="696" y="191" text-anchor="middle" fill="var(--muted)" font-size="4.5">Per-variant</text>
+<text data-dp-step="8" x="696" y="199" text-anchor="middle" fill="var(--muted)" font-size="4.5">metrics</text>
+
+<line data-dp-step="9" x1="370" y1="211" x2="370" y2="224" stroke="var(--g)" stroke-width="1" marker-end="url(#an1)"/>
+
+<!-- STORAGE LAYER -->
+<rect data-dp-step="10" x="4" y="226" width="732" height="65" rx="6" fill="rgba(251,146,60,.03)" stroke="var(--o)" stroke-width="1"/>
+<text data-dp-step="10" x="370" y="240" text-anchor="middle" fill="var(--o)" font-size="8" font-weight="800">STORAGE &middot; Hot metrics (Redis) + Analytical store (ClickHouse) + Cold (S3)</text>
+
+<rect data-dp-step="11" x="14" y="250" width="200" height="32" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="11" x="114" y="263" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Redis (Real-Time Counters)</text>
+<text data-dp-step="11" x="114" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">Per-template per-hour INCR &middot; 7-day TTL</text>
+
+<rect data-dp-step="11" x="230" y="250" width="200" height="32" rx="4" fill="rgba(108,140,255,.06)" stroke="var(--a)" stroke-width=".8"/>
+<text data-dp-step="11" x="330" y="263" text-anchor="middle" fill="var(--a)" font-size="6" font-weight="700">ClickHouse (90-day hot)</text>
+<text data-dp-step="11" x="330" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">Columnar &middot; fast aggregation queries</text>
+
+<rect data-dp-step="11" x="446" y="250" width="140" height="32" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="11" x="516" y="263" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">S3 + Parquet (cold)</text>
+<text data-dp-step="11" x="516" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">2-year retention &middot; Athena queries</text>
+
+<rect data-dp-step="11" x="602" y="250" width="128" height="32" rx="4" fill="rgba(251,191,36,.06)" stroke="var(--y)" stroke-width=".8"/>
+<text data-dp-step="11" x="666" y="263" text-anchor="middle" fill="var(--y)" font-size="6" font-weight="700">Suppression List</text>
+<text data-dp-step="11" x="666" y="275" text-anchor="middle" fill="var(--muted)" font-size="5">Redis SET + DynamoDB</text>
+
+<line data-dp-step="12" x1="370" y1="291" x2="370" y2="304" stroke="var(--o)" stroke-width="1" marker-end="url(#an1)"/>
+
+<!-- DASHBOARD / QUERY LAYER -->
+<rect data-dp-step="13" x="4" y="306" width="732" height="70" rx="6" fill="rgba(167,139,250,.03)" stroke="var(--a2)" stroke-width="1"/>
+<text data-dp-step="13" x="370" y="320" text-anchor="middle" fill="var(--a2)" font-size="8" font-weight="800">ANALYTICS DASHBOARD &middot; Real-time delivery funnel + A/B comparison</text>
+
+<rect data-dp-step="14" x="14" y="330" width="200" height="38" rx="4" fill="rgba(167,139,250,.06)" stroke="var(--a2)" stroke-width=".8"/>
+<text data-dp-step="14" x="114" y="344" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">Delivery Funnel View</text>
+<text data-dp-step="14" x="114" y="355" text-anchor="middle" fill="var(--muted)" font-size="5">Sent → Delivered → Opened → Clicked</text>
+<text data-dp-step="14" x="114" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Per template &middot; per channel &middot; per hour</text>
+
+<rect data-dp-step="14" x="230" y="330" width="200" height="38" rx="4" fill="rgba(52,211,153,.06)" stroke="var(--g)" stroke-width=".8"/>
+<text data-dp-step="14" x="330" y="344" text-anchor="middle" fill="var(--g)" font-size="6" font-weight="700">A/B Test Comparison</text>
+<text data-dp-step="14" x="330" y="355" text-anchor="middle" fill="var(--muted)" font-size="5">Variant v1 vs v2: open rate, CTR</text>
+<text data-dp-step="14" x="330" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Statistical significance calculator</text>
+
+<rect data-dp-step="14" x="446" y="330" width="140" height="38" rx="4" fill="rgba(248,113,113,.06)" stroke="var(--r)" stroke-width=".8"/>
+<text data-dp-step="14" x="516" y="344" text-anchor="middle" fill="var(--r)" font-size="6" font-weight="700">Health Alerts</text>
+<text data-dp-step="14" x="516" y="355" text-anchor="middle" fill="var(--muted)" font-size="5">Bounce rate spike detection</text>
+<text data-dp-step="14" x="516" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Complaint rate threshold alert</text>
+
+<rect data-dp-step="14" x="602" y="330" width="128" height="38" rx="4" fill="rgba(251,146,60,.06)" stroke="var(--o)" stroke-width=".8"/>
+<text data-dp-step="14" x="666" y="344" text-anchor="middle" fill="var(--o)" font-size="6" font-weight="700">Domain Reputation</text>
+<text data-dp-step="14" x="666" y="355" text-anchor="middle" fill="var(--muted)" font-size="5">Per-ISP delivery rates</text>
+<text data-dp-step="14" x="666" y="363" text-anchor="middle" fill="var(--muted)" font-size="5">Gmail / Yahoo / Outlook</text>
+
+<!-- Annotations -->
+<rect data-dp-step="15" x="560" y="146" width="170" height="48" rx="4" fill="rgba(167,139,250,.04)" stroke="var(--a2)" stroke-width=".6"/>
+<text data-dp-step="15" x="645" y="160" text-anchor="middle" fill="var(--a2)" font-size="6" font-weight="700">KEY INSIGHT</text>
+<text data-dp-step="15" x="645" y="172" text-anchor="middle" fill="var(--muted)" font-size="5">Bounce processing must suppress</text>
+<text data-dp-step="15" x="645" y="182" text-anchor="middle" fill="var(--muted)" font-size="5">within 5 minutes. Sending to hard-</text>
+<text data-dp-step="15" x="645" y="192" text-anchor="middle" fill="var(--muted)" font-size="5">bounced emails damages domain rep.</text>
+</svg>
+</div>
+
+<!-- --- DECISION TABLE --- -->
+<div class="T" id="decisions">
+<h2>Key Design Decisions</h2>
+<p class="su">Tradeoffs made in this architecture and their rationale</p>
+<table>
+<tr><th>Decision</th><th>Options Considered</th><th>Chosen</th><th>Why</th></tr>
+<tr>
+  <td><span class="hi">Open Tracking Method</span></td>
+  <td>Tracking pixel, email proxy, read receipts (not available for email)</td>
+  <td><span class="hg">1×1 transparent tracking pixel</span></td>
+  <td>Industry standard. Embedded in email HTML. Loaded when email is opened (with image display). No alternative for email open tracking.</td>
+</tr>
+<tr>
+  <td><span class="hi">Click Tracking Method</span></td>
+  <td>Redirect URLs, JavaScript click handlers (not available in email), link decoration</td>
+  <td><span class="hg">Redirect URLs (302)</span></td>
+  <td>All email links rewritten to redirect URLs. Log click, then 302 to destination. Works universally. Sub-100ms perceived latency.</td>
+</tr>
+<tr>
+  <td><span class="hi">Analytics Store</span></td>
+  <td>PostgreSQL, Elasticsearch, ClickHouse, BigQuery</td>
+  <td><span class="hg">ClickHouse (hot) + S3/Parquet (cold)</span></td>
+  <td>ClickHouse: columnar, compression, fast aggregation on 1.6TB/day ingestion. 10x cheaper than BigQuery for this write-heavy workload.</td>
+</tr>
+<tr>
+  <td><span class="hi">Real-Time Dashboard</span></td>
+  <td>Query ClickHouse directly, pre-aggregated counters in Redis</td>
+  <td><span class="hg">Redis pre-aggregated counters</span></td>
+  <td>Dashboard refresh every 5s. Querying ClickHouse at this rate is expensive. Redis INCR during stream processing → O(1) dashboard reads.</td>
+</tr>
+<tr>
+  <td><span class="hi">Bounce Suppression Speed</span></td>
+  <td>Batch process hourly, real-time per bounce</td>
+  <td><span class="hg">Real-time: suppress within 5 minutes</span></td>
+  <td>Every email sent to a hard-bounced address damages domain reputation. ISPs track repeated bounces. Must suppress immediately.</td>
+</tr>
+<tr>
+  <td><span class="hi">Apple Privacy Handling</span></td>
+  <td>Count all opens equally, weight Apple opens, ignore Apple opens</td>
+  <td><span class="hg">Weight Apple Mail opens at 0.5x</span></td>
+  <td>Apple Mail Privacy Protection pre-fetches all images (inflating opens). Weighting at 0.5x approximates real engagement. Click-through is more reliable metric.</td>
+</tr>
+</table>
+</div>
+
+<!-- --- CALLOUTS --- -->
+<div class="b bg" style="margin:8px 0"><span class="hi">Why tracking pixels must be served from CDN edge:</span> 500M pixel loads/day peaks at 500K/sec during morning email opens. Origin servers can't handle this. CDN edge (Cloudflare Workers) returns cached 1×1 GIF instantly, logs the open event to a local buffer, then async-flushes to Kafka. Zero origin load for the hot path.</div>
+
+<div class="b by" style="margin:8px 0"><span class="hi">Click redirect URL design:</span> <code>/t/c/{notification_id}/{link_id}</code> — no query parameters (some email clients strip them). The notification_id encodes template_id + user_id + variant for attribution. Link_id maps to a destination URL lookup table. 302 (not 301) prevents browsers from caching and skipping future tracking.</div>
+
+<div class="b br" style="margin:8px 0"><span class="hi">ISP feedback loop (FBL) processing:</span> When a user marks email as spam, the ISP sends an ARF (Abuse Reporting Format) report to the sender's FBL address. You MUST process these within minutes: auto-unsubscribe the user, add to suppression list. Complaint rates above 0.1% trigger ISP throttling. Above 0.3% → blacklisting.</div>
+
+<div class="b bb" style="margin:8px 0"><span class="hi">A/B testing with tracking:</span> The tracking pixel URL includes variant info: <code>/t/o/n_abc123_v2.gif</code>. The stream processor splits metrics by variant. After sufficient sample size (>10K sends per variant), compute statistical significance. Auto-promote winning variant at 95% confidence. Track open_rate AND ctr (not just opens).</div>
+
+<!-- --- RESILIENCE & EDGE CASES --- -->
+<div class="T" id="challenges">
+<h2>Resilience &amp; Edge Cases</h2>
+<p class="su">How the analytics system handles failures and edge cases</p>
+<table>
+<tr><th>Scenario</th><th>Problem</th><th>Solution</th><th>Recovery</th></tr>
+<tr>
+  <td><span class="hi">Pixel Load Spike</span></td>
+  <td>Morning email blast causes 500K pixel requests/sec.</td>
+  <td>CDN edge handles load. Pixel GIF is same bytes for all requests (cacheable). Only the logging varies. Edge buffer + batch flush to Kafka every 1s.</td>
+  <td><span class="hg">CDN absorbs</span> (infinite scale)</td>
+</tr>
+<tr>
+  <td><span class="hi">ClickHouse Ingestion Lag</span></td>
+  <td>ClickHouse falls behind on event ingestion (8B events/day).</td>
+  <td>Kafka retains 7 days. ClickHouse catches up from Kafka offset. Redis counters are unaffected (separate path). Dashboard stays fresh via Redis.</td>
+  <td><span class="hg">Auto-catch-up</span> from Kafka</td>
+</tr>
+<tr>
+  <td><span class="hi">Duplicate Pixel Loads</span></td>
+  <td>Email client loads pixel multiple times (preview pane, re-open).</td>
+  <td>Deduplicate opens per notification_id: first open counts as "open event". Subsequent loads are counted as "re-opens" (separate metric). Use Redis SET for dedup.</td>
+  <td><span class="hg">Accurate</span> unique open count</td>
+</tr>
+<tr>
+  <td><span class="hi">Apple Mail Privacy</span></td>
+  <td>Apple pre-fetches all images, inflating open rates by 30-40%.</td>
+  <td>Detect Apple Mail user-agent. Weight those opens at 0.5x. Report "adjusted open rate" alongside raw. Emphasize CTR as primary engagement metric.</td>
+  <td><span class="hg">Adjusted metrics</span> in dashboard</td>
+</tr>
+<tr>
+  <td><span class="hi">Bounce Storm</span></td>
+  <td>Sending to purchased list → 20% bounce rate → ISP throttling.</td>
+  <td>Real-time bounce rate monitoring per campaign. Auto-pause campaign if bounce rate exceeds 5% in first 1000 sends. Alert operations team immediately.</td>
+  <td><span class="hg">&lt;5 min</span> auto-pause</td>
+</tr>
+<tr>
+  <td><span class="hi">Redis Counter Loss</span></td>
+  <td>Redis shard failure loses recent counter increments.</td>
+  <td>Redis counters are a cache of aggregated data (ClickHouse is source of truth). Rebuild counters from ClickHouse for affected time window. ~10 min recovery.</td>
+  <td><span class="ho">~10 min</span> rebuild from ClickHouse</td>
+</tr>
+</table>
+</div>
+
+<!-- --- INTERVIEW CHEAT SHEET --- -->
+<div class="T" id="cheatsheet">
+<h2>Interview Cheat Sheet</h2>
+<p class="su">5 key points to nail a notification analytics interview</p>
+
+<div class="b bb" style="border-left:4px solid var(--a);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--a)">1. Tracking Pixel at CDN Edge</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Embed a 1×1 transparent GIF in every email. URL encodes notification_id + variant. CDN edge returns the same 43-byte GIF for all requests (zero origin load), but logs the request metadata (notification_id, timestamp, user-agent) asynchronously. Buffer locally, batch-flush to Kafka every 1 second. Handles 500K/sec at peak.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--g);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--g)">2. Click Redirect with 302 (Not 301)</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Rewrite all email links to redirect URLs: /t/c/{notification_id}/{link_id}. On click: log event, lookup destination from link_id mapping, return 302 redirect. Use 302 (temporary) not 301 (permanent) — browsers cache 301 and skip the tracker on subsequent clicks. Sub-100ms total latency.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--o);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--o)">3. Bounce Suppression within 5 Minutes</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Hard bounces (550 User not found) must immediately add the email to a suppression list. The notification service checks this list BEFORE sending. Every email to a hard-bounced address damages your domain reputation with that ISP. Complaint rates above 0.1% trigger throttling. Stream process bounce events in real-time.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--r);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--r)">4. Pre-Aggregated Redis Counters for Dashboards</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Don't query ClickHouse for every dashboard refresh. Stream processor INCRs Redis counters per-template per-hour per-metric during event processing. Dashboard reads O(1) from Redis. Counters have 7-day TTL. Historical queries fall through to ClickHouse. This decouples dashboard latency from analytical query performance.</span>
+</div>
+
+<div class="b bb" style="border-left:4px solid var(--y);margin:8px 0;padding:10px 14px">
+<strong style="color:var(--y)">5. Apple Mail Privacy Adjustment</strong><br>
+<span style="font-size:.82rem;color:var(--text)">Apple Mail Privacy Protection (since iOS 15) pre-fetches ALL images including tracking pixels, making open tracking unreliable for Apple Mail users (~45% of email clients). Solution: detect Apple Mail UA, weight those opens at 0.5x for adjusted metrics. Emphasize click-through rate as the more reliable engagement metric. Report both raw and adjusted open rates.</span>
+</div>
+</div>
+
+<script>
+(function(){
+  let fired=false;
+  function countUp(){
+    if(fired)return; fired=true;
+    document.querySelectorAll('.stat-num').forEach(el=>{
+      const target=+el.dataset.target,prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+      let current=0;const steps=30,duration=900,inc=target/steps;
+      const iv=setInterval(()=>{
+        current+=inc;let val=Math.round(current);let step=Math.round(current/inc);
+        el.textContent=prefix+val+suffix;
+        if(step>=steps){el.textContent=prefix+target+suffix;clearInterval(iv);}
+      },duration/steps);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});
+  setTimeout(countUp,400);
+})();
+</script>
+</div><!-- /.ct -->
+<link rel="stylesheet" href="../../css/dp-engine.css">
+<script src="../../js/header.js"></script>
+<script src="../../js/nav-realtime.js"></script>
+<script src="../../js/dp-engine.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="../../js/live-course.js"></script>
+<script src="../../js/auth.js"></script>
+
+</body>
+</html>
