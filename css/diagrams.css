@@ -52,7 +52,7 @@
 .d-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.73rem;font-weight:600;margin:3px}
 .d-badge.warn{background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.2)}
 .d-badge.ok{background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.2)}
-.d-badge.info{background:rgba(108,140,255,.12);color:var(--a);border:1px solid rgba(108,140,255,.2)}
+.d-badge.info{background:rgba(154,119,212,.12);color:var(--a);border:1px solid rgba(154,119,212,.2)}
 
 /* --- Comparison bar chart (simple horizontal) --- */
 .d-bar-wrap{margin:4px 0}

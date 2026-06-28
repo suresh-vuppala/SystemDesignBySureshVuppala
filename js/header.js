@@ -12,6 +12,7 @@
   if(inCheatsheet) activeSection = 'concepts';
   if(inRealtime) activeSection = 'realtime';
   if(page === 'engineering-blogs.html') activeSection = 'blogs';
+  if(page === 'master-system-design.html') activeSection = 'courses';
 
   // Calculate prefix to reach the project root
   var prefix = '';
@@ -26,9 +27,28 @@
     {href: prefix+'system-design-cheatsheet/engineering-blogs.html', label:'Blogs', id:'blogs'}
   ];
 
+  // Courses dropdown items
+  var courses = [
+    {href: prefix+'master-system-design.html', label:'Master System Design', desc:'8-week live weekend cohort'}
+  ];
+
   var navItems = links.map(function(l){
     return '<a href="'+l.href+'" class="sh-link'+(activeSection===l.id?' sh-active':'')+'">'+l.label+'</a>';
   }).join('');
+
+  // Build Courses dropdown
+  var courseItems = courses.map(function(c){
+    return '<a href="'+c.href+'" class="sh-dd-item">'
+      + '<span class="sh-dd-title">'+c.label+'</span>'
+      + '<span class="sh-dd-desc">'+c.desc+'</span></a>';
+  }).join('');
+  var coursesDropdown = '<div class="sh-dropdown'+(activeSection==='courses'?' sh-dd-active':'')+'">'
+    + '<button class="sh-link sh-dd-toggle'+(activeSection==='courses'?' sh-active':'')+'" aria-haspopup="true" aria-expanded="false">'
+    + '<span class="sh-livedot" aria-hidden="true"></span>Live Course <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="sh-dd-caret"><polyline points="6 9 12 15 18 9"/></svg>'
+    + '</button>'
+    + '<div class="sh-dropdown-menu">'+courseItems+'</div>'
+    + '</div>';
+  navItems = navItems + coursesDropdown;
 
   var html = '<header class="sh">'
     + '<a class="sh-brand" href="'+prefix+'index.html">'
@@ -51,6 +71,21 @@
       var open = nav.classList.toggle('sh-open');
       toggle.setAttribute('aria-expanded', open);
       toggle.textContent = open ? '✕' : '☰';
+    });
+  }
+
+  // Courses dropdown — hover on desktop (CSS), click/tap toggle for touch + mobile
+  var dd = document.querySelector('.sh-dropdown');
+  var ddToggle = dd && dd.querySelector('.sh-dd-toggle');
+  if(dd && ddToggle){
+    ddToggle.addEventListener('click', function(e){
+      e.preventDefault();
+      var open = dd.classList.toggle('sh-dd-open');
+      ddToggle.setAttribute('aria-expanded', open);
+    });
+    // Close when clicking outside
+    document.addEventListener('click', function(e){
+      if(!dd.contains(e.target)) dd.classList.remove('sh-dd-open');
     });
   }
 

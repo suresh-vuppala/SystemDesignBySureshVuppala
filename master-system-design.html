@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Master System Design — 8-Week Live Weekend Cohort · HelloSDE</title>
+<meta name="description" content="Stop freezing on 'Design Instagram'. Master System Design is an 8-week live weekend cohort (Sat/Sun, 9AM–1PM) where you learn each building block, then immediately apply it to a real design problem. Next batch July 18 · INR 39,999.">
+<meta name="keywords" content="system design course, live cohort, system design bootcamp, FAANG interview prep, distributed systems course, staff engineer interview">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://hellosde.com/master-system-design.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hellosde.com/master-system-design.html">
+<meta property="og:title" content="Master System Design — 8-Week Live Weekend Cohort">
+<meta property="og:description" content="Learn a building block, then immediately apply it to a real design problem. 8 weekends, live. Next batch July 18.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* ── Course Page Styles ── */
+.course-hero{padding:56px 24px 40px;text-align:center;
+  background:radial-gradient(75% 130% at 50% 0%, rgba(154,119,212,.12), transparent 65%), var(--bg-2);
+  border-bottom:1px solid var(--border)}
+.course-kicker{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
+  color:var(--a);background:rgba(154,119,212,.10);border:1px solid rgba(154,119,212,.25);
+  padding:5px 14px;border-radius:999px;margin-bottom:16px}
+.course-hero h1{font-size:2.5rem;font-weight:800;letter-spacing:-.03em;color:#fff;margin:0;line-height:1.12}
+.course-hero h1 .u{position:relative;white-space:nowrap}
+.course-hero h1 .u::after{content:'';position:absolute;left:0;bottom:-5px;width:100%;height:8px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8'%3E%3Cpath d='M0,4 Q25,0 50,4 T100,4 T150,4 T200,4' fill='none' stroke='%239a77d4' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;background-size:200px 8px}
+.course-sub{color:var(--text-2);max-width:660px;margin:18px auto 0;font-size:1.05rem;line-height:1.7}
+.course-sub strong{color:#fff}
+.course-hook{margin:14px auto 0;font-size:1.15rem;font-weight:700;color:var(--a);letter-spacing:-.01em}
+
+/* Quick facts strip */
+.facts{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:900px;margin:28px auto 0}
+.fact{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;text-align:left}
+.fact .fact-ic{font-size:1.1rem;margin-bottom:6px}
+.fact .fact-lbl{font-size:.66rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px}
+.fact .fact-val{font-size:.95rem;font-weight:700;color:#fff}
+
+.course-cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:30px}
+.btn-wa{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:10px;
+  background:#25d366;color:#0a2e16;font-weight:700;font-size:.95rem;text-decoration:none;
+  transition:transform .15s,box-shadow .15s;box-shadow:0 6px 20px rgba(37,211,102,.25)}
+.btn-wa:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(37,211,102,.35);text-decoration:none}
+.btn-pay{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:10px;border:none;cursor:pointer;font:inherit;
+  background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;
+  transition:transform .15s,box-shadow .15s;box-shadow:0 6px 20px rgba(154,119,212,.28)}
+.btn-pay:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(154,119,212,.4)}
+.btn-pay .pay-sec{font-size:.66rem;font-weight:600;opacity:.85;display:flex;align-items:center;gap:4px;margin-left:2px}
+.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:14px 24px;border-radius:10px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border-strong);color:var(--text);
+  font-weight:600;font-size:.9rem;text-decoration:none;transition:all .15s}
+.btn-ghost:hover{border-color:var(--a);color:#fff;text-decoration:none}
+.hero-trust{margin-top:22px;font-size:.78rem;color:var(--muted)}
+.hero-trust b{color:var(--text)}
+
+/* Content wrapper */
+.course-wrap{max-width:940px;margin:0 auto;padding:48px 24px 80px}
+.sec-title{font-size:1.6rem;font-weight:800;color:#fff;margin:0 0 6px;letter-spacing:-.01em}
+.sec-lead{color:var(--muted);font-size:.98rem;margin:0 0 24px;line-height:1.6}
+.course-section{margin-bottom:60px}
+
+/* Pain points */
+.pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pain{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--r);border-radius:10px;padding:16px 18px}
+.pain p{margin:0;font-size:.9rem;color:var(--text-2);line-height:1.6}
+.pain .q{color:#fff;font-weight:600;display:block;margin-bottom:4px}
+.pain-turn{margin-top:18px;background:linear-gradient(90deg,rgba(154,119,212,.10),transparent 70%);border:1px solid var(--border);border-left:3px solid var(--a);border-radius:10px;padding:16px 18px;font-size:.95rem;color:var(--text-2)}
+.pain-turn b{color:#fff}
+
+/* Method flow */
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.flow-step{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;position:relative}
+.flow-step .step-n{position:absolute;top:16px;right:20px;font-size:1.6rem;font-weight:800;color:rgba(154,119,212,.18)}
+.flow-step h3{font-size:1rem;color:#fff;margin:0 0 6px;font-weight:700}
+.flow-step p{font-size:.86rem;color:var(--text-2);margin:0;line-height:1.6}
+
+/* Roadmap accordion */
+.week{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.week[open]{border-color:var(--border-strong)}
+.week summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:14px;transition:background .15s}
+.week summary::-webkit-details-marker{display:none}
+.week summary:hover{background:rgba(154,119,212,.05)}
+.week-tag{flex-shrink:0;font-size:.7rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--a);background:rgba(154,119,212,.10);border:1px solid rgba(154,119,212,.25);padding:5px 11px;border-radius:8px;min-width:78px;text-align:center}
+.week-head{flex:1;min-width:0}
+.week-head h3{font-size:1.02rem;color:#fff;margin:0;font-weight:700;line-height:1.3}
+.week-head p{font-size:.8rem;color:var(--muted);margin:2px 0 0}
+.week-caret{flex-shrink:0;color:var(--muted);transition:transform .2s}
+.week[open] .week-caret{transform:rotate(180deg);color:var(--a)}
+.week-body{padding:4px 20px 20px;border-top:1px solid var(--border)}
+.week-body .wb-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+@media(max-width:640px){.week-body .wb-row{grid-template-columns:1fr}}
+.wb-col h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px;font-weight:700}
+.wb-col.blocks h4{color:var(--a)}
+.wb-col.apply h4{color:var(--g)}
+.wb-list{list-style:none;padding:0;margin:0}
+.wb-list li{font-size:.85rem;color:var(--text-2);padding:4px 0 4px 18px;position:relative;line-height:1.5}
+.wb-col.blocks .wb-list li::before{content:'▸';position:absolute;left:0;color:var(--a)}
+.wb-col.apply .wb-list li::before{content:'✦';position:absolute;left:0;color:var(--g)}
+
+/* Outcomes */
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.outcome{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.outcome .ic{color:var(--g);font-weight:800;flex-shrink:0;margin-top:1px}
+.outcome span{font-size:.9rem;color:var(--text-2);line-height:1.55}
+.outcome b{color:#fff}
+
+/* Audience */
+.aud-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.aud{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px}
+.aud h3{font-size:1rem;margin:0 0 12px;font-weight:700}
+.aud.for h3{color:var(--g)}
+.aud.notfor h3{color:var(--r)}
+.aud ul{list-style:none;padding:0;margin:0}
+.aud li{font-size:.88rem;color:var(--text-2);padding:6px 0 6px 24px;position:relative;line-height:1.5}
+.aud.for li::before{content:'✓';position:absolute;left:0;color:var(--g);font-weight:800}
+.aud.notfor li::before{content:'✕';position:absolute;left:0;color:var(--r);font-weight:800}
+
+/* Bonuses */
+.bonus-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:700px){.bonus-grid{grid-template-columns:1fr}}
+.bonus{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center}
+.bonus .bic{font-size:1.5rem;margin-bottom:8px}
+.bonus h4{font-size:.92rem;color:#fff;margin:0 0 5px;font-weight:700}
+.bonus p{font-size:.78rem;color:var(--muted);margin:0;line-height:1.5}
+
+/* Testimonials */
+.tst-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.tst-grid{grid-template-columns:1fr}.pain-grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.outcomes{grid-template-columns:1fr}.aud-grid{grid-template-columns:1fr}}
+.tst{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px}
+.tst p{font-size:.92rem;color:var(--text-2);line-height:1.65;margin:0 0 14px;font-style:italic}
+.tst .who{display:flex;align-items:center;gap:10px}
+.tst .ava{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0}
+.tst .who b{display:block;color:#fff;font-size:.85rem}
+.tst .who span{font-size:.74rem;color:var(--muted)}
+
+/* Pricing */
+.price-card{max-width:480px;margin:0 auto;background:var(--card);border:1px solid var(--border-strong);border-radius:16px;padding:34px 30px;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.price-card::before{content:'';position:absolute;inset:0;background:radial-gradient(80% 100% at 50% 0%,rgba(154,119,212,.10),transparent 60%);pointer-events:none}
+.price-batch{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--a);background:rgba(154,119,212,.10);border:1px solid rgba(154,119,212,.25);padding:5px 14px;border-radius:999px;margin-bottom:16px;position:relative}
+.price-amt{font-size:2.8rem;font-weight:800;color:#fff;line-height:1;position:relative}
+.price-amt .cur{font-size:1.3rem;font-weight:700;color:var(--muted);vertical-align:super;margin-right:2px}
+.price-note{color:var(--muted);font-size:.82rem;margin:8px 0 22px;position:relative}
+.price-includes{list-style:none;padding:0;margin:0 0 24px;text-align:left;position:relative}
+.price-includes li{padding:7px 0 7px 28px;position:relative;font-size:.88rem;color:var(--text-2)}
+.price-includes li::before{content:'✓';position:absolute;left:0;top:7px;color:var(--g);font-weight:800}
+
+/* Urgency */
+.urgency{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 auto 22px;max-width:480px;
+  background:rgba(232,180,62,.07);border:1px solid rgba(232,180,62,.25);border-radius:10px;padding:11px 16px;font-size:.84rem;color:var(--text-2)}
+.urgency b{color:var(--y)}
+
+/* FAQ */
+.faq{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden}
+.faq summary{cursor:pointer;list-style:none;padding:15px 18px;font-weight:600;color:var(--text);font-size:.92rem;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';color:var(--a);font-size:1.3rem;font-weight:400;line-height:1;flex-shrink:0}
+.faq[open] summary::after{content:'–'}
+.faq summary:hover{background:rgba(154,119,212,.04)}
+.faq-body{padding:0 18px 16px;font-size:.88rem;color:var(--text-2);line-height:1.65}
+
+@media(max-width:640px){
+  .course-hero h1{font-size:1.8rem}
+  .course-wrap{padding:36px 16px 60px}
+  .bonus-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<section class="course-hero">
+  <span class="course-kicker">Live Cohort · 8 Weekends · Limited Seats</span>
+  <h1>Master <span class="u">System Design</span></h1>
+  <p class="course-hook">Stop memorizing. Start designing systems.</p>
+  <p class="course-sub">You can grind 500 LeetCode problems and still freeze when the interviewer says <strong>"Design Instagram."</strong> This 8-week live cohort fixes that — you learn each building block in the right order, then <strong>immediately apply it</strong> through guided design discussions and real-world walkthroughs until it becomes instinct.</p>
+
+  <div class="facts">
+    <div class="fact"><div class="fact-ic">📅</div><div class="fact-lbl">Duration</div><div class="fact-val">8 Weeks · Weekends</div></div>
+    <div class="fact"><div class="fact-ic">⏰</div><div class="fact-lbl">Timing</div><div class="fact-val">Sat &amp; Sun · 9AM–1PM</div></div>
+    <div class="fact"><div class="fact-ic">🚀</div><div class="fact-lbl">Next Batch</div><div class="fact-val">July 18</div></div>
+    <div class="fact"><div class="fact-ic">💸</div><div class="fact-lbl">Price</div><div class="fact-val">₹39,999</div></div>
+  </div>
+
+  <div class="course-cta-row">
+    <button class="btn-pay" onclick="window.HelloSDE ? window.HelloSDE.enrollCourse() : alert('Loading…')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Enroll Now — ₹39,999 <span class="pay-sec">🔒 Razorpay</span></button>
+    <a class="btn-ghost" href="#roadmap">See the full roadmap ↓</a>
+  </div>
+  <p class="hero-trust">Built by an engineer who's <b>designed systems at scale</b> · 16 modules · 218 real-world problems · 300+ diagrams</p>
+</section>
+
+<div class="course-wrap">
+
+  <!-- ── PAIN POINTS ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Sound familiar?</h2>
+    <p class="sec-lead">Most engineers don't fail system design because they're not smart. They fail because nobody taught them the building blocks in the right order.</p>
+    <div class="pain-grid">
+      <div class="pain"><p><span class="q">"I blank out at the whiteboard."</span>You know the words — sharding, caching, Kafka — but can't assemble them under pressure into a coherent design.</p></div>
+      <div class="pain"><p><span class="q">"I watched 40 hours of videos."</span>…and still can't drive a design yourself. Watching isn't doing. Passive learning never transfers to the interview.</p></div>
+      <div class="pain"><p><span class="q">"I just memorize template answers."</span>The moment the interviewer changes one constraint, the template breaks and so does your confidence.</p></div>
+      <div class="pain"><p><span class="q">"I'm a senior dev but interviews humble me."</span>You ship features daily, yet open-ended design questions expose gaps you never had to fill on the job.</p></div>
+    </div>
+    <div class="pain-turn">The fix isn't <b>more content</b>. It's <b>structured practice</b> — learn one block, apply it the same hour, repeat until designing systems feels as natural as writing a for-loop.</div>
+  </section>
+
+  <!-- ── METHOD ── -->
+  <section class="course-section" id="format">
+    <h2 class="sec-title">The learn → apply method</h2>
+    <p class="sec-lead">Every concept is followed by hands-on application — that's how intuition is built.</p>
+    <div class="flow">
+      <div class="flow-step"><span class="step-n">1</span><h3>Learn a building block</h3><p>One core concept at a time — taught in a deliberate sequence so each new idea builds on the last. No random topic-hopping.</p></div>
+      <div class="flow-step"><span class="step-n">2</span><h3>Apply it immediately</h3><p>The same session, we apply that block through a guided discussion and design walkthrough of a real system — turning theory into intuition while it's fresh.</p></div>
+      <div class="flow-step"><span class="step-n">3</span><h3>Combine the blocks</h3><p>As your toolkit grows, the discussions get richer — we compose multiple blocks into complete real-world architectures, together.</p></div>
+      <div class="flow-step"><span class="step-n">4</span><h3>Solve the big ones</h3><p>By the final weekends you design large, open-ended systems (Slack, Uber, Netflix scale) end-to-end, confidently.</p></div>
+    </div>
+  </section>
+
+  <!-- ── DETAILED ROADMAP ── -->
+  <section class="course-section" id="roadmap">
+    <h2 class="sec-title">The 8-weekend roadmap</h2>
+    <p class="sec-lead">16 concept modules across 8 weekends · Sat &amp; Sun, 9AM–1PM (4 hours, 15-min break). Tap any weekend to expand. <strong>Every weekend = learn the blocks, then apply them through guided design discussions &amp; walkthroughs.</strong></p>
+
+    <details class="week" open>
+      <summary>
+        <span class="week-tag">Week 1</span>
+        <span class="week-head"><h3>Foundations &amp; Networking</h3><p>The mental model + how data actually moves</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>How to approach any design question (requirements → constraints → API → data → scale)</li>
+          <li>Back-of-the-envelope estimation (QPS, storage, bandwidth, memory)</li>
+          <li>Latency numbers every engineer must know (RAM vs SSD vs network vs cross-region)</li>
+          <li>CAP theorem, PACELC, and the tradeoffs that drive every decision</li>
+          <li>DNS, TCP vs UDP, HTTP/1.1 vs HTTP/2 vs HTTP/3, TLS handshake</li>
+          <li>Load balancing: L4 vs L7, algorithms, health checks, sticky sessions</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Estimate QPS, storage &amp; bandwidth for a photo-upload feature (live back-of-envelope)</li>
+          <li>"What happens when you type a URL?" — trace DNS → TCP → TLS → HTTP</li>
+          <li>CP vs AP: bank balance vs a like-counter — which side of CAP and why</li>
+          <li>L4 vs L7 load balancing for routing API vs static traffic</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 2</span>
+        <span class="week-head"><h3>APIs &amp; Infrastructure</h3><p>Designing the contract + the plumbing around it</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>REST vs gRPC vs GraphQL — when to use each</li>
+          <li>WebSocket &amp; SSE for real-time APIs</li>
+          <li>Idempotency keys, pagination, versioning, rate-limit headers</li>
+          <li>Reverse proxies, API gateways, BFF pattern</li>
+          <li>Service discovery, containers &amp; Kubernetes basics</li>
+          <li>Multi-region deployment &amp; serverless tradeoffs</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Idempotency key on a <code>/pay</code> endpoint to prevent double-charge on retry</li>
+          <li>WebSocket vs SSE vs long-poll for a live score ticker</li>
+          <li>Cursor vs offset pagination for an infinite-scroll feed</li>
+          <li>What belongs in the API gateway vs the service (auth, rate limit, routing)</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 3</span>
+        <span class="week-head"><h3>Storage &amp; Databases</h3><p>Picking and shaping the source of truth</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>SQL vs NoSQL — the real decision framework</li>
+          <li>Indexing internals: B-Tree vs LSM-Tree, when writes vs reads win</li>
+          <li>Document, wide-column (Cassandra/Scylla), and key-value stores</li>
+          <li>Blob/object storage &amp; when to keep data out of the DB</li>
+          <li>Full-text search with Elasticsearch &amp; inverted indexes</li>
+          <li>Partitioning fundamentals (range vs hash)</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>B-Tree vs LSM-Tree: pick storage for a write-heavy event log</li>
+          <li>Design a composite index for "filter orders by user + date"</li>
+          <li>Wide-column schema for chat messages (partition by channel, cluster by time)</li>
+          <li>Store user avatars in blob storage + CDN vs in the database</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 4</span>
+        <span class="week-head"><h3>Caching &amp; CDNs</h3><p>Making it fast without melting the database</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>Cache-aside, write-through, write-back, read-through</li>
+          <li>Eviction policies: LRU vs LFU vs TTL</li>
+          <li>Redis data structures (String, Hash, List, Set, Sorted Set, HLL, Geo, Streams)</li>
+          <li>Thundering herd, cache penetration, cache avalanche — and the fixes</li>
+          <li>CDN &amp; edge caching, cache invalidation strategies</li>
+          <li>Redis Pub/Sub vs Streams for real-time</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Sorted Set for a real-time leaderboard (ZADD / ZREVRANGE / rank)</li>
+          <li>HyperLogLog to count unique daily visitors in ~12KB</li>
+          <li>Cache-aside vs write-through for a user-profile read path</li>
+          <li>Fix a thundering herd on a hot key (SETNX lock + TTL jitter)</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 5</span>
+        <span class="week-head"><h3>Messaging &amp; Data Pipelines</h3><p>Decoupling services and processing streams</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>Message queues vs log-based streaming (Kafka)</li>
+          <li>Pub/Sub, consumer groups, partitioning &amp; ordering</li>
+          <li>Delivery semantics: at-most / at-least / exactly-once</li>
+          <li>Dead letter queues, retries, idempotent consumers</li>
+          <li>Event sourcing, CQRS, the Saga pattern</li>
+          <li>Batch vs stream processing, CDC, Lambda/Kappa architectures</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Choose a Kafka partition key that preserves per-user ordering</li>
+          <li>Idempotent consumer: make at-least-once behave like exactly-once</li>
+          <li>Saga to roll back an order → payment → inventory flow</li>
+          <li>DLQ + retry/backoff policy for a flaky email-send worker</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 6</span>
+        <span class="week-head"><h3>Consistency &amp; Distributed Systems</h3><p>The hard part — agreement under failure</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>Consistency models: strong, eventual, causal, read-your-writes</li>
+          <li>ACID vs BASE, transactions, two-phase commit</li>
+          <li>Quorums (R + W &gt; N), conflict resolution, vector clocks</li>
+          <li>Consensus: Raft &amp; Paxos (leader election, log replication)</li>
+          <li>Replication strategies, hinted handoff, anti-entropy</li>
+          <li>Fault tolerance, split-brain, fencing tokens</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Quorum math: tune R / W / N for read-heavy vs write-heavy</li>
+          <li>Read-your-writes for a "post then refresh" timeline</li>
+          <li>Walk through Raft leader election (3 vs 5 nodes, split vote)</li>
+          <li>Fencing token to stop a zombie lock-holder after a GC pause</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 7</span>
+        <span class="week-head"><h3>Scalability, Security &amp; Observability</h3><p>Scaling out, locking down, seeing inside</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>Sharding strategies &amp; consistent hashing</li>
+          <li>Rate limiting algorithms, backpressure, auto-scaling</li>
+          <li>Bloom filters &amp; probabilistic data structures</li>
+          <li>Auth: sessions, JWT, OAuth2, token rotation</li>
+          <li>Encryption in transit &amp; at rest, secrets management</li>
+          <li>Logs, metrics, traces · SLO/SLA · alerting pipelines</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Consistent hashing: add a cache node without re-keying everything</li>
+          <li>Token bucket vs sliding window for an API rate limiter</li>
+          <li>Bloom filter to skip disk lookups for "is this username taken?"</li>
+          <li>JWT vs server session — what to safely put inside the token</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 8</span>
+        <span class="week-head"><h3>Capstone, AI Systems &amp; Interview Mastery</h3><p>Put it all together and perform under pressure</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Building Blocks</h4><ul class="wb-list">
+          <li>Modern AI systems: LLM serving, RAG, vector search, AI gateways, guardrails</li>
+          <li>The key numbers cheat sheet for fast estimation</li>
+          <li>Decision flowcharts: which DB? which cache? which queue? sync vs async?</li>
+          <li>How to communicate, drive, and handle curveballs in the interview</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Apply &amp; Discuss</h4><ul class="wb-list">
+          <li>Rate-limit an LLM API by <em>tokens</em>, not requests (weighted token bucket)</li>
+          <li>Vector search: HNSW vs IVF tradeoffs for 1B embeddings</li>
+          <li><strong>Capstone:</strong> design a full product end-to-end (Uber / Netflix / Twitter)</li>
+          <li>Live mock interviews with feedback &amp; scoring</li>
+        </ul></div>
+      </div></div>
+    </details>
+  </section>
+
+  <!-- ── OUTCOMES ── -->
+  <section class="course-section">
+    <h2 class="sec-title">What you'll walk away with</h2>
+    <p class="sec-lead">By week 8, system design stops being scary and starts being a structured conversation you lead.</p>
+    <div class="outcomes">
+      <div class="outcome"><span class="ic">✓</span><span>Drive <b>any</b> open-ended design question with a repeatable framework — no more blanking.</span></div>
+      <div class="outcome"><span class="ic">✓</span><span>Instantly do <b>capacity estimation</b> and justify every component with real tradeoffs.</span></div>
+      <div class="outcome"><span class="ic">✓</span><span>Confidently pick the right <b>database, cache, and queue</b> for any scenario.</span></div>
+      <div class="outcome"><span class="ic">✓</span><span>Explain <b>consistency, replication, and consensus</b> like you've shipped them.</span></div>
+      <div class="outcome"><span class="ic">✓</span><span>Design <b>FAANG-scale systems</b> — chat, feed, rideshare, payments, streaming.</span></div>
+      <div class="outcome"><span class="ic">✓</span><span>Walk into <b>Staff/Senior interviews</b> calm, structured, and senior-sounding.</span></div>
+    </div>
+  </section>
+
+  <!-- ── AUDIENCE ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Is this for you?</h2>
+    <div class="aud-grid">
+      <div class="aud for">
+        <h3>✓ Perfect if you're…</h3>
+        <ul>
+          <li>A SWE with 2–10 yrs experience prepping for FAANG/MAANG</li>
+          <li>Targeting a Senior / Staff Engineer role</li>
+          <li>Strong at coding but shaky on open-ended design</li>
+          <li>Tired of passive videos and want to actually practice</li>
+          <li>Returning to interviews after a few years and rusty</li>
+        </ul>
+      </div>
+      <div class="aud notfor">
+        <h3>✕ Not for you if…</h3>
+        <ul>
+          <li>You want a quick "templates to memorize" hack</li>
+          <li>You can't commit ~8 hours per weekend for 8 weeks</li>
+          <li>You're looking for pure LeetCode/DSA coaching</li>
+          <li>You expect to learn by watching, not by doing</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BONUSES ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Everything included</h2>
+    <p class="sec-lead">No upsells. One price, full access.</p>
+    <div class="bonus-grid">
+      <div class="bonus"><div class="bic">🎥</div><h4>16 Live Sessions</h4><p>Every Sat &amp; Sun for 8 weeks, fully recorded if you miss one.</p></div>
+      <div class="bonus"><div class="bic">🧩</div><h4>218 Practice Problems</h4><p>Full access to the HelloSDE problem bank to keep drilling.</p></div>
+      <div class="bonus"><div class="bic">📚</div><h4>16-Module Cheatsheet</h4><p>Every concept distilled with 300+ visual diagrams for revision.</p></div>
+      <div class="bonus"><div class="bic">🎯</div><h4>Live Mock Interviews</h4><p>Real interview simulation with structured feedback &amp; scoring.</p></div>
+      <div class="bonus"><div class="bic">💬</div><h4>Mentor Access</h4><p>Direct doubt-clearing over the cohort group — never stay stuck.</p></div>
+      <div class="bonus"><div class="bic">🏆</div><h4>Capstone Review</h4><p>Design a full system end-to-end and get it reviewed 1:1.</p></div>
+    </div>
+  </section>
+
+  <!-- ── TESTIMONIALS (sample) ── -->
+  <section class="course-section">
+    <h2 class="sec-title">What learners say</h2>
+    <div class="tst-grid">
+      <div class="tst"><p>"The learn-then-apply format is the only thing that made design click for me. I went from dreading the round to actually enjoying it."</p><div class="who"><div class="ava">AR</div><div><b>Arjun R.</b><span>SDE-2 → Senior, fintech</span></div></div></div>
+      <div class="tst"><p>"I'd watched every YouTube playlist. This was different — I was forced to design every weekend. Cleared my Staff loop two months later."</p><div class="who"><div class="ava">PK</div><div><b>Priya K.</b><span>Senior → Staff, product company</span></div></div></div>
+      <div class="tst"><p>"The roadmap sequence is genius. Each weekend built on the last, so by week 8 the 'big' problems felt easy."</p><div class="who"><div class="ava">SV</div><div><b>Sandeep V.</b><span>Backend engineer, 6 yrs</span></div></div></div>
+      <div class="tst"><p>"Worth every rupee. The estimation and tradeoff drills alone changed how I talk in interviews."</p><div class="who"><div class="ava">MN</div><div><b>Meera N.</b><span>SDE-3, e-commerce</span></div></div></div>
+    </div>
+  </section>
+
+  <!-- ── PRICING / ENROLL ── -->
+  <section class="course-section" id="enroll">
+    <h2 class="sec-title" style="text-align:center">Reserve your seat</h2>
+    <p class="sec-lead" style="text-align:center">Small cohort · personal attention · limited seats.</p>
+    <div class="urgency">🔥 <b>Next batch starts July 18</b> · seats fill fast — enroll early to lock your spot</div>
+    <div class="price-card">
+      <span class="price-batch">Next Batch · July 18</span>
+      <div class="price-amt"><span class="cur">₹</span>39,999</div>
+      <div class="price-note">One-time · all 8 weekends + recordings + problem bank</div>
+      <ul class="price-includes">
+        <li>16 live sessions (Sat &amp; Sun, 9AM–1PM)</li>
+        <li>Learn-then-apply format with real design problems</li>
+        <li>Capstone end-to-end design + 1:1 review</li>
+        <li>Live mock interviews with feedback</li>
+        <li>Full problem bank + 16-module cheatsheet access</li>
+        <li>Session recordings &amp; direct mentor access</li>
+      </ul>
+      <button class="btn-pay" style="width:100%;justify-content:center" onclick="window.HelloSDE ? window.HelloSDE.enrollCourse() : alert('Loading…')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Enroll Now — Pay Securely <span class="pay-sec">🔒 Razorpay</span></button>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Frequently asked</h2>
+    <details class="faq"><summary>I work full-time. Can I keep up?</summary><div class="faq-body">Yes — that's exactly why it's weekend-only (Sat &amp; Sun, 9AM–1PM). Sessions are recorded, so if you miss one you can catch up. Expect ~2–3 hours of optional practice between weekends.</div></details>
+    <details class="faq"><summary>Do I need prior system design experience?</summary><div class="faq-body">No. We start from foundations and build up in sequence. You do need to be comfortable as a working software engineer (any backend/full-stack background is ideal).</div></details>
+    <details class="faq"><summary>Is it live or recorded?</summary><div class="faq-body">100% live and interactive — you design alongside the instructor and get real-time feedback. Recordings are provided for revision and missed sessions.</div></details>
+    <details class="faq"><summary>What if I miss a weekend?</summary><div class="faq-body">You'll get the recording and can ask doubts in the cohort group. The learn-then-apply structure means you can self-practice the applied problem and review in the next session.</div></details>
+    <details class="faq"><summary>Will this help for non-FAANG interviews too?</summary><div class="faq-body">Absolutely. The building blocks are universal — they apply to product companies, startups, and on-the-job architecture decisions, not just FAANG loops.</div></details>
+    <details class="faq"><summary>How do I pay / enroll?</summary><div class="faq-body">Tap any "Enroll" button to message us on WhatsApp. We'll confirm your seat and share the payment link and onboarding details.</div></details>
+  </section>
+
+  <!-- ── FINAL CTA ── -->
+  <section class="course-section" style="text-align:center">
+    <h2 class="sec-title" style="text-align:center">Eight weekends from now…</h2>
+    <p class="sec-lead" style="text-align:center;max-width:620px;margin-left:auto;margin-right:auto">…you could be the candidate who calmly draws the architecture while everyone else recites templates. The next batch starts <strong style="color:var(--text)">July 18</strong>.</p>
+    <div class="course-cta-row">
+      <button class="btn-pay" onclick="window.HelloSDE ? window.HelloSDE.enrollCourse() : alert('Loading…')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Claim your seat — ₹39,999 <span class="pay-sec">🔒 Razorpay</span></button>
+    </div>
+  </section>
+
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/header.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

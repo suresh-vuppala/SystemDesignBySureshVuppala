@@ -31,6 +31,14 @@ var CONFIG = {
     name: "HelloSDE",
     description: "Premium Access — Full System Design Content",
     theme: { color: "#6c8cff" }
+  },
+  course: {
+    id: "master-system-design",
+    amount: 3999900,           // ₹39,999 in paise
+    currency: "INR",
+    name: "HelloSDE",
+    description: "Master System Design — 8-Week Live Cohort (July 18 batch)",
+    batch: "2025-07-18"
   }
 };
 
@@ -55,6 +63,31 @@ var state = {
   isPremium: false,
   loaded: false
 };
+
+// ═══ ENVIRONMENT CHECK ═══
+// Firebase Auth requires http/https/chrome-extension and web storage.
+// Opening the page directly from disk (file://) breaks sign-in.
+function getEnvIssue(){
+  var proto = location.protocol;
+  if(proto !== 'http:' && proto !== 'https:' && proto !== 'chrome-extension:'){
+    return 'This page is open directly from your computer (' + proto + '//), '
+      + 'and Google sign-in only works over http/https.\n\n'
+      + 'Run a local server from the project folder, then open the site there:\n'
+      + '    npm run dev\n'
+      + '    → http://localhost:8000\n\n'
+      + 'Or use the deployed https:// link.';
+  }
+  // Verify web storage is available (private mode / blocked cookies disable it)
+  try {
+    var k = '__hsde_test__';
+    window.localStorage.setItem(k, '1');
+    window.localStorage.removeItem(k);
+  } catch(e){
+    return 'Browser storage is disabled, so sign-in can\'t work. '
+      + 'Enable cookies/site data (or leave private browsing) and try again.';
+  }
+  return null;
+}
 
 // ═══ PREMIUM CONTENT DEFINITION ═══
 // Pages/sections that require premium (section IDs within concept pages)
@@ -513,6 +546,11 @@ function injectStyles(){
 window.HelloSDE = {
   signIn: function(){
     // Firebase Google Sign-In
+    var envIssue = getEnvIssue();
+    if(envIssue){
+      alert(envIssue);
+      return;
+    }
     if(!firebaseReady){
       alert('Firebase not loaded. Please refresh the page.');
       return;
@@ -637,6 +675,143 @@ window.HelloSDE = {
     })
     .catch(function(err){
       alert('Error starting payment. Please try again.');
+    });
+  },
+
+  // ═══ Course enrollment payment (Master System Design — ₹39,999) ═══
+  enrollCourse: function(){
+    // Fall back to Firebase's live session in case auth state hasn't synced to `state` yet
+    if(!state.user && firebaseReady && firebase.auth){
+      state.user = firebase.auth().currentUser;
+    }
+    if(!state.user){
+      // Not signed in → show Google sign-in first, then continue to payment
+      var envIssue = getEnvIssue();
+      if(envIssue){
+        alert(envIssue);
+        return;
+      }
+      if(!firebaseReady || !firebase.auth){
+        alert('Sign-in is not available right now. Please refresh and try again.');
+        return;
+      }
+      var provider = new firebase.auth.GoogleAuthProvider();
+      firebase.auth().signInWithPopup(provider).then(function(result){
+        state.user = result.user;
+        // Set session cookie, then open the payment directly (no reload needed)
+        result.user.getIdToken().then(function(token){
+          document.cookie = 'hellosde_session=' + token + ';path=/;max-age=3600;SameSite=Lax';
+          window.HelloSDE._openCoursePayment();
+        }).catch(function(){
+          window.HelloSDE._openCoursePayment();
+        });
+      }).catch(function(err){
+        // User dismissed the sign-in popup — do nothing
+        if(err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+        alert('Sign-in failed: ' + err.message);
+      });
+      return;
+    }
+    // Already signed in → go straight to payment
+    window.HelloSDE._openCoursePayment();
+  },
+
+  // Opens the Razorpay checkout for the course (assumes user is signed in)
+  _openCoursePayment: function(){
+    if(!state.user){ window.HelloSDE.enrollCourse(); return; }
+    if(typeof Razorpay === 'undefined'){
+      alert('Payment system not loaded. Please refresh the page.');
+      return;
+    }
+
+    // Step 1: Create order via backend (same endpoint, course amount)
+    fetch('/api/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: CONFIG.course.amount,
+        currency: CONFIG.course.currency,
+        receipt: 'course_' + Date.now(),
+        notes: { uid: state.user.uid, email: state.user.email, course: CONFIG.course.id, batch: CONFIG.course.batch }
+      })
+    })
+    .then(function(res){ return res.json(); })
+    .then(function(order){
+      if(!order.order_id){
+        alert('Failed to create order. Please try again.');
+        return;
+      }
+
+      // Step 2: Open Razorpay checkout modal
+      var options = {
+        key: CONFIG.razorpay.key,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: CONFIG.course.name,
+        description: CONFIG.course.description,
+        prefill: {
+          email: state.user.email,
+          name: state.user.displayName
+        },
+        notes: { uid: state.user.uid, course: CONFIG.course.id, batch: CONFIG.course.batch },
+        theme: CONFIG.razorpay.theme,
+        handler: function(response){
+          // Step 3: Verify payment signature via backend
+          fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          })
+          .then(function(res){ return res.json(); })
+          .then(function(result){
+            if(result.verified){
+              // Payment verified — record course enrollment in Firestore
+              if(firebaseReady && firebase.firestore){
+                firebase.firestore().collection('courseEnrollments').doc(state.user.uid).set({
+                  email: state.user.email,
+                  name: state.user.displayName,
+                  course: CONFIG.course.id,
+                  batch: CONFIG.course.batch,
+                  amountPaid: CONFIG.course.amount,
+                  enrolledAt: new Date().toISOString(),
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpayOrderId: response.razorpay_order_id
+                }, {merge: true}).then(function(){
+                  try { localStorage.removeItem('hellosde_pending_enroll'); } catch(e){}
+                  alert('🎉 You\'re enrolled in Master System Design (July 18 batch)! We\'ll email onboarding details shortly. Tap OK to message us on WhatsApp for confirmation.');
+                  window.open('https://wa.me/919100880133?text=Hi!%20I%20just%20enrolled%20in%20Master%20System%20Design%20(July%2018%20batch).%20Payment%20ID:%20' + encodeURIComponent(response.razorpay_payment_id), '_blank');
+                }).catch(function(){
+                  alert('Payment received (ID: ' + response.razorpay_payment_id + '). If you don\'t get a confirmation email, please message us on WhatsApp with this Payment ID.');
+                });
+              } else {
+                alert('Payment received (ID: ' + response.razorpay_payment_id + '). Please message us on WhatsApp with this Payment ID to confirm your seat.');
+              }
+            } else {
+              alert('Payment verification failed. Please contact support with your payment reference.');
+            }
+          })
+          .catch(function(){
+            alert('Payment verification error. Please contact support.');
+          });
+        },
+        modal: {
+          ondismiss: function(){ /* user closed modal */ }
+        }
+      };
+
+      var rzp = new Razorpay(options);
+      rzp.on('payment.failed', function(response){
+        alert('Payment failed: ' + response.error.description);
+      });
+      rzp.open();
+    })
+    .catch(function(err){
+      alert('Error starting enrollment. Please try again.');
     });
   },
 

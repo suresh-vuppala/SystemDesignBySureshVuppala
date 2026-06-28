@@ -852,7 +852,7 @@ document.querySelectorAll('.prob-expand').forEach(function(row){
       el.textContent = phrase.substring(0, charIdx);
       if(charIdx === 0){ deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; pauseEnd = now + 400; }
     }
-    setTimeout(tick, deleting &#x2192; 30 : 50);
+    setTimeout(tick, deleting ? 30 : 50);
   }
   setTimeout(tick, 600);
 })();

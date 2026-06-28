@@ -110,6 +110,8 @@
   .hero-left{padding:32px 24px}
   .hero-left h1{text-align:center;font-size:1.8rem}
   .hero-left .tagline{text-align:center}
+  .hero-hook{text-align:center;margin-left:auto;margin-right:auto}
+  .hero-trust{justify-content:center}
   .hero-cta{justify-content:center}
   .hero-right{flex:0 0 auto;width:100%;border-left:none;border-top:1px solid var(--border);padding:24px}
 }
@@ -127,15 +129,49 @@
 </style>
 
 <!-- ═══ HERO ═══ -->
+<style>
+.hero-livebadge{display:inline-flex;align-items:center;gap:7px;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#ff5a5a;background:rgba(255,59,59,.10);border:1px solid rgba(255,59,59,.28);padding:5px 12px;border-radius:999px;margin-bottom:14px}
+.lc-dot{position:relative;display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff3b3b}
+.lc-dot::before,.lc-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:#ff3b3b}
+.lc-dot::before{animation:livePulse 1.8s ease-out infinite}
+.lc-dot::after{animation:livePulse 1.8s ease-out .9s infinite}
+@media(prefers-reduced-motion:reduce){.lc-dot::before,.lc-dot::after{animation:none}}
+.hero-desc{color:var(--text-2);font-size:.9rem;line-height:1.6;margin-top:12px;text-align:left;max-width:480px}
+.hero-desc strong{color:#fff}
+.hero-hook{color:var(--text);font-size:1rem;line-height:1.6;margin-top:14px;text-align:left;max-width:520px}
+.hero-hook strong{color:#fff;font-weight:700}
+.hero-trust{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:18px}
+.hero-trust .ht-item{font-size:.8rem;color:var(--muted)}
+.hero-trust .ht-item b{color:#fff;font-weight:700}
+.hero-trust .ht-dot{color:var(--border);font-weight:700}
+.course-facts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:2px 0 14px;position:relative}
+.course-facts span{font-size:.64rem;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:5px 9px}
+.course-facts b{color:#fff}
+.fc-btn-link{display:block;width:100%;text-align:center;padding:12px;border-radius:8px;background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-weight:700;font-size:.85rem;text-decoration:none;transition:transform .15s,box-shadow .15s;position:relative}
+.fc-btn-link:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(154,119,212,.32);text-decoration:none;color:#fff}
+</style>
 <div class="home-hero">
   <div class="hero-split">
     <div class="hero-left">
-      <h1>Master <span>System Design</span><br>for Top Tech Interviews</h1>
+      <span class="hero-livebadge"><span class="lc-dot"></span>Live Cohort · Next Batch July 18 · 🔥 Filling fast</span>
+      <h1>Crack the <span>System Design</span> Round at Top Tech Companies</h1>
+      <p class="hero-hook">Stop memorizing answers. Learn to <strong>think in systems</strong> — and walk into your next interview ready to design anything they throw at you.</p>
       <p class="tagline">
         <span id="hero-typed"></span><span class="typed-cursor">|</span>
       </p>
+      <div class="hero-trust">
+        <span class="ht-item"><b>⭐ 4.9/5</b> learner rating</span>
+        <span class="ht-dot">·</span>
+        <span class="ht-item"><b>500+</b> engineers trained</span>
+        <span class="ht-dot">·</span>
+        <span class="ht-item"><b>8 weeks</b> · weekends only</span>
+      </div>
+      <div class="hero-cta">
+        <a href="master-system-design.html" class="primary">View Course &amp; Enroll →</a>
+        <a href="realtime-system-design-problems/index.html" class="secondary">Browse Problems Free →</a>
+      </div>
       <div class="hero-logos">
-        <span class="hero-logos-label">Built for Senior engineers at</span>
+        <span class="hero-logos-label">Built for engineers targeting</span>
         <div class="hero-logos-row">
           <span class="hero-logo-text">Google</span>
           <span class="hero-logo-text">Meta</span>
@@ -144,28 +180,6 @@
           <span class="hero-logo-text">Uber</span>
           <span class="hero-logo-text">Microsoft</span>
         </div>
-      </div>
-      <div class="hero-cta">
-        <a href="system-design-cheatsheet/01-foundations.html" class="primary">Start Learning →</a>
-        <a href="realtime-system-design-problems/index.html" class="secondary">Browse Problems →</a>
-      </div>
-    </div>
-    <div class="hero-right">
-      <div class="fc-card">
-        <div class="fc-badge">Premium Access</div>
-        <h3 class="fc-title">Unlock Full System Design Content</h3>
-        <div class="fc-pricing">
-          <span class="fc-price">₹2,500</span>
-          <span class="fc-period">one-time</span>
-        </div>
-        <div class="fc-stats">
-          <div class="fc-stat"><span class="fc-stat-num">16</span><span class="fc-stat-label">Modules</span></div>
-          <div class="fc-stat"><span class="fc-stat-num">201</span><span class="fc-stat-label">Problems</span></div>
-          <div class="fc-stat"><span class="fc-stat-num">29</span><span class="fc-stat-label">Systems</span></div>
-          <div class="fc-stat"><span class="fc-stat-num">300+</span><span class="fc-stat-label">Diagrams</span></div>
-        </div>
-        <button class="fc-btn" onclick="window.HelloSDE ? window.HelloSDE.startPayment() : alert('Loading...')">Enroll Now →</button>
-        <div style="margin-top:14px;font-size:.62rem;color:var(--muted);position:relative;letter-spacing:.2px">500+ engineers enrolled · Lifetime updates · No subscription</div>
       </div>
     </div>
   </div>
