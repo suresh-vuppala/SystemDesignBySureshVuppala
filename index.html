@@ -1,59 +1,337 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>System Design Reference — HelloSDE</title>
-<link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="stylesheet" href="../css/style.css">
+<title>HelloSDE — Master System Design · 8-Week Live Cohort</title>
+<meta name="description" content="Learn system design by doing. An 8-week live weekend cohort where every building block is followed by a real-world design walkthrough — until it becomes instinct. Next batch Sep 18.">
+<meta name="keywords" content="system design course, live cohort, system design bootcamp, FAANG interview prep, distributed systems, staff engineer interview, senior engineer">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://hellosde.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hellosde.com/">
+<meta property="og:title" content="Master System Design — 8-Week Live Cohort · HelloSDE">
+<meta property="og:description" content="Learn a building block, then immediately apply it. 8 weekends, live. Next batch Sep 18.">
+
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/style.css">
+
+<style>
+/* ── Landing page — course-focused ───────────────────────── */
+.lp-hero{
+  padding:60px 24px 52px;text-align:center;
+  background:var(--brand-soft);
+  border-bottom:1px solid var(--border);
+}
+.lp-kicker{
+  display:inline-block;
+  font-size:var(--fs-2xs);font-weight:700;
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--brand);background:var(--bg);
+  border:1px solid var(--brand-border);
+  padding:6px 14px;border-radius:2px;margin-bottom:20px;
+}
+.lp-hero h1{
+  font-size:var(--fs-3xl);font-weight:700;
+  letter-spacing:var(--ls-tight);line-height:var(--lh-tight);
+  color:var(--text);
+  margin:0 auto 16px;max-width:840px;
+}
+.lp-hero h1 .u{
+  border-bottom:3px solid var(--brand);padding-bottom:4px;
+}
+.lp-hero p.lp-sub{
+  font-size:var(--fs-lg);color:var(--text-2);
+  line-height:var(--lh-loose);
+  max-width:680px;margin:0 auto;
+}
+.lp-hero p.lp-sub strong{color:var(--text)}
+
+.lp-cta-row{
+  display:flex;flex-wrap:wrap;gap:12px;
+  justify-content:center;margin-top:28px;
+}
+.lp-btn-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:13px 26px;border-radius:3px;
+  border:1px solid var(--brand);background:var(--brand);
+  color:var(--brand-fg);font-weight:700;font-size:var(--fs-sm);
+  text-decoration:none;
+  transition:background-color .12s,border-color .12s,transform .12s,box-shadow .12s;
+  box-shadow:0 3px 12px rgba(201,74,12,.22);
+}
+.lp-btn-primary:hover{
+  background:var(--brand-2);border-color:var(--brand-2);
+  transform:translateY(-1px);box-shadow:0 5px 18px rgba(201,74,12,.3);
+  text-decoration:none;
+}
+.lp-btn-secondary{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:13px 22px;border-radius:3px;
+  border:1px solid var(--border-strong);background:transparent;
+  color:var(--text);font-weight:600;font-size:var(--fs-sm);
+  text-decoration:none;transition:background-color .12s;
+}
+.lp-btn-secondary:hover{background:var(--card-2);text-decoration:none}
+
+.lp-facts{
+  display:flex;justify-content:center;flex-wrap:wrap;
+  gap:14px;margin-top:32px;max-width:900px;
+  margin-left:auto;margin-right:auto;
+}
+.lp-fact{
+  flex:1;min-width:150px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:14px 16px;text-align:left;
+}
+.lp-fact-label{
+  font-size:var(--fs-2xs);text-transform:uppercase;
+  letter-spacing:var(--ls-caps);color:var(--muted);
+  margin-bottom:4px;
+}
+.lp-fact-value{
+  font-size:var(--fs-sm);font-weight:700;color:var(--text);
+}
+.lp-hero-trust{
+  margin-top:26px;font-size:var(--fs-xs);color:var(--muted);
+}
+.lp-hero-trust b{color:var(--text);font-weight:700}
+
+/* ── Section shell ────────────────────────────────────────── */
+.lp-section{
+  max-width:1080px;margin:0 auto;
+  padding:60px 24px;
+}
+.lp-section-title{
+  font-size:var(--fs-xl);font-weight:700;
+  letter-spacing:var(--ls-tight);line-height:var(--lh-tight);
+  color:var(--text);margin:0 0 8px;text-align:center;
+}
+.lp-section-lead{
+  font-size:var(--fs-md);color:var(--muted);
+  text-align:center;max-width:660px;
+  margin:0 auto 36px;line-height:var(--lh-normal);
+}
+
+/* ── Course value props ───────────────────────────────────── */
+.lp-value-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;
+}
+.lp-value-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:6px;padding:22px 20px;
+  transition:border-color .14s,transform .14s;
+}
+.lp-value-card:hover{
+  border-color:var(--border-strong);
+  transform:translateY(-1px);
+}
+.lp-value-num{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;
+  color:var(--brand);letter-spacing:var(--ls-caps);
+  margin-bottom:10px;
+}
+.lp-value-card h3{
+  font-size:var(--fs-md);font-weight:700;color:var(--text);
+  margin:0 0 6px;line-height:var(--lh-tight);
+}
+.lp-value-card p{
+  font-size:var(--fs-sm);color:var(--text-2);
+  line-height:var(--lh-loose);margin:0;
+}
+
+.lp-section-cta{text-align:center;margin-top:36px}
+
+/* ── Free resources ───────────────────────────────────────── */
+.lp-free-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:16px;
+}
+.lp-free-card{
+  display:flex;flex-direction:column;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:6px;padding:24px;
+  text-decoration:none;color:var(--text);
+  transition:border-color .14s,transform .14s,box-shadow .14s;
+}
+.lp-free-card:hover{
+  border-color:var(--brand);
+  transform:translateY(-2px);
+  box-shadow:0 4px 14px rgba(201,74,12,.08);
+  text-decoration:none;
+}
+[data-theme="dark"] .lp-free-card:hover{
+  box-shadow:0 4px 14px rgba(0,0,0,.4);
+}
+.lp-free-card h3{
+  font-size:var(--fs-lg);font-weight:700;color:var(--text);
+  margin:0;letter-spacing:var(--ls-tight);line-height:var(--lh-tight);
+}
+.lp-free-card p{
+  font-size:var(--fs-sm);color:var(--text-2);
+  line-height:var(--lh-normal);margin:0;flex:1;
+}
+.lp-free-cta{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:var(--fs-sm);font-weight:600;
+  color:var(--link);margin-top:auto;
+  text-decoration:underline;text-underline-offset:2px;
+}
+
+/* ── Divider ──────────────────────────────────────────────── */
+.lp-divider{
+  max-width:1080px;margin:0 auto;
+  border-top:1px solid var(--border);
+}
+
+/* ── Bottom CTA ───────────────────────────────────────────── */
+.lp-bottom-cta{
+  background:var(--brand-soft);
+  border-top:1px solid var(--brand-border);
+  padding:56px 24px 60px;text-align:center;
+}
+.lp-bottom-cta h2{
+  font-size:var(--fs-xl);font-weight:700;color:var(--text);
+  letter-spacing:var(--ls-tight);line-height:var(--lh-tight);
+  margin:0 0 12px;
+}
+.lp-bottom-cta p{
+  font-size:var(--fs-md);color:var(--text-2);
+  max-width:560px;margin:0 auto 24px;
+  line-height:var(--lh-loose);
+}
+.lp-bottom-cta p b{color:var(--text)}
+
+@media(max-width:640px){
+  .lp-hero{padding:44px 16px 40px}
+  .lp-hero h1{font-size:var(--fs-2xl)}
+  .lp-hero p.lp-sub{font-size:var(--fs-md)}
+  .lp-facts{gap:10px}
+  .lp-fact{min-width:130px;padding:12px 14px}
+  .lp-section{padding:44px 16px}
+  .lp-bottom-cta{padding:44px 16px 48px}
+  .lp-section-title,.lp-bottom-cta h2{font-size:var(--fs-lg)}
+}
+</style>
 </head>
 <body>
-<div class="hero" id="top"><h1><span>System Design Reference</span></h1><p><span id="hero-typed"></span><span class="typed-cursor" style="color:var(--a,#6c8cff);font-weight:300;animation:blink .8s step-end infinite">|</span></p></div>
 
+<!-- ── HERO — course-focused ── -->
+<section class="lp-hero">
+  <span class="lp-kicker">Live Cohort · 8 Weekends · Small Group</span>
+  <h1>Master <span class="u">System Design</span> in 8 Weekends</h1>
+  <p class="lp-sub">Stop memorizing templates. Start designing real systems. A hands-on live cohort where every building block is followed by a real-world design walkthrough — <strong>until it becomes instinct.</strong></p>
+
+  <div class="lp-cta-row">
+    <a href="master-system-design.html" class="lp-btn-primary">Enroll in the Live Course ›</a>
+    <a href="system-design-cheatsheet/01-foundations.html" class="lp-btn-secondary">Explore Free Reference</a>
+  </div>
+
+  <div class="lp-facts">
+    <div class="lp-fact">
+      <div class="lp-fact-label">Next Batch</div>
+      <div class="lp-fact-value">Sep 18</div>
+    </div>
+    <div class="lp-fact">
+      <div class="lp-fact-label">Duration</div>
+      <div class="lp-fact-value">8 Weekends</div>
+    </div>
+    <div class="lp-fact">
+      <div class="lp-fact-label">Format</div>
+      <div class="lp-fact-value">Sat &amp; Sun · 9AM–1PM</div>
+    </div>
+    <div class="lp-fact">
+      <div class="lp-fact-label">Investment</div>
+      <div class="lp-fact-value">₹39,999</div>
+    </div>
+  </div>
+
+  <p class="lp-hero-trust">Built by an engineer who&rsquo;s <b>designed systems at scale</b> · 16 modules · 30+ real problems · 300+ diagrams</p>
+</section>
+
+<!-- ── COURSE VALUE PROPS ── -->
+<section class="lp-section">
+  <h2 class="lp-section-title">Why this cohort works</h2>
+  <p class="lp-section-lead">Passive tutorials don&rsquo;t transfer to the whiteboard. This course is built on the pattern that actually sticks: <strong>learn a building block, immediately apply it</strong>.</p>
+
+  <div class="lp-value-grid">
+    <div class="lp-value-card">
+      <div class="lp-value-num">01</div>
+      <h3>Learn + Apply, weekly</h3>
+      <p>Each weekend introduces a system design building block, then you use it live on a real design problem — with feedback.</p>
+    </div>
+    <div class="lp-value-card">
+      <div class="lp-value-num">02</div>
+      <h3>Real designs, not templates</h3>
+      <p>Walk through how Instagram, Uber, WhatsApp, and Discord actually work — not toy examples or memorized scripts.</p>
+    </div>
+    <div class="lp-value-card">
+      <div class="lp-value-num">03</div>
+      <h3>Small live cohort</h3>
+      <p>Not a recorded course. Limited seats, live discussion, personal feedback on your designs every session.</p>
+    </div>
+    <div class="lp-value-card">
+      <div class="lp-value-num">04</div>
+      <h3>Staff-level thinking</h3>
+      <p>Learn to reason about tradeoffs, capacity, consistency, and failure like an engineer who has shipped at scale.</p>
+    </div>
+  </div>
+
+  <div class="lp-section-cta">
+    <a href="master-system-design.html" class="lp-btn-primary">See the full 8-week roadmap ›</a>
+  </div>
+</section>
+
+<div class="lp-divider"></div>
+
+<!-- ── FREE RESOURCES ── -->
+<section class="lp-section">
+  <h2 class="lp-section-title">Free resources to get started</h2>
+  <p class="lp-section-lead">Not ready for the cohort yet? Start with these — the same material we build on in the live sessions.</p>
+
+  <div class="lp-free-grid">
+    <a href="system-design-cheatsheet/01-foundations.html" class="lp-free-card">
+      <h3>16-Module Concept Reference</h3>
+      <p>Networking, storage, caching, messaging, consistency, scalability, distributed systems, observability, AI — every building block explained visually.</p>
+      <span class="lp-free-cta">Start reading ›</span>
+    </a>
+    <a href="realtime-system-design-problems/index.html" class="lp-free-card">
+      <h3>30+ Real-World Case Studies</h3>
+      <p>How Discord holds 10M WebSockets, how Slack fans out messages, how Uber matches rides at scale — deep architecture walkthroughs.</p>
+      <span class="lp-free-cta">Browse problems ›</span>
+    </a>
+    <a href="system-design-cheatsheet/engineering-blogs.html" class="lp-free-card">
+      <h3>Curated Engineering Blogs</h3>
+      <p>The best posts from Netflix, Uber, Stripe, Airbnb, Discord and more — categorized by domain and hand-picked for interview relevance.</p>
+      <span class="lp-free-cta">Explore blogs ›</span>
+    </a>
+  </div>
+</section>
+
+<!-- ── BOTTOM CTA ── -->
+<section class="lp-bottom-cta">
+  <h2>Seats fill fast. Next batch: <b>Sep 18</b>.</h2>
+  <p>Small live cohort, weekend sessions, personal attention on every design you build. Lock your seat before it&rsquo;s gone.</p>
+  <div class="lp-cta-row">
+    <a href="master-system-design.html" class="lp-btn-primary">Enroll in Master System Design · ₹39,999 ›</a>
+  </div>
+</section>
+
+<!-- ── Back-to-top ── -->
 <button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
-<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
 <script>
-// Show first module lesson as default — redirect to Foundations
-location.replace('01-foundations.html');
+  var _tb = document.getElementById('topBtn');
+  window.addEventListener('scroll', function(){
+    _tb.style.display = window.scrollY > 400 ? 'flex' : 'none';
+  });
 </script>
-<script src="../js/header.js"></script>
-<script src="../js/nav-cheatsheet.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<script src="../js/live-course.js"></script>
-<script src="../js/auth.js"></script>
-<script>
-// Typing effect for hero tagline
-(function(){
-  var phrases = [
-    'No fluff, no long blogs — straight to the point, easy to grasp.',
-    'Visual diagrams that make concepts click instantly.',
-    '16 modules covering everything from APIs to distributed systems.',
-    'Interview-ready in days, not months.'
-  ];
-  var el = document.getElementById('hero-typed');
-  if(!el) return;
-  var phraseIdx = 0, charIdx = 0, deleting = false, pauseEnd = 0;
-  function tick(){
-    var phrase = phrases[phraseIdx];
-    var now = Date.now();
-    if(now < pauseEnd){ requestAnimationFrame(tick); return; }
-    if(!deleting){
-      charIdx++;
-      el.textContent = phrase.substring(0, charIdx);
-      if(charIdx === phrase.length){ deleting = true; pauseEnd = now + 2000; }
-    } else {
-      charIdx--;
-      el.textContent = phrase.substring(0, charIdx);
-      if(charIdx === 0){ deleting = false; phraseIdx = (phraseIdx + 1) % phrases.length; pauseEnd = now + 400; }
-    }
-    setTimeout(tick, deleting ? 30 : 50);
-  }
-  setTimeout(tick, 600);
-})();
-</script>
-<style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}.typed-cursor{animation:blink .8s step-end infinite}</style>
+
+<!-- Shared header + footer + theme toggle -->
+<script src="js/header.js"></script>
 
 </body>
 </html>
