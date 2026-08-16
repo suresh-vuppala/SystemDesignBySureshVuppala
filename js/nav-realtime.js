@@ -38,37 +38,35 @@ var modules = [
   {name:'AI/LLM', full:'29. AI &amp; LLM Systems', href:'29-ai-systems.html', anchor:'#mod-ai', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)', color:'var(--g)'}
 ];
 
-// Inject styles
+// Inject styles (monochrome; uses theme tokens so it works in both light/dark)
 var navStyle = document.createElement('style');
 navStyle.textContent = ''
   + '.mod-nav{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 16px;padding:0 24px;justify-content:center}'
-  + '.mod-nav a{padding:3px 9px;border-radius:5px;font-size:.72rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .15s}'
-  + '.mod-nav a:hover{transform:translateY(-1px);filter:brightness(1.3)}'
+  + '.mod-nav a{padding:3px 10px;border-radius:3px;font-size:.72rem;font-weight:600;text-decoration:none;white-space:nowrap;background:transparent;border:1px solid var(--border);color:var(--text-2);transition:background-color .12s,border-color .12s,color .12s}'
+  + '.mod-nav a:hover{background:var(--card-2);border-color:var(--border-strong);color:var(--text);text-decoration:none}'
+  + '.mod-nav a.mn-active{background:var(--brand);border-color:var(--brand);color:var(--brand-fg);font-weight:700}'
+  + '.mod-nav a.mn-active:hover{background:var(--brand-2);border-color:var(--brand-2);color:var(--brand-fg)}'
   + '.mod-nav .mn-short{display:none}'
   + '@media(max-width:600px){.mod-nav{gap:4px;padding:0 10px;margin:6px 0 12px}'
-  + '.mod-nav a{padding:3px 7px;font-size:.62rem;border-radius:4px}'
+  + '.mod-nav a{padding:3px 7px;font-size:.62rem;border-radius:2px}'
   + '.mod-nav .mn-full{display:none}.mod-nav .mn-short{display:inline}}';
 document.head.appendChild(navStyle);
 
-// Build pills
+// Build pills — monochrome. `active` toggles a class instead of inline colors.
 var pills = modules.map(function(m){
   var link = isIndex ? m.anchor : (prefix + 'index.html' + m.anchor);
   var folderName = m.href.replace(/\/$/, '').replace(/\.html$/, '');
   var active = (!isIndex && (location.pathname.indexOf(folderName) !== -1 || m.href.indexOf(page) !== -1));
-  var style = 'background:'+(active ? m.bg.replace('.08','.2') : m.bg)+';'
-    + 'border:1px solid '+(active ? m.color : m.border)+';'
-    + 'color:'+m.color+';'
-    + 'font-weight:'+(active?'700':'600');
-  return '<a href="'+link+'" style="'+style+'" title="'+m.full.replace(/&amp;/g,'&')+'"><span class="mn-full">'+m.full+'</span><span class="mn-short">'+m.name+'</span></a>';
+  var cls = active ? ' class="mn-active"' : '';
+  return '<a href="'+link+'"'+cls+' title="'+m.full.replace(/&amp;/g,'&')+'"><span class="mn-full">'+m.full+'</span><span class="mn-short">'+m.name+'</span></a>';
 }).join('');
 
 var homeLink = isIndex ? 'index.html' : prefix + 'index.html';
-var homeStyle = 'background:'+(isIndex?'rgba(255,255,255,.08)':'rgba(255,255,255,.04)')+';'
-  + 'border:1px solid var(--border);color:var(--muted);font-weight:'+(isIndex?'700':'600');
+var homeCls = isIndex ? ' class="mn-active"' : '';
 
 var container = document.createElement('div');
 container.className = 'mod-nav';
-container.innerHTML = '<a href="'+homeLink+'" style="'+homeStyle+'"><span class="mn-full">⚡ All Modules</span><span class="mn-short">⚡ All</span></a>' + pills;
+container.innerHTML = '<a href="'+homeLink+'"'+homeCls+'><span class="mn-full">All Modules</span><span class="mn-short">All</span></a>' + pills;
 
 var hero = document.querySelector('.hero');
 if(hero) hero.insertAdjacentElement('afterend', container);

@@ -12,8 +12,15 @@
 (function(){
 
 // ═══ CONFIGURATION ═══
+// Auto-bypass premium gates when running locally (localhost / 127.0.0.1 / file://).
+// Stays false on the live domain, so production content remains gated.
+var IS_LOCAL = (function(){
+  var h = location.hostname;
+  return location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '' || /\.local$/.test(h);
+})();
+
 var CONFIG = {
-  admin: false, // Set to true to bypass premium gates (for local testing). Set false for production.
+  admin: IS_LOCAL, // true on local dev → premium unlocked. Automatically false in production.
   firebase: {
     apiKey: "AIzaSyAbwqzKR-23IPRJy_S4JbQ-_EYWb8mTAzo",
     authDomain: "varaq-gif.firebaseapp.com",
@@ -37,8 +44,8 @@ var CONFIG = {
     amount: 3999900,           // ₹39,999 in paise
     currency: "INR",
     name: "HelloSDE",
-    description: "Master System Design — 8-Week Live Cohort (July 18 batch)",
-    batch: "2025-07-18"
+    description: "Master System Design — 8-Week Live Cohort (Sep 18 batch)",
+    batch: "2025-09-18"
   }
 };
 
@@ -783,8 +790,8 @@ window.HelloSDE = {
                   razorpayOrderId: response.razorpay_order_id
                 }, {merge: true}).then(function(){
                   try { localStorage.removeItem('hellosde_pending_enroll'); } catch(e){}
-                  alert('🎉 You\'re enrolled in Master System Design (July 18 batch)! We\'ll email onboarding details shortly. Tap OK to message us on WhatsApp for confirmation.');
-                  window.open('https://wa.me/919100880133?text=Hi!%20I%20just%20enrolled%20in%20Master%20System%20Design%20(July%2018%20batch).%20Payment%20ID:%20' + encodeURIComponent(response.razorpay_payment_id), '_blank');
+                  alert('🎉 You\'re enrolled in Master System Design (Sep 18 batch)! We\'ll email onboarding details shortly. Tap OK to message us on WhatsApp for confirmation.');
+                  window.open('https://wa.me/919100880133?text=Hi!%20I%20just%20enrolled%20in%20Master%20System%20Design%20(Sep%2018%20batch).%20Payment%20ID:%20' + encodeURIComponent(response.razorpay_payment_id), '_blank');
                 }).catch(function(){
                   alert('Payment received (ID: ' + response.razorpay_payment_id + '). If you don\'t get a confirmation email, please message us on WhatsApp with this Payment ID.');
                 });

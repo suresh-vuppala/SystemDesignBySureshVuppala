@@ -4,163 +4,199 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Master System Design — 8-Week Live Weekend Cohort · HelloSDE</title>
-<meta name="description" content="Stop freezing on 'Design Instagram'. Master System Design is an 8-week live weekend cohort (Sat/Sun, 9AM–1PM) where you learn each building block, then immediately apply it to a real design problem. Next batch July 18 · INR 39,999.">
+<meta name="description" content="Stop freezing on 'Design Instagram'. Master System Design is an 8-week live weekend cohort (Sat/Sun, 9AM–1PM) where you learn each building block, then immediately apply it to a real design problem. Next batch Sep 18 · INR 39,999.">
 <meta name="keywords" content="system design course, live cohort, system design bootcamp, FAANG interview prep, distributed systems course, staff engineer interview">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://hellosde.com/master-system-design.html">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://hellosde.com/master-system-design.html">
 <meta property="og:title" content="Master System Design — 8-Week Live Weekend Cohort">
-<meta property="og:description" content="Learn a building block, then immediately apply it to a real design problem. 8 weekends, live. Next batch July 18.">
+<meta property="og:description" content="Learn a building block, then immediately apply it to a real design problem. 8 weekends, live. Next batch Sep 18.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="css/style.css">
 <style>
-/* ── Course Page Styles ── */
-.course-hero{padding:56px 24px 40px;text-align:center;
-  background:radial-gradient(75% 130% at 50% 0%, rgba(154,119,212,.12), transparent 65%), var(--bg-2);
-  border-bottom:1px solid var(--border)}
-.course-kicker{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
-  color:var(--a);background:rgba(154,119,212,.10);border:1px solid rgba(154,119,212,.25);
-  padding:5px 14px;border-radius:999px;margin-bottom:16px}
-.course-hero h1{font-size:2.5rem;font-weight:800;letter-spacing:-.03em;color:#fff;margin:0;line-height:1.12}
-.course-hero h1 .u{position:relative;white-space:nowrap}
-.course-hero h1 .u::after{content:'';position:absolute;left:0;bottom:-5px;width:100%;height:8px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8'%3E%3Cpath d='M0,4 Q25,0 50,4 T100,4 T150,4 T200,4' fill='none' stroke='%239a77d4' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;background-size:200px 8px}
-.course-sub{color:var(--text-2);max-width:660px;margin:18px auto 0;font-size:1.05rem;line-height:1.7}
-.course-sub strong{color:#fff}
-.course-hook{margin:14px auto 0;font-size:1.15rem;font-weight:700;color:var(--a);letter-spacing:-.01em}
+/* ── Course page — monochrome, theme-aware ── */
+.course-hero{
+  padding:56px 24px 40px;text-align:center;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+}
+.course-kicker{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--text-2);background:transparent;border:1px solid var(--border-strong);
+  padding:5px 14px;border-radius:2px;margin-bottom:16px;
+}
+.course-hero h1{font-size:var(--fs-3xl);font-weight:700;letter-spacing:var(--ls-tight);color:var(--text);margin:0;line-height:var(--lh-tight)}
+.course-hero h1 .u{
+  position:relative;white-space:nowrap;
+  border-bottom:2px solid var(--brand);padding-bottom:2px;
+}
+.course-sub{color:var(--text-2);max-width:660px;margin:18px auto 0;font-size:var(--fs-md);line-height:var(--lh-loose)}
+.course-sub strong{color:var(--text);font-weight:700}
+.course-hook{margin:14px auto 0;font-size:var(--fs-lg);font-weight:700;color:var(--text);letter-spacing:var(--ls-tight)}
 
 /* Quick facts strip */
 .facts{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:900px;margin:28px auto 0}
-.fact{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;text-align:left}
-.fact .fact-ic{font-size:1.1rem;margin-bottom:6px}
-.fact .fact-lbl{font-size:.66rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px}
-.fact .fact-val{font-size:.95rem;font-weight:700;color:#fff}
+.fact{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:16px 18px;text-align:left}
+.fact .fact-ic{font-size:var(--fs-md);margin-bottom:6px;filter:grayscale(1);opacity:.85}
+.fact .fact-lbl{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);color:var(--muted);margin-bottom:3px}
+.fact .fact-val{font-size:var(--fs-sm);font-weight:700;color:var(--text)}
 
 .course-cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:30px}
-.btn-wa{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:10px;
-  background:#25d366;color:#0a2e16;font-weight:700;font-size:.95rem;text-decoration:none;
-  transition:transform .15s,box-shadow .15s;box-shadow:0 6px 20px rgba(37,211,102,.25)}
-.btn-wa:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(37,211,102,.35);text-decoration:none}
-.btn-pay{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:10px;border:none;cursor:pointer;font:inherit;
-  background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;
-  transition:transform .15s,box-shadow .15s;box-shadow:0 6px 20px rgba(154,119,212,.28)}
-.btn-pay:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(154,119,212,.4)}
-.btn-pay .pay-sec{font-size:.66rem;font-weight:600;opacity:.85;display:flex;align-items:center;gap:4px;margin-left:2px}
-.btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:14px 24px;border-radius:10px;
-  background:rgba(255,255,255,.04);border:1px solid var(--border-strong);color:var(--text);
-  font-weight:600;font-size:.9rem;text-decoration:none;transition:all .15s}
-.btn-ghost:hover{border-color:var(--a);color:#fff;text-decoration:none}
-.hero-trust{margin-top:22px;font-size:.78rem;color:var(--muted)}
+.btn-wa{
+  display:inline-flex;align-items:center;gap:9px;padding:12px 22px;border-radius:3px;
+  background:transparent;color:var(--text);border:1px solid var(--border-strong);
+  font-weight:600;font-size:var(--fs-sm);text-decoration:none;transition:background-color .12s;
+}
+.btn-wa:hover{background:var(--card-2);text-decoration:none}
+.btn-pay{
+  display:inline-flex;align-items:center;gap:9px;padding:13px 26px;border-radius:3px;
+  border:1px solid var(--brand);cursor:pointer;font:inherit;
+  background:var(--brand);color:var(--brand-fg);font-weight:700;font-size:var(--fs-sm);text-decoration:none;
+  transition:background-color .12s,transform .12s,box-shadow .12s;
+  box-shadow:0 3px 12px rgba(201,74,12,.25);
+}
+.btn-pay:hover{background:var(--brand-2);border-color:var(--brand-2);transform:translateY(-1px);box-shadow:0 5px 18px rgba(201,74,12,.32);text-decoration:none}
+.btn-pay .pay-sec{font-size:var(--fs-2xs);font-weight:600;opacity:.85;display:flex;align-items:center;gap:4px;margin-left:2px}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:3px;
+  background:transparent;border:1px solid var(--border-strong);color:var(--text);
+  font-weight:600;font-size:var(--fs-sm);text-decoration:none;transition:background-color .12s;
+}
+.btn-ghost:hover{background:var(--card-2);text-decoration:none}
+.hero-trust{margin-top:22px;font-size:var(--fs-xs);color:var(--muted)}
 .hero-trust b{color:var(--text)}
 
 /* Content wrapper */
 .course-wrap{max-width:940px;margin:0 auto;padding:48px 24px 80px}
-.sec-title{font-size:1.6rem;font-weight:800;color:#fff;margin:0 0 6px;letter-spacing:-.01em}
-.sec-lead{color:var(--muted);font-size:.98rem;margin:0 0 24px;line-height:1.6}
+.sec-title{font-size:var(--fs-xl);font-weight:700;color:var(--text);margin:0 0 6px;letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+.sec-lead{color:var(--muted);font-size:var(--fs-md);margin:0 0 24px;line-height:var(--lh-normal)}
 .course-section{margin-bottom:60px}
 
 /* Pain points */
 .pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.pain{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--r);border-radius:10px;padding:16px 18px}
-.pain p{margin:0;font-size:.9rem;color:var(--text-2);line-height:1.6}
-.pain .q{color:#fff;font-weight:600;display:block;margin-bottom:4px}
-.pain-turn{margin-top:18px;background:linear-gradient(90deg,rgba(154,119,212,.10),transparent 70%);border:1px solid var(--border);border-left:3px solid var(--a);border-radius:10px;padding:16px 18px;font-size:.95rem;color:var(--text-2)}
-.pain-turn b{color:#fff}
+.pain{
+  background:var(--card);border:1px solid var(--border);
+  border-left:3px solid var(--border-strong);border-radius:3px;padding:16px 18px;
+}
+.pain p{margin:0;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose)}
+.pain .q{color:var(--text);font-weight:700;display:block;margin-bottom:4px}
+.pain-turn{
+  margin-top:18px;background:var(--bg-2);
+  border:1px solid var(--border);border-left:3px solid var(--text);
+  border-radius:3px;padding:16px 18px;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose);
+}
+.pain-turn b{color:var(--text)}
 
 /* Method flow */
 .flow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.flow-step{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;position:relative}
-.flow-step .step-n{position:absolute;top:16px;right:20px;font-size:1.6rem;font-weight:800;color:rgba(154,119,212,.18)}
-.flow-step h3{font-size:1rem;color:#fff;margin:0 0 6px;font-weight:700}
-.flow-step p{font-size:.86rem;color:var(--text-2);margin:0;line-height:1.6}
+.flow-step{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px;position:relative}
+.flow-step .step-n{position:absolute;top:14px;right:20px;font-size:var(--fs-xl);font-weight:700;color:var(--card-2);line-height:1}
+.flow-step h3{font-size:var(--fs-md);color:var(--text);margin:0 0 6px;font-weight:700}
+.flow-step p{font-size:var(--fs-sm);color:var(--text-2);margin:0;line-height:var(--lh-loose)}
 
 /* Roadmap accordion */
-.week{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.week{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:10px;overflow:hidden}
 .week[open]{border-color:var(--border-strong)}
-.week summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:14px;transition:background .15s}
+.week summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:background .12s}
 .week summary::-webkit-details-marker{display:none}
-.week summary:hover{background:rgba(154,119,212,.05)}
-.week-tag{flex-shrink:0;font-size:.7rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--a);background:rgba(154,119,212,.10);border:1px solid rgba(154,119,212,.25);padding:5px 11px;border-radius:8px;min-width:78px;text-align:center}
+.week summary:hover{background:var(--card-2)}
+.week-tag{
+  flex-shrink:0;font-size:var(--fs-2xs);font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;
+  color:var(--text);background:var(--brand-soft);border:1px solid var(--brand-border);
+  padding:4px 10px;border-radius:2px;min-width:78px;text-align:center;
+}
 .week-head{flex:1;min-width:0}
-.week-head h3{font-size:1.02rem;color:#fff;margin:0;font-weight:700;line-height:1.3}
-.week-head p{font-size:.8rem;color:var(--muted);margin:2px 0 0}
+.week-head h3{font-size:var(--fs-md);color:var(--text);margin:0;font-weight:700;line-height:var(--lh-tight)}
+.week-head p{font-size:var(--fs-xs);color:var(--muted);margin:2px 0 0}
 .week-caret{flex-shrink:0;color:var(--muted);transition:transform .2s}
-.week[open] .week-caret{transform:rotate(180deg);color:var(--a)}
-.week-body{padding:4px 20px 20px;border-top:1px solid var(--border)}
+.week[open] .week-caret{transform:rotate(180deg);color:var(--text)}
+.week-body{padding:6px 20px 20px;border-top:1px solid var(--border)}
 .week-body .wb-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
 @media(max-width:640px){.week-body .wb-row{grid-template-columns:1fr}}
-.wb-col h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px;font-weight:700}
-.wb-col.blocks h4{color:var(--a)}
-.wb-col.apply h4{color:var(--g)}
+.wb-col h4{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);margin:0 0 8px;font-weight:700;color:var(--muted)}
 .wb-list{list-style:none;padding:0;margin:0}
-.wb-list li{font-size:.85rem;color:var(--text-2);padding:4px 0 4px 18px;position:relative;line-height:1.5}
-.wb-col.blocks .wb-list li::before{content:'▸';position:absolute;left:0;color:var(--a)}
-.wb-col.apply .wb-list li::before{content:'✦';position:absolute;left:0;color:var(--g)}
+.wb-list li{font-size:var(--fs-sm);color:var(--text-2);padding:4px 0 4px 18px;position:relative;line-height:var(--lh-normal)}
+.wb-col.blocks .wb-list li::before{content:'›';position:absolute;left:0;color:var(--text);font-weight:700}
+.wb-col.apply .wb-list li::before{content:'+';position:absolute;left:0;color:var(--text);font-weight:700}
 
 /* Outcomes */
 .outcomes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.outcome{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
-.outcome .ic{color:var(--g);font-weight:800;flex-shrink:0;margin-top:1px}
-.outcome span{font-size:.9rem;color:var(--text-2);line-height:1.55}
-.outcome b{color:#fff}
+.outcome{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:3px;padding:14px 16px}
+.outcome .ic{color:var(--text);font-weight:700;flex-shrink:0;margin-top:1px;min-width:14px}
+.outcome span{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal)}
+.outcome b{color:var(--text)}
 
-/* Audience */
+/* Audience — "for you" (positive) uses "+", "not for you" (deterrent) uses "−" */
 .aud-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.aud{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px}
-.aud h3{font-size:1rem;margin:0 0 12px;font-weight:700}
-.aud.for h3{color:var(--g)}
-.aud.notfor h3{color:var(--r)}
+.aud{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px}
+.aud h3{font-size:var(--fs-md);margin:0 0 12px;font-weight:700;color:var(--text)}
 .aud ul{list-style:none;padding:0;margin:0}
-.aud li{font-size:.88rem;color:var(--text-2);padding:6px 0 6px 24px;position:relative;line-height:1.5}
-.aud.for li::before{content:'✓';position:absolute;left:0;color:var(--g);font-weight:800}
-.aud.notfor li::before{content:'✕';position:absolute;left:0;color:var(--r);font-weight:800}
+.aud li{font-size:var(--fs-sm);color:var(--text-2);padding:6px 0 6px 22px;position:relative;line-height:var(--lh-normal)}
+.aud.for li::before{content:'+';position:absolute;left:0;color:var(--text);font-weight:700}
+.aud.notfor li::before{content:'\2212';position:absolute;left:0;color:var(--text);font-weight:700}
 
 /* Bonuses */
 .bonus-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media(max-width:700px){.bonus-grid{grid-template-columns:1fr}}
-.bonus{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center}
-.bonus .bic{font-size:1.5rem;margin-bottom:8px}
-.bonus h4{font-size:.92rem;color:#fff;margin:0 0 5px;font-weight:700}
-.bonus p{font-size:.78rem;color:var(--muted);margin:0;line-height:1.5}
+.bonus{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;text-align:center}
+.bonus .bic{font-size:var(--fs-xl);margin-bottom:8px;filter:grayscale(1);opacity:.85}
+.bonus h4{font-size:var(--fs-sm);color:var(--text);margin:0 0 5px;font-weight:700}
+.bonus p{font-size:var(--fs-xs);color:var(--muted);margin:0;line-height:var(--lh-normal)}
 
 /* Testimonials */
 .tst-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:640px){.tst-grid{grid-template-columns:1fr}.pain-grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.outcomes{grid-template-columns:1fr}.aud-grid{grid-template-columns:1fr}}
-.tst{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px}
-.tst p{font-size:.92rem;color:var(--text-2);line-height:1.65;margin:0 0 14px;font-style:italic}
+.tst{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px}
+.tst p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose);margin:0 0 14px;font-style:italic}
 .tst .who{display:flex;align-items:center;gap:10px}
-.tst .ava{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0}
-.tst .who b{display:block;color:#fff;font-size:.85rem}
-.tst .who span{font-size:.74rem;color:var(--muted)}
+.tst .ava{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--text);color:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:var(--fs-xs);flex-shrink:0;
+}
+.tst .who b{display:block;color:var(--text);font-size:var(--fs-sm)}
+.tst .who span{font-size:var(--fs-2xs);color:var(--muted)}
 
 /* Pricing */
-.price-card{max-width:480px;margin:0 auto;background:var(--card);border:1px solid var(--border-strong);border-radius:16px;padding:34px 30px;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.price-card::before{content:'';position:absolute;inset:0;background:radial-gradient(80% 100% at 50% 0%,rgba(154,119,212,.10),transparent 60%);pointer-events:none}
-.price-batch{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--a);background:rgba(154,119,212,.10);border:1px solid rgba(154,119,212,.25);padding:5px 14px;border-radius:999px;margin-bottom:16px;position:relative}
-.price-amt{font-size:2.8rem;font-weight:800;color:#fff;line-height:1;position:relative}
-.price-amt .cur{font-size:1.3rem;font-weight:700;color:var(--muted);vertical-align:super;margin-right:2px}
-.price-note{color:var(--muted);font-size:.82rem;margin:8px 0 22px;position:relative}
-.price-includes{list-style:none;padding:0;margin:0 0 24px;text-align:left;position:relative}
-.price-includes li{padding:7px 0 7px 28px;position:relative;font-size:.88rem;color:var(--text-2)}
-.price-includes li::before{content:'✓';position:absolute;left:0;top:7px;color:var(--g);font-weight:800}
+.price-card{
+  max-width:480px;margin:0 auto;
+  background:var(--card);border:1px solid var(--border-strong);border-radius:6px;
+  padding:32px 28px;text-align:center;position:relative;
+}
+.price-batch{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--text-2);background:transparent;border:1px solid var(--border-strong);
+  padding:4px 12px;border-radius:2px;margin-bottom:16px;
+}
+.price-amt{font-size:var(--fs-3xl);font-weight:700;color:var(--text);line-height:1;letter-spacing:var(--ls-tight)}
+.price-amt .cur{font-size:var(--fs-lg);font-weight:700;color:var(--muted);vertical-align:super;margin-right:2px}
+.price-note{color:var(--muted);font-size:var(--fs-xs);margin:8px 0 22px}
+.price-includes{list-style:none;padding:0;margin:0 0 24px;text-align:left}
+.price-includes li{padding:6px 0 6px 22px;position:relative;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal)}
+.price-includes li::before{content:'+';position:absolute;left:0;top:6px;color:var(--text);font-weight:700}
 
-/* Urgency */
-.urgency{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 auto 22px;max-width:480px;
-  background:rgba(232,180,62,.07);border:1px solid rgba(232,180,62,.25);border-radius:10px;padding:11px 16px;font-size:.84rem;color:var(--text-2)}
-.urgency b{color:var(--y)}
+/* Urgency — genuine warning uses accent border */
+.urgency{
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  margin:0 auto 22px;max-width:480px;
+  background:var(--bg-2);border:1px solid var(--border);border-left:3px solid var(--danger);
+  border-radius:3px;padding:11px 16px;font-size:var(--fs-xs);color:var(--text-2);
+}
+.urgency b{color:var(--text);font-weight:700}
 
 /* FAQ */
-.faq{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden}
-.faq summary{cursor:pointer;list-style:none;padding:15px 18px;font-weight:600;color:var(--text);font-size:.92rem;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.faq{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:8px;overflow:hidden}
+.faq summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:600;color:var(--text);font-size:var(--fs-sm);display:flex;justify-content:space-between;align-items:center;gap:12px}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:'+';color:var(--a);font-size:1.3rem;font-weight:400;line-height:1;flex-shrink:0}
-.faq[open] summary::after{content:'–'}
-.faq summary:hover{background:rgba(154,119,212,.04)}
-.faq-body{padding:0 18px 16px;font-size:.88rem;color:var(--text-2);line-height:1.65}
+.faq summary::after{content:'+';color:var(--muted);font-size:var(--fs-lg);font-weight:400;line-height:1;flex-shrink:0}
+.faq[open] summary::after{content:'\2212'}  /* U+2212 minus */
+.faq summary:hover{background:var(--card-2)}
+.faq-body{padding:0 18px 16px;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose)}
 
 @media(max-width:640px){
-  .course-hero h1{font-size:1.8rem}
+  .course-hero h1{font-size:var(--fs-2xl)}
   .course-wrap{padding:36px 16px 60px}
   .bonus-grid{grid-template-columns:1fr}
 }
@@ -178,7 +214,7 @@
   <div class="facts">
     <div class="fact"><div class="fact-ic">📅</div><div class="fact-lbl">Duration</div><div class="fact-val">8 Weeks · Weekends</div></div>
     <div class="fact"><div class="fact-ic">⏰</div><div class="fact-lbl">Timing</div><div class="fact-val">Sat &amp; Sun · 9AM–1PM</div></div>
-    <div class="fact"><div class="fact-ic">🚀</div><div class="fact-lbl">Next Batch</div><div class="fact-val">July 18</div></div>
+    <div class="fact"><div class="fact-ic">🚀</div><div class="fact-lbl">Next Batch</div><div class="fact-val">Sep 18</div></div>
     <div class="fact"><div class="fact-ic">💸</div><div class="fact-lbl">Price</div><div class="fact-val">₹39,999</div></div>
   </div>
 
@@ -417,12 +453,12 @@
     <h2 class="sec-title">What you'll walk away with</h2>
     <p class="sec-lead">By week 8, system design stops being scary and starts being a structured conversation you lead.</p>
     <div class="outcomes">
-      <div class="outcome"><span class="ic">✓</span><span>Drive <b>any</b> open-ended design question with a repeatable framework — no more blanking.</span></div>
-      <div class="outcome"><span class="ic">✓</span><span>Instantly do <b>capacity estimation</b> and justify every component with real tradeoffs.</span></div>
-      <div class="outcome"><span class="ic">✓</span><span>Confidently pick the right <b>database, cache, and queue</b> for any scenario.</span></div>
-      <div class="outcome"><span class="ic">✓</span><span>Explain <b>consistency, replication, and consensus</b> like you've shipped them.</span></div>
-      <div class="outcome"><span class="ic">✓</span><span>Design <b>FAANG-scale systems</b> — chat, feed, rideshare, payments, streaming.</span></div>
-      <div class="outcome"><span class="ic">✓</span><span>Walk into <b>Staff/Senior interviews</b> calm, structured, and senior-sounding.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Drive <b>any</b> open-ended design question with a repeatable framework — no more blanking.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Instantly do <b>capacity estimation</b> and justify every component with real tradeoffs.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Confidently pick the right <b>database, cache, and queue</b> for any scenario.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Explain <b>consistency, replication, and consensus</b> like you've shipped them.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Design <b>FAANG-scale systems</b> — chat, feed, rideshare, payments, streaming.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Walk into <b>Staff/Senior interviews</b> calm, structured, and senior-sounding.</span></div>
     </div>
   </section>
 
@@ -431,7 +467,7 @@
     <h2 class="sec-title">Is this for you?</h2>
     <div class="aud-grid">
       <div class="aud for">
-        <h3>✓ Perfect if you're…</h3>
+        <h3>Perfect if you're…</h3>
         <ul>
           <li>A SWE with 2–10 yrs experience prepping for FAANG/MAANG</li>
           <li>Targeting a Senior / Staff Engineer role</li>
@@ -441,7 +477,7 @@
         </ul>
       </div>
       <div class="aud notfor">
-        <h3>✕ Not for you if…</h3>
+        <h3>Not for you if…</h3>
         <ul>
           <li>You want a quick "templates to memorize" hack</li>
           <li>You can't commit ~8 hours per weekend for 8 weeks</li>
@@ -481,9 +517,9 @@
   <section class="course-section" id="enroll">
     <h2 class="sec-title" style="text-align:center">Reserve your seat</h2>
     <p class="sec-lead" style="text-align:center">Small cohort · personal attention · limited seats.</p>
-    <div class="urgency">🔥 <b>Next batch starts July 18</b> · seats fill fast — enroll early to lock your spot</div>
+    <div class="urgency">🔥 <b>Next batch starts Sep 18</b> · seats fill fast — enroll early to lock your spot</div>
     <div class="price-card">
-      <span class="price-batch">Next Batch · July 18</span>
+      <span class="price-batch">Next Batch · Sep 18</span>
       <div class="price-amt"><span class="cur">₹</span>39,999</div>
       <div class="price-note">One-time · all 8 weekends + recordings + problem bank</div>
       <ul class="price-includes">
@@ -512,7 +548,7 @@
   <!-- ── FINAL CTA ── -->
   <section class="course-section" style="text-align:center">
     <h2 class="sec-title" style="text-align:center">Eight weekends from now…</h2>
-    <p class="sec-lead" style="text-align:center;max-width:620px;margin-left:auto;margin-right:auto">…you could be the candidate who calmly draws the architecture while everyone else recites templates. The next batch starts <strong style="color:var(--text)">July 18</strong>.</p>
+    <p class="sec-lead" style="text-align:center;max-width:620px;margin-left:auto;margin-right:auto">…you could be the candidate who calmly draws the architecture while everyone else recites templates. The next batch starts <strong style="color:var(--text)">Sep 18</strong>.</p>
     <div class="course-cta-row">
       <button class="btn-pay" onclick="window.HelloSDE ? window.HelloSDE.enrollCourse() : alert('Loading…')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Claim your seat — ₹39,999 <span class="pay-sec">🔒 Razorpay</span></button>
     </div>

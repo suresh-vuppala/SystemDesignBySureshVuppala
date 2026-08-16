@@ -1628,6 +1628,78 @@ document.addEventListener('keydown',function(e){
 <span class="hi">Load Balancing:</span> <span class="hg">Sticky sessions</span> (pin client to server) vs <span class="hg">connection migration</span> (client reconnects) vs <span class="hg">shared Redis store</span> (state survives server change).
 </div>
 
+<!-- ─── Connection Lifecycle ─── -->
+<div class="d-title"><span class="num d-yellow">▸</span> Connection Lifecycle & Close Codes</div>
+<div class="d-grid" style="margin:4px 0">
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--a)">States</h4>
+<div style="font-size:.78rem;line-height:1.7">
+  <span class="hi">CONNECTING</span> (0) — handshake in progress<br>
+  <span class="hg">OPEN</span> (1) — live, frames can flow<br>
+  <span class="ha">CLOSING</span> (2) — close handshake started<br>
+  <span class="hr">CLOSED</span> (3) — connection gone
+</div>
+</div>
+<div class="d-panel" style="padding:8px">
+<h4 style="color:var(--g)">Common Close Codes</h4>
+<div style="font-size:.76rem;line-height:1.7;font-family:monospace">
+  <span class="hg">1000</span> — Normal closure (all done)<br>
+  <span class="hi">1001</span> — Going away (tab closed / server restart)<br>
+  <span class="hr">1006</span> — Abnormal close (no close frame — network drop)<br>
+  <span class="hr">1011</span> — Server internal error<br>
+  <span class="ha">1008</span> — Policy violation (auth failed)
+</div>
+</div>
+</div>
+
+<!-- ─── Reconnect with backoff ─── -->
+<div class="d-title"><span class="num d-red">▸</span> Reconnect Logic — Exponential Backoff + Jitter</div>
+<div class="b bg" style="margin:2px 0 4px;font-size:.8rem;line-height:1.6">
+  Without backoff, all clients reconnect at once after a server restart → <span class="hr">thundering herd</span> kills the server again.<br>
+  <span class="hg">Formula:</span> <code>delay = min(baseMs × 2<sup>attempt</sup>, maxMs) + random(0, jitterMs)</code><br>
+  <span class="hg">Example:</span> base=1s, max=30s, jitter=0–1s → attempt 1: ~1s, attempt 2: ~2s, attempt 3: ~4s … capped at 30s.
+</div>
+<div style="font-size:.76rem;color:var(--muted);padding:6px 10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:6px;font-family:monospace;line-height:1.7;margin:0 0 4px">
+<span style="color:var(--a)">let</span> attempt = <span style="color:var(--g)">0</span>;<br>
+<span style="color:var(--a)">function</span> connect() {<br>
+&nbsp;&nbsp;<span style="color:var(--a)">const</span> ws = <span style="color:var(--a)">new</span> WebSocket(<span style="color:var(--y)">'wss://api/chat'</span>);<br>
+&nbsp;&nbsp;ws.onopen = () =&gt; attempt = <span style="color:var(--g)">0</span>;  <span style="color:var(--muted)">// reset on success</span><br>
+&nbsp;&nbsp;ws.onclose = (e) =&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--a)">if</span> (e.code !== <span style="color:var(--g)">1000</span>) {  <span style="color:var(--muted)">// don't retry normal close</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--a)">const</span> delay = Math.min(<span style="color:var(--g)">1000</span> * <span style="color:var(--g)">2</span> ** attempt, <span style="color:var(--g)">30000</span>) + Math.random() * <span style="color:var(--g)">1000</span>;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setTimeout(connect, delay); attempt++;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;};<br>
+}
+</div>
+
+<!-- ─── Backpressure ─── -->
+<div class="d-title"><span class="num d-orange">▸</span> Backpressure — Slow Consumer Problem</div>
+<div class="b by" style="margin:2px 0 4px;font-size:.8rem;line-height:1.55">
+  <span class="hi">Problem:</span> Server produces events faster than a client can consume. The <code>ws.bufferedAmount</code> grows unboundedly → OOM crash or stale data delivered.<br>
+  <span class="hg">Fix 1 — Check before send:</span> <code>if (ws.bufferedAmount &lt; HIGH_WATER_MARK) ws.send(msg);</code> — drop or queue excess.<br>
+  <span class="hg">Fix 2 — Per-client send queues</span> on the server with a max depth. Drop oldest (live feeds) or block producer (chat).<br>
+  <span class="hg">Fix 3 — Client-side flow control:</span> client sends ACK / credits back to server (manual window like TCP).
+</div>
+
+<!-- ─── Security ─── -->
+<div class="d-title"><span class="num d-blue">▸</span> Security Specifics</div>
+<table style="margin:4px 0;font-size:.8rem">
+<tr><th style="width:35%">Risk</th><th>Fix</th></tr>
+<tr><td><span class="hr">No Origin validation</span></td><td>Server checks <code>Origin</code> header in the HTTP upgrade request — reject unexpected origins (same-site CSRF vector).</td></tr>
+<tr><td><span class="hr">Credentials in URL</span></td><td>EventSource / WS URL is logged. Pass auth in the <span class="hg">first message</span> after open (<code>ws.send(token)</code>), not in the URL query string.</td></tr>
+<tr><td><span class="hr">ws:// in production</span></td><td>Always use <span class="hg">wss://</span> (TLS). Plain WS leaks payloads and is blocked by many proxies.</td></tr>
+<tr><td><span class="hr">Message injection</span></td><td>Validate + sanitize every inbound message server-side. Never trust client-sent opcodes or payloads.</td></tr>
+</table>
+
+<!-- ─── Subprotocols ─── -->
+<div class="d-title"><span class="num d-cyan">▸</span> Subprotocols</div>
+<div class="b bg" style="margin:2px 0 6px;font-size:.8rem;line-height:1.55">
+  Negotiate an application-level protocol during the handshake via <code>Sec-WebSocket-Protocol</code>.<br>
+  <span class="hg">Example:</span> <code>new WebSocket('wss://api', ['json-rpc', 'graphql-ws'])</code> — server picks one and echoes it in the 101 response.<br>
+  Common: <span class="hi">STOMP</span> (messaging), <span class="hi">graphql-ws</span> (GraphQL subscriptions), <span class="hi">WAMP</span> (pub/sub + RPC), custom JSON-RPC.
+</div>
+
 <div class="b by" style="margin-top:4px"><span class="hi">Real-world:</span> <strong>Slack</strong> (millions of connections), <strong>Figma</strong> (collaborative editing), <strong>Binance</strong> (market data). Typical: <strong>100K–500K connections/server</strong>, sub-ms latency.</div>
 </div>
 
@@ -1726,6 +1798,60 @@ document.addEventListener('keydown',function(e){
 <div class="b bg" style="margin:2px 0 6px;font-size:.82rem;line-height:1.5">
 <span class="hi">Performance:</span> <strong>10K–100K</strong> connections/server, <strong>2–5KB</strong> memory/connection, <strong>~10 bytes</strong> overhead vs 400+ for HTTP.
 </div>
+
+<!-- ─── HTTP/2 and the 6-connection limit ─── -->
+<div class="d-title"><span class="num d-yellow">▸</span> HTTP/2 Removes the 6-Connection Limit</div>
+<div class="b by" style="margin:2px 0 4px;font-size:.8rem;line-height:1.55">
+  HTTP/1.1 browsers cap at <span class="hr">6 connections per domain</span>. Open 6 SSE streams and the 7th request is blocked — a real problem for micro-frontends or multi-tab apps.<br>
+  <span class="hg">HTTP/2 fix:</span> All SSE streams are multiplexed over a <span class="hg">single TCP connection</span> → effectively unlimited streams. No origin limit.<br>
+  <span class="hi">Caveat:</span> Nginx must be configured with <code>proxy_http_version 1.1</code> between itself and the backend or it downgrades to HTTP/1.1 for the upstream leg.
+</div>
+
+<!-- ─── Heartbeat / proxy timeout prevention ─── -->
+<div class="d-title"><span class="num d-cyan">▸</span> Heartbeat — Keeping Proxies Alive</div>
+<div class="b bg" style="margin:2px 0 4px;font-size:.8rem;line-height:1.55">
+  Proxies (Nginx, AWS ALB) kill idle HTTP connections after <span class="hr">60s by default</span>. An SSE stream with no events will be cut, even though it's legitimately open.<br>
+  <span class="hg">Fix:</span> Server sends a <span class="hg">comment line</span> every 15–30s — it costs nothing, resets the proxy idle timer, and is silently ignored by the browser.<br>
+</div>
+<div style="font-size:.76rem;color:var(--muted);padding:6px 10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:6px;font-family:monospace;line-height:1.7;margin:0 0 4px">
+<span style="color:var(--muted)"># Server sends every 15s (comment lines start with ":")</span><br>
+: ping<br><br>
+<span style="color:var(--muted)"># Then events resume normally</span><br>
+data: {"price": 152.00}<br>
+</div>
+
+<!-- ─── CORS ─── -->
+<div class="d-title"><span class="num d-green">▸</span> CORS & Authentication</div>
+<div class="b bg" style="margin:2px 0 4px;font-size:.8rem;line-height:1.55">
+  SSE is a regular HTTP request so normal CORS rules apply.<br>
+  <span class="hg">Required headers:</span> <code>Access-Control-Allow-Origin: https://app.example.com</code> (wildcard is fine for public feeds).<br>
+  <span class="hg">With credentials (cookies):</span> <code>new EventSource(url, { withCredentials: true })</code> + server must set <code>Access-Control-Allow-Credentials: true</code> and a specific origin (not <code>*</code>).
+</div>
+<div class="b br" style="margin:2px 0 4px;font-size:.8rem;line-height:1.55">
+  <span class="hr">Auth gotcha:</span> <code>EventSource</code> gives you <span class="hr">no way to set custom headers</span> (no Authorization header). Options:<br>
+  &nbsp;&nbsp;① Pass token as URL query param: <code>/events?token=xxx</code> — simple but token ends up in server logs.<br>
+  &nbsp;&nbsp;② Use a short-lived one-time token: exchange it from a REST endpoint, then use it in the SSE URL.<br>
+  &nbsp;&nbsp;③ Use cookies (with <code>withCredentials</code>) — cleanest for same-origin or CORS-configured setups.
+</div>
+
+<!-- ─── EventSource browser API ─── -->
+<div class="d-title"><span class="num d-purple">▸</span> EventSource Browser API</div>
+<div style="font-size:.76rem;color:var(--muted);padding:8px 10px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:6px;font-family:monospace;line-height:1.8;margin:0 0 4px">
+<span style="color:var(--a)">const</span> es = <span style="color:var(--a)">new</span> EventSource(<span style="color:var(--y)">'https://api/events'</span>, { withCredentials: <span style="color:var(--g)">true</span> });<br><br>
+<span style="color:var(--muted)">// bare 'data:' events → message handler</span><br>
+es.onmessage = (e) =&gt; console.log(JSON.parse(e.data));<br><br>
+<span style="color:var(--muted)">// named events (event: priceUpdate) → addEventListener</span><br>
+es.addEventListener(<span style="color:var(--y)">'priceUpdate'</span>, (e) =&gt; updateUI(JSON.parse(e.data)));<br><br>
+<span style="color:var(--muted)">// connection states: 0=CONNECTING 1=OPEN 2=CLOSED</span><br>
+es.onerror = (e) =&gt; {<br>
+&nbsp;&nbsp;<span style="color:var(--a)">if</span> (es.readyState === EventSource.CLOSED) showOfflineBanner();<br>
+&nbsp;&nbsp;<span style="color:var(--muted)">// readyState CONNECTING = browser is auto-reconnecting — do nothing</span><br>
+};<br><br>
+<span style="color:var(--muted)">// clean up (browser doesn't close on page unload automatically)</span><br>
+window.addEventListener(<span style="color:var(--y)">'beforeunload'</span>, () =&gt; es.close());<br>
+</div>
+<div class="b bg" style="font-size:.78rem;margin:2px 0 4px;line-height:1.5"><span class="hi">Named events vs bare data:</span> <code>data:</code> lines with no <code>event:</code> field fire the <code>onmessage</code> handler. Named events (<code>event: priceUpdate</code>) only fire listeners registered with <code>addEventListener('priceUpdate', ...)</code> — not <code>onmessage</code>. Use named events to multiplex multiple event types over one stream.</div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ -->

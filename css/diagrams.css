@@ -1,87 +1,144 @@
-/* ═══ Reusable Diagram Primitives ═══ */
+/* ═══════════════════════════════════════════════════════════════
+   Diagram primitives — monochrome. Nodes distinguished by
+   luminance (4-step ramp), not hue.
+   ═══════════════════════════════════════════════════════════════ */
 
-/* --- Ring (circle container) --- */
-.d-ring{position:relative;width:280px;height:280px;margin:0 auto;border-radius:50%;border:3px solid var(--border)}
+:root{
+  --node-1:#111111;
+  --node-2:#3a3a3a;
+  --node-3:#666666;
+  --node-4:#8a8a8a;
+  --node-fg:#ffffff;
+}
+[data-theme="dark"]{
+  --node-1:#f2f2f2;
+  --node-2:#c8c8c8;
+  --node-3:#8a8a8a;
+  --node-4:#5a5a5a;
+  --node-fg:#0f0f0f;
+}
+
+/* Ring */
+.d-ring{position:relative;width:280px;height:280px;margin:0 auto;border-radius:50%;border:2px solid var(--border)}
 .d-ring.lg{width:320px;height:320px}
 .d-ring.sm{width:220px;height:220px}
 .d-ring-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-size:.75rem;color:var(--muted);line-height:1.4;pointer-events:none}
 
-/* --- Nodes on ring (positioned via --angle) --- */
-.d-node{position:absolute;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:#fff;z-index:2;
+/* Nodes on ring */
+.d-node{position:absolute;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--node-fg);z-index:2;
   top:calc(50% - 18px + calc(-1 * 50% * cos(var(--angle))));
   left:calc(50% - 18px + calc(50% * sin(var(--angle))));
-  transform:translate(calc(cos(var(--angle)) * -4px), calc(sin(var(--angle)) * 4px))}
-.d-node.server{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.3);font-size:.72rem}
-.d-node.key{width:28px;height:28px;border-radius:50%;font-size:.65rem;opacity:.9}
+  transform:translate(calc(cos(var(--angle)) * -4px), calc(sin(var(--angle)) * 4px));
+  background:var(--node-2);
+}
+.d-node.server{width:40px;height:40px;border-radius:50%;border:2px solid var(--border-strong);font-size:.72rem}
+.d-node.key{width:28px;height:28px;border-radius:50%;font-size:.65rem;opacity:.95}
 
-/* --- Node colors --- */
-.d-green{background:var(--g)}.d-blue{background:var(--a)}.d-orange{background:var(--o)}
-.d-red{background:var(--r)}.d-purple{background:var(--a2)}.d-cyan{background:var(--c)}
-.d-yellow{background:var(--y)}.d-pink{background:var(--p)}.d-teal{background:var(--t)}
+/* Node "colors" — mapped to greyscale luminance ramp.
+   Kept as class names for backward compatibility with existing HTML. */
+.d-blue,.d-purple{background:var(--node-1)}
+.d-green,.d-teal,.d-cyan{background:var(--node-2)}
+.d-orange,.d-yellow{background:var(--node-3)}
+.d-red,.d-pink{background:var(--node-4)}
 
-/* --- Server boxes (for non-ring diagrams) --- */
-.d-box{display:inline-flex;align-items:center;justify-content:center;padding:6px 14px;border-radius:8px;font-size:.78rem;font-weight:600;color:#fff;min-width:44px;text-align:center}
+/* Server boxes */
+.d-box{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:6px 14px;border-radius:3px;font-size:.78rem;font-weight:600;
+  background:var(--node-2);color:var(--node-fg);
+  min-width:44px;text-align:center;
+}
 .d-box.sm{padding:4px 10px;font-size:.7rem;min-width:36px}
 
-/* --- Key pills --- */
-.d-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text)}
+/* Key pills */
+.d-pill{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 9px;border-radius:2px;font-size:.72rem;font-weight:600;
+  background:transparent;border:1px solid var(--border-strong);color:var(--text);
+}
 
-/* --- Arrow --- */
+/* Arrows */
 .d-arrow{display:inline-block;color:var(--muted);font-size:1.2rem;margin:0 6px;vertical-align:middle}
 .d-arrow-down{display:block;text-align:center;color:var(--muted);font-size:1.2rem;margin:6px 0}
 
-/* --- Flow row (horizontal items) --- */
 .d-flow{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin:6px 0}
 
-/* --- Mapping table (compact key→server) --- */
+/* Compact key→server map */
 .d-map{display:grid;grid-template-columns:auto auto auto;gap:2px 10px;font-size:.78rem;margin:8px 0}
-.d-map .k{color:var(--a);font-weight:600}.d-map .ar{color:var(--muted)}.d-map .v{font-weight:600}
+.d-map .k{color:var(--text);font-weight:700}
+.d-map .ar{color:var(--muted)}
+.d-map .v{font-weight:700;color:var(--text)}
 
-/* --- Diagram grid (side by side panels) --- */
+/* Diagram grid */
 .d-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}
 .d-grid.tri{grid-template-columns:1fr 1fr 1fr}
 .d-grid.quad{grid-template-columns:1fr 1fr 1fr 1fr}
 @media(max-width:800px){.d-grid,.d-grid.tri,.d-grid.quad{grid-template-columns:1fr 1fr}}
 @media(max-width:500px){.d-grid,.d-grid.tri,.d-grid.quad{grid-template-columns:1fr}}
 
-/* --- Diagram panel --- */
-.d-panel{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
-.d-panel h4{font-size:.78rem;font-weight:700;margin-bottom:6px;color:var(--text);text-transform:uppercase;letter-spacing:.5px}
+/* Panel */
+.d-panel{background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
+.d-panel h4{font-size:.75rem;font-weight:700;margin-bottom:6px;color:var(--text);text-transform:uppercase;letter-spacing:.6px}
 
-/* --- Callout badge --- */
-.d-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.73rem;font-weight:600;margin:3px}
-.d-badge.warn{background:rgba(248,113,113,.12);color:var(--r);border:1px solid rgba(248,113,113,.2)}
-.d-badge.ok{background:rgba(52,211,153,.12);color:var(--g);border:1px solid rgba(52,211,153,.2)}
-.d-badge.info{background:rgba(154,119,212,.12);color:var(--a);border:1px solid rgba(154,119,212,.2)}
+/* Callout badges — prefix with "+" / "−" instead of color */
+.d-badge{
+  display:inline-block;padding:2px 9px;border-radius:2px;font-size:.72rem;font-weight:700;
+  margin:3px;background:transparent;border:1px solid var(--border-strong);color:var(--text);
+}
+.d-badge.ok::before{content:"+ "}
+.d-badge.warn::before{content:"\2212 "}  /* U+2212 minus */
+.d-badge.info::before{content:"\00b7 "}   /* middle dot for neutral info */
 
-/* --- Comparison bar chart (simple horizontal) --- */
+/* Horizontal bar chart */
 .d-bar-wrap{margin:4px 0}
 .d-bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.75rem}
 .d-bar-label{min-width:40px;text-align:right;color:var(--muted);font-weight:600}
-.d-bar{height:20px;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:.7rem;font-weight:600;color:#fff;transition:width .3s}
+.d-bar{height:18px;border-radius:2px;display:flex;align-items:center;padding:0 8px;font-size:.7rem;font-weight:600;color:var(--node-fg);background:var(--node-2);transition:width .3s}
 
-/* --- Connector line (CSS-only) --- */
-.d-connector{width:2px;height:20px;background:var(--border);margin:0 auto}
+.d-connector{width:1px;height:20px;background:var(--border-strong);margin:0 auto}
 
-/* --- Step list (numbered visual steps) --- */
+/* Step list */
 .d-steps{counter-reset:step;list-style:none;padding:0;margin:6px 0}
-.d-steps li{counter-increment:step;display:flex;align-items:flex-start;gap:8px;margin:4px 0;font-size:.82rem;line-height:1.5}
-.d-steps li::before{content:counter(step) ".";flex-shrink:0;min-width:18px;color:var(--a);font-size:.78rem;font-weight:700}
+.d-steps li{counter-increment:step;display:flex;align-items:flex-start;gap:8px;margin:4px 0;font-size:.82rem;line-height:1.5;color:var(--text-2)}
+.d-steps li::before{content:counter(step) ".";flex-shrink:0;min-width:18px;color:var(--text);font-size:.78rem;font-weight:700}
 
-/* --- Tick / Cross markers --- */
-.d-tick{color:var(--g);font-weight:700}.d-cross{color:var(--r);font-weight:700}
+/* Tick / cross → replaced with "+" / "−" characters, monochrome */
+.d-tick{color:var(--text);font-weight:700}
+.d-tick::before{content:"+ "}
+.d-cross{color:var(--text);font-weight:700}
+.d-cross::before{content:"\2212 "}
 
-/* --- Section title inside diagrams --- */
-.d-title{font-size:.88rem;font-weight:700;margin:14px 0 6px;color:var(--text);display:flex;align-items:center;gap:6px}
-.d-title .num{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#fff;flex-shrink:0}
+/* Diagram title — modern chevron indicator instead of boxed triangle.
+   Hide the original ▸ character in .num and inject a clean › via ::after. */
+.d-title{
+  font-size:var(--fs-sm,.88rem);font-weight:700;
+  margin:16px 0 8px;color:var(--text);
+  display:flex;align-items:center;gap:6px;
+  line-height:var(--lh-tight,1.3);
+}
+.d-title .num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:auto;height:auto;padding:0;
+  background:transparent;
+  color:var(--brand);font-weight:700;
+  font-size:0;                 /* hide the original ▸ glyph */
+  flex-shrink:0;line-height:1;
+}
+.d-title .num::after{
+  content:"›";
+  font-size:1.35rem;
+  line-height:1;
+  color:var(--brand);
+  transform:translateY(-1px);
+}
 
-/* --- SVG ring (for precise circular diagrams) --- */
+/* SVG ring */
 .svg-ring{display:block;margin:0 auto}
-.svg-ring text{font-family:'Segoe UI',system-ui,sans-serif;font-weight:700}
-.svg-ring .ring-line{fill:none;stroke:var(--border);stroke-width:3}
-.svg-ring .arc-segment{fill:none;stroke-width:5;opacity:.35}
-.svg-ring .server-dot{stroke:rgba(0,0,0,.3);stroke-width:1.5}
-.svg-ring .key-dot{stroke:rgba(0,0,0,.2);stroke-width:1}
-.svg-ring .arrow-path{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4,3;marker-end:url(#arrowhead)}
+.svg-ring text{font-family:inherit;font-weight:700;fill:var(--text)}
+.svg-ring .ring-line{fill:none;stroke:var(--border-strong);stroke-width:2}
+.svg-ring .arc-segment{fill:none;stroke:var(--text);stroke-width:4;opacity:.35}
+.svg-ring .server-dot{stroke:var(--bg);stroke-width:1.5;fill:var(--text)}
+.svg-ring .key-dot{stroke:var(--bg);stroke-width:1;fill:var(--muted)}
+.svg-ring .arrow-path{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:3,3;marker-end:url(#arrowhead)}
 .svg-ring .label-text{fill:var(--muted);font-size:9px;font-weight:400}
 .svg-ring .pos-text{fill:var(--muted);font-size:8px;font-weight:600}

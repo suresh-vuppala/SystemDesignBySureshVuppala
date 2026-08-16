@@ -28,7 +28,7 @@ const navHTML = `
     <div class="sg"><a href="05-infrastructure.html#multi-region">Multi-Region</a><a href="05-infrastructure.html#service-discovery">Service Discovery</a><a href="05-infrastructure.html#cicd">CI/CD</a><a href="05-infrastructure.html#serverless">Serverless</a><a href="05-infrastructure.html#iac">IaC</a></div>
   </div>
   <div class="nc"><h3 style="color:var(--g)">6. Storage Systems</h3>
-    <div class="sg"><a href="06-storage.html#db-choice">DB Choice</a><a href="06-storage.html#db-internals">Internals</a><a href="06-storage.html#db-indexing">Indexing</a></div>
+    <div class="sg"><a href="06-storage.html#db-internals">Internals</a><a href="06-storage.html#db-indexing">Indexing</a><a href="06-storage.html#db-choice">DB Choice</a></div>
     <div class="sg"><a href="06-storage.html#sql">SQL</a><a href="06-storage.html#nosql">NoSQL</a><a href="06-storage.html#newsql">NewSQL</a><a href="06-storage.html#timeseries">TimeSeries</a></div>
     <div class="sg"><a href="06-storage.html#search">Search/ES</a><a href="06-storage.html#blob">Blob/S3</a><a href="06-storage.html#vector-db">Vector DB</a><a href="06-storage.html#graph-db-deep">Graph DB</a></div>
   </div>

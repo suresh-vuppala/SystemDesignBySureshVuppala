@@ -22,13 +22,11 @@
 <div class="T" id="partitioning">
 <h2>Partitioning</h2>
 <p class="su">
-  Splitting data across nodes to improve 
-  <span class="hg">scalability</span> (horizontal growth), 
-  <span class="hg">throughput</span> (parallel processing), and 
-  <span class="hg">storage capacity</span> (distribute data), 
-  with trade-offs in 
-  <span class="hg">complexity</span> (routing, rebalancing) and 
-  <span class="hg">skew</span> (uneven distribution).
+  Splitting one logical table into smaller physical <em>partitions</em> within a single DB instance — managed transparently by the engine as one unified table, keyed by a <span class="hg">partition key</span> (range, list, or hash). Improves 
+  <span class="hg">query performance</span> (pruning skips irrelevant partitions), 
+  <span class="hg">manageability</span> (archive/drop partitions cheaply), and 
+  <span class="hg">parallelism</span> (scan partitions concurrently), 
+  with trade-offs in <span class="hg">partition-key choice</span>, <span class="hg">skew</span> (uneven sizes), and <span class="hg">DDL complexity</span>.
 </p>
 <!-- ═══ Horizontal vs Vertical ═══ -->
 <div class="d-title"><span class="num d-cyan">▸</span> Horizontal vs Vertical Partitioning</div>
@@ -189,6 +187,9 @@
 
 <div class="b bg" style="margin-top:4px"><span class="hi">Guarantees:</span> Partitioning provides <span class="hg">linear write scaling</span>. <span class="hg">Partition pruning</span> skips irrelevant partitions. <span class="hr">Cross-partition queries are expensive</span> (scatter-gather).</div>
 <div class="b by"><span class="hi">Hotspot Mitigation:</span> Celebrity problem — fix: add random suffix → scatter across shards → aggregate on read.</div>
+
+<div class="b bb" style="margin-top:4px;font-size:.8rem;line-height:1.55"><span class="hi">Where partitioning sits vs indexes:</span> These three solve <span class="hi">different</span> problems — <span class="hg">Partitioning</span> removes irrelevant chunks so there's less to consider · <span class="hg">Clustered index</span> makes the remaining rows physically sequential (kills random I/O) · <span class="hg">Non-clustered index</span> pinpoints the exact row. Partitioning does <span class="hr">not</span> make row fetches sequential — that's the clustered index's job. Full walkthrough in <a href="06-storage.html#db-indexing" style="color:var(--a)">Storage → Database Indexing</a>.</div>
+
 </div>
 
 <div class="T" id="distributed-indexing">
@@ -1620,7 +1621,7 @@
 </div>
 
 <div class="T" id="bloom-filters">
-<h2>Bloom Filters</h2><p class="su">A probabilistic data structure that tells you: <span class="hr">"Definitely not in the set"</span> or <span class="hi">"Probably in the set"</span> (false positives possible, false negatives never). Uses <span class="hg">tiny memory</span> for ultra-fast checks at massive scale.</p>
+<h2>Bloom Filters</h2><p class="su">A probabilistic data structure that gives one of two answers: <span class="hr">"Definitely not in the set"</span> — the item was never inserted, so you can <span class="hg">trust this 100%</span> (always correct, no false negatives); or <span class="hi">"Probably in the set"</span> — it <span class="hg">might be wrong</span> (false positives possible), so go do the real lookup to confirm. Uses <span class="hg">tiny memory</span> for ultra-fast checks at massive scale.</p>
 
 <!-- ═══ REAL-TIME EXAMPLE: Username Availability Check ═══ -->
 <div class="d-title"><span class="num d-green">▸</span> Real-Time Example: "Is this username taken?" (Instagram/Twitter signup)</div>
@@ -1723,7 +1724,10 @@
   <text x="270" y="249" text-anchor="middle" fill="var(--g)" font-size="7" font-weight="700">Compare: "@suresh_dev_2024" → H1→pos 7=0 → ❌ DEFINITELY AVAILABLE (no DB query needed! saved ~5ms)</text>
 </svg>
 
-<div class="b bg" style="margin-top:4px"><span class="hi">Why this matters at scale:</span> Instagram has <span class="hg">500M+ usernames</span>. Without Bloom filter: every signup checks DB (5ms × millions of signups/day = massive DB load). With Bloom filter: <span class="hg">99% of "is this taken?" checks answered in ~0.01ms from memory</span> — only the 1% "maybe taken" results hit the DB. Filter size: 500M × 10 bits = <span class="hg">~600MB RAM</span> (fits on one server).</div>
+<div class="b bg" style="margin-top:4px;line-height:1.6"><span class="hi">Why this matters at scale:</span> Instagram already has <span class="hg">500M+ usernames</span>, and every signup asks the same question — <em>"is this name taken?"</em><br><br>
+<span class="hr">Without a Bloom filter:</span> every check hits the database (~5ms each). Multiply by millions of signups a day and the DB is buried under lookups that mostly come back as "no, it's free."<br><br>
+<span class="hg">With a Bloom filter:</span> the check runs in memory in <span class="hg">~0.01ms</span>. For <span class="hg">~99%</span> of names the filter instantly says <span class="hr">"definitely free"</span> — no DB call at all. Only the <span class="hg">~1%</span> it flags as <span class="hi">"maybe taken"</span> fall through to a real DB lookup to confirm.<br><br>
+<span class="hi">And it's cheap:</span> 500M usernames × 10 bits each ≈ <span class="hg">600MB of RAM</span> — small enough to fit on a single server.</div>
 
 
 <!-- ═══ LOOKUP: Two scenarios ═══ -->
@@ -1780,6 +1784,9 @@
 
 <!-- ═══ Key Insight callout ═══ -->
 <div class="b bg" style="text-align:center;margin-top:4px"><span class="hi">Key Insight:</span> If <span class="hr">ANY bit is 0</span> → <span class="hr">Definitely NOT present</span> (zero false negatives). If <span class="hg">ALL bits are 1</span> → <span class="hi">Might be present</span> (false positive possible). Memory: <span class="hg">~100KB for 1M items</span> · O(K) insert + lookup.</div>
+
+<!-- ═══ Where false positives come from ═══ -->
+<div class="b by" style="margin-top:4px;font-size:.82rem;line-height:1.55"><span class="hi">Where false positives come from:</span> As you insert millions of items, more and more bits flip to <span class="hg">1</span>. Eventually a query for an item you <span class="hr">never inserted</span> can happen to hash to positions that are <span class="hg">all already 1</span> — each set by a different item. The filter then answers <span class="hi">"probably yes"</span> for something never added. This is <span class="hg">controlled, not random</span> — the rate depends entirely on your configuration (<span class="hg">m</span> bits, <span class="hg">k</span> hashes, <span class="hg">n</span> items).</div>
 
 <!-- ═══ Real-world use cases ═══ -->
 <div class="d-title"><span class="num d-yellow">▸</span> Why It Matters — Real-World</div>
