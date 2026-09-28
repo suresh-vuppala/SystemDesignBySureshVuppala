@@ -102,7 +102,7 @@
 
 /* ── Reset + base ───────────────────────────────────────────── */
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;overflow-x:hidden;font-size:16px}
+html{scroll-behavior:smooth;overflow-x:clip;font-size:16px}
 body{
   font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   background:var(--bg);
@@ -112,7 +112,7 @@ body{
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
   text-rendering:optimizeLegibility;
-  overflow-x:hidden;
+  overflow-x:clip;
   transition:background-color .12s linear, color .12s linear;
 }
 ::selection{background:var(--selection);color:var(--text)}
@@ -138,22 +138,87 @@ b,strong{color:var(--text);font-weight:700}
 /* ── Site header / navigation ───────────────────────────────── */
 .sh{
   position:sticky;top:0;z-index:200;
+  transition:box-shadow .18s ease;
   background:var(--bg);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 24px;
   height:54px;
 }
+.sh.sh-scrolled{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+[data-theme="dark"] .sh.sh-scrolled{box-shadow:0 4px 16px rgba(0,0,0,.5)}
 .sh-brand{
-  font-size:var(--fs-md);font-weight:700;
+  font-size:var(--fs-xl);font-weight:800;
   color:var(--text);
   text-decoration:none;letter-spacing:var(--ls-tight);
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:9px;
 }
 .sh-brand:hover{text-decoration:none;color:var(--text)}
-.sh-logo{flex-shrink:0;color:var(--text)}
-@keyframes shLogoSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.sh-logo{animation:none!important}}
+/* Dotted-terminal display face (Doto), same ROND 0 / weight 900 treatment
+   as the course app's lesson-title heading, applied to just the "SDE"
+   mark so the brand keeps its accent without the full wordmark going
+   illegible at this smaller size. */
+.sh-brand-sde{
+  font-family:'Doto','Inter',sans-serif;
+  font-weight:900;font-variation-settings:'ROND' 0;
+  color:var(--brand);
+}
+/* Wordmark composition: "Hello" in a handwritten script, "SDE" in the
+   pixel/terminal face, ".com" small and muted, with a hand-drawn emerald
+   curved underline running under "HelloSDE" (and a touch past it), all
+   matching the logo reference. */
+/* Inline-block + inline spans so "Hello" (Caveat) and "SDE" (Doto) share
+   a natural text baseline. Flexbox baseline alignment was dropping the
+   larger script "Hello" below "SDE" because the two fonts have very
+   different baseline metrics. */
+.sh-brand-word{display:inline-block;position:relative;white-space:nowrap}
+.sh-brand-underlined{position:relative;display:inline-block}
+.sh-brand-hello{
+  font-family:inherit;
+  font-weight:800;font-style:normal;letter-spacing:var(--ls-tight);
+  font-size:1em;color:var(--text);
+  margin-right:1px;vertical-align:baseline;
+}
+.sh-brand-sde{vertical-align:baseline}
+.sh-brand-dot{
+  font-family:inherit;
+  font-size:.9em;font-weight:600;letter-spacing:normal;
+  color:var(--text);margin-left:1px;vertical-align:baseline;
+}
+/* Curved underline: infinite draw-in, hold, then retract loop. clip-path
+   percentages are relative to the element box, so the animation is
+   independent of the SVG's non-uniform (preserveAspectRatio="none")
+   stretch. */
+.sh-brand-underline{
+  position:absolute;left:-3%;bottom:-5px;width:110%;height:12px;
+  overflow:visible;pointer-events:none;
+  animation:shUnderlineDraw 2.6s ease-in-out infinite;
+}
+.sh-brand-underline path{stroke:var(--brand)}
+@keyframes shUnderlineDraw{
+  0%,100%{clip-path:inset(0 100% 0 0)}
+  35%,65%{clip-path:inset(0 0 0 0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .sh-brand-underline{animation:none;clip-path:none}
+}
+/* Waving-hand emoji logo: pivots near the wrist (bottom-left of the
+   glyph) so the motion reads as a side-to-side wave, echoing the site
+   name "Hello". Loops continuously. */
+.sh-logo-wave{
+  display:inline-flex;flex-shrink:0;font-size:1.3em;line-height:1;
+  transform-origin:20% 85%;
+  animation:shWave 2.2s ease-in-out infinite;
+}
+@keyframes shWave{
+  0%,40%,100%{transform:rotate(0deg)}
+  50%{transform:rotate(-8deg)}
+  60%{transform:rotate(14deg)}
+  70%{transform:rotate(-10deg)}
+  80%{transform:rotate(8deg)}
+  90%{transform:rotate(-4deg)}
+}
+@media(prefers-reduced-motion:reduce){.sh-logo-wave{animation:none!important}}
 
 .sh-nav{display:flex;align-items:center;gap:2px;margin-left:32px}
 .sh-right{display:flex;align-items:center;gap:8px;margin-left:auto}

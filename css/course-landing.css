@@ -1,0 +1,150 @@
+/* === Modern polish for the live-course landing pages ===
+   Shared by master-system-design.html and master-ai-engineering.html.
+   Linked AFTER each page's inline <style> so these refinements win the
+   cascade. Theme-aware, on-brand (orange), consistent with the home page. */
+
+/* ── Hero: soft brand glow + animated gradient headline accent ── */
+.course-hero{
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(760px 320px at 50% -10%, var(--brand-soft), transparent 72%),
+    var(--bg);
+}
+.course-kicker{
+  color:var(--brand-2);background:var(--brand-soft);
+  border:1px solid var(--brand-border);border-radius:30px;padding:6px 15px;
+}
+.course-hero h1 .u{
+  border-bottom:none;padding-bottom:0;white-space:nowrap;
+  background:linear-gradient(90deg,#fb923c,#f97316,#fbbf24,#f97316,#fb923c);
+  background-size:220% auto;
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+  animation:clShine 7s linear infinite;
+}
+@keyframes clShine{to{background-position:220% center}}
+@media(prefers-reduced-motion:reduce){.course-hero h1 .u{animation:none}}
+
+/* Colorful emoji (the page greyscaled them; bring them back for pop) */
+.fact .fact-ic,.bonus .bic{filter:none;opacity:1}
+
+/* ── Fact strip cards ── */
+.fact{
+  position:relative;overflow:hidden;border-radius:12px;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.fact::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  transform:scaleX(0);transform-origin:left;transition:transform .24s ease;
+}
+.fact:hover{transform:translateY(-3px);border-color:var(--brand-border);box-shadow:0 12px 26px -10px rgba(2,6,23,.28)}
+.fact:hover::before{transform:scaleX(1)}
+[data-theme="dark"] .fact:hover{box-shadow:0 12px 26px -10px rgba(0,0,0,.6)}
+
+/* ── Method flow steps ── */
+.flow-step{border-radius:12px;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.flow-step .step-n{
+  font-size:var(--fs-2xl);opacity:.95;
+  background:linear-gradient(135deg,#fb923c,#f97316);
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+}
+.flow-step:hover{transform:translateY(-3px);border-color:var(--brand-border);box-shadow:0 12px 26px -10px rgba(2,6,23,.28)}
+[data-theme="dark"] .flow-step:hover{box-shadow:0 12px 26px -10px rgba(0,0,0,.6)}
+
+/* ── Roadmap week accordion ── */
+.week{border-radius:12px;transition:box-shadow .16s ease,border-color .16s ease}
+.week:hover{border-color:var(--brand-border);box-shadow:0 8px 20px -10px rgba(2,6,23,.22)}
+[data-theme="dark"] .week:hover{box-shadow:0 8px 20px -10px rgba(0,0,0,.5)}
+.week-tag{
+  color:var(--brand-fg);border:none;border-radius:20px;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));
+  box-shadow:0 3px 8px rgba(201,74,12,.25);
+}
+
+/* ── Generic content cards ── */
+.pain,.outcome,.aud,.bonus,.tst{
+  border-radius:12px;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.pain:hover,.outcome:hover,.aud:hover,.bonus:hover,.tst:hover{
+  transform:translateY(-2px);border-color:var(--brand-border);
+  box-shadow:0 10px 22px -10px rgba(2,6,23,.22);
+}
+[data-theme="dark"] .pain:hover,[data-theme="dark"] .outcome:hover,
+[data-theme="dark"] .aud:hover,[data-theme="dark"] .bonus:hover,
+[data-theme="dark"] .tst:hover{box-shadow:0 10px 22px -10px rgba(0,0,0,.55)}
+
+/* Testimonial avatar: gradient chip */
+.tst .ava{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:var(--brand-fg)}
+
+/* ── Pricing card: gradient accent + gradient amount ── */
+.price-card{
+  position:relative;overflow:hidden;border-radius:16px;
+  border-color:var(--brand-border);
+  background:linear-gradient(180deg,var(--brand-soft),var(--card) 130px);
+  box-shadow:0 24px 60px -28px rgba(2,6,23,.4);
+}
+.price-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+}
+.price-batch{
+  color:var(--brand-fg);border:none;border-radius:20px;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));
+  box-shadow:0 3px 8px rgba(201,74,12,.25);
+}
+.price-amt{
+  background:linear-gradient(135deg,#fb923c,#f97316);
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+}
+.price-amt .cur{color:var(--muted);-webkit-text-fill-color:var(--muted)}
+
+/* ── Per-week topic pills (AI page) ── */
+.week-tags .wt{transition:border-color .14s ease,color .14s ease}
+.week-tags .wt:hover{border-color:var(--brand-border);color:var(--brand-2)}
+
+
+/* ── Retro 8-bit pixel buttons (match the home page) ── */
+.btn-pay,.btn-ghost,.btn-wa{
+  border:none;border-radius:0;
+  font-family:'Doto',var(--font-mono,ui-monospace),monospace;
+  font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  clip-path:polygon(0 4px,4px 4px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));
+  transition:transform .1s ease,filter .1s ease,background-color .12s;
+}
+.btn-pay{
+  --pxln:#141418;--pxsh:rgba(20,20,25,.9);
+  background:var(--brand);color:var(--brand-fg);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(4px 4px 0 var(--pxsh));
+}
+.btn-pay:hover{
+  background:var(--brand-2);transform:translate(2px,2px);text-decoration:none;
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(2px 2px 0 var(--pxsh));
+}
+.btn-pay:active{
+  transform:translate(4px,4px);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln));
+}
+[data-theme="dark"] .btn-pay{--pxsh:rgba(255,255,255,.16)}
+/* Secondary / WhatsApp pixel buttons need a SOLID fill: the drop-shadow
+   pixel outline traces the button box (as it does for .btn-pay). On a
+   transparent background there is no box to trace, so the filter outlines
+   the dotted Doto glyphs instead and the label collapses into unreadable
+   black bars. A neutral card fill keeps the retro look and stays legible. */
+.btn-ghost,.btn-wa{
+  --pxln:var(--text);--pxsh:rgba(0,0,0,.28);
+  background:var(--card);color:var(--text);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(3px 3px 0 var(--pxsh));
+}
+.btn-ghost:hover,.btn-wa:hover{
+  background:var(--card-2);transform:translate(1px,1px);text-decoration:none;
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(2px 2px 0 var(--pxsh));
+}
+[data-theme="dark"] .btn-ghost,[data-theme="dark"] .btn-wa{--pxsh:rgba(255,255,255,.14)}
+@media(prefers-reduced-motion:reduce){
+  .btn-pay,.btn-ghost,.btn-wa{transition:filter .1s ease,background-color .12s}
+  .btn-pay:hover,.btn-ghost:hover,.btn-wa:hover,.btn-pay:active{transform:none}
+}

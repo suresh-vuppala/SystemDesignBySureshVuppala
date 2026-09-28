@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Master AI Engineering: RAG &amp; Agents, 8-Week Live Cohort · HelloSDE</title>
+<meta name="description" content="An 8-week live weekend cohort (Sat/Sun) where you build production RAG pipelines, tool-calling and multi-agent systems, MCP, evals, guardrails and observability, then ship a capstone. For engineers upskilling into AI and FDE roles.">
+<meta name="keywords" content="AI engineering course, RAG course, LLM agents, multi-agent systems, MCP, model context protocol, LangGraph, vector database, LLM evals, guardrails, FDE, forward deployed engineer">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://hellosde.com/master-ai-engineering.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hellosde.com/master-ai-engineering.html">
+<meta property="og:title" content="Master AI Engineering: RAG &amp; Agents, 8-Week Live Cohort">
+<meta property="og:description" content="Build production RAG, tool-calling and multi-agent systems, MCP, evals and guardrails, then ship a capstone. 8 weekends, live. For software engineers moving into AI and FDE roles.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "Master AI Engineering",
+  "description": "An 8-week live weekend cohort where you build production RAG pipelines, tool-calling and multi-agent systems, MCP, evals, guardrails and observability, then ship a capstone. For engineers upskilling into AI and FDE roles.",
+  "url": "https://hellosde.com/master-ai-engineering.html",
+  "provider": { "@type": "Organization", "name": "HelloSDE", "url": "https://hellosde.com" },
+  "offers": { "@type": "Offer", "category": "Paid", "price": "39999", "priceCurrency": "INR", "url": "https://hellosde.com/master-ai-engineering.html" },
+  "hasCourseInstance": {
+    "@type": "CourseInstance",
+    "courseMode": "online",
+    "startDate": "2026-10-18",
+    "location": { "@type": "VirtualLocation", "url": "https://hellosde.com/master-ai-engineering.html" }
+  }
+}
+</script>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* Course page: monochrome, theme-aware */
+.course-hero{
+  padding:56px 24px 40px;text-align:center;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+}
+.course-kicker{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--text-2);background:transparent;border:1px solid var(--border-strong);
+  padding:5px 14px;border-radius:2px;margin-bottom:16px;
+}
+.course-hero h1{font-size:var(--fs-3xl);font-weight:700;letter-spacing:var(--ls-tight);color:var(--text);margin:0;line-height:var(--lh-tight)}
+.course-hero h1 .u{
+  position:relative;white-space:nowrap;
+  border-bottom:2px solid var(--brand);padding-bottom:2px;
+}
+.course-sub{color:var(--text-2);max-width:660px;margin:18px auto 0;font-size:var(--fs-md);line-height:var(--lh-loose)}
+.course-sub strong{color:var(--text);font-weight:700}
+.course-hook{margin:14px auto 0;font-size:var(--fs-lg);font-weight:700;color:var(--text);letter-spacing:var(--ls-tight)}
+
+/* Quick facts strip */
+.facts{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:900px;margin:28px auto 0}
+.fact{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:16px 18px;text-align:left}
+.fact .fact-ic{font-size:var(--fs-md);margin-bottom:6px;filter:grayscale(1);opacity:.85}
+.fact .fact-lbl{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);color:var(--muted);margin-bottom:3px}
+.fact .fact-val{font-size:var(--fs-sm);font-weight:700;color:var(--text)}
+
+.course-cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:30px}
+.btn-wa{
+  display:inline-flex;align-items:center;gap:9px;padding:12px 22px;border-radius:3px;
+  background:transparent;color:var(--text);border:1px solid var(--border-strong);
+  font-weight:600;font-size:var(--fs-sm);text-decoration:none;transition:background-color .12s;
+}
+.btn-wa:hover{background:var(--card-2);text-decoration:none}
+.btn-pay{
+  display:inline-flex;align-items:center;gap:9px;padding:13px 26px;border-radius:3px;
+  border:1px solid var(--brand);cursor:pointer;font:inherit;
+  background:var(--brand);color:var(--brand-fg);font-weight:700;font-size:var(--fs-sm);text-decoration:none;
+  transition:background-color .12s,transform .12s,box-shadow .12s;
+  box-shadow:0 3px 12px rgba(201,74,12,.25);
+}
+.btn-pay:hover{background:var(--brand-2);border-color:var(--brand-2);transform:translateY(-1px);box-shadow:0 5px 18px rgba(201,74,12,.32);text-decoration:none}
+.btn-pay .pay-sec{font-size:var(--fs-2xs);font-weight:600;opacity:.85;display:flex;align-items:center;gap:4px;margin-left:2px}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:3px;
+  background:transparent;border:1px solid var(--border-strong);color:var(--text);
+  font-weight:600;font-size:var(--fs-sm);text-decoration:none;transition:background-color .12s;
+}
+.btn-ghost:hover{background:var(--card-2);text-decoration:none}
+.hero-trust{margin-top:22px;font-size:var(--fs-xs);color:var(--muted)}
+.hero-trust b{color:var(--text)}
+
+/* Content wrapper */
+.course-wrap{max-width:940px;margin:0 auto;padding:48px 24px 80px}
+.sec-title{font-size:var(--fs-xl);font-weight:700;color:var(--text);margin:0 0 6px;letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+.sec-lead{color:var(--muted);font-size:var(--fs-md);margin:0 0 24px;line-height:var(--lh-normal)}
+.course-section{margin-bottom:60px}
+
+/* Pain points */
+.pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pain{
+  background:var(--card);border:1px solid var(--border);
+  border-left:3px solid var(--border-strong);border-radius:3px;padding:16px 18px;
+}
+.pain p{margin:0;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose)}
+.pain .q{color:var(--text);font-weight:700;display:block;margin-bottom:4px}
+.pain-turn{
+  margin-top:18px;background:var(--bg-2);
+  border:1px solid var(--border);border-left:3px solid var(--text);
+  border-radius:3px;padding:16px 18px;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose);
+}
+.pain-turn b{color:var(--text)}
+
+/* Method flow */
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.flow-step{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px;position:relative}
+.flow-step .step-n{position:absolute;top:14px;right:20px;font-size:var(--fs-xl);font-weight:700;color:var(--card-2);line-height:1}
+.flow-step h3{font-size:var(--fs-md);color:var(--text);margin:0 0 6px;font-weight:700}
+.flow-step p{font-size:var(--fs-sm);color:var(--text-2);margin:0;line-height:var(--lh-loose)}
+
+/* Roadmap accordion */
+.week{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:10px;overflow:hidden}
+.week[open]{border-color:var(--border-strong)}
+.week summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:background .12s}
+.week summary::-webkit-details-marker{display:none}
+.week summary:hover{background:var(--card-2)}
+.week-tag{
+  flex-shrink:0;font-size:var(--fs-2xs);font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;
+  color:var(--text);background:var(--brand-soft);border:1px solid var(--brand-border);
+  padding:4px 10px;border-radius:2px;min-width:78px;text-align:center;
+}
+.week-head{flex:1;min-width:0}
+.week-head h3{font-size:var(--fs-md);color:var(--text);margin:0;font-weight:700;line-height:var(--lh-tight)}
+.week-head p{font-size:var(--fs-xs);color:var(--muted);margin:2px 0 0}
+.week-caret{flex-shrink:0;color:var(--muted);transition:transform .2s}
+.week[open] .week-caret{transform:rotate(180deg);color:var(--text)}
+.week-body{padding:6px 20px 20px;border-top:1px solid var(--border)}
+.week-body .wb-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+@media(max-width:640px){.week-body .wb-row{grid-template-columns:1fr}}
+.wb-col h4{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);margin:0 0 8px;font-weight:700;color:var(--muted)}
+.wb-list{list-style:none;padding:0;margin:0}
+.wb-list li{font-size:var(--fs-sm);color:var(--text-2);padding:4px 0 4px 18px;position:relative;line-height:var(--lh-normal)}
+.wb-col.blocks .wb-list li::before{content:'›';position:absolute;left:0;color:var(--text);font-weight:700}
+.wb-col.apply .wb-list li::before{content:'+';position:absolute;left:0;color:var(--text);font-weight:700}
+/* Per-week tag pills */
+.week-tags{margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);display:flex;flex-wrap:wrap;gap:6px}
+.week-tags .wt{
+  font-size:var(--fs-2xs);font-weight:600;color:var(--text-2);
+  background:var(--bg-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;
+}
+.wb-new{
+  display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--brand-2);background:var(--brand-soft);border:1px solid var(--brand-border);
+  border-radius:2px;padding:0 5px;margin-left:6px;vertical-align:middle;
+}
+
+/* Outcomes */
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.outcome{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:3px;padding:14px 16px}
+.outcome .ic{color:var(--text);font-weight:700;flex-shrink:0;margin-top:1px;min-width:14px}
+.outcome span{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal)}
+.outcome b{color:var(--text)}
+
+/* Audience: "for you" (positive) uses "+", "not for you" (deterrent) uses "−" */
+.aud-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.aud{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px}
+.aud h3{font-size:var(--fs-md);margin:0 0 12px;font-weight:700;color:var(--text)}
+.aud ul{list-style:none;padding:0;margin:0}
+.aud li{font-size:var(--fs-sm);color:var(--text-2);padding:6px 0 6px 22px;position:relative;line-height:var(--lh-normal)}
+.aud.for li::before{content:'+';position:absolute;left:0;color:var(--text);font-weight:700}
+.aud.notfor li::before{content:'\2212';position:absolute;left:0;color:var(--text);font-weight:700}
+
+/* Capstone tracks */
+.track-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:760px){.track-grid{grid-template-columns:1fr}}
+.track{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 20px;position:relative}
+.track .tk-n{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);color:var(--muted);margin-bottom:8px}
+.track h4{font-size:var(--fs-md);color:var(--text);margin:0 0 8px;font-weight:700}
+.track p{font-size:var(--fs-sm);color:var(--text-2);margin:0;line-height:var(--lh-loose)}
+
+/* Bonuses */
+.bonus-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:700px){.bonus-grid{grid-template-columns:1fr}}
+.bonus{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;text-align:center}
+.bonus .bic{font-size:var(--fs-xl);margin-bottom:8px;filter:grayscale(1);opacity:.85}
+.bonus h4{font-size:var(--fs-sm);color:var(--text);margin:0 0 5px;font-weight:700}
+.bonus p{font-size:var(--fs-xs);color:var(--muted);margin:0;line-height:var(--lh-normal)}
+
+/* Testimonials */
+.tst-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.tst-grid{grid-template-columns:1fr}}
+.tst{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px}
+.tst p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose);margin:0 0 14px;font-style:italic}
+.tst .who{display:flex;align-items:center;gap:10px}
+.tst .ava{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--text);color:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:var(--fs-xs);flex-shrink:0;
+}
+.tst .who b{display:block;color:var(--text);font-size:var(--fs-sm)}
+.tst .who span{font-size:var(--fs-2xs);color:var(--muted)}
+
+/* Pricing */
+.price-card{
+  max-width:480px;margin:0 auto;
+  background:var(--card);border:1px solid var(--border-strong);border-radius:6px;
+  padding:32px 28px;text-align:center;position:relative;
+}
+.price-batch{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--text-2);background:transparent;border:1px solid var(--border-strong);
+  padding:4px 12px;border-radius:2px;margin-bottom:16px;
+}
+.price-amt{font-size:var(--fs-3xl);font-weight:700;color:var(--text);line-height:1;letter-spacing:var(--ls-tight)}
+.price-amt .cur{font-size:var(--fs-lg);font-weight:700;color:var(--muted);vertical-align:super;margin-right:2px}
+.price-note{color:var(--muted);font-size:var(--fs-xs);margin:8px 0 22px}
+.price-includes{list-style:none;padding:0;margin:0 0 24px;text-align:left}
+.price-includes li{padding:6px 0 6px 22px;position:relative;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal)}
+.price-includes li::before{content:'+';position:absolute;left:0;top:6px;color:var(--text);font-weight:700}
+
+/* Urgency: genuine warning uses accent border */
+.urgency{
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  margin:0 auto 22px;max-width:480px;
+  background:var(--bg-2);border:1px solid var(--border);border-left:3px solid var(--danger);
+  border-radius:3px;padding:11px 16px;font-size:var(--fs-xs);color:var(--text-2);
+}
+.urgency b{color:var(--text);font-weight:700}
+
+/* FAQ */
+.faq{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:8px;overflow:hidden}
+.faq summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:600;color:var(--text);font-size:var(--fs-sm);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';color:var(--muted);font-size:var(--fs-lg);font-weight:400;line-height:1;flex-shrink:0}
+.faq[open] summary::after{content:'\2212'}  /* U+2212 minus */
+.faq summary:hover{background:var(--card-2)}
+.faq-body{padding:0 18px 16px;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose)}
+
+@media(max-width:640px){
+  .course-hero h1{font-size:var(--fs-2xl)}
+  .course-wrap{padding:36px 16px 60px}
+  .bonus-grid{grid-template-columns:1fr}
+  .tst-grid{grid-template-columns:1fr}.pain-grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.outcomes{grid-template-columns:1fr}.aud-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="css/course-landing.css">
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<section class="course-hero">
+  <span class="course-kicker">Live Cohort · 8 Weekends · Limited Seats</span>
+  <h1>Master <span class="u">AI Engineering</span></h1>
+  <p class="course-sub">You can already ship software. But "add AI to it" now means <strong>RAG pipelines, agents, tool calling, evals, and guardrails</strong>, and most tutorials stop at a toy demo that falls apart in production. This 8-week live cohort is the hands-on path: you learn each building block, then <strong>build it the same session</strong>, week after week, until you ship a real capstone you can put in front of an interviewer.</p>
+
+  <div class="facts">
+    <div class="fact"><div class="fact-ic">📅</div><div class="fact-lbl">Duration</div><div class="fact-val">8 Weeks · Weekends</div></div>
+    <div class="fact"><div class="fact-ic">⏰</div><div class="fact-lbl">Timing</div><div class="fact-val">Sat &amp; Sun · 9:00–11:30 AM IST</div></div>
+    <div class="fact"><div class="fact-ic">🚀</div><div class="fact-lbl">Next Batch</div><div class="fact-val">Oct 18</div></div>
+    <div class="fact"><div class="fact-ic">🎓</div><div class="fact-lbl">Outcome</div><div class="fact-val">Ship a capstone</div></div>
+  </div>
+
+  <div class="course-cta-row">
+    <a class="btn-pay" href="https://wa.me/919100880133?text=Hi%2C%20I%27m%20interested%20in%20the%20Master%20AI%20Engineering%20(RAG%20%26%20Agents)%20cohort." target="_blank" rel="noopener"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Enroll: Chat on WhatsApp</a>
+    <a class="btn-ghost" href="#roadmap">See the full syllabus ↓</a>
+  </div>
+  <p class="hero-trust">Built for engineers moving into <b>AI Engineer and Forward-Deployed Engineer</b> roles · 8 hands-on weeks · 3 capstone tracks</p>
+</section>
+
+<div class="course-wrap">
+
+  <!-- ── PAIN POINTS ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Sound familiar?</h2>
+    <p class="sec-lead">Most engineers don't struggle with AI because they lack intelligence. They struggle because every tutorial stops at "hello world" and never shows the production reality.</p>
+    <div class="pain-grid">
+      <div class="pain"><p><span class="q">"My RAG demo works on 5 docs, then dies in prod."</span>It looked great in the notebook, but real corpora, bad chunks, and irrelevant retrievals crater the accuracy the moment users show up.</p></div>
+      <div class="pain"><p><span class="q">"I can call an LLM, but I can't build an agent."</span>You know the API. You still can't wire up tool calling, a reasoning loop, and structured outputs into something that reliably gets work done.</p></div>
+      <div class="pain"><p><span class="q">"I glued a LangChain tutorial together and it breaks."</span>When it fails you have no idea why, because you never learned evals, tracing, or how to reason about the context window.</p></div>
+      <div class="pain"><p><span class="q">"Everyone name-drops MCP, evals, guardrails."</span>You keep hearing the terms in job descriptions but have never actually built one, so interviews expose the gap fast.</p></div>
+    </div>
+    <div class="pain-turn">The fix isn't <b>more videos</b>. It's <b>structured practice</b>: learn one block, build it the same session on a real use case, then compose the blocks into agents and pipelines you can defend in an interview.</div>
+  </section>
+
+  <!-- ── METHOD ── -->
+  <section class="course-section" id="format">
+    <h2 class="sec-title">The learn → build method</h2>
+    <p class="sec-lead">Every concept is followed by hands-on code the same session. That's how it becomes a skill, not a bookmark.</p>
+    <div class="flow">
+      <div class="flow-step"><span class="step-n">1</span><h3>Learn the building block</h3><p>One core idea at a time, in a deliberate sequence: LLM basics, retrieval, agents, evals. Each week builds on the last.</p></div>
+      <div class="flow-step"><span class="step-n">2</span><h3>Build it immediately</h3><p>The same session, you write the code: a RAG pipeline, a tool-calling agent, an MCP connection, an eval suite. Theory turns into a working artifact while it's fresh.</p></div>
+      <div class="flow-step"><span class="step-n">3</span><h3>Compose the blocks</h3><p>As your toolkit grows, you combine them: advanced retrieval, multi-agent orchestration, guardrails and observability wrapped around real workloads.</p></div>
+      <div class="flow-step"><span class="step-n">4</span><h3>Ship a capstone</h3><p>The final weeks you scope, build, and present a production-shaped project end-to-end, with eval results and a demo you can show off.</p></div>
+    </div>
+  </section>
+
+  <!-- ── DETAILED ROADMAP ── -->
+  <section class="course-section" id="roadmap">
+    <h2 class="sec-title">The 8-week syllabus</h2>
+    <p class="sec-lead">Live sessions, Sat &amp; Sun, 9:00–11:30 AM IST. Prerequisites: prior coding experience and a basic understanding of software systems. Tap any week to expand. <strong>Every week = learn the theory, then build it in a hands-on lab.</strong></p>
+
+    <details class="week" open>
+      <summary>
+        <span class="week-tag">Week 1</span>
+        <span class="week-head"><h3>Terminology, Prerequisites &amp; the Model Landscape</h3><p>The vocabulary and the provider tradeoffs before you build</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>Core LLM terminology: tokens, context window, parameters, attention</li>
+          <li>How LLMs are trained: pre-training, post-training, and inference at runtime</li>
+          <li>Embeddings &amp; semantic similarity: turning text into vectors</li>
+          <li>Prompting basics: system, user, few-shot</li>
+          <li>Structured outputs and JSON formatting</li>
+          <li>Choosing a provider: frontier APIs (Anthropic, OpenAI, Google) vs open-weight models (Llama, Mistral, Qwen), cost, latency, data-residency tradeoffs <span class="wb-new">New</span></li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Make your first LLM API calls</li>
+          <li>Compute cosine similarity from scratch</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">LLMs</span><span class="wt">Embeddings</span><span class="wt">Tokens</span><span class="wt">Prompts</span><span class="wt">API Basics</span><span class="wt">Model Selection</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 2</span>
+        <span class="week-head"><h3>RAG: Components &amp; Architecture</h3><p>The 5-stage pipeline that grounds an LLM in your data</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>Why RAG exists: knowledge cutoff and the hallucination problem</li>
+          <li>The 5-stage RAG pipeline: ingest, chunk, embed, index, retrieve</li>
+          <li>Chunking strategies and when to use each</li>
+          <li>Embedding models: choosing the right one for your use case</li>
+          <li>Vector databases &amp; indexing algorithms (HNSW, IVF, PQ)</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Build an end-to-end RAG pipeline with LangChain + ChromaDB</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">Chunking</span><span class="wt">Embeddings</span><span class="wt">Vector DB</span><span class="wt">HNSW</span><span class="wt">Retrieval</span><span class="wt">Augmentation</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 3</span>
+        <span class="week-head"><h3>Advanced RAG</h3><p>Breaking through the accuracy ceiling of naive RAG</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>Why naive RAG hits accuracy ceilings</li>
+          <li>Query rewriting techniques: expansion, HyDE, multi-query</li>
+          <li>Cross-encoder reranking: LLM-quality scoring after initial retrieval</li>
+          <li>Metadata filtering and hybrid search (dense + sparse)</li>
+          <li>Evals specific to RAG: faithfulness, answer relevance</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Apply advanced retrieval techniques to your Week 2 pipeline</li>
+          <li>Benchmark the accuracy improvements with an eval suite</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">HyDE</span><span class="wt">Reranker</span><span class="wt">Query Rewriting</span><span class="wt">Multi-Vector</span><span class="wt">Self-RAG</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 4</span>
+        <span class="week-head"><h3>RAG Architectures &amp; the RAG-vs-Long-Context Decision</h3><p>Advanced patterns, and when not to build RAG at all</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>Common pitfalls in production RAG systems</li>
+          <li>GraphRAG: knowledge graphs as retrieval backends</li>
+          <li>KAG (Knowledge-Augmented Generation): structured KB + LLM</li>
+          <li>Agentic RAG: the LLM decides what to retrieve, when, and how</li>
+          <li>Multimodal RAG: retrieving across text, images, and tables</li>
+          <li>Decision framework: when RAG is right, when long-context stuffing beats it, when to skip retrieval entirely <span class="wb-new">New</span></li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Build a GraphRAG system on a real use case using Neo4j</li>
+          <li>Compare it against vanilla RAG</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">GraphRAG</span><span class="wt">Agentic RAG</span><span class="wt">KAG</span><span class="wt">Multimodal RAG</span><span class="wt">LightRAG</span><span class="wt">Long Context</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 5</span>
+        <span class="week-head"><h3>Tool Calling, MCP &amp; Single-Agent Systems</h3><p>Turning an LLM into an agent that gets work done</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>What is an agent? LLM + tools + loop</li>
+          <li>LLM vs agent: how to tell a pipeline from a single API call</li>
+          <li>Tool / function calling: how the LLM triggers Python functions</li>
+          <li>Model Context Protocol (MCP): standardized tool/data connectivity, architecture, servers, clients, and why it's replacing bespoke integrations <span class="wb-new">New</span></li>
+          <li>The ReAct pattern: Reasoning, Acting, Observing</li>
+          <li>Pydantic AI: type-safe agents with validated structured outputs</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Build a single agent with tools, structured outputs, and basic guardrails</li>
+          <li>Connect your agent to an MCP server</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">ReAct</span><span class="wt">Tool Calling</span><span class="wt">MCP</span><span class="wt">PydanticAI</span><span class="wt">Prompt Engineering</span><span class="wt">Structured Outputs</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 6</span>
+        <span class="week-head"><h3>Multi-Agent Systems</h3><p>Orchestration, routing, and memory across agents</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>Why multi-agent? Parallelism, specialisation, separation of concerns</li>
+          <li>Agentic design patterns: Orchestrator-Worker, Routing</li>
+          <li>Problems unique to multi-agent: orchestration, information isolation, planning</li>
+          <li>Memory systems for agents: short-term and long-term</li>
+          <li>Cost and latency considerations in multi-agent systems</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Build a research + writer + critic multi-agent pipeline in LangGraph with routing</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">LangGraph</span><span class="wt">Multi-Agent</span><span class="wt">Orchestration</span><span class="wt">Design Patterns</span><span class="wt">Routing</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 7</span>
+        <span class="week-head"><h3>Context Engineering, Evaluation, Guardrails &amp; Production</h3><p>The densest week: making agents accurate, safe, and observable</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>Context engineering vs prompt engineering</li>
+          <li>What goes in the context: instructions, tools, history, retrieved docs</li>
+          <li>Quantitative evals (accuracy, F1, exact match, tool-call accuracy)</li>
+          <li>Qualitative evals with LLM-as-a-Judge: rubric design, single-answer grading</li>
+          <li>Prompt injection: attack patterns and defenses for agents with tool access <span class="wb-new">New</span></li>
+          <li>Output validation and jailbreak resistance for user-facing systems <span class="wb-new">New</span></li>
+          <li>Observability and tracing in production (Langfuse, LangSmith or equivalent) <span class="wb-new">New</span></li>
+          <li>Serving patterns: streaming responses, async execution, latency budgets <span class="wb-new">New</span></li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Run a full eval suite on your Week 6 multi-agent pipeline (quantitative + LLM-as-a-Judge)</li>
+          <li>Red-team your pipeline and add input/output guardrails and tracing</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">Context Engineering</span><span class="wt">Memory</span><span class="wt">LLM-as-a-Judge</span><span class="wt">Evals</span><span class="wt">Prompt Injection</span><span class="wt">Guardrails</span><span class="wt">Observability</span><span class="wt">Serving</span></div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 8</span>
+        <span class="week-head"><h3>Capstone Project</h3><p>Scope it, build it, present it</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Theory</h4><ul class="wb-list">
+          <li>AI engineering best practices: from prototype to production</li>
+          <li>Engineering decision framework: choosing RAG type, agent pattern, and stack</li>
+          <li>How to scope a capstone: MVP definition, what to cut, what to keep</li>
+          <li>Architecture reviews and 1:1 feedback on each project plan</li>
+          <li>Presenting AI systems in interviews: structure, demo flow, eval results</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Hands-On Coding</h4><ul class="wb-list">
+          <li>Live capstone demos with peer Q&amp;A</li>
+          <li>Eval walkthroughs and structured feedback</li>
+        </ul></div>
+      </div>
+      <div class="week-tags"><span class="wt">Capstone</span><span class="wt">Architecture Design</span><span class="wt">Presentation</span><span class="wt">Portfolio</span></div></div>
+    </details>
+  </section>
+
+  <!-- ── CAPSTONE TRACKS ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Capstone project tracks</h2>
+    <p class="sec-lead">Pick one and ship it end-to-end. Each track is a production-shaped system, not a toy demo.</p>
+    <div class="track-grid">
+      <div class="track">
+        <div class="tk-n">Track 1</div>
+        <h4>FinQuery</h4>
+        <p>Deterministic personal-finance AI agents with tool-calling ReAct, typed SQL execution, a hybrid-search knowledge base, and a reversible pseudonymization gate for 0% raw PII leakage to the LLM.</p>
+      </div>
+      <div class="track">
+        <div class="tk-n">Track 2</div>
+        <h4>Product Discovery Copilot</h4>
+        <p>Root-cause attribution for product funnels using a cyclic, stateful multi-agent system with a dedicated "Falsifier" agent, Pydantic AI tools, typed SQL via DuckDB, and hybrid BM25 + cross-encoder reranking.</p>
+      </div>
+      <div class="track">
+        <div class="tk-n">Track 3</div>
+        <h4>GrantMatch</h4>
+        <p>Transparent scholarship-eligibility agents combining retrieval over compliance PDFs, active web search, and structured JSON rulesets to generate cited eligibility reasoning.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── OUTCOMES ── -->
+  <section class="course-section">
+    <h2 class="sec-title">What you'll walk away with</h2>
+    <p class="sec-lead">By week 8, "add AI to it" stops being vague and becomes a set of engineering decisions you can make and defend.</p>
+    <div class="outcomes">
+      <div class="outcome"><span class="ic">+</span><span>Build a <b>production RAG pipeline</b> end-to-end: ingest, chunk, embed, index, retrieve, rerank, and eval.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Know <b>when not to use RAG</b>, and when long-context or no retrieval is the better call.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Build <b>single and multi-agent systems</b> with tool calling, the ReAct loop, and MCP.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Add <b>evals, guardrails, tracing, and serving</b> so your agents are trustworthy in production.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Ship a <b>capstone project</b> you can demo, with real eval results, for your portfolio.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Interview confidently for <b>AI Engineer and FDE roles</b>, speaking the production vocabulary fluently.</span></div>
+    </div>
+  </section>
+
+  <!-- ── AUDIENCE ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Is this for you?</h2>
+    <div class="aud-grid">
+      <div class="aud for">
+        <h3>Perfect if you're…</h3>
+        <ul>
+          <li>A software engineer upskilling into AI Engineer or FDE roles</li>
+          <li>A backend / full-stack dev who wants real production AI skills</li>
+          <li>Comfortable coding, but new to RAG, agents, and evals</li>
+          <li>Tired of tutorials that stop at a toy "hello world RAG"</li>
+          <li>Wanting a portfolio-ready capstone, not just certificates</li>
+        </ul>
+      </div>
+      <div class="aud notfor">
+        <h3>Not for you if…</h3>
+        <ul>
+          <li>You've never written code and want an intro-to-programming class</li>
+          <li>You want to train or fine-tune foundation models from scratch (this is applied AI engineering)</li>
+          <li>You're looking for a no-code tool tour</li>
+          <li>You can't commit ~3 hours per weekend for 8 weeks</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BONUSES ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Everything included</h2>
+    <p class="sec-lead">One price, full access, no upsells.</p>
+    <div class="bonus-grid">
+      <div class="bonus"><div class="bic">🎥</div><h4>16 Live Sessions</h4><p>Every Sat &amp; Sun for 8 weeks, recorded if you miss one.</p></div>
+      <div class="bonus"><div class="bic">🧪</div><h4>Hands-On Lab Every Week</h4><p>You write real code each session, from first API call to full pipelines.</p></div>
+      <div class="bonus"><div class="bic">🏗️</div><h4>3 Capstone Tracks</h4><p>Choose FinQuery, Product Discovery Copilot, or GrantMatch and ship it.</p></div>
+      <div class="bonus"><div class="bic">🛡️</div><h4>Production Playbooks</h4><p>Evals, guardrails, prompt-injection defense, tracing, and serving patterns.</p></div>
+      <div class="bonus"><div class="bic">💬</div><h4>Mentor Access</h4><p>Direct doubt-clearing over the cohort group, never stay stuck.</p></div>
+      <div class="bonus"><div class="bic">🏆</div><h4>Capstone Review</h4><p>Architecture review and 1:1 feedback on your project plan and demo.</p></div>
+    </div>
+  </section>
+
+  <!-- ── TESTIMONIALS (sample) ── -->
+  <section class="course-section">
+    <h2 class="sec-title">What learners say</h2>
+    <div class="tst-grid">
+      <div class="tst"><p>"I'd shipped backend for years but froze on anything AI. Building a RAG pipeline and an agent the same session I learned them is what finally made it click."</p><div class="who"><div class="ava">RK</div><div><b>Rahul K.</b><span>Backend SWE → AI Engineer</span></div></div></div>
+      <div class="tst"><p>"The RAG-vs-long-context week alone saved me from over-engineering a pipeline my project didn't even need. Very production-minded."</p><div class="who"><div class="ava">TS</div><div><b>Tanvi S.</b><span>Full-stack, 5 yrs</span></div></div></div>
+      <div class="tst"><p>"MCP, evals, guardrails were just buzzwords to me before. Now I've actually built them and can talk through the tradeoffs in interviews."</p><div class="who"><div class="ava">AM</div><div><b>Ankit M.</b><span>SDE-2, moving into FDE</span></div></div></div>
+      <div class="tst"><p>"The capstone is the part that mattered. I walked out with a real project and eval numbers to show, not another certificate."</p><div class="who"><div class="ava">DN</div><div><b>Divya N.</b><span>Platform engineer</span></div></div></div>
+    </div>
+  </section>
+
+  <!-- ── PRICING / ENROLL ── -->
+  <section class="course-section" id="enroll">
+    <h2 class="sec-title" style="text-align:center">Reserve your seat</h2>
+    <p class="sec-lead" style="text-align:center">Small cohort · personal attention · limited seats.</p>
+    <div class="urgency">🔥 <b>Next batch starts Oct 18</b> · seats fill fast, reach out early to lock your spot</div>
+    <div class="price-card">
+      <span class="price-batch">Next Batch · Oct 18</span>
+      <div class="price-amt"><span class="cur">₹</span>39,999</div>
+      <div class="price-note">One-time · all 8 weekends + recordings + labs</div>
+      <ul class="price-includes">
+        <li>16 live sessions (Sat &amp; Sun, 9:00–11:30 AM IST)</li>
+        <li>Learn-then-build format with hands-on labs every week</li>
+        <li>3 capstone tracks + 1:1 architecture review</li>
+        <li>Production playbooks: evals, guardrails, tracing, serving</li>
+        <li>Session recordings &amp; direct mentor access</li>
+        <li>MCP, multi-agent, and RAG-vs-long-context deep dives</li>
+      </ul>
+      <a class="btn-pay" style="width:100%;justify-content:center;box-sizing:border-box" href="https://wa.me/919100880133?text=Hi%2C%20I%27d%20like%20to%20enroll%20in%20the%20Master%20AI%20Engineering%20(RAG%20%26%20Agents)%20cohort." target="_blank" rel="noopener"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Enroll: Chat on WhatsApp</a>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Frequently asked</h2>
+    <details class="faq"><summary>Do I need prior AI or ML experience?</summary><div class="faq-body">No. You need prior coding experience and a basic understanding of software systems. We start from LLM terminology and build up. This is applied AI engineering, not a machine-learning theory or model-training course.</div></details>
+    <details class="faq"><summary>I work full-time. Can I keep up?</summary><div class="faq-body">Yes, that's why it's weekend-only (Sat &amp; Sun, 9:00–11:30 AM IST). Sessions are recorded, so you can catch up if you miss one. Expect a few hours of optional practice between weekends to finish the labs.</div></details>
+    <details class="faq"><summary>What stack and tools will I use?</summary><div class="faq-body">Python throughout, with LangChain and ChromaDB for RAG, Neo4j for GraphRAG, Pydantic AI and MCP for agents, LangGraph for multi-agent orchestration, and tools like Langfuse or LangSmith for evals and tracing. You'll also compare frontier APIs against open-weight models.</div></details>
+    <details class="faq"><summary>Do I need an expensive GPU or big API budget?</summary><div class="faq-body">No. Labs are designed to run on free tiers and small models where possible, and we cover the cost/latency tradeoffs of providers directly so you make budget-aware choices.</div></details>
+    <details class="faq"><summary>Is it live or recorded?</summary><div class="faq-body">100% live and interactive, you build alongside the instructor and get real-time feedback. Recordings are provided for revision and any missed session.</div></details>
+    <details class="faq"><summary>How do I enroll?</summary><div class="faq-body">Tap any "Enroll" button to message us on WhatsApp. We'll confirm your seat, share the fee and payment details, and send onboarding instructions.</div></details>
+  </section>
+
+  <!-- ── FINAL CTA ── -->
+  <section class="course-section" style="text-align:center">
+    <h2 class="sec-title" style="text-align:center">Eight weeks from now…</h2>
+    <p class="sec-lead" style="text-align:center;max-width:620px;margin-left:auto;margin-right:auto">…you could be the engineer who ships a real RAG-and-agents system with evals and guardrails, while everyone else is still stuck at the tutorial demo. Reserve your seat for the next cohort.</p>
+    <div class="course-cta-row">
+      <a class="btn-pay" href="https://wa.me/919100880133?text=Hi%2C%20I%27d%20like%20to%20enroll%20in%20the%20Master%20AI%20Engineering%20(RAG%20%26%20Agents)%20cohort." target="_blank" rel="noopener"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Claim your seat: Chat on WhatsApp</a>
+    </div>
+  </section>
+
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/header.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

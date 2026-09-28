@@ -44,7 +44,7 @@ var CONFIG = {
     amount: 3999900,           // ₹39,999 in paise
     currency: "INR",
     name: "HelloSDE",
-    description: "Master System Design — 8-Week Live Cohort (Sep 18 batch)",
+    description: "Master System Design — 8-Week Live Cohort (Sep 18 to Oct 18 batch)",
     batch: "2025-09-18"
   }
 };

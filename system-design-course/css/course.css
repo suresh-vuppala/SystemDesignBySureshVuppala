@@ -1,0 +1,850 @@
+/* === Course Viewer - Brand New UI/UX Shell ===
+   Reuses the site's existing design tokens (--bg, --text, --brand, --border,
+   etc. from css/style.css) so this matches the rest of HelloSDE, but the
+   layout itself (sidebar + tabs + right rail) is a new app shell distinct
+   from the flat cheat-sheet pages. */
+
+:root{
+  --sidebar-w: 280px;
+  --rail-w: 300px;
+  --site-header-h: 54px; /* matches .sh in css/style.css */
+}
+
+*{box-sizing:border-box}
+
+/* Global icon-size guard: every SVG icon in this app is sized explicitly by
+   its containing context. Without this reset, an <svg> with no CSS size
+   renders at the browser's intrinsic default (often 150x150 or worse for
+   icons with a large viewBox), which is exactly the "icons too big" bug. */
+svg{width:1em;height:1em;flex-shrink:0;display:block}
+
+/* Dotted-terminal display face (Doto) is reserved for the single main
+   lesson title only (.cm-title-block h1). It's large enough there to read
+   as a fun display face at max weight with sharp (ROND 0) dots. Everywhere
+   else (tab headings, rail headers, module titles) uses bold Inter instead:
+   at smaller sizes Doto's dot construction blurs letterforms and reads as
+   light/mushy no matter how heavy the weight, so it isn't worth the
+   legibility cost outside one hero-sized spot. */
+
+body.course-body{
+  margin:0;
+  background:var(--bg-2);
+  overflow:hidden;
+}
+
+/* ── App shell ─────────────────────────────────────────────── */
+.course-app{
+  display:grid;
+  grid-template-columns:var(--sidebar-w) 1fr var(--rail-w);
+  height:calc(100vh - var(--site-header-h));
+}
+
+/* Tablet / narrow laptop: rail becomes a slide-in drawer (same pattern as
+   the left sidebar) instead of disappearing with no way to reach it. */
+@media(max-width:1200px){
+  .course-app{grid-template-columns:var(--sidebar-w) 1fr}
+  .course-rail{
+    position:fixed;right:0;top:var(--site-header-h);bottom:0;z-index:400;
+    height:calc(100vh - var(--site-header-h));
+    width:min(var(--rail-w), 86vw);
+    transform:translateX(100%);
+    transition:transform .2s ease;
+    box-shadow:-4px 0 24px rgba(0,0,0,.15);
+  }
+  .course-rail.cr-open{transform:translateX(0)}
+  .course-rail-toggle{display:flex!important}
+}
+
+/* Mobile: left sidebar becomes a slide-in drawer too, and both drawer
+   toggles sit side by side at the bottom of the screen. */
+@media(max-width:860px){
+  .course-app{grid-template-columns:1fr}
+  .course-sidebar{
+    position:fixed;left:0;top:var(--site-header-h);bottom:0;z-index:400;
+    height:calc(100vh - var(--site-header-h));
+    width:min(var(--sidebar-w), 86vw);
+    transform:translateX(-100%);
+    transition:transform .2s ease;
+    box-shadow:4px 0 24px rgba(0,0,0,.15);
+  }
+  .course-sidebar.cs-open{transform:translateX(0)}
+  .course-mobile-toggle{display:flex!important}
+}
+
+/* Small phones: tighten padding and font sizes so nothing overflows or
+   requires horizontal scrolling. */
+@media(max-width:520px){
+  .cm-header{padding:14px 16px 16px}
+  .cm-connects{margin:14px 16px 0}
+  .cm-tabs{margin:16px 16px 0}
+  .cm-body{padding:18px 0 90px;margin:0 16px}
+  .cm-title-block h1{font-size:calc(var(--fs-xl) * 1.1)}
+  .cm-icon{width:34px;height:34px;font-size:var(--fs-sm)}
+  .cc-card-grid{grid-template-columns:1fr}
+  .course-mobile-toggle,.course-rail-toggle{width:44px;height:44px;bottom:16px}
+  .course-mobile-toggle{left:16px}
+  .course-rail-toggle{right:16px}
+}
+
+/* ── Sidebar ───────────────────────────────────────────────── */
+.course-sidebar{
+  background:var(--bg);
+  border-right:1px solid var(--border-strong);
+  overflow-y:auto;
+  height:100%;
+  padding:16px 0 40px;
+}
+
+.cs-back{
+  display:flex;align-items:center;gap:6px;
+  padding:0 20px 14px;
+  font-size:var(--fs-xs);color:var(--muted);
+  text-decoration:none;
+}
+.cs-back:hover{color:var(--text);text-decoration:none}
+.cs-back svg{width:12px;height:12px;flex-shrink:0}
+
+.cs-course-title{
+  padding:0 20px 16px;
+  border-bottom:1px solid var(--border-strong);
+  margin-bottom:12px;
+}
+.cs-course-title h1{
+  font-size:var(--fs-lg);font-weight:800;color:var(--text);
+  margin:0 0 4px;letter-spacing:var(--ls-tight);
+}
+.cs-course-title p{
+  font-size:var(--fs-2xs);color:var(--muted);margin:0;
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+}
+
+/* ── Sidebar search ───────────────────────────────────────────
+   Sits between the course title and the module tree. Typing swaps the tree
+   out for a ranked result list (.cs-search-results) covering modules,
+   lessons, tab names, and important terms (see wireSidebarSearch in
+   js/course.js). */
+.cs-search{
+  position:relative;
+  margin:0 16px 14px;
+}
+.cs-search-icon{
+  position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  display:flex;color:var(--muted);pointer-events:none;
+}
+.cs-search-icon svg{width:14px;height:14px}
+.cs-search-input{
+  width:100%;
+  padding:9px 30px 9px 32px;
+  font:inherit;font-size:var(--fs-xs);
+  color:var(--text);
+  background:var(--card-2);
+  border:1px solid var(--border-strong);
+  border-radius:8px;
+  outline:none;
+  transition:border-color .12s, box-shadow .12s;
+}
+.cs-search-input::placeholder{color:var(--muted)}
+.cs-search-input:focus{
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px var(--brand-soft);
+}
+.cs-search-clear{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;justify-content:center;
+  width:18px;height:18px;padding:0;
+  background:none;border:none;cursor:pointer;color:var(--muted);
+  border-radius:4px;
+}
+.cs-search-clear:hover{color:var(--text);background:var(--card)}
+.cs-search-clear svg{width:12px;height:12px}
+
+/* ── Search results ───────────────────────────────────────── */
+.cs-search-results{
+  padding:0 12px 8px;
+}
+.cs-search-count{
+  padding:2px 8px 8px;
+  font-size:var(--fs-2xs);color:var(--muted);
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+}
+.cs-search-empty{
+  padding:16px 8px;
+  font-size:var(--fs-xs);color:var(--muted);
+}
+.cs-search-hit{
+  display:block;
+  padding:9px 10px;
+  margin-bottom:4px;
+  border-radius:8px;
+  text-decoration:none;
+  border:1px solid transparent;
+  transition:background-color .12s, border-color .12s;
+}
+.cs-search-hit:hover,
+.cs-search-hit:focus-visible{
+  background:var(--card-2);
+  border-color:var(--border-strong);
+  text-decoration:none;
+}
+.cs-hit-title{
+  display:flex;align-items:baseline;gap:7px;
+  font-size:var(--fs-sm);font-weight:600;color:var(--text);
+  line-height:1.3;
+}
+.cs-hit-num{
+  flex-shrink:0;
+  font-size:var(--fs-2xs);font-weight:700;color:var(--brand);
+  font-variant-numeric:tabular-nums;
+}
+.cs-hit-module{
+  display:block;margin-top:2px;
+  font-size:var(--fs-2xs);color:var(--muted);
+}
+.cs-hit-context{
+  display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;
+}
+.cs-hit-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 7px;
+  font-size:var(--fs-2xs);color:var(--text-2);
+  background:var(--card);
+  border:1px solid var(--border-strong);
+  border-radius:999px;
+  line-height:1.4;
+}
+.cs-hit-chip svg{width:10px;height:10px}
+.cs-hit-chip-tab{color:var(--brand)}
+.cs-hit-chip-more{color:var(--muted)}
+.cs-hl{
+  background:var(--brand-soft);
+  color:var(--brand);
+  font-weight:700;
+  border-radius:3px;padding:0 1px;
+}
+
+/* ── Sidebar tree ─────────────────────────────────────────────
+   Design rule: every row (module or lesson) starts at the SAME left edge.
+   Hierarchy is communicated only by the connecting vertical line plus each
+   row's dot marker, never by indentation. This mirrors the reference
+   screenshot: modules and their lessons share one continuous left rail. */
+
+.cs-tree{
+  position:relative;
+  padding:4px 0 8px;
+}
+
+/* The single continuous connecting line running down the whole tree,
+   behind every dot. Positioned to pass through the center of each dot. */
+.cs-tree::before{
+  content:'';
+  position:absolute;
+  left:27px;top:8px;bottom:8px;
+  width:1px;background:var(--border-strong);
+  z-index:0;
+}
+
+.cs-module{position:relative}
+
+.cs-module-header{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;background:none;border:none;cursor:pointer;
+  padding:9px 20px 9px 0;font:inherit;text-align:left;
+  color:var(--text-2);position:relative;z-index:1;
+  transition:background-color .12s;
+}
+.cs-module-header:hover{background:var(--card-2)}
+.cs-module-header.cs-active-module{color:var(--text)}
+
+.cs-module-label{
+  display:flex;align-items:center;gap:12px;
+  font-size:var(--fs-sm);font-weight:600;
+  overflow:hidden;padding-left:18px;
+}
+
+/* Module marker: a bigger filled circle, sized up from lessons' circles
+   so scale itself signals "this is the bigger unit" at a glance, still
+   centered on the same connecting line (left:27px in .cs-tree::before)
+   as every lesson dot below it. */
+.cs-module-dot{
+  flex-shrink:0;width:18px;height:18px;border-radius:50%;
+  background:var(--text-2);border:none;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;z-index:1;
+  box-shadow:0 0 0 3px var(--bg);
+}
+.cs-module-header.cs-active-module .cs-module-dot{
+  background:var(--brand);
+  box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--brand-soft);
+}
+
+.cs-module-title{
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cs-module-header.cs-active-module .cs-module-title{
+  font-weight:700;
+}
+
+.cs-module-meta{
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+}
+.cs-progress{
+  font-size:var(--fs-2xs);color:var(--muted);font-variant-numeric:tabular-nums;
+}
+.cs-chevron{
+  width:13px;height:13px;color:var(--muted);
+  transition:transform .16s ease;
+  flex-shrink:0;
+}
+.cs-module.cs-expanded .cs-chevron{transform:rotate(90deg)}
+
+.cs-lessons{
+  max-height:0;overflow:hidden;
+  transition:max-height .22s ease;
+}
+.cs-module.cs-expanded .cs-lessons{max-height:2000px}
+
+.cs-lesson{
+  display:flex;align-items:center;gap:12px;
+  padding:7px 20px 7px 22px;
+  font-size:var(--fs-xs);color:var(--text-2);
+  text-decoration:none;position:relative;z-index:1;
+  transition:background-color .12s,color .12s;
+}
+.cs-lesson:hover{background:var(--card-2);color:var(--text);text-decoration:none}
+.cs-lesson.cs-active-lesson{
+  color:var(--brand);font-weight:600;
+  background:var(--brand-soft);
+}
+
+/* Lesson marker: a smaller circle than the module square above it, so
+   the size difference itself reads as "module = bigger unit, lesson =
+   smaller step within it", still centered on the shared connecting line. */
+.cs-lesson-dot{
+  flex-shrink:0;width:10px;height:10px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg);border:2px solid var(--border-strong);
+  position:relative;z-index:1;
+  transition:border-color .12s,background-color .12s,transform .12s;
+}
+.cs-lesson:hover .cs-lesson-dot{transform:scale(1.15)}
+.cs-lesson.cs-active-lesson .cs-lesson-dot{
+  border-color:var(--brand);background:var(--brand);
+  box-shadow:0 0 0 3px var(--brand-soft);
+}
+.cs-lesson.cs-active-lesson .cs-lesson-dot::after{
+  content:'';width:4px;height:4px;border-radius:50%;background:var(--bg);
+}
+.cs-lesson.cs-complete .cs-lesson-dot{
+  border-color:var(--ok,#2e9e5b);background:var(--ok,#2e9e5b);
+}
+.cs-lesson-dot svg{width:7px;height:7px;color:var(--bg)}
+
+.cs-lesson-label{
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  flex:1;
+}
+.cs-lesson-num{
+  color:var(--muted);font-variant-numeric:tabular-nums;margin-right:5px;
+}
+
+/* ── Mobile toggle ─────────────────────────────────────────── */
+.course-mobile-toggle{
+  display:none;
+  position:fixed;bottom:20px;left:20px;z-index:410;
+  width:46px;height:46px;border-radius:50%;
+  background:var(--brand);color:var(--brand-fg);border:none;
+  align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.2);
+}
+/* Right-rail drawer toggle. Only shown once the rail becomes a drawer
+   (<=1200px). Sits on the opposite side from the sidebar toggle so both
+   can be reachable and visually distinct at once on mobile. */
+.course-rail-toggle{
+  display:none;
+  position:fixed;bottom:20px;right:20px;z-index:410;
+  width:46px;height:46px;border-radius:50%;
+  background:var(--card);color:var(--text);border:1px solid var(--border-strong);
+  align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.15);
+}
+.cs-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:399;
+}
+.cs-overlay.cs-overlay-visible{display:block}
+
+/* ── Main content column ──────────────────────────────────── */
+.course-main{
+  overflow-y:auto;height:100%;
+  background:var(--bg-2);
+}
+
+.cm-header{
+  background:var(--bg);border-bottom:1px solid var(--border-strong);
+  padding:18px 32px 20px;
+  position:sticky;top:0;z-index:10;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+[data-theme="dark"] .cm-header{box-shadow:0 1px 4px rgba(0,0,0,.25)}
+
+/* All lesson-content rows (breadcrumb/title, connects banner, tabs, body)
+   share one content width so their right edges line up regardless of
+   viewport: same box-sizing, same left inset (32px, via padding or margin
+   depending on the element), same cap on total content width. */
+.cm-header,.cm-connects,.cm-tabs,.cm-body{box-sizing:border-box}
+.cm-breadcrumb,.cm-title-row,.cm-connects,.cm-tabs,.cm-body{max-width:1212px}
+
+.cm-breadcrumb{
+  font-size:var(--fs-2xs);color:var(--muted);margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.cm-breadcrumb a{color:var(--muted);text-decoration:none}
+.cm-breadcrumb a:hover{color:var(--brand);text-decoration:underline}
+.cm-breadcrumb .cm-sep{color:var(--border-strong)}
+.cm-breadcrumb .cm-current{color:var(--text-2)}
+.cm-breadcrumb .cm-current-module{color:var(--muted)}
+
+.cm-title-row{display:flex;align-items:flex-start;gap:14px}
+.cm-icon{
+  flex-shrink:0;width:40px;height:40px;border-radius:9px;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));
+  display:flex;align-items:center;justify-content:center;
+  color:var(--brand-fg);font-weight:700;font-size:var(--fs-md);
+}
+.cm-title-block h1{
+  font-family:'Doto','Inter',sans-serif;
+  font-size:calc(var(--fs-2xl) * 1.15);font-weight:900;color:var(--text);
+  margin:0 0 8px;letter-spacing:.02em;line-height:var(--lh-tight);
+  font-variation-settings:'ROND' 0;
+}
+.cm-badges{display:flex;gap:8px;flex-wrap:wrap}
+.cm-badge{
+  font-size:var(--fs-2xs);font-weight:600;padding:3px 10px;border-radius:12px;
+  background:var(--card-2);border:1px solid var(--border-strong);color:var(--text-2);
+}
+.cm-badge.cm-badge-brand{
+  background:var(--brand-soft);border-color:var(--brand-border);color:var(--brand-2);
+}
+
+/* Connects-from banner: a "Derived from" pointer back to the specific
+   previous lesson this one builds on, plus the explanatory text of how.
+   The link is the point, not decoration, so it's styled like a real
+   navigable chip (border, hover state) rather than plain inline text. */
+.cm-connects{
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--brand-soft);border:1px solid var(--brand-border);
+  border-radius:8px;padding:14px 16px;margin:18px 32px 0;
+  max-width:1180px;
+  font-size:var(--fs-sm);line-height:var(--lh-normal);color:var(--text-2);
+}
+.cm-connects-body{width:100%}
+.cm-connects-derived{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:0 0 10px;
+}
+.cm-connects-kicker{
+  display:flex;align-items:center;gap:6px;
+  font-size:var(--fs-2xs);font-weight:700;color:var(--brand-2);
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+  flex-shrink:0;
+}
+.cm-connects-kicker svg{width:13px;height:13px}
+.cm-connects-source{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--bg);border:1px solid var(--brand-border);border-radius:20px;
+  padding:4px 12px 4px 10px;font-size:var(--fs-xs);font-weight:600;
+  color:var(--text);text-decoration:none;
+  transition:border-color .12s,background .12s,transform .12s;
+}
+.cm-connects-source::before{content:'\2190';color:var(--brand-2);font-weight:700}
+.cm-connects-source:hover{
+  border-color:var(--brand);background:var(--card);
+  text-decoration:none;transform:translateX(-2px);
+}
+.cm-connects-text{margin:0}
+
+/* ── Tabs ──────────────────────────────────────────────────── */
+.cm-tabs{
+  display:flex;gap:4px;margin:20px 32px 0;
+  max-width:1180px;
+  border-bottom:1px solid var(--border-strong);
+  overflow-x:auto;
+}
+.cm-tab{
+  display:flex;align-items:center;gap:6px;
+  padding:10px 16px;font-size:var(--fs-sm);font-weight:600;
+  color:var(--muted);background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap;
+  transition:color .12s,border-color .12s;
+}
+.cm-tab:hover{color:var(--text)}
+.cm-tab.cm-tab-active{color:var(--brand);border-bottom-color:var(--brand)}
+.cm-tab svg{width:15px;height:15px}
+
+.cm-body{padding:24px 0 60px;margin:0 32px;max-width:1212px}
+
+/* ── Content cards inside a tab ────────────────────────────── */
+.cc-heading{
+  font-size:var(--fs-lg);font-weight:800;color:var(--text);
+  display:flex;align-items:center;gap:8px;margin:0 0 6px;
+  letter-spacing:var(--ls-tight);
+}
+.cc-heading svg{width:18px;height:18px;color:var(--brand);flex-shrink:0}
+.cc-intro{color:var(--text-2);font-size:var(--fs-sm);line-height:var(--lh-normal);margin:0 0 18px}
+/* Inline lesson cross-links (from [[slug|label]] tokens in lesson content) */
+.cc-xlink{color:var(--brand);font-weight:600;text-decoration:none;border-bottom:1px solid var(--brand-border)}
+.cc-xlink:hover{border-bottom-color:var(--brand);text-decoration:none}
+
+/* Image series: a vertical sequence of figure cards (modern, rounded, with
+   optional caption). Schema: `images:[{src,alt,caption}]` on any tab. */
+.cc-figs{display:flex;flex-direction:column;gap:16px;margin:0 0 22px}
+.cc-fig{
+  margin:0;width:100%;max-width:820px;align-self:center;
+  background:var(--card);border:1px solid var(--border-strong);border-radius:12px;
+  overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);
+  transition:border-color .15s,box-shadow .15s,transform .15s;
+}
+.cc-fig:hover{border-color:var(--brand-border);box-shadow:0 6px 20px rgba(0,0,0,.10);transform:translateY(-2px)}
+[data-theme="dark"] .cc-fig{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+[data-theme="dark"] .cc-fig:hover{box-shadow:0 6px 20px rgba(0,0,0,.45)}
+/* Fixed-aspect frame so images of any size fit consistently (letterboxed
+   via object-fit:contain) instead of resizing the layout per image. */
+.cc-imgwrap{
+  position:relative;width:100%;aspect-ratio:16/9;background:var(--bg-2);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.cc-imgwrap img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+.cc-fig-expand{
+  position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--border-strong);background:var(--card);color:var(--text);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);transition:opacity .15s,background .12s,color .12s,border-color .12s;
+}
+.cc-fig:hover .cc-fig-expand,.cc-fig-expand:focus-visible{opacity:1}
+.cc-fig-expand:hover{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.cc-fig-expand svg{width:16px;height:16px}
+.cc-fig figcaption{
+  padding:10px 16px;font-size:var(--fs-xs);color:var(--muted);
+  line-height:var(--lh-normal);border-top:1px solid var(--border-strong);
+  background:var(--card-2);
+}
+
+/* Image carousel: three-plus images in one place with arrow + dot nav. */
+.cc-carousel{
+  position:relative;margin:0 auto 22px;width:100%;max-width:820px;
+  background:var(--card);border:1px solid var(--border-strong);border-radius:12px;
+  overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);outline:none;
+}
+.cc-carousel:focus-visible{border-color:var(--brand-border);box-shadow:0 0 0 3px var(--brand-soft)}
+[data-theme="dark"] .cc-carousel{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.cc-car-viewport{position:relative;overflow:hidden;width:100%}
+.cc-car-track{display:flex;transition:transform .35s ease;will-change:transform}
+.cc-slide{margin:0;flex:0 0 100%;min-width:100%}
+.cc-car-btn.cc-car-expand{top:10px;right:10px;bottom:auto;transform:none}
+.cc-slide figcaption{
+  padding:10px 48px;font-size:var(--fs-xs);color:var(--muted);text-align:center;min-height:42px;
+  line-height:var(--lh-normal);border-top:1px solid var(--border-strong);background:var(--card-2);
+  display:flex;align-items:center;justify-content:center;
+}
+.cc-car-btn{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid var(--border-strong);background:var(--card);color:var(--text);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);transition:background .12s,color .12s,border-color .12s;
+}
+.cc-car-btn:hover{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.cc-car-btn svg{width:20px;height:20px}
+.cc-car-prev{left:10px}
+.cc-car-next{right:10px}
+.cc-car-count{
+  position:absolute;top:10px;left:12px;z-index:2;
+  font-size:var(--fs-2xs);font-weight:600;color:#fff;background:rgba(0,0,0,.55);
+  padding:3px 9px;border-radius:12px;
+}
+.cc-car-dots{display:flex;gap:8px;justify-content:center;align-items:center;padding:12px 0;background:var(--card-2)}
+.cc-dot{
+  width:9px;height:9px;border-radius:50%;border:none;padding:0;cursor:pointer;
+  background:var(--border-strong);transition:background .12s,transform .12s;
+}
+.cc-dot:hover{background:var(--muted)}
+.cc-dot-active{background:var(--brand);transform:scale(1.3)}
+
+/* Fullscreen image lightbox: zoom (buttons/wheel/click), drag-to-pan, nav. */
+.cc-lb{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center}
+.cc-lb[hidden]{display:none}
+.cc-lb-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.85)}
+.cc-lb-stage{position:relative;z-index:1;max-width:92vw;max-height:80vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cc-lb-img{max-width:92vw;max-height:80vh;object-fit:contain;transition:transform .12s ease;user-select:none;-webkit-user-drag:none;touch-action:none}
+.cc-lb-ctrl,.cc-lb-nav{
+  position:absolute;z-index:3;width:42px;height:42px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.25);background:rgba(20,20,20,.62);color:#fff;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.cc-lb-ctrl:hover,.cc-lb-nav:hover{background:var(--brand);border-color:var(--brand);color:var(--brand-fg)}
+.cc-lb-ctrl svg,.cc-lb-nav svg{width:18px;height:18px}
+.cc-lb-close{top:18px;right:18px}
+.cc-lb-nav{top:50%;transform:translateY(-50%)}
+.cc-lb-prev{left:18px}
+.cc-lb-next{right:18px}
+.cc-lb-count{position:absolute;top:20px;left:20px;z-index:3;color:#fff;background:rgba(0,0,0,.5);padding:5px 12px;border-radius:14px;font-size:var(--fs-xs);font-weight:600}
+.cc-lb-caption{position:absolute;left:50%;bottom:76px;transform:translateX(-50%);z-index:3;color:#eaeaea;font-size:var(--fs-sm);max-width:80vw;text-align:center;line-height:var(--lh-normal)}
+.cc-lb-bar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:8px;background:rgba(20,20,20,.55);padding:6px;border-radius:26px}
+.cc-lb-bar .cc-lb-ctrl{position:static}
+.cc-lb-reset{width:auto;min-width:58px;padding:0 12px;border-radius:20px;font-size:var(--fs-xs);font-weight:600}
+
+.cc-card-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:14px;margin-bottom:20px;
+}
+.cc-card{
+  position:relative;overflow:hidden;
+  background:var(--card);border:1px solid var(--border-strong);border-radius:12px;
+  padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);
+  transition:border-color .14s,box-shadow .14s,transform .14s;
+}
+.cc-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  transform:scaleX(0);transform-origin:left;transition:transform .24s ease;
+}
+.cc-card:hover{border-color:var(--brand-border);box-shadow:0 8px 22px -8px rgba(2,6,23,.18);transform:translateY(-2px)}
+.cc-card:hover::before{transform:scaleX(1)}
+[data-theme="dark"] .cc-card{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+[data-theme="dark"] .cc-card:hover{box-shadow:0 10px 24px -8px rgba(0,0,0,.55)}
+.cc-card-icon{
+  width:34px;height:34px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:var(--fs-sm);margin-bottom:10px;
+  box-shadow:0 3px 8px -2px rgba(2,6,23,.18),inset 0 1px 0 rgba(255,255,255,.35);
+  transition:transform .14s ease;
+}
+.cc-card:hover .cc-card-icon{transform:scale(1.06)}
+.cc-card-icon.cc-purple{background:#efe6ff;color:#6b3fd4}
+.cc-card-icon.cc-green{background:#e3f6ea;color:#1c8a4b}
+.cc-card-icon.cc-blue{background:#e5f0ff;color:#2563c9}
+.cc-card-icon.cc-orange{background:var(--brand-soft);color:var(--brand-2)}
+.cc-card-icon.cc-red{background:#fde8e6;color:#c93a2f}
+.cc-card-icon.cc-teal{background:#e1f5f2;color:#128a76}
+[data-theme="dark"] .cc-card-icon.cc-purple{background:#2a1f42;color:#b79dff}
+[data-theme="dark"] .cc-card-icon.cc-green{background:#173424;color:#6fd99a}
+[data-theme="dark"] .cc-card-icon.cc-blue{background:#182b45;color:#8bb6ff}
+[data-theme="dark"] .cc-card-icon.cc-red{background:#3a1e1c;color:#ff9d95}
+[data-theme="dark"] .cc-card-icon.cc-teal{background:#12332e;color:#6fe0cc}
+
+.cc-card h4{font-size:var(--fs-sm);font-weight:700;color:var(--text);margin:0 0 6px}
+.cc-card p{font-size:var(--fs-xs);color:var(--text-2);line-height:var(--lh-normal);margin:0}
+
+/* Ported diagram: horizontal + vertical scroll instead of squeezing a
+   fixed-layout SVG to fit the column, plus the shared DP Engine's
+   expand/zoom/pan modal (loaded via css/dp-engine.css + js/dp-engine.js).
+   The expand button (.cc-diagram-ctrls) is a sibling of the scrolling
+   element, positioned against .cc-diagram-frame instead of the scrolled
+   content, so it stays pinned to the top-right corner of the visible
+   frame no matter how far the diagram is scrolled in either direction. */
+.cc-diagram{margin-bottom:20px}
+.cc-diagram-frame{
+  position:relative;
+  border:1px solid var(--border-strong);border-radius:10px;
+  background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+[data-theme="dark"] .cc-diagram-frame{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.cc-diagram-scroll{
+  overflow:auto;max-height:min(60vh, 420px);padding:12px;
+}
+.cc-dp-panel{min-width:640px;width:100%}
+.cc-dp-panel svg{display:block;width:100%;height:auto;min-width:640px}
+.cc-diagram-ctrls{
+  position:absolute;top:8px;right:8px;z-index:4;
+}
+.cc-diagram-ctrls .dp-ctrl{
+  width:30px;height:30px;font-size:14px;
+  background:var(--bg);box-shadow:0 1px 4px rgba(0,0,0,.15);
+}
+[data-theme="dark"] .cc-diagram-ctrls .dp-ctrl{box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.cc-diagram-caption{
+  font-size:var(--fs-xs);color:var(--muted);line-height:var(--lh-normal);
+  margin:8px 2px 0;
+}
+
+.cc-points{margin-bottom:18px}
+.cc-point{
+  padding:14px 0;border-bottom:1px solid var(--border-strong);
+}
+.cc-point:last-child{border-bottom:none;padding-bottom:0}
+.cc-point:first-child{padding-top:0}
+.cc-point h5{
+  font-size:var(--fs-sm);font-weight:700;color:var(--text);margin:0 0 6px;
+  display:flex;align-items:center;gap:8px;
+}
+.cc-point h5::before{
+  content:'';flex-shrink:0;width:6px;height:6px;border-radius:50%;
+  background:var(--brand);
+}
+.cc-point p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal);margin:0 0 0 14px}
+
+.cc-callout{
+  border:1px solid var(--border-strong);border-radius:10px;
+  padding:12px 16px;margin-bottom:12px;font-size:var(--fs-sm);
+  line-height:var(--lh-normal);color:var(--text-2);
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+[data-theme="dark"] .cc-callout{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.cc-callout-label{font-weight:700;color:var(--text)}
+.cc-callout-green{border-left:3px solid #1c8a4b;background:rgba(28,138,75,.06)}
+.cc-callout-yellow{border-left:3px solid #c98a12;background:rgba(201,138,18,.06)}
+.cc-callout-purple{border-left:3px solid #6b3fd4;background:rgba(107,63,212,.06)}
+.cc-callout-blue{border-left:3px solid #2563c9;background:rgba(37,99,201,.06)}
+[data-theme="dark"] .cc-callout-green{border-left-color:#6fd99a;background:rgba(111,217,154,.08)}
+[data-theme="dark"] .cc-callout-yellow{border-left-color:#e0b64a;background:rgba(224,182,74,.08)}
+[data-theme="dark"] .cc-callout-purple{border-left-color:#b79dff;background:rgba(183,157,255,.08)}
+[data-theme="dark"] .cc-callout-blue{border-left-color:#8bb6ff;background:rgba(139,182,255,.08)}
+
+.cc-table-wrap{overflow-x:auto;margin-bottom:20px;border:1px solid var(--border-strong);border-radius:8px}
+.cc-table{width:100%;min-width:640px;border-collapse:separate;border-spacing:0;font-size:var(--fs-sm);
+  border:none;border-radius:0}
+.cc-table td,.cc-table th{white-space:normal}
+.cc-table td{min-width:120px}
+.cc-table th{
+  background:var(--brand-soft);border-bottom:1px solid var(--brand-border);
+  padding:10px 14px;text-align:left;font-weight:700;color:var(--text);
+  font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);
+}
+.cc-table td{padding:10px 14px;border-bottom:1px solid var(--border-strong);color:var(--text-2);vertical-align:top}
+.cc-table tr:last-child td{border-bottom:none}
+.cc-table tbody tr:nth-child(even) td{background:var(--bg-2)}
+
+.cc-related-box{
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--card-2);border:1px solid var(--border-strong);border-radius:8px;
+  padding:14px 16px;margin-bottom:20px;font-size:var(--fs-sm);color:var(--text-2);
+}
+.cc-related-box a{color:var(--link);font-weight:600}
+.cc-related-box svg{width:16px;height:16px;color:var(--brand);margin-top:2px;flex-shrink:0}
+
+/* Hands-On tab specific layout */
+.ho-block{
+  background:var(--card);border:1px solid var(--border-strong);border-radius:10px;
+  padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+[data-theme="dark"] .ho-block{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.ho-block h4{
+  display:flex;align-items:center;gap:8px;
+  font-size:var(--fs-sm);font-weight:700;color:var(--text);margin:0 0 8px;
+}
+.ho-block h4 .ho-icon{
+  width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  background:var(--brand-soft);color:var(--brand-2);font-size:var(--fs-2xs);flex-shrink:0;
+}
+.ho-block p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal);margin:0}
+
+/* ── Right rail ────────────────────────────────────────────── */
+.course-rail{
+  overflow-y:auto;height:100%;
+  padding:20px;border-left:1px solid var(--border-strong);
+  background:var(--bg);
+}
+.cr-box{
+  background:var(--card);border:1px solid var(--border-strong);border-radius:10px;
+  padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+[data-theme="dark"] .cr-box{box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.cr-box h5{
+  display:flex;align-items:center;gap:8px;
+  font-size:var(--fs-sm);font-weight:700;color:var(--text);margin:0 0 12px;
+}
+.cr-box h5 .cr-ic{
+  width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:var(--fs-2xs);flex-shrink:0;
+}
+.cr-box h5 .cr-ic svg{width:11px;height:11px}
+.cr-link-arrow svg{width:14px;height:14px}
+.course-mobile-toggle svg{width:20px;height:20px}
+.cr-ic.cr-ic-brand{background:var(--brand-soft);color:var(--brand-2)}
+.cr-ic.cr-ic-blue{background:#e5f0ff;color:#2563c9}
+.cr-ic.cr-ic-green{background:#e3f6ea;color:#1c8a4b}
+.cr-ic.cr-ic-purple{background:#efe6ff;color:#6b3fd4}
+[data-theme="dark"] .cr-ic.cr-ic-blue{background:#182b45;color:#8bb6ff}
+[data-theme="dark"] .cr-ic.cr-ic-green{background:#173424;color:#6fd99a}
+[data-theme="dark"] .cr-ic.cr-ic-purple{background:#2a1f42;color:#b79dff}
+
+.cr-link{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 0;border-bottom:1px solid var(--border-strong);
+  text-decoration:none;font-size:var(--fs-xs);color:var(--text-2);
+}
+.cr-link:last-child{border-bottom:none}
+.cr-link:hover{color:var(--brand);text-decoration:none}
+.cr-link-title{font-weight:600;color:var(--text);display:block}
+.cr-link-sub{color:var(--muted);font-size:var(--fs-2xs)}
+.cr-link-arrow{flex-shrink:0;color:var(--muted)}
+
+.cr-topics{display:flex;flex-wrap:wrap;gap:6px}
+.cr-topic-chip{
+  font-size:var(--fs-2xs);padding:4px 10px;border-radius:12px;
+  background:var(--card-2);border:1px solid var(--border-strong);color:var(--text-2);
+  text-decoration:none;
+}
+.cr-topic-chip:hover{border-color:var(--brand);color:var(--brand);text-decoration:none}
+
+.cr-takeaway{
+  display:flex;gap:8px;align-items:flex-start;
+  font-size:var(--fs-xs);color:var(--text-2);line-height:var(--lh-normal);
+  margin-bottom:10px;
+}
+.cr-takeaway:last-child{margin-bottom:0}
+.cr-takeaway svg{flex-shrink:0;margin-top:2px;color:var(--ok,#2e9e5b);width:14px;height:14px}
+
+.cr-box.cr-protip{background:var(--brand-soft);border-color:var(--brand-border)}
+.cr-box.cr-protip p{font-size:var(--fs-xs);color:var(--text-2);line-height:var(--lh-normal);margin:0}
+
+.cr-box.cr-bridge{border-left:3px solid var(--brand)}
+.cr-box.cr-bridge p{font-size:var(--fs-xs);color:var(--text-2);line-height:var(--lh-normal);margin:0}
+
+/* ── Live-cohort promo (sell the live courses) ──────────────── */
+.cr-box.cr-promo{
+  background:linear-gradient(160deg,var(--brand-soft),var(--card));
+  border:1px solid var(--brand-border);
+  box-shadow:0 2px 10px rgba(201,74,12,.10);
+}
+[data-theme="dark"] .cr-box.cr-promo{box-shadow:0 2px 12px rgba(0,0,0,.35)}
+.cr-promo-badge{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--brand-2);background:var(--bg);
+  border:1px solid var(--brand-border);border-radius:20px;
+  padding:3px 10px;margin-bottom:10px;
+}
+.cr-promo-title{
+  font-size:var(--fs-sm);font-weight:800;color:var(--text);
+  margin:0 0 6px;letter-spacing:var(--ls-tight);
+}
+.cr-promo-text{
+  font-size:var(--fs-xs);color:var(--text-2);line-height:var(--lh-normal);
+  margin:0 0 12px;
+}
+.cr-promo-btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  width:100%;box-sizing:border-box;padding:9px 12px;margin-top:8px;
+  border-radius:6px;font-size:var(--fs-xs);font-weight:700;
+  text-decoration:none;text-align:center;transition:background-color .12s,transform .12s,border-color .12s;
+}
+.cr-promo-btn{
+  background:var(--brand);color:var(--brand-fg);border:1px solid var(--brand);
+}
+.cr-promo-btn:hover{background:var(--brand-2);border-color:var(--brand-2);transform:translateY(-1px);text-decoration:none}
+.cr-promo-btn.cr-promo-btn-alt{
+  background:var(--bg);color:var(--text);border:1px solid var(--brand-border);
+}
+.cr-promo-btn.cr-promo-btn-alt:hover{background:var(--card-2);border-color:var(--brand);color:var(--text)}
+
+/* ── Coming-soon placeholder (for un-built lessons) ──────────── */
+.cm-placeholder{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 20px;text-align:center;color:var(--muted);
+}
+.cm-placeholder svg{width:48px;height:48px;margin-bottom:16px;opacity:.5}
+.cm-placeholder h3{
+  color:var(--text);font-size:var(--fs-lg);font-weight:800;margin:0 0 8px;
+}
+.cm-placeholder p{font-size:var(--fs-sm);max-width:400px;margin:0}

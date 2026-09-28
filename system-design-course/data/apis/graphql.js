@@ -1,0 +1,50 @@
+/* === Lesson graphql - part of Module 3 (APIs & Communication) ===
+   Source: system-design-cheatsheet/04-apis.html (#graphql)
+   + system-design-cheatsheet-course-hierarchy.md, Module 3.3.
+   Cheat-sheet content ported into the course tab structure, preserving
+   the callouts and highlighted terms. */
+
+window.COURSE_CONTENT = window.COURSE_CONTENT || {};
+window.COURSE_CONTENT["graphql"] = {
+  module: 3, num: "3.3", title: "GraphQL",
+  connectsFrom: "A mobile client needs 3 fields; a web client needs 15 different ones from the same resource. With a fixed REST response shape, one endpoint either over-fetches for the mobile client or under-fetches for the web client.",
+  tabs: {
+    overview: {
+      heading: "GraphQL",
+      intro: "The client specifies <strong>exactly which fields</strong> it wants, in a single request to a single endpoint, against a <strong>strongly-typed schema</strong>. No versioning, no over-fetching.",
+      callouts: [
+        { color: "green", label: "Guarantees:", body: "<strong>No over-fetching</strong>: the client gets only the requested fields. <strong>Schema contract</strong>: the server validates queries against the schema before execution. <strong>Introspection</strong>: clients can discover available types and fields." }
+      ]
+    },
+    realWorld: {
+      heading: "GraphQL in Production",
+      points: [
+        { label: "GitHub API v4", body: "GitHub moved its public API from REST (v3) to GraphQL to let clients shape their own responses." },
+        { label: "Shopify Storefront", body: "A GraphQL surface so storefronts fetch exactly the product and cart fields they render, nothing more." }
+      ]
+    },
+    tradeoffs: {
+      heading: "Failure Modes and Trade-offs",
+      points: [
+        { label: "N+1 queries", body: "A naive resolver fetches a list, then fetches each item's related data one at a time. Fixed with a batching layer like <strong>DataLoader</strong>." },
+        { label: "Deep query DoS", body: "A maliciously deep or nested query can force expensive resolution. Fixed with <strong>depth limiting</strong> and query-cost analysis." },
+        { label: "Caching is harder", body: "Every query can be shaped differently, so HTTP-level caching no longer maps cleanly to a URL. Complexity shifts to the server." }
+      ]
+    },
+    handsOn: {
+      prerequisites: "Node.js; Apollo Server or `graphql-yoga` (both free, npm-installable).",
+      setup: "Local and free only.",
+      simulate: "Build a schema with `User { id, name, orders: [Order] }` and a naive resolver where `orders` triggers one DB query per user. Query a list of 20 users each with their orders, and log every DB call your resolver makes.",
+      observe: "21 queries firing (1 for users plus 20 for each user's orders): the N+1 problem, reproduced exactly as named in Failure Modes. Then add DataLoader to batch the `orders` lookups and re-run the same query.",
+      stretch: "Send a deliberately deep, nested query (for example `user { orders { user { orders { user } } } }` nested 10 levels) against your unprotected schema and watch resolution time balloon. Then add `graphql-depth-limit` and confirm the same query is rejected before it ever resolves."
+    }
+  },
+  keyTakeaways: [
+    "GraphQL lets the client request <strong>exactly which fields</strong> it needs from one endpoint against a strongly-typed schema.",
+    "It eliminates over-fetching and under-fetching, but shifts complexity to the server and makes HTTP caching harder.",
+    "Watch for the <strong>N+1 problem</strong> (fix with DataLoader) and deep-query DoS (fix with depth limiting and cost analysis)."
+  ],
+  proTip: "GraphQL trades REST's caching simplicity for client-side flexibility. If your clients all need the same fixed shape, plain REST is often the calmer choice.",
+  related: ["rest", "rest-vs-graphql", "grpc", "api-versioning", "web-request", "cors", "pagination", "api-choice"],
+  bridgeOut: "REST and GraphQL have each made their own case. Before moving on, the practical question every design discussion actually asks: given a concrete screen, which one do you reach for, and why?"
+};

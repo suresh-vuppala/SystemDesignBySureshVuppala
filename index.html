@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HelloSDE — Master System Design · 8-Week Live Cohort</title>
-<meta name="description" content="Learn system design by doing. An 8-week live weekend cohort where every building block is followed by a real-world design walkthrough — until it becomes instinct. Next batch Sep 18.">
+<meta name="description" content="Learn system design by doing. An 8-week live weekend cohort where every building block is followed by a real-world design walkthrough — until it becomes instinct. Next batch Oct 18.">
 <meta name="keywords" content="system design course, live cohort, system design bootcamp, FAANG interview prep, distributed systems, staff engineer interview, senior engineer">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://hellosde.com/">
@@ -12,10 +12,13 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://hellosde.com/">
 <meta property="og:title" content="Master System Design — 8-Week Live Cohort · HelloSDE">
-<meta property="og:description" content="Learn a building block, then immediately apply it. 8 weekends, live. Next batch Sep 18.">
+<meta property="og:description" content="Learn a building block, then immediately apply it. 8 weekends, live. Next batch Oct 18.">
 
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@500;700;900&display=swap" rel="stylesheet">
 
 <style>
 /* ── Landing page — course-focused ───────────────────────── */
@@ -52,28 +55,45 @@
   display:flex;flex-wrap:wrap;gap:12px;
   justify-content:center;margin-top:28px;
 }
-.lp-btn-primary{
+/* Retro 8-bit pixel buttons: dotted font, notched corners, pixel outline
+   (traced by 4 hard drop-shadows), and a hard offset drop with a press. */
+.lp-btn-primary,.lp-btn-secondary{
   display:inline-flex;align-items:center;gap:8px;
-  padding:13px 26px;border-radius:3px;
-  border:1px solid var(--brand);background:var(--brand);
-  color:var(--brand-fg);font-weight:700;font-size:var(--fs-sm);
+  padding:13px 26px;border:none;border-radius:0;cursor:pointer;
+  font-family:'Doto',var(--font-mono,ui-monospace),monospace;
+  font-weight:800;font-size:var(--fs-sm);letter-spacing:.6px;text-transform:uppercase;
   text-decoration:none;
-  transition:background-color .12s,border-color .12s,transform .12s,box-shadow .12s;
-  box-shadow:0 3px 12px rgba(201,74,12,.22);
+  clip-path:polygon(0 4px,4px 4px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));
+  transition:transform .1s ease,filter .1s ease,background-color .12s;
+}
+.lp-btn-primary{
+  --pxln:#141418;--pxsh:rgba(20,20,25,.9);
+  background:var(--brand);color:var(--brand-fg);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(4px 4px 0 var(--pxsh));
 }
 .lp-btn-primary:hover{
-  background:var(--brand-2);border-color:var(--brand-2);
-  transform:translateY(-1px);box-shadow:0 5px 18px rgba(201,74,12,.3);
-  text-decoration:none;
+  background:var(--brand-2);text-decoration:none;transform:translate(2px,2px);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(2px 2px 0 var(--pxsh));
 }
+.lp-btn-primary:active{
+  transform:translate(4px,4px);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln));
+}
+[data-theme="dark"] .lp-btn-primary{--pxsh:rgba(255,255,255,.16)}
 .lp-btn-secondary{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:13px 22px;border-radius:3px;
-  border:1px solid var(--border-strong);background:transparent;
-  color:var(--text);font-weight:600;font-size:var(--fs-sm);
-  text-decoration:none;transition:background-color .12s;
+  --pxln:var(--text);--pxsh:rgba(0,0,0,.28);
+  background:transparent;color:var(--text);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(3px 3px 0 var(--pxsh));
 }
-.lp-btn-secondary:hover{background:var(--card-2);text-decoration:none}
+.lp-btn-secondary:hover{
+  background:var(--card-2);text-decoration:none;transform:translate(1px,1px);
+  filter:drop-shadow(2px 0 0 var(--pxln)) drop-shadow(-2px 0 0 var(--pxln)) drop-shadow(0 2px 0 var(--pxln)) drop-shadow(0 -2px 0 var(--pxln)) drop-shadow(2px 2px 0 var(--pxsh));
+}
+[data-theme="dark"] .lp-btn-secondary{--pxsh:rgba(255,255,255,.14)}
+@media(prefers-reduced-motion:reduce){
+  .lp-btn-primary,.lp-btn-secondary{transition:filter .1s ease,background-color .12s}
+  .lp-btn-primary:hover,.lp-btn-secondary:hover,.lp-btn-primary:active{transform:none}
+}
 
 .lp-facts{
   display:flex;justify-content:center;flex-wrap:wrap;
@@ -113,6 +133,11 @@
   text-align:center;max-width:660px;
   margin:0 auto 36px;line-height:var(--lh-normal);
 }
+.lp-section-note{
+  font-size:var(--fs-sm);color:var(--muted);
+  text-align:center;margin:20px auto 0;
+}
+.lp-section-note a{color:var(--link)}
 
 /* ── Course value props ───────────────────────────────────── */
 .lp-value-grid{
@@ -190,7 +215,10 @@
 
 /* ── Bottom CTA ───────────────────────────────────────────── */
 .lp-bottom-cta{
-  background:var(--brand-soft);
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(680px 240px at 50% 0%, rgba(249,115,22,.18), transparent 72%),
+    var(--brand-soft);
   border-top:1px solid var(--brand-border);
   padding:56px 24px 60px;text-align:center;
 }
@@ -206,6 +234,240 @@
 }
 .lp-bottom-cta p b{color:var(--text)}
 
+/* ── System Design course modules (digital hero band) ─────── */
+.lp-modules{
+  --lp-grid:rgba(0,0,0,.055);
+  position:relative;overflow:hidden;padding:74px 24px 78px;
+  background:
+    radial-gradient(900px 420px at 50% -8%, var(--brand-soft), transparent 72%),
+    radial-gradient(680px 360px at 86% 20%, rgba(249,115,22,.08), transparent 70%),
+    var(--bg);
+  border-bottom:1px solid var(--border);
+}
+/* Dark theme: turn the band into the full digital-neon treatment */
+[data-theme="dark"] .lp-modules{
+  --lp-grid:rgba(255,255,255,.045);
+  background:
+    radial-gradient(900px 420px at 50% -8%, rgba(249,115,22,.24), transparent 70%),
+    radial-gradient(760px 380px at 86% 16%, rgba(251,191,36,.14), transparent 70%),
+    radial-gradient(680px 360px at 12% 30%, rgba(234,88,12,.18), transparent 70%),
+    linear-gradient(180deg,#0c0a09,#141210);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+/* faint tech grid texture, faded at the edges */
+.lp-modules::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--lp-grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--lp-grid) 1px,transparent 1px);
+  background-size:46px 46px;
+  -webkit-mask-image:radial-gradient(circle at 50% 26%,#000,transparent 80%);
+  mask-image:radial-gradient(circle at 50% 26%,#000,transparent 80%);
+}
+.lp-modules-glow{
+  position:absolute;top:-90px;left:50%;transform:translateX(-50%);
+  width:72%;height:280px;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at center,rgba(249,115,22,.16),transparent 70%);
+  filter:blur(34px);
+}
+[data-theme="dark"] .lp-modules-glow{background:radial-gradient(ellipse at center,rgba(249,115,22,.28),transparent 70%)}
+.lp-modules-inner{position:relative;z-index:1;max-width:1160px;margin:0 auto}
+.lp-modules-head{text-align:center;margin-bottom:40px}
+.lp-mod-kicker{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:800;
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--brand-2);background:var(--brand-soft);
+  border:1px solid var(--brand-border);
+  padding:6px 15px;border-radius:30px;margin-bottom:20px;
+}
+[data-theme="dark"] .lp-mod-kicker{
+  color:#fed7aa;background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.42);
+}
+.lp-modules-title{
+  font-family:'Doto',var(--font-mono,ui-monospace),monospace;
+  font-size:clamp(2rem,5.2vw,3.6rem);font-weight:900;
+  letter-spacing:.02em;line-height:1.05;margin:0 auto 16px;max-width:860px;
+  background:linear-gradient(90deg,#fb923c,#f97316,#fbbf24,#f97316,#fb923c);
+  background-size:220% auto;
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+  animation:lpShine 7s linear infinite;
+}
+@keyframes lpShine{to{background-position:220% center}}
+@media(prefers-reduced-motion:reduce){.lp-modules-title{animation:none}}
+.lp-modules-lead{
+  font-size:var(--fs-md);color:var(--muted);line-height:var(--lh-normal);
+  max-width:640px;margin:0 auto;
+}
+[data-theme="dark"] .lp-modules-lead{color:#a8a29e}
+.lp-modules-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(248px,1fr));
+  gap:14px;
+}
+.lp-mod-card{
+  position:relative;display:flex;flex-direction:column;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:20px 18px;overflow:hidden;
+  text-decoration:none;color:var(--text);
+  transition:transform .16s,border-color .16s,box-shadow .16s;
+}
+.lp-mod-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--_g,linear-gradient(90deg,var(--brand),var(--brand-2)));
+  transform:scaleX(0);transform-origin:left;transition:transform .22s;
+}
+.lp-mod-card:hover{
+  transform:translateY(-3px);border-color:var(--brand-border);
+  box-shadow:0 12px 28px rgba(0,0,0,.10);text-decoration:none;
+}
+.lp-mod-card:hover::before{transform:scaleX(1)}
+[data-theme="dark"] .lp-mod-card:hover{box-shadow:0 12px 28px rgba(0,0,0,.5)}
+.lp-mod-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+/* Module badge: a sleek modern mini-display. The module gradient is the
+   glowing screen, wrapped in a thin dark bezel with a glossy sheen and faint
+   scanlines, and the number sits on it in the dotted Doto font. Modern, with
+   a retro-digital hint. */
+.lp-mod-num{
+  position:relative;flex-shrink:0;box-sizing:border-box;
+  width:54px;height:46px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--_g,linear-gradient(135deg,var(--brand),var(--brand-2)));
+  border:2px solid rgba(2,6,23,.6);
+  box-shadow:0 10px 22px -8px rgba(2,6,23,.5),inset 0 1px 0 rgba(255,255,255,.4),inset 0 0 0 1px rgba(255,255,255,.14);
+  font-family:'Doto',var(--font-mono,ui-monospace),monospace;
+  font-weight:900;font-size:18px;letter-spacing:1px;color:#fff;
+  text-shadow:0 1px 2px rgba(2,6,23,.4);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+/* glossy screen sheen */
+.lp-mod-num::before{
+  content:'';position:absolute;inset:0;border-radius:10px;pointer-events:none;
+  background:linear-gradient(157deg,rgba(255,255,255,.42),rgba(255,255,255,0) 46%);
+}
+/* faint scanlines for the retro-digital hint */
+.lp-mod-num::after{
+  content:'';position:absolute;inset:3px;border-radius:8px;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px);
+  mix-blend-mode:soft-light;opacity:.6;
+}
+.lp-mod-card:hover .lp-mod-num{
+  transform:translateY(-1px) scale(1.04);
+  box-shadow:0 14px 26px -8px rgba(2,6,23,.55),inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 1px rgba(255,255,255,.18);
+}
+.lp-mod-count{
+  font-size:var(--fs-2xs);font-weight:700;color:var(--muted);
+  background:var(--card-2);border:1px solid var(--border);
+  border-radius:20px;padding:3px 10px;white-space:nowrap;
+}
+.lp-mod-card h3{
+  font-size:var(--fs-md);font-weight:700;color:var(--text);
+  margin:0;line-height:var(--lh-tight);letter-spacing:var(--ls-tight);
+}
+.lp-mod-card p{
+  font-size:var(--fs-xs);color:var(--text-2);
+  margin:0;line-height:var(--lh-normal);flex:1;
+}
+.lp-mod-arrow{
+  font-size:var(--fs-2xs);font-weight:700;color:var(--brand);
+  text-transform:uppercase;letter-spacing:var(--ls-caps);
+  opacity:0;transform:translateX(-5px);
+  transition:opacity .16s,transform .16s;
+}
+.lp-mod-card:hover .lp-mod-arrow{opacity:1;transform:translateX(0)}
+/* Dark theme only: glassy card treatment on the digital band. In light mode
+   the cards use the standard theme tokens (var(--card)/var(--text)). */
+[data-theme="dark"] .lp-modules .lp-mod-card{background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.10)}
+[data-theme="dark"] .lp-modules .lp-mod-card:hover{border-color:rgba(255,255,255,.24);box-shadow:0 16px 36px rgba(0,0,0,.5)}
+[data-theme="dark"] .lp-modules .lp-mod-card h3{color:#f5f5f4}
+[data-theme="dark"] .lp-modules .lp-mod-card p{color:#a8a29e}
+[data-theme="dark"] .lp-modules .lp-mod-count{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:#d6d3d1}
+[data-theme="dark"] .lp-modules .lp-mod-arrow{color:#fdba74}
+
+/* ── Live Courses ─────────────────────────────────────────── */
+.lp-live{max-width:1080px;margin:0 auto;padding:64px 24px}
+.lp-live-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:18px;
+}
+.lp-live-card{
+  position:relative;display:flex;flex-direction:column;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:28px;overflow:hidden;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+}
+.lp-live-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  transform:scaleX(0);transform-origin:left;transition:transform .28s ease;
+}
+.lp-live-card:hover{
+  transform:translateY(-4px);border-color:var(--brand-border);
+  box-shadow:0 18px 40px -12px rgba(2,6,23,.28);
+}
+.lp-live-card:hover::before{transform:scaleX(1)}
+[data-theme="dark"] .lp-live-card:hover{box-shadow:0 18px 40px -12px rgba(0,0,0,.6)}
+.lp-live-card.is-featured{
+  border-color:var(--brand-border);
+  background:linear-gradient(180deg,var(--brand-soft),var(--card) 120px);
+}
+.lp-live-badge{
+  align-self:flex-start;display:inline-flex;align-items:center;gap:6px;
+  font-size:var(--fs-2xs);font-weight:800;text-transform:uppercase;
+  letter-spacing:var(--ls-caps);color:var(--brand-fg);
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));
+  padding:5px 12px;border-radius:20px;margin-bottom:14px;
+  box-shadow:0 3px 10px rgba(201,74,12,.28);
+}
+.lp-live-badge .lp-live-dot{
+  width:7px;height:7px;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 0 rgba(255,255,255,.7);animation:lpPulse 1.8s infinite;
+}
+@keyframes lpPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.7)}70%{box-shadow:0 0 0 7px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+.lp-live-card h3{
+  font-size:var(--fs-xl);font-weight:700;color:var(--text);
+  margin:0 0 8px;letter-spacing:var(--ls-tight);line-height:var(--lh-tight);
+}
+.lp-live-card > p{
+  font-size:var(--fs-sm);color:var(--text-2);
+  line-height:var(--lh-loose);margin:0 0 18px;
+}
+.lp-live-facts{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px;
+}
+.lp-live-fact{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;
+}
+.lp-live-fact .k{
+  font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--muted);margin-bottom:3px;
+}
+.lp-live-fact .v{font-size:var(--fs-sm);font-weight:700;color:var(--text)}
+.lp-live-feats{list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:9px}
+.lp-live-feats li{
+  position:relative;padding-left:24px;
+  font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal);
+}
+.lp-live-feats li::before{
+  content:'\2713';position:absolute;left:0;top:0;
+  color:var(--brand);font-weight:800;
+}
+.lp-live-card .lp-btn-primary{align-self:flex-start;margin-top:auto}
+.lp-live-soon{
+  align-items:center;justify-content:center;text-align:center;
+  border-style:dashed;background:var(--card-2);
+}
+.lp-live-soon .lp-soon-ic{
+  width:46px;height:46px;border-radius:12px;display:flex;
+  align-items:center;justify-content:center;margin-bottom:14px;
+  background:var(--brand-soft);color:var(--brand);font-size:22px;
+}
+.lp-live-soon h4{font-size:var(--fs-md);font-weight:700;color:var(--text);margin:0 0 6px}
+.lp-live-soon p{font-size:var(--fs-sm);color:var(--muted);margin:0;line-height:var(--lh-normal)}
+
+@media(max-width:820px){
+  .lp-live-grid{grid-template-columns:1fr}
+}
 @media(max-width:640px){
   .lp-hero{padding:44px 16px 40px}
   .lp-hero h1{font-size:var(--fs-2xl)}
@@ -213,6 +475,9 @@
   .lp-facts{gap:10px}
   .lp-fact{min-width:130px;padding:12px 14px}
   .lp-section{padding:44px 16px}
+  .lp-modules,.lp-live{padding:44px 16px}
+  .lp-live-card{padding:22px 18px}
+  .lp-live-facts{grid-template-columns:1fr 1fr}
   .lp-bottom-cta{padding:44px 16px 48px}
   .lp-section-title,.lp-bottom-cta h2{font-size:var(--fs-lg)}
 }
@@ -220,104 +485,170 @@
 </head>
 <body>
 
-<!-- ── HERO — course-focused ── -->
-<section class="lp-hero">
-  <span class="lp-kicker">Live Cohort · 8 Weekends · Small Group</span>
-  <h1>Master <span class="u">System Design</span> in 8 Weekends</h1>
-  <p class="lp-sub">Stop memorizing templates. Start designing real systems. A hands-on live cohort where every building block is followed by a real-world design walkthrough — <strong>until it becomes instinct.</strong></p>
-
-  <div class="lp-cta-row">
-    <a href="master-system-design.html" class="lp-btn-primary">Enroll in the Live Course ›</a>
-    <a href="system-design-cheatsheet/01-foundations.html" class="lp-btn-secondary">Explore Free Reference</a>
+<!-- ── SYSTEM DESIGN COURSE MODULES ── -->
+<section class="lp-modules">
+  <div class="lp-modules-glow"></div>
+  <div class="lp-modules-inner">
+  <div class="lp-modules-head">
+    <span class="lp-mod-kicker">15 Modules · 142 Lessons · Free Forever</span>
+    <h2 class="lp-modules-title">The Complete System Design Course</h2>
+    <p class="lp-modules-lead">From first principles to distributed systems. Every concept paired with real-world case studies and hands-on labs. Tap any module to jump straight in.</p>
   </div>
 
-  <div class="lp-facts">
-    <div class="lp-fact">
-      <div class="lp-fact-label">Next Batch</div>
-      <div class="lp-fact-value">Sep 18</div>
-    </div>
-    <div class="lp-fact">
-      <div class="lp-fact-label">Duration</div>
-      <div class="lp-fact-value">8 Weekends</div>
-    </div>
-    <div class="lp-fact">
-      <div class="lp-fact-label">Format</div>
-      <div class="lp-fact-value">Sat &amp; Sun · 9AM–1PM</div>
-    </div>
-    <div class="lp-fact">
-      <div class="lp-fact-label">Investment</div>
-      <div class="lp-fact-value">₹39,999</div>
-    </div>
-  </div>
-
-  <p class="lp-hero-trust">Built by an engineer who&rsquo;s <b>designed systems at scale</b> · 16 modules · 30+ real problems · 300+ diagrams</p>
-</section>
-
-<!-- ── COURSE VALUE PROPS ── -->
-<section class="lp-section">
-  <h2 class="lp-section-title">Why this cohort works</h2>
-  <p class="lp-section-lead">Passive tutorials don&rsquo;t transfer to the whiteboard. This course is built on the pattern that actually sticks: <strong>learn a building block, immediately apply it</strong>.</p>
-
-  <div class="lp-value-grid">
-    <div class="lp-value-card">
-      <div class="lp-value-num">01</div>
-      <h3>Learn + Apply, weekly</h3>
-      <p>Each weekend introduces a system design building block, then you use it live on a real design problem — with feedback.</p>
-    </div>
-    <div class="lp-value-card">
-      <div class="lp-value-num">02</div>
-      <h3>Real designs, not templates</h3>
-      <p>Walk through how Instagram, Uber, WhatsApp, and Discord actually work — not toy examples or memorized scripts.</p>
-    </div>
-    <div class="lp-value-card">
-      <div class="lp-value-num">03</div>
-      <h3>Small live cohort</h3>
-      <p>Not a recorded course. Limited seats, live discussion, personal feedback on your designs every session.</p>
-    </div>
-    <div class="lp-value-card">
-      <div class="lp-value-num">04</div>
-      <h3>Staff-level thinking</h3>
-      <p>Learn to reason about tradeoffs, capacity, consistency, and failure like an engineer who has shipped at scale.</p>
-    </div>
+  <div class="lp-modules-grid">
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#6366f1,#8b5cf6)" href="system-design-course/foundations/sd-framework.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">01</span><span class="lp-mod-count">7 lessons</span></div>
+      <h3>Foundations</h3>
+      <p>The mental model every design starts from: framework, NFRs, scaling, concurrency.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#0ea5e9,#2563eb)" href="system-design-course/networking/web-request.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">02</span><span class="lp-mod-count">11 lessons</span></div>
+      <h3>Networking</h3>
+      <p>How a request actually travels the wire: DNS, TCP/UDP, HTTPS, the event loop.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#06b6d4,#0891b2)" href="system-design-course/apis/rest.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">03</span><span class="lp-mod-count">15 lessons</span></div>
+      <h3>APIs &amp; Communication</h3>
+      <p>REST, gRPC, GraphQL, WebSockets, SSE, idempotency, pagination and more.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#ef4444,#f97316)" href="system-design-course/security/authentication.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">04</span><span class="lp-mod-count">3 lessons</span></div>
+      <h3>Security</h3>
+      <p>Authentication, authorization, and encryption done the way production expects.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#f59e0b,#f97316)" href="system-design-course/infrastructure/load-balancer.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">05</span><span class="lp-mod-count">11 lessons</span></div>
+      <h3>Infrastructure</h3>
+      <p>Load balancers, gateways, NGINX, Kubernetes, service mesh, CI/CD, IaC.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#10b981,#059669)" href="system-design-course/storage/db-internals.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">06</span><span class="lp-mod-count">13 lessons</span></div>
+      <h3>Storage</h3>
+      <p>DB internals, indexing, SQL, NoSQL, search, blob, vector, and graph databases.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#ec4899,#db2777)" href="system-design-course/caching/caching.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">07</span><span class="lp-mod-count">12 lessons</span></div>
+      <h3>Caching</h3>
+      <p>Strategies, invalidation, a full Redis deep dive, and CDNs at the edge.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#8b5cf6,#6366f1)" href="system-design-course/messaging/message-queues.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">08</span><span class="lp-mod-count">9 lessons</span></div>
+      <h3>Messaging</h3>
+      <p>Queues, Kafka, pub/sub, DLQs, event sourcing, CQRS, and ordering.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#14b8a6,#0d9488)" href="system-design-course/consistency/cap.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">09</span><span class="lp-mod-count">8 lessons</span></div>
+      <h3>Consistency</h3>
+      <p>CAP, consistency models, consensus, distributed transactions, sagas.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#f43f5e,#e11d48)" href="system-design-course/scalability/partitioning.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">10</span><span class="lp-mod-count">10 lessons</span></div>
+      <h3>Scalability</h3>
+      <p>Partitioning, sharding, consistent hashing, bloom filters, rate limiting.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#3b82f6,#6366f1)" href="system-design-course/distributed-systems/dist-patterns.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">11</span><span class="lp-mod-count">12 lessons</span></div>
+      <h3>Distributed Systems</h3>
+      <p>Patterns, ZooKeeper, consensus, leader election, fault tolerance.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#22c55e,#16a34a)" href="system-design-course/data-pipelines/cdc.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">12</span><span class="lp-mod-count">10 lessons</span></div>
+      <h3>Data Pipelines</h3>
+      <p>CDC, ETL/ELT, stream and batch processing, warehouses, lakehouses.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#eab308,#ca8a04)" href="system-design-course/observability/logging.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">13</span><span class="lp-mod-count">7 lessons</span></div>
+      <h3>Observability</h3>
+      <p>Logs, metrics, distributed tracing, OpenTelemetry, incident response.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#a855f7,#7c3aed)" href="system-design-course/key-numbers/latency-numbers.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">14</span><span class="lp-mod-count">7 lessons</span></div>
+      <h3>Key Numbers</h3>
+      <p>Latency, throughput, storage, cost, SLA math, and back-of-envelope estimation.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
+    <a class="lp-mod-card" style="--_g:linear-gradient(135deg,#fb923c,#ea580c)" href="system-design-course/decision-guides/api-choice.html">
+      <div class="lp-mod-top"><span class="lp-mod-num">15</span><span class="lp-mod-count">7 lessons</span></div>
+      <h3>Decision Guides</h3>
+      <p>Flowcharts to pick the right API, database, cache, and scaling approach.</p>
+      <span class="lp-mod-arrow">Start module ›</span>
+    </a>
   </div>
 
   <div class="lp-section-cta">
-    <a href="master-system-design.html" class="lp-btn-primary">See the full 8-week roadmap ›</a>
+    <a href="system-design-course/index.html" class="lp-btn-primary">Browse the full course ›</a>
+  </div>
+  </div>
+</section>
+
+<!-- ── LIVE COURSES ── -->
+<section class="lp-live">
+  <div class="lp-modules-head">
+    <span class="lp-kicker">Cohort-Based · Live · Small Group</span>
+    <h2 class="lp-section-title">Live Courses</h2>
+    <p class="lp-section-lead">Two live cohorts to go deep with feedback on your actual designs: master system design, or build production-grade AI systems.</p>
+  </div>
+
+  <div class="lp-live-grid">
+    <div class="lp-live-card is-featured">
+      <span class="lp-live-badge"><span class="lp-live-dot"></span>Enrolling Now</span>
+      <h3>Master System Design — 8-Week Live Cohort</h3>
+      <p>Every weekend introduces a building block, then you use it live on a real-world design problem. Instagram, Uber, WhatsApp, Discord — how they actually work, not memorized scripts.</p>
+      <div class="lp-live-facts">
+        <div class="lp-live-fact"><div class="k">Next Batch</div><div class="v">Oct 18</div></div>
+        <div class="lp-live-fact"><div class="k">Duration</div><div class="v">8 Weekends</div></div>
+        <div class="lp-live-fact"><div class="k">Format</div><div class="v">Sat &amp; Sun · 9AM–1PM</div></div>
+      </div>
+      <ul class="lp-live-feats">
+        <li>Learn a building block, then immediately apply it live, with feedback.</li>
+        <li>Real-world design walkthroughs, not toy examples or templates.</li>
+        <li>Small cohort with limited seats and personal attention every session.</li>
+        <li>Reason about tradeoffs, capacity, consistency, and failure like a staff engineer.</li>
+      </ul>
+      <a href="master-system-design.html" class="lp-btn-primary">Enroll ›</a>
+    </div>
+
+    <div class="lp-live-card is-featured">
+      <span class="lp-live-badge"><span class="lp-live-dot"></span>New Cohort</span>
+      <h3>AI Systems &amp; LLM Engineering — Live Cohort</h3>
+      <p>Design production AI systems end to end: RAG pipelines, vector search, agentic workflows, evals, and the latency and cost tradeoffs that decide whether an LLM feature actually ships.</p>
+      <div class="lp-live-facts">
+        <div class="lp-live-fact"><div class="k">Next Batch</div><div class="v">Nov 15</div></div>
+        <div class="lp-live-fact"><div class="k">Duration</div><div class="v">6 Weekends</div></div>
+        <div class="lp-live-fact"><div class="k">Format</div><div class="v">Sat &amp; Sun · 9AM–1PM</div></div>
+      </div>
+      <ul class="lp-live-feats">
+        <li>RAG, embeddings, and vector search built on real datasets.</li>
+        <li>Agentic systems, tool use, and orchestration patterns.</li>
+        <li>Evals and guardrails: measuring output quality you can trust.</li>
+        <li>Latency, cost, and scaling tradeoffs for LLM-backed features.</li>
+      </ul>
+      <a href="master-ai-engineering.html" class="lp-btn-primary">Join the AI cohort ›</a>
+    </div>
   </div>
 </section>
 
 <div class="lp-divider"></div>
 
-<!-- ── FREE RESOURCES ── -->
-<section class="lp-section">
-  <h2 class="lp-section-title">Free resources to get started</h2>
-  <p class="lp-section-lead">Not ready for the cohort yet? Start with these — the same material we build on in the live sessions.</p>
-
-  <div class="lp-free-grid">
-    <a href="system-design-cheatsheet/01-foundations.html" class="lp-free-card">
-      <h3>16-Module Concept Reference</h3>
-      <p>Networking, storage, caching, messaging, consistency, scalability, distributed systems, observability, AI — every building block explained visually.</p>
-      <span class="lp-free-cta">Start reading ›</span>
-    </a>
-    <a href="realtime-system-design-problems/index.html" class="lp-free-card">
-      <h3>30+ Real-World Case Studies</h3>
-      <p>How Discord holds 10M WebSockets, how Slack fans out messages, how Uber matches rides at scale — deep architecture walkthroughs.</p>
-      <span class="lp-free-cta">Browse problems ›</span>
-    </a>
-    <a href="system-design-cheatsheet/engineering-blogs.html" class="lp-free-card">
-      <h3>Curated Engineering Blogs</h3>
-      <p>The best posts from Netflix, Uber, Stripe, Airbnb, Discord and more — categorized by domain and hand-picked for interview relevance.</p>
-      <span class="lp-free-cta">Explore blogs ›</span>
-    </a>
-  </div>
-</section>
-
 <!-- ── BOTTOM CTA ── -->
 <section class="lp-bottom-cta">
-  <h2>Seats fill fast. Next batch: <b>Sep 18</b>.</h2>
+  <h2>Seats fill fast. Next batch: <b>Oct 18</b>.</h2>
   <p>Small live cohort, weekend sessions, personal attention on every design you build. Lock your seat before it&rsquo;s gone.</p>
   <div class="lp-cta-row">
-    <a href="master-system-design.html" class="lp-btn-primary">Enroll in Master System Design · ₹39,999 ›</a>
+    <a href="master-system-design.html" class="lp-btn-primary">Enroll in Master System Design ›</a>
   </div>
 </section>
 
