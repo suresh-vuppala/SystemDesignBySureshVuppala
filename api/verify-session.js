@@ -1,5 +1,5 @@
 /**
- * Vercel Serverless Function — Verify Firebase Session
+ * Vercel Serverless Function, Verify Firebase Session
  * 
  * Called by middleware to verify if a user is premium.
  * Checks the Firebase ID token and looks up Firestore for isPremium.

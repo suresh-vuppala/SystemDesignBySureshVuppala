@@ -62,11 +62,40 @@ window.COURSE_CONTENT["rest-vs-graphql"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js; a GraphQL server (Apollo Server) and a tiny REST server (Express).",
-      setup: "Local and free. Model a product whose fields come from 2 to 3 in-memory \u201cservices\u201d (product, reviews, recommendations).",
-      simulate: "Expose the product both ways: a GraphQL schema, and REST endpoints (<code>/product/:id</code>, <code>/product/:id/reviews</code>, <code>/product/:id/recommendations</code>). Fetch one screen\u2019s data (name, price, reviews) via a single GraphQL query, then via REST, and count the round trips. Then deliberately build the N+1: resolve 100 posts where each fetches its author with a per-author query, and log the query count.",
-      observe: "The GraphQL screen fetch is <strong>1 request shaped exactly to the fields you asked for</strong>, versus multiple REST calls or an over-fetching <code>/dashboard</code>. Then watch the naive resolver fire <strong>101 queries</strong> for 100 posts; add a DataLoader to batch the authors and watch it drop to 2.",
-      stretch: "Add a query <strong>depth limit</strong> (say max depth 5) and a cost limit to the GraphQL server, then send a deeply nested friends-of-friends query and confirm the server rejects it before touching the database, the exact protection a fixed REST endpoint never needs."
+      goal: "Serve the same product screen both ways and count round trips: three REST calls versus one field-shaped GraphQL query.",
+      stack: "Node.js + Express (REST) + Apollo Server (GraphQL), compared with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir rest-vs-gql && cd rest-vs-gql\nnpm init -y && npm pkg set type=module\nnpm install express @apollo/server graphql",
+          lang: "bash"
+        },
+        {
+          title: "Expose the product as three REST resources",
+          body: "Fields live in separate in-memory services, so a full screen needs three calls. Save as <code>rest.js</code>.",
+          code: "import express from 'express';\nconst app = express();\nconst product = { 1: { id: 1, name: 'Desk', price: 199 } };\nconst reviews = { 1: [{ stars: 5 }, { stars: 4 }] };\nconst recs = { 1: [{ id: 2, name: 'Chair' }] };\n\napp.get('/product/:id', (r, s) => s.json(product[r.params.id]));\napp.get('/product/:id/reviews', (r, s) => s.json(reviews[r.params.id]));\napp.get('/product/:id/recommendations', (r, s) => s.json(recs[r.params.id]));\napp.listen(3000, () => console.log('REST on :3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Expose the same data as one GraphQL endpoint",
+          body: "One request, and the client names exactly the fields it wants. Save as <code>gql.js</code>.",
+          code: "import { ApolloServer } from '@apollo/server';\nimport { startStandaloneServer } from '@apollo/server/standalone';\n\nconst db = { product: { id: 1, name: 'Desk', price: 199 }, reviews: [{ stars: 5 }, { stars: 4 }], recs: [{ id: 2, name: 'Chair' }] };\n\nconst typeDefs = `#graphql\n  type Review { stars: Int }\n  type Rec { id: Int, name: String }\n  type Product { id: Int, name: String, price: Int, reviews: [Review], recommendations: [Rec] }\n  type Query { product(id: Int): Product }\n`;\nconst resolvers = {\n  Query: { product: () => db.product },\n  Product: { reviews: () => db.reviews, recommendations: () => db.recs },\n};\nconst server = new ApolloServer({ typeDefs, resolvers });\nconst { url } = await startStandaloneServer(server, { listen: { port: 4000 } });\nconsole.log('GraphQL at ' + url);",
+          lang: "javascript"
+        },
+        {
+          title: "Run both servers",
+          code: "node rest.js &\nnode gql.js &",
+          lang: "bash"
+        },
+        {
+          title: "Fetch one screen each way and count the calls",
+          body: "REST needs three round trips for name, price, and reviews; GraphQL needs one shaped to exactly those fields.",
+          code: "# REST: three requests\ncurl -s localhost:3000/product/1\ncurl -s localhost:3000/product/1/reviews\ncurl -s localhost:3000/product/1/recommendations\n\n# GraphQL: one request, only the fields you name\ncurl -s localhost:4000 -H 'Content-Type: application/json' \\\n  -d '{\"query\":\"{ product(id:1){ name price reviews{ stars } } }\"}'",
+          lang: "bash"
+        }
+      ],
+      observe: "The REST screen took three separate calls (and the recommendations call fetched data this screen did not even need), while the GraphQL screen was <strong>1 request shaped exactly to the fields you asked for</strong>. The trade is that the REST responses are trivially HTTP-cacheable and the GraphQL POST is not.",
+      stretch: "Add a naive <code>posts { author }</code> resolver that fetches each author separately, watch it fire 101 queries for 100 posts (the N+1 problem), then add DataLoader and watch it drop to 2."
     }
   },
   keyTakeaways: [

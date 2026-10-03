@@ -61,11 +61,46 @@ window.COURSE_CONTENT["metrics"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Prometheus setup from Module 6.7; Grafana (free, Docker image).",
-      setup: "Local and free: Prometheus + Grafana via Docker Compose, both official free images.",
-      simulate: "Instrument a small app with request-count and latency histogram metrics using an OTel SDK, scrape it with Prometheus, and build a Grafana dashboard computing p50/p95/p99 via PromQL (<code>histogram_quantile(0.99, rate(...[5m]))</code>). Generate load with varying latency and watch the percentiles diverge from the average in real time.",
-      observe: "Your own dashboard reproduces the \u201cavg hides tail pain\u201d claim with live numbers, including a real p999 spike whenever you inject an artificially slow request. The Golden Signals, on your own graph instead of a static example.",
-      stretch: "Add a <code>user_id</code> label to your request-count metric and generate traffic from 10,000 distinct synthetic user IDs. Watch Prometheus memory and <code>prometheus_tsdb_head_series</code> climb sharply, reproducing cardinality explosion on purpose so you recognize it before it happens by accident."
+      goal: "Instrument an app with a latency histogram, scrape it with Prometheus, and compute p50/p95/p99 in PromQL so you watch the tail diverge from the average on live data.",
+      stack: "Prometheus + Grafana in Docker, plus a Node.js app using the OpenTelemetry metrics SDK and its Prometheus exporter. Local and free.",
+      steps: [
+        {
+          title: "Configure the Prometheus scrape",
+          body: "Save as <code>prometheus.yml</code>. It scrapes the exporter the app exposes on port 9464. <code>host.docker.internal</code> lets the container reach the app on your host.",
+          code: "global:\n  scrape_interval: 5s\nscrape_configs:\n  - job_name: demo\n    static_configs:\n      - targets: [\"host.docker.internal:9464\"]",
+          lang: "yaml"
+        },
+        {
+          title: "Instrument the app with an OTel latency histogram",
+          body: "Save as <code>app.js</code>. Install with <code>npm install @opentelemetry/sdk-metrics @opentelemetry/exporter-prometheus</code>, then run <code>node app.js</code>. A 5% slow branch and a 5% error branch give the tail something to show.",
+          code: "const { MeterProvider } = require('@opentelemetry/sdk-metrics');\nconst { PrometheusExporter } = require('@opentelemetry/exporter-prometheus');\nconst http = require('http');\n\nconst exporter = new PrometheusExporter({ port: 9464 });\nconst meter = new MeterProvider({ readers: [exporter] }).getMeter('demo');\nconst latency = meter.createHistogram('http_server_duration_ms');\n\nhttp.createServer((req, res) => {\n  const start = Date.now();\n  const slow = Math.random() < 0.05;\n  const isError = Math.random() < 0.05;\n  setTimeout(() => {\n    latency.record(Date.now() - start, { route: '/api', status: isError ? '500' : '200' });\n    res.end('ok');\n  }, slow ? 800 : 20 + Math.random() * 60);\n}).listen(3000, () => console.log('app on :3000, metrics on :9464/metrics'));",
+          lang: "javascript"
+        },
+        {
+          title: "Start Prometheus and Grafana",
+          code: "docker run -d --name prom -p 9090:9090 -v \"$PWD/prometheus.yml:/etc/prometheus/prometheus.yml\" prom/prometheus\ndocker run -d --name grafana -p 3001:3000 grafana/grafana",
+          lang: "bash"
+        },
+        {
+          title: "Generate load with a slow tail",
+          code: "hey -z 30s -c 50 http://localhost:3000/",
+          lang: "bash"
+        },
+        {
+          title: "Query p50, p95, and p99 in PromQL",
+          body: "Run these in the Prometheus UI at <code>http://localhost:9090</code> or a Grafana panel.",
+          code: "histogram_quantile(0.50, sum(rate(http_server_duration_ms_bucket[1m])) by (le))\nhistogram_quantile(0.95, sum(rate(http_server_duration_ms_bucket[1m])) by (le))\nhistogram_quantile(0.99, sum(rate(http_server_duration_ms_bucket[1m])) by (le))",
+          lang: "promql"
+        },
+        {
+          title: "Watch the average hide the tail",
+          body: "Graph both together. The average stays low and calm while p99 jumps every time the slow branch fires.",
+          code: "sum(rate(http_server_duration_ms_sum[1m])) / sum(rate(http_server_duration_ms_count[1m]))\nhistogram_quantile(0.99, sum(rate(http_server_duration_ms_bucket[1m])) by (le))",
+          lang: "promql"
+        }
+      ],
+      observe: "p99 sits far above the average whenever the 5% slow branch fires, so your own graph reproduces the \u201caverage hides tail pain\u201d claim with live numbers. The Golden Signals, on your own dashboard instead of a static example.",
+      stretch: "Add a <code>user_id</code> label to the <code>latency.record</code> call and drive traffic from 10,000 distinct synthetic IDs. Watch <code>prometheus_tsdb_head_series</code> climb sharply, reproducing cardinality explosion on purpose so you recognize it before it happens by accident."
     }
   },
   keyTakeaways: [

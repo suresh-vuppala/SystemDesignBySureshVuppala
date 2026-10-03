@@ -33,11 +33,34 @@ window.COURSE_CONTENT["pagination"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A local Postgres or SQLite database with a `posts` table seeded with about 10,000 rows.",
-      setup: "Local and free: `docker run -d -p 5432:5432 postgres`, then seed with a script generating 10K rows.",
-      simulate: "Implement `GET /posts?page=N&amp;size=20` (offset: `OFFSET (N-1)*20 LIMIT 20`) and `GET /posts?after=&lt;id&gt;&amp;size=20` (cursor: `WHERE id &gt; &lt;id&gt; ORDER BY id LIMIT 20`). Run `EXPLAIN ANALYZE` on both queries at page 1 and at \u201cpage 400\u201d (offset 8,000) and compare execution time.",
-      observe: "The offset query's execution time grows as the offset grows (it still scans and discards 8,000 rows internally), while the cursor query's time stays flat regardless of how deep you page: the O(skip + limit) vs O(limit) claim, measured rather than asserted.",
-      stretch: "Insert 5 new rows at the top of the table between two offset-pagination requests and watch a row appear twice (or get skipped) across the page boundary: the exact instability named in Overview, reproduced."
+      goal: "Measure why deep offset pagination slows down while cursor pagination stays flat, using <code>EXPLAIN ANALYZE</code> on 10,000 rows.",
+      stack: "Postgres in Docker, queried with <code>psql</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres and seed 10,000 rows",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker exec -i pg psql -U postgres -c \"CREATE TABLE posts(id serial primary key, title text);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO posts(title) SELECT 'post '||g FROM generate_series(1,10000) g;\"",
+          lang: "bash"
+        },
+        {
+          title: "Time offset pagination at page 1",
+          code: "docker exec -i pg psql -U postgres -c \"EXPLAIN ANALYZE SELECT * FROM posts ORDER BY id OFFSET 0 LIMIT 20;\"",
+          lang: "sql"
+        },
+        {
+          title: "Time offset pagination at page 400",
+          body: "Same query, offset 8000. The database still scans and discards every skipped row.",
+          code: "docker exec -i pg psql -U postgres -c \"EXPLAIN ANALYZE SELECT * FROM posts ORDER BY id OFFSET 8000 LIMIT 20;\"",
+          lang: "sql"
+        },
+        {
+          title: "Time cursor pagination just as deep",
+          body: "Seek past id 8000 with a <code>WHERE</code> on the indexed primary key instead of skipping.",
+          code: "docker exec -i pg psql -U postgres -c \"EXPLAIN ANALYZE SELECT * FROM posts WHERE id > 8000 ORDER BY id LIMIT 20;\"",
+          lang: "sql"
+        }
+      ],
+      observe: "The offset query's actual time grows from page 1 to page 400 (it internally scans and throws away 8,000 rows), while the cursor query stays flat and uses an index scan no matter how deep you page: the O(skip + limit) vs O(limit) difference, measured rather than asserted.",
+      stretch: "Insert 5 new rows between two offset requests and watch a row appear twice or get skipped across the page boundary, the exact instability named in Overview, reproduced."
     }
   },
   keyTakeaways: [

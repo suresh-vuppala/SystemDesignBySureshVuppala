@@ -30,11 +30,41 @@ window.COURSE_CONTENT["zookeeper"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (ZooKeeper\u2019s official image); `zkCli.sh` (ships with it).",
-      setup: "Local and free: `docker run -d -p 2181:2181 zookeeper`.",
-      simulate: "Connect with `zkCli.sh` and create an ephemeral node (`create -e /leader \"worker-1\"`), then open a second `zkCli.sh` session and set a watch on it (`get -w /leader`). Close the first session (simulating that worker crashing) and watch the second session get notified the moment the ephemeral node disappears.",
-      observe: "The ephemeral node vanishing automatically the instant its owning session ends, with zero manual cleanup and zero polling. That is the exact mechanism real systems use for \u201cwho is the current leader,\u201d made concrete instead of described.",
-      stretch: "Have 3 separate clients all try to `create /leader-election` (a non-ephemeral node) at once in a tight loop. Confirm exactly one succeeds and the other two get `NodeExists` errors: a minimal leader-election primitive built from ZooKeeper\u2019s atomic create."
+      goal: "Use a ZooKeeper ephemeral node plus a watch to build a self-cleaning leader marker, then prove exactly one client can win an election.",
+      stack: "ZooKeeper via its official Docker image, driven with the bundled <code>zkCli.sh</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a single-node ZooKeeper",
+          code: "docker run -d --name zk -p 2181:2181 zookeeper",
+          lang: "bash"
+        },
+        {
+          title: "Open a client session",
+          body: "This drops you into the ZooKeeper shell connected to the running server.",
+          code: "docker exec -it zk zkCli.sh -server localhost:2181",
+          lang: "bash"
+        },
+        {
+          title: "Create an ephemeral leader node",
+          body: "The <code>-e</code> flag ties this node's lifetime to your session: when the session ends, ZooKeeper deletes the node automatically.",
+          code: "create -e /leader \"worker-1\"\nget /leader",
+          lang: "bash"
+        },
+        {
+          title: "Watch the node from a second session",
+          body: "In a second terminal, open another client and register a one-time watch on the same node.",
+          code: "docker exec -it zk zkCli.sh -server localhost:2181\nget -w /leader",
+          lang: "bash"
+        },
+        {
+          title: "Kill the first session",
+          body: "Back in the first shell, quit to simulate that worker crashing. The watch in the second session fires the moment the ephemeral node disappears.",
+          code: "quit",
+          lang: "bash"
+        }
+      ],
+      observe: "The ephemeral node vanishes the instant its owning session ends, and the second session's watch fires immediately with a <code>NodeDeleted</code> event, with zero manual cleanup and zero polling. That is the exact mechanism real systems use for \"who is the current leader,\" made concrete instead of described.",
+      stretch: "Have 3 clients race to <code>create /leader-election</code> (a normal, non-ephemeral node) at once. Confirm exactly one succeeds and the other two get <code>NodeExists</code> errors: a minimal leader-election primitive built from ZooKeeper's atomic create."
     }
   },
   keyTakeaways: [

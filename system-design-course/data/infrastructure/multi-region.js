@@ -39,11 +39,33 @@ window.COURSE_CONTENT["multi-region"] = {
       ]
     },
     handsOn: {
-      prerequisites: "2 free-tier cloud accounts/regions, or 2 local Docker Postgres instances standing in for \u201cregion A\u201d and \u201cregion B.\u201d",
-      setup: "Cloud free-tier: 2 small Postgres instances in 2 different AWS regions (or simulate with `docker run` on 2 ports locally, adding artificial latency with `tc netem` to mimic cross-region distance). Local and free: the 2-port simulation alone.",
-      simulate: "Write to \u201cregion A\u201d and set up simple replication (a script polling for changes and applying them to \u201cregion B,\u201d standing in for real cross-region replication). Measure the delay between a write landing in A and becoming visible in B.",
-      observe: "A real, non-zero replication lag. Even a simulated one makes concrete the Active-Passive failover risk: if A dies right after a write, that write may not exist yet in B, the exact problem Module 9 will formalize with consistency models.",
-      stretch: "Build the cheapest multi-tenant shape: one app, one Postgres instance, a `tenant_id` column on every table, and row-level security restricting each query to its own tenant's rows. Confirm tenant A's queries genuinely cannot see tenant B's data even with a bug in your WHERE clause."
+      goal: "Stand up two Postgres instances as \u201cregion A\u201d and \u201cregion B,\u201d run a naive replication poller between them, and measure the real lag between a write landing in A and becoming visible in B.",
+      stack: "Two Postgres containers in Docker plus a small bash poller standing in for cross-region replication. Local and free.",
+      steps: [
+        {
+          title: "Start two Postgres regions",
+          code: "docker run -d --name region-a -p 5433:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker run -d --name region-b -p 5434:5432 -e POSTGRES_PASSWORD=pw postgres",
+          lang: "bash"
+        },
+        {
+          title: "Create the same table in both",
+          code: "docker exec region-a psql -U postgres -c \"CREATE TABLE orders(id int primary key, note text, ts timestamptz default now());\"\ndocker exec region-b psql -U postgres -c \"CREATE TABLE orders(id int primary key, note text, ts timestamptz default now());\"",
+          lang: "bash"
+        },
+        {
+          title: "Run a naive replication poller",
+          body: "Every 5 seconds it dumps A's rows and reloads them into B, standing in for real async cross-region replication.",
+          code: "cat > replicate.sh <<'EOF'\n#!/usr/bin/env bash\nwhile true; do\n  docker exec region-a pg_dump -U postgres -t orders --data-only > /tmp/a.dump\n  docker exec -i region-b psql -U postgres -q -c \"TRUNCATE orders;\" > /dev/null\n  docker exec -i region-b psql -U postgres -q < /tmp/a.dump > /dev/null\n  echo \"synced at $(date +%T)\"\n  sleep 5\ndone\nEOF\nbash replicate.sh &",
+          lang: "bash"
+        },
+        {
+          title: "Write to A and time when it reaches B",
+          code: "docker exec region-a psql -U postgres -c \"INSERT INTO orders(id, note) VALUES (3, 'lag test');\"\nstart=$(date +%s)\nuntil docker exec region-b psql -U postgres -tAc \"SELECT 1 FROM orders WHERE id=3\" | grep -q 1; do sleep 1; done\necho \"visible in B after $(( $(date +%s) - start ))s\"",
+          lang: "bash"
+        }
+      ],
+      observe: "A real, non-zero replication lag (up to your 5s poll interval). It makes the Active-Passive failover risk concrete: if A dies in the window right after a write, that write does not exist in B yet, the exact problem Module 9 formalizes with consistency models.",
+      stretch: "Build the cheapest multi-tenant shape in one Postgres instance: a <code>tenant_id</code> column on every table plus row-level security (<code>ALTER TABLE orders ENABLE ROW LEVEL SECURITY</code> and a policy on <code>tenant_id</code>). Confirm tenant A's queries cannot see tenant B's rows even with a bug in the WHERE clause."
     }
   },
   keyTakeaways: [

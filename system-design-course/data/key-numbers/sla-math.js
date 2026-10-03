@@ -71,13 +71,6 @@ window.COURSE_CONTENT["sla-math"] = {
         { label: "Each nine costs 10\u00d7 more", body: "Going from 99.9% to 99.99% is not a small tuning task; it is 10\u00d7 harder and 10\u00d7 more expensive, demanding redundancy, faster failover, and tighter operations. Match the target to the business need, do not chase nines for their own sake." },
         { label: "Redundancy is the lever, and it is not free", body: "Parallel paths turn 99.9% into six-nines on paper, but each replica adds cost, and the single-point-of-failure component (a lone app tier, a solo primary) silently caps the whole system." }
       ]
-    },
-    handsOn: {
-      prerequisites: "None. A pure arithmetic exercise, ideally checked with a short script.",
-      setup: "No setup, just a calculator or a few lines of code.",
-      simulate: "Compute the exact composite availability for a 5-component chain: Load Balancer 99.99%, App Servers \u00d73 in parallel (each 99.9%), DB Primary+Replica in parallel (each 99.95%), Redis HA 99.99%. Apply the parallel formula first to collapse each redundant group into one effective number, then multiply the results in series.",
-      observe: "Your composite should land close to the ~99.98% figure. If it does not, you likely applied a formula in the wrong order: parallel groups must collapse <em>before</em> the serial multiplication, not after.",
-      stretch: "Recompute assuming the App Server tier has only 1 instance instead of 3 in parallel, and quantify exactly how much composite availability that single point of failure costs. That is a numeric answer to \u201chow much does redundancy actually buy you.\u201d"
     }
   },
   keyTakeaways: [

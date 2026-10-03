@@ -36,11 +36,36 @@ window.COURSE_CONTENT["osi"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A terminal (Command Prompt or PowerShell on Windows, any shell on macOS/Linux).",
-      setup: "Nothing to install, these tools ship with the OS.",
-      simulate: "Run three commands and notice which layer each one exercises: `ping example.com` (Layer 3, ICMP, is the host reachable), `tracert example.com` (Windows) or `traceroute example.com` (macOS/Linux) (Layer 3, every router hop between you and the host), and `curl -v https://example.com` (Layers 4 to 7, watch it open the TCP connection, do the TLS handshake, then send the HTTP request).",
-      observe: "`ping` and `tracert` never mention HTTP, ports, or paths, because they live at Layer 3. Only `curl -v` shows ports, TLS, and HTTP headers, because it climbs the stack all the way to Layer 7.",
-      stretch: "Run `curl -v http://example.com` vs `curl -v https://example.com` and diff the output. The HTTPS run adds a whole TLS negotiation block (Layer 6) that the plain HTTP run skips entirely."
+      goal: "Run the same destination through three tools and watch each one stop at the OSI layer it belongs to.",
+      stack: "<code>ping</code>, <code>traceroute</code>/<code>tracert</code>, and <code>curl</code>, all preinstalled with the OS. Local and free.",
+      steps: [
+        {
+          title: "Layer 3: is the host even reachable?",
+          body: "<code>ping</code> uses ICMP at Layer 3. It knows nothing about ports, TLS, or HTTP.",
+          code: "ping example.com",
+          lang: "bash"
+        },
+        {
+          title: "Layer 3: trace every router hop",
+          body: "Each line is a Layer 3 router between you and the host.",
+          code: "# macOS / Linux\ntraceroute example.com\n\n# Windows\ntracert example.com",
+          lang: "bash"
+        },
+        {
+          title: "Layers 4 to 7: open a real connection",
+          body: "<code>curl -v</code> climbs the stack: it opens the TCP connection (L4), runs the TLS handshake (L6), then sends the HTTP request (L7).",
+          code: "curl -v https://example.com",
+          lang: "bash"
+        },
+        {
+          title: "Diff plain HTTP against HTTPS",
+          body: "The HTTPS run adds a whole TLS negotiation block (Layer 6) that plain HTTP skips.",
+          code: "curl -v http://example.com  2>&1 | head -n 20\ncurl -v https://example.com 2>&1 | head -n 30",
+          lang: "bash"
+        }
+      ],
+      observe: "<code>ping</code> and <code>traceroute</code> never print a port, cipher, or header because they live at Layer 3. Only <code>curl -v</code> shows the TCP connect, the TLS handshake, and HTTP headers, because it climbs all the way to Layer 7.",
+      stretch: "Compare the two <code>curl -v</code> runs side by side: the HTTPS output carries an extra TLS handshake section (Layer 6) that the plain HTTP run has nothing equivalent to."
     }
   },
   keyTakeaways: [

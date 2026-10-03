@@ -54,11 +54,35 @@ window.COURSE_CONTENT["redis-fast"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); `redis-benchmark` (ships with Redis).",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis`.",
-      simulate: "Run `redis-benchmark -t set,get -n 100000 -q` and read the reported ops/sec for plain SET/GET. Then run the same benchmark with `-P 16` (pipelining 16 commands per round trip) and compare throughput.",
-      observe: "Ops/sec climbing substantially with pipelining enabled, a concrete number next to the up-to-10\u00d7 throughput claim, measured on your own machine instead of taken on faith.",
-      stretch: "Insert a 1M-member set (a loop of `SADD bigset item1..item1000000`), then time `KEYS *` against `SCAN 0 COUNT 100` in a loop. `KEYS *` visibly blocks other commands issued from a second `redis-cli` session while it runs; `SCAN` does not, because it returns incrementally."
+      goal: "Measure Redis throughput on your own machine and watch pipelining multiply it, turning the up-to-10\u00d7 claim into a real number.",
+      stack: "Redis in Docker with the bundled <code>redis-benchmark</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis",
+          code: "docker run -d --name redis -p 6379:6379 redis",
+          lang: "bash"
+        },
+        {
+          title: "Benchmark plain SET and GET",
+          body: "One command per round trip. Note the ops/sec it reports.",
+          code: "docker exec redis redis-benchmark -t set,get -n 100000 -q",
+          lang: "bash"
+        },
+        {
+          title: "Benchmark again with pipelining",
+          body: "<code>-P 16</code> sends 16 commands per round trip, amortizing network cost.",
+          code: "docker exec redis redis-benchmark -t set,get -n 100000 -P 16 -q",
+          lang: "bash"
+        },
+        {
+          title: "Prove one slow command blocks the single thread",
+          body: "Load a big set, then compare a blocking <code>KEYS *</code> to an incremental <code>SCAN</code> while a second session issues commands.",
+          code: "docker exec redis sh -c 'for i in $(seq 1 1000000); do echo \"SADD bigset item$i\"; done | redis-cli'\ndocker exec redis redis-cli --scan --pattern '*' | head -n 5",
+          lang: "bash"
+        }
+      ],
+      observe: "Ops/sec climbs substantially with <code>-P 16</code> enabled: a concrete number next to the up-to-10\u00d7 throughput claim, measured on your own machine instead of taken on faith. The bottleneck was the round trip, not the CPU.",
+      stretch: "Open two <code>redis-cli</code> sessions. In one, run <code>KEYS *</code> against the millon-member set; in the other, issue a <code>GET</code>. The <code>GET</code> visibly stalls until <code>KEYS</code> finishes, because both share one command thread. Repeat with <code>SCAN 0 COUNT 100</code> and the stall disappears."
     }
   },
   keyTakeaways: [

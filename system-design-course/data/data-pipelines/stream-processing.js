@@ -47,11 +47,29 @@ window.COURSE_CONTENT["stream-processing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Flink\u2019s official image has a free local cluster mode); the Kafka lab from 8.2.",
-      setup: "Local and free: Flink\u2019s Docker Compose (JobManager + TaskManager) reading from your existing Kafka topic.",
-      simulate: "Write a Flink job that reads <code>ride_requested</code> events keyed by <code>zone_id</code> and computes a count over a 5-minute tumbling window, emitting a requests-per-zone-per-5-min result. Feed it a burst of synthetic events with realistic timestamps (some slightly out of order) and watch the Flink dashboard (<code>localhost:8081</code>) show the running job and its windowed output.",
-      observe: "Events that arrive slightly late but within the watermark\u2019s allowed lateness still get counted into the correct window, while events arriving after the watermark passes get dropped or routed to a separate late-data output: the watermark policy tested against your own deliberately shuffled timestamps.",
-      stretch: "Kill the Flink TaskManager mid-stream and restart it. Confirm the job resumes from its last checkpoint with correct window counts (no double-counting, no gaps): the exactly-once claim verified instead of assumed."
+      goal: "Count ride requests per zone over a 5-minute tumbling window in Flink, and prove that watermarks fold slightly-late events into the correct window while dropping ones that arrive too late.",
+      stack: "Apache Flink via PyFlink, run as a local mini-cluster with the web dashboard on port 8081. Local and free.",
+      steps: [
+        {
+          title: "Install PyFlink",
+          code: "pip install apache-flink",
+          lang: "bash"
+        },
+        {
+          title: "Write the event-time windowing job",
+          body: "Events are <code>(zone_id, event_time_ms)</code>. The 4th event is deliberately out of order; the watermark allows 30s of lateness. Checkpointing every 5s is what makes the exactly-once claim testable. Save as <code>ride_windows.py</code>.",
+          code: "from pyflink.common import Configuration, Duration, Time, WatermarkStrategy, Types\nfrom pyflink.common.watermark_strategy import TimestampAssigner\nfrom pyflink.datastream import StreamExecutionEnvironment\nfrom pyflink.datastream.window import TumblingEventTimeWindows\n\nconfig = Configuration()\nconfig.set_string(\"rest.port\", \"8081\")  # expose the dashboard locally\nenv = StreamExecutionEnvironment.get_execution_environment(config)\nenv.set_parallelism(1)\nenv.enable_checkpointing(5000)  # exactly-once snapshot every 5s\n\n# (zone_id, event_time_ms). The 4th event arrives out of order.\nevents = [(\"z1\", 0), (\"z1\", 60000), (\"z2\", 30000),\n          (\"z1\", 20000), (\"z2\", 290000), (\"z1\", 310000)]\nds = env.from_collection(events, type_info=Types.TUPLE([Types.STRING(), Types.LONG()]))\n\nclass ExtractTs(TimestampAssigner):\n    def extract_timestamp(self, value, record_ts):\n        return value[1]\n\nwm = (WatermarkStrategy\n      .for_bounded_out_of_orderness(Duration.of_seconds(30))\n      .with_timestamp_assigner(ExtractTs()))\n\n(ds.assign_timestamps_and_watermarks(wm)\n   .map(lambda e: (e[0], 1), output_type=Types.TUPLE([Types.STRING(), Types.INT()]))\n   .key_by(lambda e: e[0])\n   .window(TumblingEventTimeWindows.of(Time.minutes(5)))\n   .reduce(lambda a, b: (a[0], a[1] + b[1]))\n   .print())\n\nenv.execute(\"rides-per-zone-5min\")",
+          lang: "python"
+        },
+        {
+          title: "Run it and watch the windowed counts",
+          body: "Each printed row is one closed 5-minute window: zone and its request count.",
+          code: "python ride_windows.py\n# while it runs, open http://localhost:8081 to see the job graph",
+          lang: "bash"
+        }
+      ],
+      observe: "The out-of-order event at 20000ms still lands in the same 0-to-5-min window as the earlier <code>z1</code> events because it is within the watermark's 30s allowed lateness, so <code>z1</code>'s first window counts 3, not 2. Push that timestamp far enough back (past the watermark) and rerun: it gets dropped instead, the watermark policy tested against your own deliberately shuffled timestamps.",
+      stretch: "Run the same job on a standalone Flink cluster (JobManager + TaskManager via Docker Compose), kill the TaskManager mid-stream, and restart it. Confirm the job resumes from its last checkpoint with correct window counts (no double-counting, no gaps): the exactly-once claim verified instead of assumed."
     }
   },
   keyTakeaways: [

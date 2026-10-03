@@ -35,11 +35,34 @@ window.COURSE_CONTENT["key-ports"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`nmap` installed (or `nc -zv` as a lighter substitute).",
-      setup: "Local/free: `docker run -d -p 6379:6379 redis` (Redis with no password, intentionally, to see the failure mode), plus `docker run -d -p 27017:27017 mongo`.",
-      simulate: "Run `nmap localhost` to see which of these ports are open on your machine right now. Then `redis-cli -h localhost ping`, with default settings it just works, no password asked.",
-      observe: "An open, unauthenticated Redis port answers `PONG` to anyone who can reach it, the exact breach pattern above, reproduced safely on your own machine. Then run `docker exec -it <container> redis-cli` and `CONFIG SET requirepass mypassword`, and watch `redis-cli ping` now require `AUTH mypassword` first.",
-      stretch: "On a cloud free-tier VM, run `nmap` against its public IP from your laptop and confirm only the ports you explicitly opened in its Security Group actually respond, the practical link straight into the next lesson."
+      goal: "Reproduce the open, unauthenticated Redis breach on your own machine, then lock it down with a password.",
+      stack: "Docker, <code>nmap</code> (or <code>nc -zv</code>), and <code>redis-cli</code>. Local and free.",
+      steps: [
+        {
+          title: "Start datastores with no password (on purpose)",
+          code: "docker run -d --name redis -p 6379:6379 redis\ndocker run -d --name mongo -p 27017:27017 mongo",
+          lang: "bash"
+        },
+        {
+          title: "Scan which ports are open right now",
+          body: "No nmap? Use <code>nc -zv localhost 6379</code> instead.",
+          code: "nmap -p 6379,27017 localhost",
+          lang: "bash"
+        },
+        {
+          title: "Talk to the open, unauthenticated Redis",
+          body: "It answers anyone who can reach the port, no password asked: the exact breach pattern.",
+          code: "docker exec -it redis redis-cli ping",
+          lang: "bash"
+        },
+        {
+          title: "Require a password and watch access change",
+          code: "docker exec -it redis redis-cli CONFIG SET requirepass mypassword\ndocker exec -it redis redis-cli ping                 # -> NOAUTH error\ndocker exec -it redis redis-cli -a mypassword ping   # -> PONG",
+          lang: "bash"
+        }
+      ],
+      observe: "Before the password, <code>ping</code> returns <strong>PONG</strong> to anyone who can reach 6379, the open-Redis breach reproduced safely. After <code>CONFIG SET requirepass</code>, the same <code>ping</code> fails with a <strong>NOAUTH</strong> error until you pass <code>-a mypassword</code>.",
+      stretch: "On a cloud free-tier VM, run <code>nmap</code> against its public IP from your laptop and confirm only the ports you explicitly opened in its Security Group respond, the practical link straight into the next lesson."
     }
   },
   keyTakeaways: [

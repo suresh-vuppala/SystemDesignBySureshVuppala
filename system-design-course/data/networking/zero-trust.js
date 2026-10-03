@@ -48,11 +48,35 @@ window.COURSE_CONTENT["zero-trust"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker and `docker-compose`; basic service-mesh familiarity helps but is not required.",
-      setup: "Local/free: a minimal Istio or Linkerd install on a local Kubernetes cluster (`kind` or `minikube`). Cloud free-tier: a managed K8s free tier (GKE/EKS) with the mesh add-on.",
-      simulate: "Deploy 2 services (`service-a`, `service-b`) in the mesh and confirm they can call each other. Then run `istioctl proxy-config` (or the mesh equivalent) to confirm mTLS is active, and capture traffic with `tcpdump` on the pod network to confirm the payload is encrypted even though it is \u201cinside\u201d the cluster.",
-      observe: "An mTLS handshake happening for pod-to-pod traffic that never leaves your own cluster, proof that \u201cinside the network\u201d is not treated as automatically trusted, the core Zero Trust claim made visible in a packet capture.",
-      stretch: "Write an OPA policy that denies `service-a \u2192 service-b` on a specific path and confirm the call is rejected even though network-level connectivity exists, decoupling \u201ccan reach\u201d from \u201cis allowed.\u201d"
+      goal: "Stand up two services in a service mesh and prove pod-to-pod traffic is mTLS-encrypted even though it never leaves the cluster.",
+      stack: "<code>kind</code> (or <code>minikube</code>) plus Linkerd on local Kubernetes. Local and free.",
+      steps: [
+        {
+          title: "Create a local cluster and install the mesh",
+          code: "kind create cluster --name zt\ncurl -sL https://run.linkerd.io/install | sh\nexport PATH=$PATH:$HOME/.linkerd2/bin\nlinkerd install --crds | kubectl apply -f -\nlinkerd install | kubectl apply -f -\nlinkerd check",
+          lang: "bash"
+        },
+        {
+          title: "Deploy two meshed services",
+          body: "Annotating the namespace injects a sidecar proxy into every pod, which is what terminates mTLS.",
+          code: "kubectl create ns demo\nkubectl annotate ns demo linkerd.io/inject=enabled\nkubectl -n demo create deploy service-b --image=nginx --port=80\nkubectl -n demo expose deploy service-b --port=80\nkubectl -n demo run service-a --image=curlimages/curl -it --rm -- curl -s service-b",
+          lang: "bash"
+        },
+        {
+          title: "Confirm mTLS is active between the pods",
+          body: "<code>linkerd edges</code> reports whether each connection is secured by mutual TLS.",
+          code: "linkerd -n demo edges deploy",
+          lang: "bash"
+        },
+        {
+          title: "Capture the traffic to prove it is encrypted",
+          body: "Sniff the sidecar's port: the payload is ciphertext even though both pods sit inside your own cluster.",
+          code: "POD=$(kubectl -n demo get pod -l app=service-b -o jsonpath='{.items[0].metadata.name}')\nkubectl -n demo debug -it $POD --image=nicolaka/netshoot -- tcpdump -A -n port 4143",
+          lang: "bash"
+        }
+      ],
+      observe: "<code>linkerd edges</code> marks the service-a \u2192 service-b connection as <strong>secured</strong> (mTLS), and the packet capture shows ciphertext, not readable HTTP, for traffic that never left your cluster. That is the core Zero Trust claim: inside the network is not automatically trusted.",
+      stretch: "Add an authorization policy that denies <code>service-a \u2192 service-b</code> on a specific path and confirm the call is rejected even though network connectivity exists, decoupling <strong>can reach</strong> from <strong>is allowed</strong>."
     }
   },
   keyTakeaways: [

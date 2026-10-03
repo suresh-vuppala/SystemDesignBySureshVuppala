@@ -38,11 +38,46 @@ window.COURSE_CONTENT["etl"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (dbt-core, free, pip-installable); Postgres or a Snowflake/BigQuery free tier.",
-      setup: "Local and free: Postgres with a raw <code>orders</code> table loaded (ELT\u2019s load-raw step already done for you); <code>pip install dbt-postgres</code>.",
-      simulate: "Write a dbt model (<code>models/staging/stg_orders.sql</code>) that transforms the raw table into a cleaned view (cast types, rename columns), then a second model that aggregates it into daily revenue. Run <code>dbt run</code> and inspect the generated SQL and the resulting tables in Postgres.",
-      observe: "The raw data lands untransformed first (ELT\u2019s load-raw), with all transformation logic living as version-controlled SQL files that <code>dbt run</code> re-executes. Contrast that with the same transformation as a one-off Python script with no lineage tracking. Run <code>dbt docs generate</code> and browse the auto-generated lineage graph.",
-      stretch: "Use Airflow (a free local install, or Astronomer\u2019s free tier) to schedule the <code>dbt run</code> step as a DAG task running nightly, giving the transformation an orchestrated schedule instead of a manual command."
+      goal: "Transform a raw orders table into a cleaned staging view and a daily-revenue table with dbt, keeping every transformation as version-controlled SQL (the ELT pattern).",
+      stack: "Postgres + dbt-core (dbt-postgres adapter) in Python. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres and load a raw orders table",
+          body: "This is ELT's load-raw step: the data lands untransformed first.",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker exec -i pg psql -U postgres -c \"CREATE TABLE raw_orders(id int, cust text, amt text, ts text);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO raw_orders VALUES (1,'ada','19.99','2024-01-01'),(2,'lin','5.00','2024-01-01'),(3,'ada','8.50','2024-01-02');\"",
+          lang: "bash"
+        },
+        {
+          title: "Install dbt and scaffold a project",
+          code: "pip install dbt-postgres\nmkdir -p shop/models/staging",
+          lang: "bash"
+        },
+        {
+          title: "Point dbt at Postgres",
+          body: "Two files: <code>dbt_project.yml</code> in the project root and <code>profiles.yml</code> in <code>~/.dbt/</code>.",
+          code: "# shop/dbt_project.yml\nname: shop\nprofile: shop\nversion: \"1.0.0\"\nmodels:\n  shop:\n    +materialized: view\n\n# ~/.dbt/profiles.yml\nshop:\n  target: dev\n  outputs:\n    dev:\n      type: postgres\n      host: localhost\n      port: 5432\n      user: postgres\n      password: pw\n      dbname: postgres\n      schema: analytics\n      threads: 4",
+          lang: "yaml"
+        },
+        {
+          title: "Staging model: cast types and rename columns",
+          body: "Save as <code>shop/models/staging/stg_orders.sql</code>.",
+          code: "-- stg_orders.sql\nselect\n    id           as order_id,\n    cust         as customer,\n    amt::numeric as amount,\n    ts::date     as order_date\nfrom raw_orders",
+          lang: "sql"
+        },
+        {
+          title: "Aggregate model: daily revenue",
+          body: "Save as <code>shop/models/daily_revenue.sql</code>. The <code>ref()</code> call is what lets dbt build the lineage graph.",
+          code: "-- daily_revenue.sql\nselect\n    order_date,\n    count(*)    as orders,\n    sum(amount) as revenue\nfrom {{ ref('stg_orders') }}\ngroup by order_date\norder by order_date",
+          lang: "sql"
+        },
+        {
+          title: "Run the models and browse the lineage graph",
+          code: "cd shop\ndbt run\ndbt docs generate && dbt docs serve",
+          lang: "bash"
+        }
+      ],
+      observe: "The raw table stays untransformed while all transformation logic lives as version-controlled SQL that <code>dbt run</code> re-executes into the <code>analytics</code> schema. Contrast that with the same transformation as a one-off Python script with no lineage tracking, then open the docs and browse the auto-generated lineage graph linking <code>raw_orders</code> \u2192 <code>stg_orders</code> \u2192 <code>daily_revenue</code>.",
+      stretch: "Use Airflow (a free local install, or Astronomer's free tier) to schedule the <code>dbt run</code> step as a DAG task running nightly, giving the transformation an orchestrated schedule instead of a manual command."
     }
   },
   keyTakeaways: [

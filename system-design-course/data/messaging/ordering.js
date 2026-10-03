@@ -45,11 +45,36 @@ window.COURSE_CONTENT["ordering"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Kafka lab from 8.2.",
-      setup: "Local and free: the same Kafka container.",
-      simulate: "Produce 30 events for `trip_id=trip-1` in quick succession, each with an incrementing sequence number in the payload (`{seq: 1}`, `{seq: 2}`, ...). Consume them and print the order they arrive in. Then produce another 30 events but key half with `trip-1` and half with a random key, and check whether the `trip-1`-keyed ones still arrive in order relative to each other once mixed with the others.",
-      observe: "The pure `trip-1`-keyed sequence arrives in exact order every time (same partition, guaranteed order), while events split across partitions have no guaranteed relative order: the \u201conly within a partition\u201d claim, demonstrated with your own sequence numbers instead of trusted on faith.",
-      stretch: "Increase the topic\u2019s partition count while consumers are running and watch a rebalance occur. Check whether any `trip-1` events briefly appear out of order around the rebalance, and whether sticky partition assignment reduces how much shuffling happens."
+      goal: "Prove Kafka guarantees order only within a partition: tag events with sequence numbers and watch same-key events stay ordered while mixed-key events do not.",
+      stack: "The Kafka lab from 8.2 (<code>apache/kafka</code> in Docker, topic <code>rides</code> with 3 partitions) + the bundled CLI. Local and free.",
+      steps: [
+        {
+          title: "Produce 30 events, all keyed trip-1",
+          body: "Every event shares the key <code>trip-1</code>, so all 30 hash to the same partition.",
+          code: "for i in $(seq 1 30); do echo \"trip-1:{\\\"seq\\\":$i}\"; done | \\\n  docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \\\n    --topic rides --bootstrap-server localhost:9092 \\\n    --property parse.key=true --property key.separator=:",
+          lang: "bash"
+        },
+        {
+          title: "Consume and print key + partition",
+          body: "Read the seq values in arrival order. For the single key they climb 1, 2, 3, ... with no gaps.",
+          code: "docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \\\n  --topic rides --from-beginning --timeout-ms 8000 \\\n  --property print.key=true --property print.partition=true \\\n  --bootstrap-server localhost:9092",
+          lang: "bash"
+        },
+        {
+          title: "Produce 30 mixed-key events",
+          body: "Even <code>seq</code> keeps key <code>trip-1</code>; odd <code>seq</code> uses a random key, scattering those across partitions.",
+          code: "for i in $(seq 1 30); do \\\n  if [ $((i%2)) -eq 0 ]; then echo \"trip-1:{\\\"seq\\\":$i}\"; \\\n  else echo \"k$RANDOM:{\\\"seq\\\":$i}\"; fi; \\\ndone | docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \\\n    --topic rides --bootstrap-server localhost:9092 \\\n    --property parse.key=true --property key.separator=:",
+          lang: "bash"
+        },
+        {
+          title: "Consume again and inspect relative order",
+          body: "Filter to the <code>trip-1</code> partition and confirm its seq values are still monotonic among themselves, even though other keys interleave across partitions.",
+          code: "docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \\\n  --topic rides --from-beginning --timeout-ms 8000 \\\n  --property print.key=true --property print.partition=true \\\n  --bootstrap-server localhost:9092",
+          lang: "bash"
+        }
+      ],
+      observe: "The pure <code>trip-1</code> run arrives in exact seq order every time (same partition, guaranteed order). In the mixed run the <code>trip-1</code> events are still ordered relative to each other, but there is no consistent global order across the random-keyed events on other partitions: the \"only within a partition\" claim, demonstrated with your own sequence numbers instead of trusted on faith.",
+      stretch: "Increase the topic's partition count with <code>kafka-topics.sh --alter --partitions 6</code> while a consumer runs, watch the rebalance, and check whether new <code>trip-1</code> events now hash to a different partition (breaking order against the old ones) and whether sticky assignment reduces the shuffling."
     }
   },
   keyTakeaways: [

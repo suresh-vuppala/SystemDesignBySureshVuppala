@@ -55,11 +55,41 @@ window.COURSE_CONTENT["backpressure"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The queue lab from Messaging (RabbitMQ or SQS).",
-      setup: "Local and free: reuse the RabbitMQ container.",
-      simulate: "Build a producer that pushes 1,000 messages/sec into a queue and a single consumer that can only process 100/sec (a deliberate <code>sleep</code>). Watch queue depth grow unbounded in the management UI. Then apply two fixes separately: (a) load shedding, where the producer drops messages once depth exceeds 5,000; (b) scale consumers, adding 9 more identical consumers so aggregate consumption matches production.",
-      observe: "Three different, felt outcomes from the same overload: unbounded growth eventually exhausts memory or hits the broker\u2019s max queue length; load shedding plateaus depth at your ceiling; scaled consumers keep depth low because aggregate throughput now matches the producer\u2019s 1,000/sec.",
-      stretch: "Implement a priority queue (RabbitMQ supports message priorities natively) and confirm a \u201cpayment\u201d message enqueued after 500 \u201canalytics\u201d messages still gets processed first: mixed-criticality handling, working."
+      goal: "Overwhelm a slow consumer with a fast producer, watch the queue grow unbounded, then bound it so excess is shed instead of crashing the broker.",
+      stack: "RabbitMQ (with management UI) in Docker, a Node.js producer and consumer using <code>amqplib</code>. Local and free.",
+      steps: [
+        {
+          title: "Start RabbitMQ with the management UI",
+          code: "docker run -d --name rabbit -p 5672:5672 -p 15672:15672 rabbitmq:3-management",
+          lang: "bash"
+        },
+        {
+          title: "Write a fast producer (1,000 msg/sec)",
+          body: "Save as <code>producer.js</code>: 100 messages every 100ms.",
+          code: "const amqp = require('amqplib');\n(async () => {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n  await ch.assertQueue('work', { durable: false });\n  let i = 0;\n  setInterval(() => {\n    for (let j = 0; j < 100; j++) ch.sendToQueue('work', Buffer.from(String(i++)));\n  }, 100);\n})();",
+          lang: "javascript"
+        },
+        {
+          title: "Write a slow consumer (~100 msg/sec)",
+          body: "Save as <code>consumer.js</code>: prefetch 1, 10ms of simulated work per message.",
+          code: "const amqp = require('amqplib');\n(async () => {\n  const conn = await amqp.connect('amqp://localhost');\n  const ch = await conn.createChannel();\n  await ch.assertQueue('work', { durable: false });\n  ch.prefetch(1);\n  ch.consume('work', async (msg) => {\n    await new Promise(r => setTimeout(r, 10));\n    ch.ack(msg);\n  });\n})();",
+          lang: "javascript"
+        },
+        {
+          title: "Run both and watch depth climb",
+          body: "Open <code>http://localhost:15672</code> (guest / guest) and watch the <code>work</code> queue depth grow without bound.",
+          code: "npm init -y && npm install amqplib\nnode producer.js &\nnode consumer.js &",
+          lang: "bash"
+        },
+        {
+          title: "Bound the queue to shed load",
+          body: "Cap the queue at 5,000 messages; overflow drops the oldest instead of growing forever.",
+          code: "docker exec rabbit rabbitmqctl set_policy shed \"^work$\" '{\"max-length\":5000,\"overflow\":\"drop-head\"}' --apply-to queues",
+          lang: "bash"
+        }
+      ],
+      observe: "Three felt outcomes from the same overload: the unbounded queue climbs toward memory exhaustion or the broker\u2019s limit; the bounded queue plateaus flat at 5,000 as excess is dropped; and if you launch nine more consumers (<code>for i in $(seq 1 9); do node consumer.js & done</code>) aggregate throughput matches the 1,000/sec producer and depth stays low.",
+      stretch: "Declare a priority queue (RabbitMQ supports <code>x-max-priority</code> natively) and confirm a high-priority \u201cpayment\u201d message enqueued after 500 low-priority \u201canalytics\u201d messages still gets processed first: mixed-criticality handling, working."
     }
   },
   keyTakeaways: [

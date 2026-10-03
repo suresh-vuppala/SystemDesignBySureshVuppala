@@ -66,11 +66,39 @@ window.COURSE_CONTENT["kafka"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Compose (Kafka + KRaft image, or Confluent\u2019s all-in-one dev image); `kafka-console-producer`/`kafka-console-consumer` (ship with Kafka) or `kcat`.",
-      setup: "Local and free: `docker run -d apache/kafka` (KRaft mode, no ZooKeeper needed) or Confluent\u2019s `cp-all-in-one` Compose file.",
-      simulate: "Create a topic with 3 partitions (`kafka-topics.sh --create --topic rides --partitions 3`), produce 20 events keyed by `trip_id` (for example `trip-1`, `trip-2`, `trip-3` repeating), and start 2 consumers in the same consumer group. Run `kafka-consumer-groups.sh --describe` to see which partitions each consumer owns.",
-      observe: "All events for the same `trip_id` land in the same partition every time, because <code>hash(key) % 3</code> is deterministic. Start a 3rd consumer in the same group and watch a partition rebalance happen live; with only 3 partitions, a 4th consumer would sit idle.",
-      stretch: "Kill one consumer mid-stream without committing its last offset, restart it, and confirm it resumes from its last committed offset (possibly reprocessing a few messages), at-least-once delivery observed directly instead of described."
+      goal: "Run Kafka in KRaft mode, create a 3-partition topic keyed by <code>trip_id</code>, and watch a consumer group split partitions and rebalance live.",
+      stack: "Single-node <code>apache/kafka</code> (KRaft, no ZooKeeper) in Docker + the bundled <code>kafka-*.sh</code> CLI. Local and free.",
+      steps: [
+        {
+          title: "Start Kafka in KRaft mode",
+          code: "docker run -d --name kafka -p 9092:9092 apache/kafka:latest",
+          lang: "bash"
+        },
+        {
+          title: "Create a topic with 3 partitions",
+          code: "docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \\\n  --topic rides --partitions 3 \\\n  --bootstrap-server localhost:9092",
+          lang: "bash"
+        },
+        {
+          title: "Produce 20 events keyed by trip_id",
+          body: "Keys rotate across <code>trip-1</code>, <code>trip-2</code>, <code>trip-3</code>. The producer hashes the key to pick a partition, so one trip's events always land together.",
+          code: "for i in $(seq 1 20); do echo \"trip-$((i%3+1)):{\\\"seq\\\":$i}\"; done | \\\n  docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \\\n    --topic rides --bootstrap-server localhost:9092 \\\n    --property parse.key=true --property key.separator=:",
+          lang: "bash"
+        },
+        {
+          title: "Start 2 consumers in the same group",
+          body: "Run each line in its own terminal. Both join group <code>ride-workers</code>, so the 3 partitions are divided between them.",
+          code: "docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \\\n  --topic rides --group ride-workers --from-beginning \\\n  --property print.key=true --property print.partition=true \\\n  --bootstrap-server localhost:9092",
+          lang: "bash"
+        },
+        {
+          title: "See which partitions each consumer owns",
+          code: "docker exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --describe \\\n  --group ride-workers --bootstrap-server localhost:9092",
+          lang: "bash"
+        }
+      ],
+      observe: "Every event for a given <code>trip_id</code> prints from the same partition every time, because <code>hash(key) % 3</code> is deterministic. The <code>--describe</code> output shows each consumer owning a disjoint set of partitions. Start a 3rd consumer in the group and a rebalance happens live; a 4th consumer sits idle because there are only 3 partitions to hand out.",
+      stretch: "Kill one consumer mid-stream before it commits, restart it, and confirm it resumes from its last committed offset (reprocessing a few messages): at-least-once delivery observed directly instead of described."
     }
   },
   keyTakeaways: [

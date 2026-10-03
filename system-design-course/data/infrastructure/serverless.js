@@ -35,11 +35,34 @@ window.COURSE_CONTENT["serverless"] = {
       ]
     },
     handsOn: {
-      prerequisites: "An AWS free-tier account (Lambda's free tier is generous, 1M requests/month).",
-      setup: "Cloud free-tier: the AWS Lambda console, with a simple function (Node.js or Python) that just returns a timestamp.",
-      simulate: "Invoke the function once after it has been idle for 10+ minutes and log the reported duration in CloudWatch (this is your cold start). Invoke it again immediately after and log that duration too (a warm invocation). Repeat with a heavier runtime (a Java function, or a Node function importing a large dependency) to feel the cold-start difference by language.",
-      observe: "The stark duration gap between the cold and warm invocation: put your own two numbers next to the \u201c100ms to 10s vs 1-5ms\u201d claim. Then enable Provisioned Concurrency (within free-tier limits or a short test window to avoid cost) and confirm every invocation is now warm-speed.",
-      stretch: "Run a sustained load test against the function (`hey -n 5000 -c 100`) and watch AWS Lambda's concurrency metric scale up automatically in CloudWatch: no server you provisioned, no capacity you planned for in advance."
+      goal: "Deploy a trivial Lambda, invoke it cold and then warm, and read the two durations from CloudWatch to feel the cold-start tax firsthand.",
+      stack: "AWS Lambda plus the AWS CLI and CloudWatch Logs. Free cloud tier (1M requests/month).",
+      steps: [
+        {
+          title: "Write and package the function",
+          code: "cat > index.js <<'EOF'\nexports.handler = async () => ({ statusCode: 200, body: new Date().toISOString() });\nEOF\nzip function.zip index.js",
+          lang: "bash"
+        },
+        {
+          title: "Create the Lambda",
+          body: "Reuse an existing Lambda execution role ARN (or create a basic one first).",
+          code: "aws lambda create-function --function-name cold-start-demo \\\n  --runtime nodejs20.x --handler index.handler \\\n  --zip-file fileb://function.zip \\\n  --role arn:aws:iam::<ACCOUNT_ID>:role/<lambda-exec-role>",
+          lang: "bash"
+        },
+        {
+          title: "Invoke cold and read the Init Duration",
+          body: "Wait 10+ minutes since the last activity so the runtime is torn down first.",
+          code: "aws lambda invoke --function-name cold-start-demo out.json\naws logs tail /aws/lambda/cold-start-demo --since 2m | grep -E 'REPORT|Init Duration'",
+          lang: "bash"
+        },
+        {
+          title: "Invoke warm immediately after",
+          code: "aws lambda invoke --function-name cold-start-demo out.json\naws logs tail /aws/lambda/cold-start-demo --since 1m | grep REPORT",
+          lang: "bash"
+        }
+      ],
+      observe: "The cold invocation's REPORT line carries an <code>Init Duration</code> (roughly 100ms to 10s depending on runtime) that the warm one does not; the warm call adds only a few ms. Put your own two numbers next to the \u201c100ms to 10s vs 1-5ms\u201d claim.",
+      stretch: "Enable provisioned concurrency for a short window and confirm every invocation is now warm-speed, then add a Function URL and run <code>hey -n 5000 -c 100</code> against it while watching the <code>ConcurrentExecutions</code> metric scale up in CloudWatch, capacity you never provisioned."
     }
   },
   keyTakeaways: [

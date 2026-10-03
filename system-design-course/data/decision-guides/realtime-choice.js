@@ -38,13 +38,6 @@ window.COURSE_CONTENT["realtime-choice"] = {
         { label: "WebRTC for peer-to-peer media", body: "Video, audio, and screen share go directly between peers via STUN/TURN, keeping media off your servers. The cost: NAT traversal complexity and TURN relay fallback when direct connection fails." },
         { label: "MQTT and Long Polling at the edges", body: "<strong>MQTT</strong> is a lightweight pub/sub for constrained IoT devices and flaky networks. <strong>Long Polling</strong> is the legacy fallback: repeated HTTP requests, 100-1000ms latency, chosen only when nothing better is available in the client." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. A real-time feature and the table above.",
-      setup: "Take one feature and walk it through direction and endpoint questions.",
-      simulate: "Scenario: \u201ca collaborative document editor where every keystroke from any user appears for all others instantly.\u201d Walk it: client-facing, bidirectional? Yes \u2192 WebSocket. Second scenario: \u201can AI chat UI that streams the model\u2019s tokens to the browser as they generate.\u201d Walk it: client-facing, server-push only? Yes \u2192 SSE.",
-      observe: "The AI streaming case is the classic trap: people reach for WebSocket, but the data flows only one way, so SSE is simpler and auto-reconnects. Direction, not novelty, picks the transport.",
-      stretch: "Add \u201cthe same editor must also support a live video call between editors.\u201d Which branch fires for that sub-feature? (WebRTC for the media, while WebSocket still carries the document edits, two transports in one product.)"
     }
   },
   keyTakeaways: [

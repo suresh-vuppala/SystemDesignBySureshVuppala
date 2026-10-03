@@ -73,11 +73,36 @@ window.COURSE_CONTENT["http-https"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`curl` and `openssl` (both usually preinstalled).",
-      setup: "None. Test against any public site plus a local plain-HTTP server (`python -m http.server`, which serves HTTP only).",
-      simulate: "Run `curl -v http://<your-local-server>` and read the headers in the clear, no TLS lines at all. This is exactly what a coffee-shop router could see. Then run `openssl s_client -connect google.com:443` and observe the certificate chain and negotiated cipher suite. Finally hit a test API (e.g. httpbin.org) with `curl -X POST`, `curl -X PUT`, `curl -X DELETE` and inspect the status codes.",
-      observe: "The complete absence of encryption metadata on the plain-HTTP request vs the full handshake detail on the HTTPS one. Also: calling DELETE twice on the same resource returns the same result both times (idempotent), while two POSTs create two separate resources (not idempotent).",
-      stretch: "Use `openssl s_client -connect <host>:443 -tls1_3` vs forcing `-tls1_2` and compare the round trips shown before \u201cVerify return code.\u201d TLS 1.3's 1-round-trip handshake vs TLS 1.2's 2 is right there in the output."
+      goal: "Read HTTP headers in the clear, then watch TLS wrap them, and prove which methods are idempotent.",
+      stack: "<code>curl</code>, <code>openssl</code>, and Python's built-in HTTP server, all preinstalled. Local and free.",
+      steps: [
+        {
+          title: "Serve plain HTTP locally",
+          body: "Python's module serves HTTP only, no TLS: the perfect insecure baseline.",
+          code: "python -m http.server 8000",
+          lang: "bash"
+        },
+        {
+          title: "Read the request in the clear",
+          body: "No TLS lines at all. This is exactly what a coffee-shop router could see.",
+          code: "curl -v http://localhost:8000 2>&1 | head -n 20",
+          lang: "bash"
+        },
+        {
+          title: "Watch the TLS handshake and certificate chain",
+          body: "Against an HTTPS host you see the negotiated cipher and the CA-signed certificate that plain HTTP never had.",
+          code: "openssl s_client -connect google.com:443 -servername google.com < /dev/null",
+          lang: "bash"
+        },
+        {
+          title: "Compare idempotent and non-idempotent methods",
+          body: "DELETE twice returns the same result; two POSTs create two separate things.",
+          code: "curl -s -o /dev/null -w \"POST   -> %{http_code}\\n\" -X POST   https://httpbin.org/post\ncurl -s -o /dev/null -w \"PUT    -> %{http_code}\\n\" -X PUT    https://httpbin.org/put\ncurl -s -o /dev/null -w \"DELETE -> %{http_code}\\n\" -X DELETE https://httpbin.org/delete",
+          lang: "bash"
+        }
+      ],
+      observe: "The plain HTTP request shows zero encryption metadata; the <code>openssl</code> run shows the full certificate chain and negotiated cipher. And DELETE returns the same result every time (idempotent), while each POST creates a new resource (not idempotent).",
+      stretch: "Force the TLS version and compare the round trips shown before <code>Verify return code</code>: <code>openssl s_client -connect google.com:443 -tls1_3</code> versus <code>-tls1_2</code>. TLS 1.3's 1-round-trip handshake versus 1.2's 2 is right there in the output."
     }
   },
   keyTakeaways: [

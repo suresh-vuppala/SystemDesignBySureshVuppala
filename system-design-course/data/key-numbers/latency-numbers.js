@@ -82,11 +82,35 @@ window.COURSE_CONTENT["latency-numbers"] = {
       ]
     },
     handsOn: {
-      prerequisites: "None. Every number here is measurable on your own laptop.",
-      setup: "No setup required, just a way to run a small script and `curl`.",
-      simulate: "Measure 4 of the named operations directly: time a mutex lock/unlock in a tight loop averaged over 1M iterations; read a small file you have not touched recently (clear the OS page cache first if you can) to feel an SSD read; time an HDD seek if you have access to one, or use the reference number; and run `curl -w \"%{time_total}\"` against a server in a different region for a real network round trip.",
-      observe: "Your measured numbers should land in the same order of magnitude as the reference table. The point is not matching exactly, it is confirming the roughly-100\u00d7-per-tier pattern (RAM \u2192 SSD \u2192 HDD \u2192 network) holds on real current hardware.",
-      stretch: "Measure a round trip to 3 different cloud regions and compare against geographic distance. Latency roughly tracks distance, bounded below by the speed of light in fiber."
+      goal: "Measure a few of the latency-table numbers on your own machine and confirm the roughly-100\u00d7-per-tier pattern (RAM, SSD, network) holds on real hardware.",
+      stack: "A shell plus <code>curl</code> and a tiny Python script. Local and free.",
+      steps: [
+        {
+          title: "Time a memory-speed operation",
+          body: "A tight lock/unlock loop over 1,000,000 iterations stands in for nanosecond-scale work.",
+          code: "python3 - <<'EOF'\nimport threading, time\nlock = threading.Lock()\nN = 1000000\nt = time.perf_counter()\nfor _ in range(N):\n    with lock:\n        pass\nprint('lock/unlock: %.1f ns/op' % ((time.perf_counter() - t) / N * 1e9))\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "Feel an SSD read",
+          body: "Write 100MB, drop it from the OS cache if you can, then time reading it back.",
+          code: "dd if=/dev/zero of=/tmp/blob bs=1M count=100\nsync; echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true\npython3 -c \"import time; t=time.perf_counter(); open('/tmp/blob','rb').read(); print('read 100MB: %.1f ms' % ((time.perf_counter()-t)*1000))\"",
+          lang: "bash"
+        },
+        {
+          title: "Measure a same-region network round trip",
+          code: "curl -s -o /dev/null -w 'time_total: %{time_total}s\\n' https://example.com",
+          lang: "bash"
+        },
+        {
+          title: "Measure a cross-continent round trip",
+          body: "Hit a host you know is far away and compare it to the nearby one.",
+          code: "curl -s -o /dev/null -w 'time_total: %{time_total}s\\n' https://www.google.co.jp",
+          lang: "bash"
+        }
+      ],
+      observe: "Your numbers land in the same order of magnitude as the reference table: nanoseconds for the in-memory loop, single-digit milliseconds for the SSD read, tens to over a hundred milliseconds for a cross-continent round trip. The roughly-100\u00d7 jump per tier (RAM \u2192 SSD \u2192 network), confirmed on your own hardware instead of taken on faith.",
+      stretch: "curl the same path against 3 hosts on different continents and compare <code>time_total</code> to rough geographic distance: latency tracks distance, bounded below by the speed of light in fiber."
     }
   },
   keyTakeaways: [

@@ -36,13 +36,6 @@ window.COURSE_CONTENT["fr-nfr"] = {
         { color: "blue", label: "Core Challenges:", body: "<strong>Too many users</strong> \u2192 horizontal scaling, LB, caching. <strong>Too much data</strong> \u2192 sharding, tiered storage. <strong>Low latency</strong> \u2192 caching, CDN, geo-distribution. <strong>High availability</strong> \u2192 replication, multi-region, graceful degradation." },
         { color: "yellow", label: "Interview tip:", body: "Always pair each FR with its NFR constraint. \u201cUsers can post tweets\u201d \u2192 \u201cat 10K tweets/sec with P99 &lt;200ms.\u201d This shows you think about <em>both</em> what the system does and how well it must do it." }
       ]
-    },
-    handsOn: {
-      prerequisites: "None.",
-      setup: "No infra needed, just a text editor and the FR list above.",
-      simulate: "Pick any product you use daily (e.g. a food-delivery app) and write down 5 of its FRs, then force yourself to pair each with a numeric NFR. Not \u201cfast,\u201d but \u201corder confirmation p99 < 2s\u201d; not \u201creliable,\u201d but \u201c99.9% order placement availability, 0% double-charge rate.\u201d",
-      observe: "Which NFRs you genuinely don\u2019t know the right number for. That gap is exactly what interviewers probe, and exactly what 1.3\u2019s SLI/SLO/SLA framework exists to make rigorous.",
-      stretch: "For one FR/NFR pair, name which specific architecture component (cache, queue, replica) would actually need to exist to hit that number."
     }
   },
   keyTakeaways: [

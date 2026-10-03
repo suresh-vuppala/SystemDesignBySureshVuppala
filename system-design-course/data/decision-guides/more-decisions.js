@@ -40,13 +40,6 @@ window.COURSE_CONTENT["more-decisions"] = {
         { label: "SQL vs NoSQL: the same DB decision, condensed", body: "This restates 15.2 with NoSQL\u2019s three sub-branches spelled out: relationships and ACID \u2192 <strong>SQL</strong>; huge write throughput \u2192 <strong>Wide-Column</strong> (Cassandra); flexible documents \u2192 <strong>Document</strong> (MongoDB); fastest key lookups \u2192 <strong>Key-Value</strong> (Redis/DynamoDB). Rule of thumb: relationships \u2192 SQL, scale writes \u2192 Cassandra, flexible \u2192 Mongo." },
         { label: "The meta-skill: name the constraint", body: "Every one of these is won not by the answer but by the sentence \u201cX over Y because of Z.\u201d The decision guides exist so that under pressure you reach for the constraint first and the technology second." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. One system you know well and all three trees.",
-      setup: "Take a familiar product and run it through all three decisions in sequence, stating the constraint each time.",
-      simulate: "Pick something concrete, say a food-delivery app. Sync vs Async: placing an order is sync (the user waits), but notifying the restaurant, updating analytics, and sending the receipt are async. Monolith vs Microservices: a 6-person startup should ship a modular monolith, not 15 services. SQL vs NoSQL: orders and payments \u2192 SQL, driver location updates \u2192 wide-column or key-value.",
-      observe: "You just designed the spine of a real system using nothing but three decision trees and the constraint behind each fork. That is the exact motion a design interview rewards.",
-      stretch: "Replay the same product two years later at 200 engineers and 10\u00d7 traffic. Which branches move? (Modular monolith \u2192 selective microservices, single SQL \u2192 sharded plus a wide-column store for location.) Watching the answers migrate as constraints change is the whole point of the course."
     }
   },
   keyTakeaways: [

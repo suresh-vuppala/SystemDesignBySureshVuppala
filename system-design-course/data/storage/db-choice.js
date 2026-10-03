@@ -29,13 +29,6 @@ window.COURSE_CONTENT["db-choice"] = {
         { color: "blue", label: "Every row is a consequence of the engine underneath:", body: "<strong>B+Tree</strong> engines (Postgres, MySQL) favour reads and range scans. <strong>LSM-tree</strong> engines (Cassandra, RocksDB) favour writes. <strong>Hash</strong> engines (Redis, DynamoDB) favour point lookups but cannot range-scan. <strong>Inverted index</strong> engines (Elasticsearch) favour text matching. Pick the engine whose native shape matches your dominant access pattern." },
         { color: "yellow", label: "Most systems use several:", body: "A typical product runs Postgres as the source of truth, Redis for hot lookups, Elasticsearch for search, S3 for blobs, and a columnar warehouse for analytics. The question is rarely \u201cwhich one database,\u201d it is \u201cwhich engine owns which access pattern.\u201d" }
       ]
-    },
-    handsOn: {
-      prerequisites: "None beyond what the labs in 6.4 to 6.8 will need.",
-      setup: "None. This lesson's \u201clab\u201d is a decision exercise, not infrastructure.",
-      simulate: "Take 3 real access patterns: \u201clook up a user by ID\u201d (point lookup), \u201cfind all orders for a user in the last 30 days\u201d (range scan), \u201cfind every document mentioning 'refund'\u201d (full-text search). Using only the categories above, write down which engine category you would pick for each and why, before reading the dedicated lessons that follow.",
-      observe: "Whether your instinct matches the pattern: B+Tree for point lookup plus range, Inverted Index for full-text. Mismatches here are exactly the intuition the hands-on labs in 6.4 to 6.8 will sharpen.",
-      stretch: "None. Revisit this exercise after finishing 6.4 to 6.8 and see if your answers change."
     }
   },
   keyTakeaways: [

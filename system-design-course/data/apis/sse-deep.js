@@ -57,11 +57,35 @@ window.COURSE_CONTENT["sse-deep"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js; a browser.",
-      setup: "Local and free only.",
-      simulate: "Build an Express endpoint that sets `Content-Type: text/event-stream` and every 2 seconds writes `data: {\u201cprice\u201d: &lt;random number&gt;}` followed by a blank line to the response, never closing it. In the browser, connect with `new EventSource(\u2019/prices\u2019)` and log every message via `onmessage`.",
-      observe: "Killing the server and watching `EventSource` automatically reconnect on its own within a few seconds, with zero reconnect code written by you: the free auto-reconnect claim, observed directly. Compare this to how much manual reconnect logic the WebSocket lab needed.",
-      stretch: "Add an `id:` field to each event, kill the server mid-stream, and check the `Last-Event-ID` header the browser automatically sends on reconnect: it confirms the replay-from-last-seen-event behavior without you implementing it."
+      goal: "Stream server-pushed prices over plain HTTP with SSE and watch the browser auto-reconnect with zero reconnect code.",
+      stack: "Node.js + Express and the browser's built-in <code>EventSource</code>, plus <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir sse-lab && cd sse-lab\nnpm init -y && npm install express",
+          lang: "bash"
+        },
+        {
+          title: "Push an event every 2 seconds and never close",
+          body: "Set <code>Content-Type: text/event-stream</code>, write an <code>id:</code> and a <code>data:</code> line ended by a blank line, and keep the response open. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst app = express();\n\napp.get('/', (req, res) => res.send(\n  `<script>const es = new EventSource('/prices'); es.onmessage = e => console.log(e.data);</script>`\n));\n\napp.get('/prices', (req, res) => {\n  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });\n  let id = Number(req.headers['last-event-id'] || 0);\n  const timer = setInterval(() => {\n    id++;\n    res.write('id: ' + id + '\\n');\n    res.write('data: {\"price\": ' + (100 + Math.floor(Math.random() * 50)) + '}\\n\\n');\n  }, 2000);\n  req.on('close', () => clearInterval(timer));\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run it and see the raw stream",
+          body: "<code>curl -N</code> keeps the connection open so you can watch events arrive.",
+          code: "node server.js &\ncurl -N localhost:3000/prices",
+          lang: "bash"
+        },
+        {
+          title: "Watch auto-reconnect in the browser",
+          body: "Open the page, then kill and restart the server. The console keeps logging with no reconnect code from you.",
+          code: "# open http://localhost:3000 and watch the console\n# then: kill %1 ; node server.js &",
+          lang: "bash"
+        }
+      ],
+      observe: "After you kill the server, <code>EventSource</code> reconnects on its own within a few seconds, zero reconnect code written, unlike the manual backoff the WebSocket lab needed. On reconnect the browser automatically sends a <code>Last-Event-ID</code> header carrying the last <code>id:</code> it saw.",
+      stretch: "Log <code>req.headers['last-event-id']</code> on the server, kill it mid-stream, and confirm the browser resumes from the last seen event id, replay-from-last-seen without you implementing it."
     }
   },
   keyTakeaways: [

@@ -31,11 +31,33 @@ window.COURSE_CONTENT["service-mesh"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The local K8s cluster from the Docker & Kubernetes lesson, plus `istioctl` or Linkerd's CLI (both free).",
-      setup: "Local and free: `istioctl install` (or `linkerd install`) on your `kind` cluster, then label your namespace for automatic sidecar injection.",
-      simulate: "Deploy the same 2-service setup from the K8s lesson, label the namespace `istio-injection=enabled`, and redeploy. Check `kubectl get pods` and notice each Pod now shows 2/2 containers (your app plus the injected Envoy sidecar), with zero changes to your application code.",
-      observe: "Traffic between the 2 services still works exactly as before, but is now visible in Istio's dashboard (Kiali, if installed) as a service graph with automatic mTLS between them. The \u201czero code changes\u201d claim, confirmed by diffing your app's source before and after.",
-      stretch: "Apply an Istio `VirtualService` that injects a 3-second delay on 10% of calls to one service, without touching that service's code at all: a fault-injection test, and a useful preview of Chaos Engineering."
+      goal: "Inject an Envoy sidecar next to a running app with Istio, confirm each Pod becomes 2/2 with zero code changes, and get mTLS plus observability for free.",
+      stack: "Istio on the local <code>kind</code> cluster from the Docker &amp; Kubernetes lesson, plus <code>kubectl</code>. Local and free.",
+      steps: [
+        {
+          title: "Install Istio into the cluster",
+          code: "curl -L https://istio.io/downloadIstio | sh -\ncd istio-*\nexport PATH=$PWD/bin:$PATH\nistioctl install --set profile=demo -y",
+          lang: "bash"
+        },
+        {
+          title: "Turn on automatic sidecar injection",
+          body: "Any Pod created in a labelled namespace gets an Envoy sidecar injected transparently.",
+          code: "kubectl label namespace default istio-injection=enabled",
+          lang: "bash"
+        },
+        {
+          title: "Deploy the app, then redeploy so sidecars inject",
+          code: "kubectl apply -f app.yaml\nkubectl rollout restart deployment myapp",
+          lang: "bash"
+        },
+        {
+          title: "Confirm each Pod is now 2/2",
+          code: "kubectl get pods -l app=myapp\nkubectl get pod -l app=myapp -o jsonpath='{.items[0].spec.containers[*].name}'",
+          lang: "bash"
+        }
+      ],
+      observe: "Each Pod now reports <code>2/2</code> containers and the container list shows <code>web istio-proxy</code>: your app plus the injected Envoy, with not a single line changed in your source. Traffic still works exactly as before, now with automatic mTLS between instances.",
+      stretch: "Apply an Istio <code>VirtualService</code> with an <code>http.fault.delay</code> of 3s on 10% of calls to the service, without touching its code: a fault-injection test and a first taste of Chaos Engineering."
     }
   },
   keyTakeaways: [

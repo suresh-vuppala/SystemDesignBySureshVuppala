@@ -43,11 +43,41 @@ window.COURSE_CONTENT["nfr-metrics"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Basic command line; curl installed.",
-      setup: "Local/free: run any HTTP server locally (e.g. python3 -m http.server or a small Express app). Cloud free-tier: hit a public API you don\u2019t control to get real-world latency variance.",
-      simulate: "Run 100 sequential requests with curl -w \"%{time_total}\\n\" -o /dev/null -s <url>, save the 100 timings to a file, then compute p50/p95/p99 yourself (sort the numbers, take the value at the 50th/95th/99th position).",
-      observe: "How far the <strong>p99</strong> is from the average. This is the \u201caverage hides tail pain\u201d claim, made concrete with your own numbers instead of taking it on faith.",
-      stretch: "Install hey or k6 and run a proper load test (hey -n 1000 -c 50 <url>) to get p50/p95/p99 computed for you, then compare against your manual calculation."
+      goal: "Measure real latency on a local server and compute p50/p95/p99 by hand to see how far the tail sits from the average.",
+      stack: "<code>curl</code> + Python's built-in HTTP server + standard shell tools (<code>sort</code>, <code>sed</code>, <code>awk</code>), optionally <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Start any local HTTP server",
+          body: "Python ships one, so there is nothing to install.",
+          code: "python3 -m http.server 8000",
+          lang: "bash"
+        },
+        {
+          title: "Collect 100 sequential response timings",
+          body: "In a second terminal, hit the server 100 times and append each total time (in seconds) to a file.",
+          code: "rm -f timings.txt\nfor i in $(seq 1 100); do\n  curl -w \"%{time_total}\\n\" -o /dev/null -s http://localhost:8000/ >> timings.txt\ndone",
+          lang: "bash"
+        },
+        {
+          title: "Compute p50, p95, and p99 yourself",
+          body: "Sort the numbers, then read off the value at the 50th, 95th, and 99th position.",
+          code: "sort -n timings.txt -o timings.txt\necho \"p50 = $(sed -n '50p' timings.txt)\"\necho \"p95 = $(sed -n '95p' timings.txt)\"\necho \"p99 = $(sed -n '99p' timings.txt)\"",
+          lang: "bash"
+        },
+        {
+          title: "Compare the tail against the plain average",
+          code: "awk '{ s += $1 } END { print \"avg =\", s / NR }' timings.txt",
+          lang: "bash"
+        },
+        {
+          title: "Let a load tester compute the percentiles for you",
+          body: "Install <code>hey</code> and run a concurrent test, then check its latency distribution against your manual numbers.",
+          code: "hey -n 1000 -c 50 http://localhost:8000/",
+          lang: "bash"
+        }
+      ],
+      observe: "How far the <strong>p99</strong> sits above the average. That gap is the \u201caverage hides tail pain\u201d claim made concrete with your own numbers instead of taking it on faith.",
+      stretch: "Point the same loop at a public API you do not control and watch the tail widen: real-world latency variance is far larger than a loopback server, which is exactly why SLOs are written on p95/p99 rather than the mean."
     }
   },
   keyTakeaways: [

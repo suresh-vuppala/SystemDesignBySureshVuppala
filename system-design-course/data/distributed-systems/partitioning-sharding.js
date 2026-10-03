@@ -40,11 +40,39 @@ window.COURSE_CONTENT["partitioning-sharding"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Elasticsearch cluster from the earlier search lab (multi-node if you set that up).",
-      setup: "Local and free: reuse it.",
-      simulate: "Index 50,000 documents across multiple shards, then run a query that must check every shard (a broad match with no filtering) with `?search_type=query_then_fetch` and check the response\u2019s `_shards` field (`total`, `successful`) and the `took` time. Artificially slow one shard\u2019s node (throttle its container CPU with `docker update --cpus`) and rerun the same query.",
-      observe: "Overall query latency rising to match the slowest shard\u2019s response time, not the average: the tail-latency claim measured by deliberately creating one slow participant in an otherwise fast scatter-gather.",
-      stretch: "Compare the same query\u2019s latency at 1 shard vs 5 shards (same total document count) to see scatter-gather coordination overhead grow as shard count increases beyond what is useful for this data size."
+      goal: "Index 50,000 documents across 5 shards and prove a scatter-gather query fans out to every shard and pays the slowest one.",
+      stack: "A single-node Elasticsearch in Docker, queried with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Elasticsearch",
+          code: "docker run -d --name es -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false docker.elastic.co/elasticsearch/elasticsearch:8.13.4",
+          lang: "bash"
+        },
+        {
+          title: "Create an index with 5 shards",
+          code: "curl -s -X PUT localhost:9200/lab -H 'Content-Type: application/json' -d '{\"settings\":{\"number_of_shards\":5,\"number_of_replicas\":0}}'",
+          lang: "bash"
+        },
+        {
+          title: "Bulk-index 50,000 documents",
+          code: "for i in $(seq 1 50000); do echo '{\"index\":{}}'; echo \"{\\\"msg\\\":\\\"event $i\\\"}\"; done > bulk.ndjson\ncurl -s -X POST 'localhost:9200/lab/_bulk' -H 'Content-Type: application/x-ndjson' --data-binary @bulk.ndjson > /dev/null\ncurl -s -X POST 'localhost:9200/lab/_refresh'",
+          lang: "bash"
+        },
+        {
+          title: "Run a query that touches every shard",
+          body: "Read the <code>_shards</code> block (total and successful) and the <code>took</code> time from the response.",
+          code: "curl -s 'localhost:9200/lab/_search?search_type=query_then_fetch' -H 'Content-Type: application/json' -d '{\"query\":{\"match\":{\"msg\":\"event\"}}}' | python -m json.tool | grep -E 'took|total|successful'",
+          lang: "bash"
+        },
+        {
+          title: "Throttle the node and rerun",
+          body: "Starving CPU makes the scatter-gather slower and lets you watch tail latency dominate.",
+          code: "docker update --cpus 0.2 es\ncurl -s 'localhost:9200/lab/_search' -H 'Content-Type: application/json' -d '{\"query\":{\"match\":{\"msg\":\"event\"}}}' | python -m json.tool | grep took",
+          lang: "bash"
+        }
+      ],
+      observe: "The <code>_shards.total</code> is 5, so every query fans out to all 5 shards and waits for the slowest to return before merging. Under a throttled node the <code>took</code> time climbs, showing latency track the slowest participant, not the average. On a real multi-node cluster you throttle a single shard's node to isolate one slow shard.",
+      stretch: "Compare the same query's <code>took</code> time at 1 shard versus 5 shards for the same document count, to see scatter-gather coordination overhead grow as shard count rises beyond what the data needs."
     }
   },
   keyTakeaways: [

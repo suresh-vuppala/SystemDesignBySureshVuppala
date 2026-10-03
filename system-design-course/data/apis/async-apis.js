@@ -35,11 +35,40 @@ window.COURSE_CONTENT["async-apis"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js or Python; a job queue is optional (an in-memory array works fine for the lab).",
-      setup: "Local and free only.",
-      simulate: "Build `POST /jobs` that returns `{jobId, status: \u201cpending\u201d}` immediately, kicks off a fake 10-second background task (a `setTimeout`), and stores its result keyed by `jobId`. Build `GET /jobs/:id` for the client to poll. Write a client that polls every 2 seconds until `status` becomes `\u201cdone\u201d`.",
-      observe: "The initial `POST` returns in milliseconds regardless of how long the actual work takes, versus what would happen if you kept that connection open for the full 10 seconds. Try it both ways and compare how each behaves if you kill the client mid-request.",
-      stretch: "Swap polling for a webhook: have the background task `POST` the result to a callback URL you control (use a free tool like webhook.site to see it land) instead of making the client ask."
+      goal: "Build an async job API that returns <code>202</code> instantly, processes in the background, and lets a client poll for the result.",
+      stack: "Node.js + Express with an in-memory job store, driven by <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir async-jobs && cd async-jobs\nnpm init -y && npm install express",
+          lang: "bash"
+        },
+        {
+          title: "Accept work immediately, finish it in the background",
+          body: "<code>POST /jobs</code> returns a job id and <code>202</code> right away, then a <code>setTimeout</code> stands in for a 10-second task. <code>GET /jobs/:id</code> lets the client poll. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst app = express();\napp.use(express.json());\n\nconst jobs = {};\nlet nextId = 1;\n\napp.post('/jobs', (req, res) => {\n  const id = String(nextId++);\n  jobs[id] = { status: 'pending', result: null };\n  // background work: does not block the response\n  setTimeout(() => { jobs[id] = { status: 'done', result: 42 }; }, 10000);\n  res.status(202).json({ jobId: id, status: 'pending' });\n});\n\napp.get('/jobs/:id', (req, res) => {\n  const job = jobs[req.params.id];\n  if (!job) return res.status(404).json({ error: 'not found' });\n  res.json(job);\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run the server",
+          code: "node server.js",
+          lang: "bash"
+        },
+        {
+          title: "Submit a job and time the response",
+          body: "The response returns in milliseconds even though the work takes 10 seconds.",
+          code: "curl -i -w '\\ntime: %{time_total}s\\n' -X POST localhost:3000/jobs",
+          lang: "bash"
+        },
+        {
+          title: "Poll until the job is done",
+          body: "Ask every 2 seconds; status flips from <code>pending</code> to <code>done</code> after the background task finishes.",
+          code: "while true; do\n  curl -s localhost:3000/jobs/1\n  echo\n  sleep 2\ndone",
+          lang: "bash"
+        }
+      ],
+      observe: "The <code>POST</code> returns in milliseconds with <code>202</code> and a <code>jobId</code>, no matter how long the real work runs. The poll loop shows <code>pending</code> for about five checks, then <code>done</code> with the result: the client never held a connection open for the full task.",
+      stretch: "Swap polling for a webhook: have the background task <code>POST</code> the result to a callback URL you control (use a free tool like webhook.site to watch it land) instead of making the client keep asking."
     }
   },
   keyTakeaways: [

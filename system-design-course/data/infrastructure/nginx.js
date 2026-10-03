@@ -24,11 +24,38 @@ window.COURSE_CONTENT["nginx"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker, plus a basic `nginx.conf`.",
-      setup: "Local and free only.",
-      simulate: "Run NGINX serving a static HTML page, then configure it as a reverse proxy in front of a small Node.js app, then add caching (`proxy_cache_path` + `proxy_cache`) in front of that same app. Load-test all 3 configurations with `hey -n 2000 -c 100` and compare requests/sec.",
-      observe: "The cached configuration serves far more requests/sec than the proxied-but-uncached one, since cached responses never reach your Node.js app at all. Check `X-Cache-Status` (or add your own header) to confirm hits vs misses. Also check NGINX's worker process count (`ps aux | grep nginx`) staying small and flat throughout, even at 100 concurrent connections.",
-      stretch: "Add TLS termination: generate a self-signed cert (`openssl req -x509 ...`), configure NGINX to terminate TLS and forward plain HTTP to the backend, and confirm (via `tcpdump` on the loopback interface) that traffic between NGINX and the backend is unencrypted while the client-facing side is HTTPS."
+      goal: "Run NGINX as a static server, then as a caching reverse proxy in front of an app, and prove that cached responses never reach the backend while worker count stays flat.",
+      stack: "NGINX plus a <code>traefik/whoami</code> backend in Docker, load-tested with <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Serve a static page",
+          code: "mkdir -p site\necho '<h1>hello from nginx</h1>' > site/index.html\ndocker run -d --name web -p 8080:80 -v \"$PWD/site:/usr/share/nginx/html:ro\" nginx\ncurl -s http://localhost:8080/",
+          lang: "bash"
+        },
+        {
+          title: "Add a caching reverse proxy in front of an app",
+          body: "<code>proxy_cache</code> stores 200 responses for 60s; the <code>X-Cache-Status</code> header reports HIT or MISS.",
+          code: "docker network create nginxnet\ndocker run -d --name app --network nginxnet traefik/whoami\ncat > nginx.conf <<'EOF'\nevents {}\nhttp {\n  proxy_cache_path /tmp/cache keys_zone=z:10m;\n  server {\n    listen 80;\n    location / {\n      proxy_pass http://app:80;\n      proxy_cache z;\n      proxy_cache_valid 200 60s;\n      add_header X-Cache-Status $upstream_cache_status;\n    }\n  }\n}\nEOF\ndocker run -d --name proxy --network nginxnet -p 8081:80 \\\n  -v \"$PWD/nginx.conf:/etc/nginx/nginx.conf:ro\" nginx",
+          lang: "bash"
+        },
+        {
+          title: "Confirm the cache flips MISS to HIT",
+          code: "curl -si http://localhost:8081/ | grep X-Cache-Status\ncurl -si http://localhost:8081/ | grep X-Cache-Status",
+          lang: "bash"
+        },
+        {
+          title: "Load-test static vs cached proxy",
+          code: "hey -n 2000 -c 100 http://localhost:8080/\nhey -n 2000 -c 100 http://localhost:8081/",
+          lang: "bash"
+        },
+        {
+          title: "Watch the worker count stay small",
+          code: "docker exec proxy sh -c 'ps -o pid,comm | grep nginx'",
+          lang: "bash"
+        }
+      ],
+      observe: "The cached proxy serves far more requests/sec than an uncached backend would, because after the first request <code>X-Cache-Status</code> reads <code>HIT</code> and the response never reaches <code>app</code> at all. The NGINX worker count stays small and flat even at 100 concurrent connections, the C10K event-loop model in action.",
+      stretch: "Add TLS termination: generate a self-signed cert (<code>openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 1 -subj \"/CN=localhost\"</code>), have NGINX terminate TLS and forward plain HTTP to the backend, and confirm the client side is HTTPS while the hop to the backend is not."
     }
   },
   keyTakeaways: [

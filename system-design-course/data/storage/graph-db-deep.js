@@ -40,11 +40,36 @@ window.COURSE_CONTENT["graph-db-deep"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Neo4j's free Community image).",
-      setup: "Local and free: `docker run -d -p 7474:7474 -p 7687:7687 neo4j`.",
-      simulate: "Create ~200 `Person` nodes with `FRIENDS_WITH` relationships forming a realistic social graph, then run a \u201cfriends of friends within 3 hops\u201d query in Cypher (`MATCH (me:Person)-[:FRIENDS_WITH*1..3]-(fof) WHERE me.name='Alice' RETURN DISTINCT fof`) and time it. Model the exact same data in Postgres as a `friendships` table and write the equivalent 3-hop query as nested JOINs (or a recursive CTE), then time that.",
-      observe: "The Neo4j query stays fast as you increase hop depth from 1 to 3 to 4, while the SQL JOIN-based version's execution time and query complexity both grow sharply: index-free adjacency, measured with your own `EXPLAIN` and timing numbers on both sides.",
-      stretch: "Visualize the graph in Neo4j's built-in browser UI at `localhost:7474` and click through actual relationship paths: a felt sense of why pointer-chasing, not an index lookup, makes traversal cheap regardless of total graph size."
+      goal: "Build a social graph in Neo4j, run a 3-hop friends-of-friends traversal in Cypher, and feel why index-free adjacency stays cheap where the equivalent SQL nested JOINs blow up.",
+      stack: "Neo4j Community in Docker, Cypher via the browser UI or <code>cypher-shell</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Neo4j",
+          body: "Sets an initial password so you can log in at once.",
+          code: "docker run -d --name neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password123 neo4j",
+          lang: "bash"
+        },
+        {
+          title: "Generate ~200 people with random friendships",
+          body: "Open <code>http://localhost:7474</code> (or <code>docker exec -it neo4j cypher-shell -u neo4j -p password123</code>) and run this.",
+          code: "UNWIND range(1, 200) AS i CREATE (:Person {id: i, name: 'p' + i});\nMATCH (a:Person), (b:Person)\nWHERE a.id < b.id AND rand() < 0.03\nMERGE (a)-[:FRIENDS_WITH]-(b);",
+          lang: "sql"
+        },
+        {
+          title: "Run the friends-of-friends within 3 hops query",
+          body: "Prefix with <code>PROFILE</code> to see the db hits and timing.",
+          code: "PROFILE\nMATCH (me:Person {id: 1})-[:FRIENDS_WITH*1..3]-(fof)\nRETURN DISTINCT fof.name;",
+          lang: "sql"
+        },
+        {
+          title: "Compare the same query in Postgres",
+          body: "Model friendships as a table and express 3 hops as a recursive CTE, then <code>EXPLAIN ANALYZE</code> it. Complexity and cost climb with each added hop.",
+          code: "EXPLAIN ANALYZE\nWITH RECURSIVE reach(id, depth) AS (\n  SELECT 1, 0\n  UNION\n  SELECT CASE WHEN f.a = r.id THEN f.b ELSE f.a END, r.depth + 1\n  FROM reach r\n  JOIN friendships f ON (f.a = r.id OR f.b = r.id)\n  WHERE r.depth < 3\n)\nSELECT DISTINCT id FROM reach WHERE id <> 1;",
+          lang: "sql"
+        }
+      ],
+      observe: "The Neo4j traversal stays fast as you raise hop depth from 1 to 3 to 4, while the SQL recursive/JOIN version's execution time and complexity both grow sharply: index-free adjacency, measured with <code>PROFILE</code> and <code>EXPLAIN ANALYZE</code> on both sides.",
+      stretch: "Visualize the graph in Neo4j's browser UI at <code>http://localhost:7474</code> and click through relationship paths: a felt sense of why pointer-chasing, not an index lookup, keeps traversal cheap regardless of total graph size."
     }
   },
   keyTakeaways: [

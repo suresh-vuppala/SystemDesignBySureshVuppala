@@ -1,5 +1,5 @@
 /**
- * Firebase Cloud Function — Razorpay Payment Webhook
+ * Firebase Cloud Function, Razorpay Payment Webhook
  * 
  * SETUP:
  * 1. cd functions && npm install

@@ -79,11 +79,36 @@ window.COURSE_CONTENT["search"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Elasticsearch's official free image).",
-      setup: "Local and free: `docker run -d -p 9200:9200 -e \"discovery.type=single-node\" elasticsearch:8.x`.",
-      simulate: "Index 1,000 short text documents (product descriptions work well) via the `_bulk` API, then run a `LIKE '%word%'`-equivalent query against a Postgres table with the same data (no index) and compare timing against an Elasticsearch `match` query for the same term.",
-      observe: "Elasticsearch returns results with a `_score` per document (BM25 ranking, higher for rarer and more relevant terms) versus Postgres's `LIKE` returning an unordered list with no relevance signal at all, plus a real latency gap at this document count that widens sharply as you scale up.",
-      stretch: "Index a new document, immediately query for it, and note it is sometimes not yet visible (before the refresh interval, default ~1s): the eventually consistent claim, caught in the act."
+      goal: "Index text into Elasticsearch and see a <code>match</code> query return ranked results with a <code>_score</code> per document, versus a Postgres <code>LIKE '%word%'</code> that returns an unordered list with no relevance signal at all.",
+      stack: "Elasticsearch in Docker, driven with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a single-node Elasticsearch",
+          body: "Security disabled so <code>curl</code> works without credentials, for local experiments only.",
+          code: "docker run -d --name es -p 9200:9200 -e \"discovery.type=single-node\" -e \"xpack.security.enabled=false\" elasticsearch:8.13.0",
+          lang: "bash"
+        },
+        {
+          title: "Bulk-index a few documents",
+          body: "The <code>_bulk</code> body is newline-delimited JSON and must end with a trailing newline. Scale this loop to 1,000 for a real timing gap.",
+          code: "curl -s -H 'Content-Type: application/x-ndjson' -XPOST 'http://localhost:9200/products/_bulk' --data-binary '\n{\"index\":{\"_id\":1}}\n{\"desc\":\"wireless noise cancelling headphones\"}\n{\"index\":{\"_id\":2}}\n{\"desc\":\"wired earbuds with microphone\"}\n{\"index\":{\"_id\":3}}\n{\"desc\":\"bluetooth speaker waterproof\"}\n'",
+          lang: "bash"
+        },
+        {
+          title: "Run a full-text match query",
+          body: "Ask for documents matching \u201cwireless headphones\u201d and inspect the ranking.",
+          code: "curl -s 'http://localhost:9200/products/_search' -H 'Content-Type: application/json' -d '{ \"query\": { \"match\": { \"desc\": \"wireless headphones\" } } }'",
+          lang: "bash"
+        },
+        {
+          title: "Compare against Postgres LIKE on the same data",
+          body: "Seed the same rows in Postgres, then run the substring query. No <code>_score</code>, no ranking.",
+          code: "SELECT desc FROM products WHERE desc LIKE '%wireless%';",
+          lang: "sql"
+        }
+      ],
+      observe: "Elasticsearch returns each hit with a <code>_score</code> (BM25 ranking, higher for rarer and more relevant terms) while Postgres <code>LIKE</code> returns an unordered list with no relevance signal, plus a latency gap that widens sharply as the document count grows.",
+      stretch: "Index a new document and immediately query for it: sometimes it is not yet visible (before the refresh interval, default \u2248 1s). The eventually consistent claim, caught in the act."
     }
   },
   keyTakeaways: [

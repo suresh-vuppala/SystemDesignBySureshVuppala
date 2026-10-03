@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HelloSDE — Master System Design · 8-Week Live Cohort</title>
-<meta name="description" content="Learn system design by doing. An 8-week live weekend cohort where every building block is followed by a real-world design walkthrough — until it becomes instinct. Next batch Oct 18.">
+<title>HelloSDE, Master Advanced System Design · 8-Week Live Cohort</title>
+<meta name="description" content="Learn system design by doing. An 8-week live weekend cohort where every building block is followed by a real-world design walkthrough, until it becomes instinct. Next batch Oct 18.">
 <meta name="keywords" content="system design course, live cohort, system design bootcamp, FAANG interview prep, distributed systems, staff engineer interview, senior engineer">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://hellosde.com/">
 
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://hellosde.com/">
-<meta property="og:title" content="Master System Design — 8-Week Live Cohort · HelloSDE">
+<meta property="og:title" content="Master Advanced System Design, 8-Week Live Cohort · HelloSDE">
 <meta property="og:description" content="Learn a building block, then immediately apply it. 8 weekends, live. Next batch Oct 18.">
 
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -21,7 +21,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@500;700;900&display=swap" rel="stylesheet">
 
 <style>
-/* ── Landing page — course-focused ───────────────────────── */
+/* ── Landing page, course-focused ───────────────────────── */
 .lp-hero{
   padding:60px 24px 52px;text-align:center;
   background:var(--brand-soft);
@@ -465,8 +465,60 @@
 .lp-live-soon h4{font-size:var(--fs-md);font-weight:700;color:var(--text);margin:0 0 6px}
 .lp-live-soon p{font-size:var(--fs-sm);color:var(--muted);margin:0;line-height:var(--lh-normal)}
 
+/* ── Companies / placement trust band ─────────────────────── */
+.lp-companies{
+  background:var(--bg-2);
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  padding-bottom:58px;overflow:hidden;
+}
+.lp-companies-inner{
+  max-width:1080px;margin:0 auto;padding:56px 24px 0;text-align:center;
+}
+.lp-companies .lp-kicker{margin-bottom:18px}
+
+/* Logo marquee: a single light "strip" card (one container, no per-logo
+   boxes) holding one auto-scrolling row. The light surface keeps every
+   brand in FULL COLOR on both light and dark themes. Fades at the inner
+   edges, pauses on hover, static scroll for reduced-motion users. */
+.lp-marquee{
+  width:min(1120px,calc(100% - 48px));margin:38px auto 0;
+  padding:30px 0;overflow:hidden;background:transparent;
+}
+.lp-marquee-row{
+  display:flex;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);
+}
+.lp-track{display:flex;gap:64px;flex:0 0 auto;width:max-content;align-items:center;will-change:transform}
+.lp-track-a{animation:lpScroll 50s linear infinite}
+.lp-marquee:hover .lp-track{animation-play-state:paused}
+@keyframes lpScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* Logos sit directly on the strip, full color, no individual boxes. */
+.lp-logo-chip{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0}
+.lp-logo-chip img{
+  height:48px;width:auto;max-width:180px;object-fit:contain;display:block;
+  transition:transform .22s ease,opacity .22s ease;
+}
+.lp-logo-chip:hover img{transform:scale(1.09)}
+/* Dark theme: no background anywhere; logos render as clean white so they
+   are visible on the dark band (full brand color is kept in light theme). */
+[data-theme="dark"] .lp-logo-chip img{filter:brightness(0) invert(1);opacity:.85}
+[data-theme="dark"] .lp-logo-chip:hover img{opacity:1}
+@media(prefers-reduced-motion:reduce){
+  .lp-track-a{animation:none}
+  .lp-marquee-row{overflow-x:auto}
+}
+
 @media(max-width:820px){
   .lp-live-grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .lp-companies{padding-bottom:44px}
+  .lp-companies-inner{padding:40px 16px 0}
+  .lp-marquee{margin-top:28px;padding:18px 0;border-radius:16px;width:calc(100% - 32px)}
+  .lp-track{gap:40px}
+  .lp-logo-chip img{height:36px;max-width:130px}
 }
 @media(max-width:640px){
   .lp-hero{padding:44px 16px 40px}
@@ -594,23 +646,71 @@
   </div>
 </section>
 
+<!-- ── COMPANIES / PLACEMENT TRUST BAND ──
+     Single-row auto-scrolling logo marquee (all 15 brands), no boxes and no
+     background. Light theme: full brand color on the band. Dark theme: logos
+     render clean white (no light surface behind them, since black marks like
+     Apple cannot show color on a dark background). SVGs in images/Homepage/. -->
+<section class="lp-companies">
+  <div class="lp-companies-inner">
+    <span class="lp-kicker">Where our learners aim</span>
+    <h2 class="lp-section-title">Land your dream job at one of the leading tech companies</h2>
+    <p class="lp-section-lead">The patterns, data-structure instincts, and system design skills you build here are exactly what top product and FAANG-level companies interview for.</p>
+  </div>
+  <div class="lp-marquee" aria-label="Companies our learners aim to join">
+    <div class="lp-marquee-row"><div class="lp-track lp-track-a">
+      <div class="lp-logo-chip"><img src="images/Homepage/Google-Logo.wine.svg" alt="Google" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Amazon_(company)-Logo.wine.svg" alt="Amazon" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Microsoft-Logo.wine.svg" alt="Microsoft" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Meta_Platforms-Logo.wine.svg" alt="Meta" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Apple_Inc.-Logo.wine.svg" alt="Apple" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Netflix-Logo.wine.svg" alt="Netflix" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Adobe_Inc.-Logo.wine.svg" alt="Adobe" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Atlassian-Logo.wine.svg" alt="Atlassian" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/PayPal-Logo.wine.svg" alt="PayPal" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Spotify-Logo.wine.svg" alt="Spotify" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Intel-Logo.wine.svg" alt="Intel" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/EBay-Logo.wine.svg" alt="eBay" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Flipkart-Logo.wine.svg" alt="Flipkart" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/Walmart_Labs-Logo.wine.svg" alt="Walmart" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip"><img src="images/Homepage/AT%26T-Logo.wine.svg" alt="AT&amp;T" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Google-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Amazon_(company)-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Microsoft-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Meta_Platforms-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Apple_Inc.-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Netflix-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Adobe_Inc.-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Atlassian-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/PayPal-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Spotify-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Intel-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/EBay-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Flipkart-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/Walmart_Labs-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+      <div class="lp-logo-chip" aria-hidden="true"><img src="images/Homepage/AT%26T-Logo.wine.svg" alt="" loading="lazy" decoding="async"></div>
+    </div></div>
+  </div>
+</section>
+
 <!-- ── LIVE COURSES ── -->
 <section class="lp-live">
   <div class="lp-modules-head">
     <span class="lp-kicker">Cohort-Based · Live · Small Group</span>
     <h2 class="lp-section-title">Live Courses</h2>
-    <p class="lp-section-lead">Two live cohorts to go deep with feedback on your actual designs: master system design, or build production-grade AI systems.</p>
+    <p class="lp-section-lead">Three live cohorts to go deep with expert feedback: crack the coding round with data structures &amp; algorithms, master system design, or build production-grade AI systems.</p>
   </div>
 
   <div class="lp-live-grid">
     <div class="lp-live-card is-featured">
       <span class="lp-live-badge"><span class="lp-live-dot"></span>Enrolling Now</span>
-      <h3>Master System Design — 8-Week Live Cohort</h3>
-      <p>Every weekend introduces a building block, then you use it live on a real-world design problem. Instagram, Uber, WhatsApp, Discord — how they actually work, not memorized scripts.</p>
+      <h3>Master System Design, 8-Week Live Cohort</h3>
+      <p>Every weekend introduces a building block, then you use it live on a real-world design problem. Instagram, Uber, WhatsApp, Discord, how they actually work, not memorized scripts.</p>
       <div class="lp-live-facts">
         <div class="lp-live-fact"><div class="k">Next Batch</div><div class="v">Oct 18</div></div>
         <div class="lp-live-fact"><div class="k">Duration</div><div class="v">8 Weekends</div></div>
-        <div class="lp-live-fact"><div class="k">Format</div><div class="v">Sat &amp; Sun · 9AM–1PM</div></div>
+        <div class="lp-live-fact"><div class="k">Timing</div><div class="v">Sat &amp; Sun · 9AM–1PM</div></div>
+        <div class="lp-live-fact"><div class="k">Price</div><div class="v">₹39,999</div></div>
       </div>
       <ul class="lp-live-feats">
         <li>Learn a building block, then immediately apply it live, with feedback.</li>
@@ -622,13 +722,33 @@
     </div>
 
     <div class="lp-live-card is-featured">
-      <span class="lp-live-badge"><span class="lp-live-dot"></span>New Cohort</span>
-      <h3>AI Systems &amp; LLM Engineering — Live Cohort</h3>
-      <p>Design production AI systems end to end: RAG pipelines, vector search, agentic workflows, evals, and the latency and cost tradeoffs that decide whether an LLM feature actually ships.</p>
+      <span class="lp-live-badge"><span class="lp-live-dot"></span>Enrolling Now</span>
+      <h3>Master Data Structures and Algorithms, 14-Week Live Cohort</h3>
+      <p>Learn one coding pattern at a time, then apply it immediately, arrays &amp; hashing through trees, graphs, and dynamic programming, in the right order until pattern recognition is instinct.</p>
       <div class="lp-live-facts">
-        <div class="lp-live-fact"><div class="k">Next Batch</div><div class="v">Nov 15</div></div>
-        <div class="lp-live-fact"><div class="k">Duration</div><div class="v">6 Weekends</div></div>
-        <div class="lp-live-fact"><div class="k">Format</div><div class="v">Sat &amp; Sun · 9AM–1PM</div></div>
+        <div class="lp-live-fact"><div class="k">Next Batch</div><div class="v">Oct 29</div></div>
+        <div class="lp-live-fact"><div class="k">Duration</div><div class="v">14 Weeks</div></div>
+        <div class="lp-live-fact"><div class="k">Timing</div><div class="v">Sat &amp; Sun · 4–8 PM IST</div></div>
+        <div class="lp-live-fact"><div class="k">Price</div><div class="v">₹29,999</div></div>
+      </div>
+      <ul class="lp-live-feats">
+        <li>Pattern-first: learn a technique, then solve it live with feedback.</li>
+        <li>24 modules from arrays &amp; hashing to graphs and dynamic programming.</li>
+        <li>Clean, reusable code templates for every pattern.</li>
+        <li>Weekly timed contests and live mock interviews.</li>
+      </ul>
+      <a href="master-dsa.html" class="lp-btn-primary">Enroll ›</a>
+    </div>
+
+    <div class="lp-live-card is-featured">
+      <span class="lp-live-badge"><span class="lp-live-dot"></span>New Cohort</span>
+      <h3>Master AI Engineering, 8-Week Live Cohort</h3>
+      <p>Build production AI systems end to end: RAG pipelines, tool-calling and multi-agent systems, MCP, evals, guardrails, and observability, then ship a capstone.</p>
+      <div class="lp-live-facts">
+        <div class="lp-live-fact"><div class="k">Next Batch</div><div class="v">Oct 18</div></div>
+        <div class="lp-live-fact"><div class="k">Duration</div><div class="v">8 Weekends</div></div>
+        <div class="lp-live-fact"><div class="k">Timing</div><div class="v">Sat &amp; Sun · 9:00–11:30 AM IST</div></div>
+        <div class="lp-live-fact"><div class="k">Price</div><div class="v">₹39,999</div></div>
       </div>
       <ul class="lp-live-feats">
         <li>RAG, embeddings, and vector search built on real datasets.</li>
@@ -636,7 +756,7 @@
         <li>Evals and guardrails: measuring output quality you can trust.</li>
         <li>Latency, cost, and scaling tradeoffs for LLM-backed features.</li>
       </ul>
-      <a href="master-ai-engineering.html" class="lp-btn-primary">Join the AI cohort ›</a>
+      <a href="master-ai-engineering.html" class="lp-btn-primary">ENROLL ›</a>
     </div>
   </div>
 </section>
@@ -648,7 +768,7 @@
   <h2>Seats fill fast. Next batch: <b>Oct 18</b>.</h2>
   <p>Small live cohort, weekend sessions, personal attention on every design you build. Lock your seat before it&rsquo;s gone.</p>
   <div class="lp-cta-row">
-    <a href="master-system-design.html" class="lp-btn-primary">Enroll in Master System Design ›</a>
+    <a href="master-system-design.html" class="lp-btn-primary">Enroll in Master Advanced System Design ›</a>
   </div>
 </section>
 

@@ -43,11 +43,36 @@ window.COURSE_CONTENT["redis-ha"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); `redis-cli`.",
-      setup: "Local and free: 2 Redis containers, one configured as a replica of the other (`docker run -d redis --replicaof <primary-ip> 6379`); AOF enabled on the primary (`--appendonly yes`).",
-      simulate: "Write 100 keys to the primary with AOF disabled, kill the container (`docker kill`) without a clean shutdown, restart it, and check how many keys survived (likely very few). Repeat with AOF enabled and `appendfsync everysec`, then kill and restart again.",
-      observe: "The AOF-enabled instance recovers nearly all writes (at most ~1 second of loss, matching `everysec`'s guarantee), versus the no-persistence instance losing everything, a measured version of the RDB/AOF trade rather than an asserted one.",
-      stretch: "Confirm replication by writing a key on the primary and reading it from the replica (`redis-cli -p <replica-port> GET key`) within milliseconds, then kill the primary and manually promote the replica (`REPLICAOF NO ONE`), simulating what Sentinel would do automatically."
+      goal: "Measure the RDB versus AOF durability trade by crashing Redis with and without the append-only log, then hand-promote a replica.",
+      stack: "Two Redis containers in Docker on a shared network, driven from <code>redis-cli</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a no-persistence Redis and load 100 keys",
+          body: "Default persistence off means an unclean kill loses the tail.",
+          code: "docker run -d --name redis-nop -p 6379:6379 redis --save '' --appendonly no\ndocker exec redis-nop sh -c 'for i in $(seq 1 100); do redis-cli SET key:$i v$i > /dev/null; done'\ndocker exec redis-nop redis-cli DBSIZE",
+          lang: "bash"
+        },
+        {
+          title: "Hard-kill and restart, then count survivors",
+          body: "<code>docker kill</code> skips a clean shutdown, so nothing was flushed to disk.",
+          code: "docker kill redis-nop\ndocker start redis-nop\nsleep 2\ndocker exec redis-nop redis-cli DBSIZE",
+          lang: "bash"
+        },
+        {
+          title: "Repeat with AOF enabled at everysec",
+          body: "The append-only log fsyncs roughly once a second, capping loss.",
+          code: "docker run -d --name redis-aof -p 6380:6379 redis --appendonly yes --appendfsync everysec\ndocker exec redis-aof sh -c 'for i in $(seq 1 100); do redis-cli SET key:$i v$i > /dev/null; done'\ndocker kill redis-aof\ndocker start redis-aof\nsleep 2\ndocker exec redis-aof redis-cli DBSIZE",
+          lang: "bash"
+        },
+        {
+          title: "Wire up replication and promote by hand",
+          body: "Point a replica at the AOF primary, confirm the write propagates, then promote the replica as Sentinel would.",
+          code: "docker network create rnet 2>/dev/null; docker network connect rnet redis-aof\ndocker run -d --name redis-replica --network rnet redis --replicaof redis-aof 6379\nsleep 2\ndocker exec redis-aof redis-cli SET canary hello\ndocker exec redis-replica redis-cli GET canary\ndocker exec redis-replica redis-cli REPLICAOF NO ONE",
+          lang: "bash"
+        }
+      ],
+      observe: "The AOF instance recovers nearly all 100 writes (at most ~1 second of loss, matching <code>everysec</code>'s guarantee), while the no-persistence instance comes back nearly empty: a measured version of the RDB/AOF trade rather than an asserted one. The replica returns <code>hello</code> within milliseconds and, after <code>REPLICAOF NO ONE</code>, accepts writes as a standalone primary.",
+      stretch: "Add a second replica and set <code>min-replicas-to-write 1</code> on the primary. Kill both replicas and confirm the primary now refuses writes, the availability-versus-durability knob made concrete."
     }
   },
   keyTakeaways: [

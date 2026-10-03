@@ -1,4 +1,4 @@
-﻿/* ═══ HelloSDE Premium — Google Auth + Razorpay ═══ 
+﻿/* ═══ HelloSDE Premium, Google Auth + Razorpay ═══ 
    
    SETUP INSTRUCTIONS:
    1. Create Firebase project at https://console.firebase.google.com
@@ -36,7 +36,7 @@ var CONFIG = {
     amount: 250000,            // ₹2500 in paise
     currency: "INR",
     name: "HelloSDE",
-    description: "Premium Access — Full System Design Content",
+    description: "Premium Access, Full System Design Content",
     theme: { color: "#6c8cff" }
   },
   course: {
@@ -44,7 +44,7 @@ var CONFIG = {
     amount: 3999900,           // ₹39,999 in paise
     currency: "INR",
     name: "HelloSDE",
-    description: "Master System Design — 8-Week Live Cohort (Sep 18 to Oct 18 batch)",
+    description: "Master Advanced System Design, 8-Week Live Cohort (Sep 18 to Oct 18 batch)",
     batch: "2025-09-18"
   }
 };
@@ -119,7 +119,7 @@ var PREMIUM_CONCEPT_PAGES = [
   '16-decision-flowcharts.html'
 ];
 
-// Free problem pages — only pages that have actually been created (file exists on disk)
+// Free problem pages, only pages that have actually been created (file exists on disk)
 var FREE_PROBLEM_PAGES = [
   // Module 1: Chat & Messaging (first 7 free)
   'slack-real-time-messaging.html',
@@ -209,13 +209,13 @@ function injectAuthUI(){
   }
 }
 
-// ═══ PREMIUM GATE UI — Lock + Popup ═══
+// ═══ PREMIUM GATE UI, Lock + Popup ═══
 function gatePremiumContent(){
   if(state.isPremium || CONFIG.admin) return; // Premium user or admin sees everything
 
   var page = location.pathname.split('/').pop() || 'index.html';
   
-  // Gate sections within cheatsheet pages — hide content completely with a lock
+  // Gate sections within cheatsheet pages, hide content completely with a lock
   Object.keys(PREMIUM_SECTIONS).forEach(function(pageKey){
     PREMIUM_SECTIONS[pageKey].forEach(function(sectionId){
       var section = document.getElementById(sectionId);
@@ -247,7 +247,7 @@ function gatePremiumContent(){
     });
   });
 
-  // Gate problems in index — lock rows whose links point to non-existent placeholder pages
+  // Gate problems in index, lock rows whose links point to non-existent placeholder pages
   if(page === 'index.html' && location.pathname.indexOf('realtime-system-design-problems') !== -1){
     var tables = document.querySelectorAll('.T table');
     tables.forEach(function(table){
@@ -322,7 +322,7 @@ function gatePremiumProblemPage(){
   if(location.pathname.indexOf('realtime-system-design-problems') === -1) return;
   // Check if this page is in the free list
   if(FREE_PROBLEM_PAGES.indexOf(page) !== -1) return;
-  // This is a premium problem page — block it
+  // This is a premium problem page, block it
   blockPageContent();
 }
 
@@ -331,7 +331,7 @@ function gatePremiumConceptPage(){
   var page = location.pathname.split('/').pop() || '';
   if(location.pathname.indexOf('system-design-cheatsheet') === -1) return;
   if(PREMIUM_CONCEPT_PAGES.indexOf(page) === -1) return;
-  // This is a premium concept page — block it
+  // This is a premium concept page, block it
   blockPageContent();
 }
 
@@ -484,7 +484,7 @@ function setupAuthMenu(){
       if(state.isPremium){
         items += '<div style="padding:6px 12px;font-size:.75rem;color:var(--g)">✓ Premium Active</div>';
       } else {
-        items += '<div style="padding:6px 12px"><button onclick="window.HelloSDE.startPayment()" style="width:100%;padding:8px;border-radius:6px;border:none;background:var(--a);color:#fff;font-size:.78rem;font-weight:600;cursor:pointer">Upgrade to Premium — ₹2,500</button></div>';
+        items += '<div style="padding:6px 12px"><button onclick="window.HelloSDE.startPayment()" style="width:100%;padding:8px;border-radius:6px;border:none;background:var(--a);color:#fff;font-size:.78rem;font-weight:600;cursor:pointer">Upgrade to Premium, ₹2,500</button></div>';
       }
       
       items += '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">'
@@ -644,7 +644,7 @@ window.HelloSDE = {
           .then(function(res){ return res.json(); })
           .then(function(result){
             if(result.verified){
-              // Payment verified — mark user as premium in Firestore
+              // Payment verified, mark user as premium in Firestore
               if(firebaseReady && firebase.firestore){
                 firebase.firestore().collection('users').doc(state.user.uid).set({
                   email: state.user.email,
@@ -685,7 +685,7 @@ window.HelloSDE = {
     });
   },
 
-  // ═══ Course enrollment payment (Master System Design — ₹39,999) ═══
+  // ═══ Course enrollment payment (Master Advanced System Design, ₹39,999) ═══
   enrollCourse: function(){
     // Fall back to Firebase's live session in case auth state hasn't synced to `state` yet
     if(!state.user && firebaseReady && firebase.auth){
@@ -713,7 +713,7 @@ window.HelloSDE = {
           window.HelloSDE._openCoursePayment();
         });
       }).catch(function(err){
-        // User dismissed the sign-in popup — do nothing
+        // User dismissed the sign-in popup, do nothing
         if(err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
         alert('Sign-in failed: ' + err.message);
       });
@@ -777,7 +777,7 @@ window.HelloSDE = {
           .then(function(res){ return res.json(); })
           .then(function(result){
             if(result.verified){
-              // Payment verified — record course enrollment in Firestore
+              // Payment verified, record course enrollment in Firestore
               if(firebaseReady && firebase.firestore){
                 firebase.firestore().collection('courseEnrollments').doc(state.user.uid).set({
                   email: state.user.email,
@@ -790,8 +790,8 @@ window.HelloSDE = {
                   razorpayOrderId: response.razorpay_order_id
                 }, {merge: true}).then(function(){
                   try { localStorage.removeItem('hellosde_pending_enroll'); } catch(e){}
-                  alert('🎉 You\'re enrolled in Master System Design (Sep 18 batch)! We\'ll email onboarding details shortly. Tap OK to message us on WhatsApp for confirmation.');
-                  window.open('https://wa.me/919100880133?text=Hi!%20I%20just%20enrolled%20in%20Master%20System%20Design%20(Sep%2018%20batch).%20Payment%20ID:%20' + encodeURIComponent(response.razorpay_payment_id), '_blank');
+                  alert('🎉 You\'re enrolled in Master Advanced System Design (Sep 18 batch)! We\'ll email onboarding details shortly. Tap OK to message us on WhatsApp for confirmation.');
+                  window.open('https://wa.me/919100880133?text=Hi!%20I%20just%20enrolled%20in%20Master%20Advanced%20System%20Design%20(Sep%2018%20batch).%20Payment%20ID:%20' + encodeURIComponent(response.razorpay_payment_id), '_blank');
                 }).catch(function(){
                   alert('Payment received (ID: ' + response.razorpay_payment_id + '). If you don\'t get a confirmation email, please message us on WhatsApp with this Payment ID.');
                 });
@@ -835,7 +835,7 @@ window.HelloSDE = {
           return Promise.resolve(true);
         }
       } catch(e){}
-      // Expired or invalid — clear it
+      // Expired or invalid, clear it
       localStorage.removeItem('hellosde_premium_cache');
     }
     
@@ -891,7 +891,7 @@ function init(){
       }
     });
   } else {
-    // Firebase not loaded — use localStorage fallback
+    // Firebase not loaded, use localStorage fallback
         state.isPremium = false /* always verify from Firestore */;
     injectAuthUI();
     setupAuthMenu();

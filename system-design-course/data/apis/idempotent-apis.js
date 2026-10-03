@@ -36,11 +36,39 @@ window.COURSE_CONTENT["idempotent-apis"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (for Redis); Node.js or Python.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis`.",
-      simulate: "Build a `POST /charge` endpoint that reads an `Idempotency-Key` header, does `SET idem:&lt;key&gt; \u201cprocessing\u201d NX EX 86400` in Redis, and only actually charges (increments an in-memory counter) if that SET succeeded. Fire 20 concurrent requests with the same idempotency key using `hey -n 20 -c 20 -H \u201cIdempotency-Key: abc123\u201d`.",
-      observe: "The charge counter increments exactly once despite 20 concurrent attempts: the race condition from Overview, closed. Then remove the `NX` (making it a plain `SET`, no atomicity) and re-run: watch the counter increment more than once under concurrency.",
-      stretch: "Store the actual response body alongside the key so a retry with the same key returns the original success response instead of a generic \u201calready processed\u201d message, which is Stripe's actual behavior."
+      goal: "Fire 20 concurrent charges with the same idempotency key and prove an atomic Redis <code>SET NX</code> lets exactly one through.",
+      stack: "Node.js + Express + Redis (Docker), load-tested with <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis and set up the project",
+          code: "docker run -d --name redis -p 6379:6379 redis\nmkdir idem-lab && cd idem-lab\nnpm init -y && npm install express ioredis",
+          lang: "bash"
+        },
+        {
+          title: "Claim the key atomically before charging",
+          body: "<code>SET idem:&lt;key&gt; processing NX EX 86400</code> succeeds only for the first request; the charge counter increments only when the claim wins. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst Redis = require('ioredis');\nconst redis = new Redis();\nconst app = express();\n\nlet charges = 0; // stand-in for a real payment\n\napp.post('/charge', async (req, res) => {\n  const key = req.header('Idempotency-Key');\n  // atomic claim: NX means 'only if it does not already exist'\n  const won = await redis.set('idem:' + key, 'processing', 'NX', 'EX', 86400);\n  if (!won) return res.status(200).json({ status: 'already processed', charges });\n  charges++;\n  res.status(201).json({ status: 'charged', charges });\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run the server",
+          code: "node server.js",
+          lang: "bash"
+        },
+        {
+          title: "Fire 20 concurrent requests with one shared key",
+          code: "hey -n 20 -c 20 -m POST -H 'Idempotency-Key: abc123' http://localhost:3000/charge\ndocker exec redis redis-cli GET idem:abc123",
+          lang: "bash"
+        },
+        {
+          title: "Break it to see the race, then fix it back",
+          body: "Drop the <code>NX</code> so the claim is no longer atomic, restart, clear the key, and re-run the load test.",
+          code: "# change the SET line to a plain, non-atomic write:\n#   await redis.set('idem:' + key, 'processing', 'EX', 86400);\ndocker exec redis redis-cli DEL idem:abc123\nhey -n 20 -c 20 -m POST -H 'Idempotency-Key: abc123' http://localhost:3000/charge",
+          lang: "bash"
+        }
+      ],
+      observe: "With <code>NX</code>, the charge counter reaches exactly <strong>1</strong> despite 20 concurrent attempts: 1 response says <code>charged</code> and 19 say <code>already processed</code>. Remove <code>NX</code> and the counter climbs past 1 under concurrency, the check-then-act race from Overview, reopened.",
+      stretch: "Store the real response body alongside the key so a retry with the same key returns the original success payload instead of a generic <code>already processed</code> message, which is Stripe's actual behavior."
     }
   },
   keyTakeaways: [

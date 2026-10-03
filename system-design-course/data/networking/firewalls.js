@@ -38,11 +38,35 @@ window.COURSE_CONTENT["firewalls"] = {
       ]
     },
     handsOn: {
-      prerequisites: "An AWS free-tier account.",
-      setup: "Cloud free-tier: a free-tier EC2 instance in a VPC you control.",
-      simulate: "Launch an EC2 instance with a Security Group allowing only port 22 from your own IP. Try to `curl` port 80 on it from your laptop (times out, nothing listening AND not allowed). Install nginx on the instance, try again (still blocked, the SG does not allow 80 yet). Add an SG rule allowing 80 from `0.0.0.0/0` and retry.",
-      observe: "The exact moment the request starts succeeding is tied to the SG rule, not the server config. nginx was serving the whole time; the SG was the thing stopping traffic from reaching it. And because SGs are stateful, your reply traffic is automatically allowed back out with no separate outbound rule.",
-      stretch: "Add a NACL on the subnet that explicitly denies port 80 inbound and watch it override the permissive SG, a direct demonstration of two independent layers: NACLs evaluate every packet statelessly regardless of what the stateful SG already decided."
+      goal: "Prove that the Security Group, not the server config, is what lets traffic reach an instance, and that it auto-allows return traffic.",
+      stack: "AWS CLI against a free-tier EC2 instance, tested with <code>curl</code> (AWS free tier).",
+      steps: [
+        {
+          title: "Create a Security Group allowing only SSH from your IP",
+          code: "MYIP=$(curl -s https://checkip.amazonaws.com)\nSG=$(aws ec2 create-security-group --group-name lab-sg --description \"firewall lab\" --query GroupId --output text)\naws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 22 --cidr $MYIP/32",
+          lang: "bash"
+        },
+        {
+          title: "Launch a free-tier instance that installs nginx on boot",
+          body: "User-data starts nginx immediately, so nothing but the SG blocks port 80. Replace the AMI id with a current one for your region.",
+          code: "aws ec2 run-instances --image-id ami-xxxxxxxx --instance-type t2.micro \\\n  --security-group-ids $SG \\\n  --user-data '#!/bin/bash\napt update && apt install -y nginx' \\\n  --query 'Instances[0].InstanceId' --output text",
+          lang: "bash"
+        },
+        {
+          title: "Confirm port 80 is blocked",
+          body: "Grab the public IP, then curl it: the request times out because the SG never allowed 80, even though nginx is serving.",
+          code: "IP=$(aws ec2 describe-instances --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)\ncurl --max-time 5 http://$IP     # times out: blocked by the SG",
+          lang: "bash"
+        },
+        {
+          title: "Open port 80 and retry",
+          body: "Opening 80 to <code>0.0.0.0/0</code> exposes it to the whole internet: fine for a throwaway lab, never for a database port.",
+          code: "aws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 80 --cidr 0.0.0.0/0\ncurl --max-time 5 http://$IP     # now returns the nginx welcome page",
+          lang: "bash"
+        }
+      ],
+      observe: "The exact moment <code>curl</code> starts succeeding is tied to the SG rule, not the server: nginx was serving the whole time. Because Security Groups are <strong>stateful</strong>, your reply traffic is allowed back out automatically with no separate outbound rule.",
+      stretch: "Add a NACL on the subnet that explicitly denies port 80 inbound and watch it override the permissive SG. NACLs are <strong>stateless</strong>, so you must also open the ephemeral outbound range (1024-65535) for any reply, unlike the SG which handled that for you."
     }
   },
   keyTakeaways: [

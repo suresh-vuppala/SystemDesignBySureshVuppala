@@ -52,11 +52,29 @@ window.COURSE_CONTENT["replication-strategies"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The primary+replica Postgres setup from the earlier scalability lab.",
-      setup: "Local and free: reuse it.",
-      simulate: "Write a value on the primary, then immediately read it from the replica in a loop, logging each read\u2019s value and a timestamp, until it matches. Record the actual replication-lag window in milliseconds. Then implement the read-your-writes fix: route reads for the same user who just wrote to the primary for a short window (e.g. 2 seconds) instead of the replica.",
-      observe: "A real, non-zero lag window on your own machine (even local, same-host replication has some lag), and the read-your-writes routing eliminating the stale read specifically for the writer, while other users reading the replica during that same window may still see the old value: the fix is scoped, not a blanket solution.",
-      stretch: "None. This reuses the earlier infrastructure to make the failure mode and its fix concrete rather than requiring new setup."
+      goal: "Measure the real replication-lag window between a Postgres primary and its replica, then fix the stale read with read-your-writes routing.",
+      stack: "Primary and replica Postgres containers in Docker, plus a short routing snippet in Node.js. Local and free.",
+      steps: [
+        {
+          title: "Write to the primary and poll the replica for the value",
+          body: "Assumes running <code>pg-primary</code> and <code>pg-replica</code> containers. The loop spins until the write shows up on the replica and prints how long that took in milliseconds.",
+          code: "docker exec -i pg-primary psql -U postgres -c \"CREATE TABLE IF NOT EXISTS kv(k text primary key, v text);\"\ndocker exec -i pg-primary psql -U postgres -c \"INSERT INTO kv VALUES('x','v1') ON CONFLICT (k) DO UPDATE SET v=excluded.v;\"\nstart=$(date +%s%3N)\nuntil docker exec -i pg-replica psql -U postgres -tAc \"SELECT v FROM kv WHERE k='x';\" | grep -q v1; do :; done\necho \"replica caught up after $(( $(date +%s%3N) - start )) ms\"",
+          lang: "bash"
+        },
+        {
+          title: "Implement read-your-writes routing",
+          body: "After a user writes, pin that user's own reads to the primary for a short window so they never hit a stale replica. Save as <code>ryw.js</code>.",
+          code: "// pin a user's reads to the primary briefly after they write\nconst lastWrite = new Map();\n\nfunction writeFor(userId) {\n  lastWrite.set(userId, Date.now() + 2000); // pin for 2s\n  return 'primary';\n}\nfunction readFor(userId) {\n  const pinnedUntil = lastWrite.get(userId) || 0;\n  return Date.now() < pinnedUntil ? 'primary' : 'replica';\n}\n\nconsole.log('write u1 ->', writeFor('u1'));   // primary\nconsole.log('read u1  ->', readFor('u1'));     // primary (pinned)\nconsole.log('read u2  ->', readFor('u2'));     // replica (not the writer)\nsetTimeout(() => console.log('read u1 later ->', readFor('u1')), 2500); // replica after window",
+          lang: "javascript"
+        },
+        {
+          title: "Run the routing demo",
+          code: "node ryw.js",
+          lang: "bash"
+        }
+      ],
+      observe: "A real, non-zero lag window even on the same host (replication is never instant), and the read-your-writes routing sending the writer's reads to the primary during the pin window while other users still read the replica. The fix is scoped to the writer, not a blanket solution.",
+      stretch: "Increase write load on the primary and re-measure the lag window: watch it widen as the replica falls further behind, which is exactly when read-after-write bugs surface in production."
     }
   },
   keyTakeaways: [

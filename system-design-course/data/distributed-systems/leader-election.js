@@ -75,11 +75,35 @@ window.COURSE_CONTENT["leader-election"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The 5-node etcd cluster from the earlier coordination lab.",
-      setup: "Local and free: reuse that cluster.",
-      simulate: "Use `etcdctl` to watch leader changes (`etcdctl endpoint status --cluster` shows the leader flag per node) while you kill the current leader\u2019s container. Time precisely how long it takes before a new leader is confirmed and a write succeeds again.",
-      observe: "Your measured failover time landing in the same rough 1-5 second range from Overview, and split-brain never happening: at no point do 2 nodes simultaneously report themselves as leader, no matter how many times you repeat the kill.",
-      stretch: "Try to force split-brain by partitioning the network into 2 groups where neither has a clear majority (e.g. 2 vs 2 with 1 node unreachable by both, on a 5-node cluster). Confirm neither side can elect a leader, since neither has the required majority: the mathematical guarantee tested at its exact boundary."
+      goal: "Kill an etcd leader and measure how fast a new one is elected, confirming split brain never happens.",
+      stack: "A 3-node etcd cluster in Docker, driven with <code>etcdctl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a 3-node etcd cluster",
+          body: "All three nodes share one Docker network and one initial cluster definition, so they form a single Raft group.",
+          code: "docker network create etcd-net\nfor i in 1 2 3; do\n  docker run -d --name etcd$i --network etcd-net quay.io/coreos/etcd:v3.5.15 \\\n    /usr/local/bin/etcd --name etcd$i \\\n    --initial-advertise-peer-urls http://etcd$i:2380 \\\n    --listen-peer-urls http://0.0.0.0:2380 \\\n    --listen-client-urls http://0.0.0.0:2379 \\\n    --advertise-client-urls http://etcd$i:2379 \\\n    --initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380 \\\n    --initial-cluster-state new --initial-cluster-token tkn\ndone",
+          lang: "bash"
+        },
+        {
+          title: "Find the current leader",
+          body: "The IS LEADER column marks exactly one node true.",
+          code: "docker exec etcd1 etcdctl endpoint status --cluster -w table",
+          lang: "bash"
+        },
+        {
+          title: "Kill the leader and watch re-election",
+          body: "Destroy whichever node was leader (etcd1 here), then re-check status from a survivor and time how long until a new leader appears.",
+          code: "docker rm -f etcd1\ndocker exec etcd2 etcdctl endpoint status --cluster -w table",
+          lang: "bash"
+        },
+        {
+          title: "Confirm writes resume",
+          code: "docker exec etcd2 etcdctl put foo bar\ndocker exec etcd2 etcdctl get foo",
+          lang: "bash"
+        }
+      ],
+      observe: "Failover lands in the same rough 1-5 second range from the Overview, and at no point do 2 nodes both report IS LEADER true, no matter how many times you repeat the kill. Writes resume as soon as the new leader wins its majority.",
+      stretch: "Try to force split brain by partitioning the cluster so no side holds a majority (for example 2 vs 2 with 1 node unreachable by both, on a 5-node cluster). Confirm neither side can elect a leader: the majority-quorum guarantee tested at its exact boundary."
     }
   },
   keyTakeaways: [

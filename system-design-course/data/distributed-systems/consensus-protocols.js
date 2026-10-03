@@ -42,11 +42,23 @@ window.COURSE_CONTENT["consensus-protocols"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python or Node.js only. Paxos is rarely run off-the-shelf, so this lab builds a minimal simulation.",
-      setup: "None.",
-      simulate: "Implement the 4 Classic Paxos phases as plain function calls between 5 simulated nodes in one script (no real network): a proposer sends `Prepare(n)` to all 5, collects Promises, sends `Accept(n, value)` once it has a majority, and collects Accepted confirmations. Then simulate 2 competing proposers racing with overlapping proposal numbers and trace which value wins.",
-      observe: "Exactly one value getting permanently chosen even with 2 concurrent proposers. The majority-overlap guarantee (any 2 majorities out of 5 share at least 1 node) is what prevents two different values from both being Accepted, walked through in your own trace log instead of taken on faith.",
-      stretch: "Add the Multi-Paxos optimization: once one proposer\u2019s Prepare succeeds, skip Prepare for its next 5 proposals and go straight to Accept. Count how many total messages you saved versus running Classic Paxos\u2019s full 4 phases each time."
+      goal: "Simulate Classic Paxos across 5 in-process nodes and watch a single value stay chosen even when a later proposer tries a different one.",
+      stack: "A single Python script, no real network and no dependencies. Local and free.",
+      steps: [
+        {
+          title: "Implement the acceptors and the propose flow",
+          body: "Each acceptor tracks the highest number it promised and the value it accepted. A proposal needs a majority in Phase 1 (Prepare/Promise) and Phase 2 (Accept/Accepted), and must adopt any value already accepted. Save as <code>paxos.py</code>.",
+          code: "class Acceptor:\n    def __init__(self):\n        self.promised = 0      # highest proposal number promised\n        self.accepted_n = 0    # number of the accepted value\n        self.accepted_v = None # the accepted value\n\n    def prepare(self, n):\n        if n > self.promised:\n            self.promised = n\n            return (True, self.accepted_n, self.accepted_v)\n        return (False, None, None)\n\n    def accept(self, n, v):\n        if n >= self.promised:\n            self.promised = n\n            self.accepted_n, self.accepted_v = n, v\n            return True\n        return False\n\ndef propose(acceptors, n, value):\n    majority = len(acceptors) // 2 + 1\n    # Phase 1: Prepare -> Promise\n    promises = [a.prepare(n) for a in acceptors]\n    oks = [p for p in promises if p[0]]\n    if len(oks) < majority:\n        return None\n    # adopt the highest already-accepted value, if any\n    chosen, best = value, 0\n    for ok, an, av in oks:\n        if av is not None and an > best:\n            best, chosen = an, av\n    # Phase 2: Accept -> Accepted\n    if sum(a.accept(n, chosen) for a in acceptors) >= majority:\n        return chosen\n    return None\n\nacceptors = [Acceptor() for _ in range(5)]\nprint('proposer 1 (n=1, value-A):', propose(acceptors, 1, 'value-A'))\nprint('proposer 2 (n=2, value-B):', propose(acceptors, 2, 'value-B'))\nprint('proposer 3 (n=3, value-C):', propose(acceptors, 3, 'value-C'))",
+          lang: "python"
+        },
+        {
+          title: "Run the simulation",
+          code: "python paxos.py",
+          lang: "bash"
+        }
+      ],
+      observe: "Once a value is accepted by a majority, later proposers are forced to adopt it: proposer 2 and proposer 3 report the already-chosen value, not their own. The majority-overlap guarantee (any 2 majorities of 5 share at least 1 node) is what prevents two different values from both being chosen, walked through in your own output instead of taken on faith.",
+      stretch: "Add the Multi-Paxos optimization: once a proposer's Prepare succeeds, skip Phase 1 for its next proposals and go straight to Accept. Count how many messages you save versus running all 4 phases every time."
     }
   },
   keyTakeaways: [

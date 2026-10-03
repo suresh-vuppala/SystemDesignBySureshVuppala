@@ -38,13 +38,6 @@ window.COURSE_CONTENT["messaging-choice"] = {
         { label: "Routing complexity picks RabbitMQ", body: "When delivery depends on topic, header, or priority rules, RabbitMQ exchanges express that natively. The cost: more moving parts than a plain queue, and lower raw throughput than Kafka." },
         { label: "Fan-out plus buffering picks SNS + SQS", body: "One event that must reach several services, each processing independently and reliably, is the classic SNS \u2192 SQS \u2192 Lambda shape. SNS gives broadcast, SQS gives per-service durability, so a slow consumer never blocks the others." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. The table above and a real event.",
-      setup: "Take one event and decide which technology should carry it, walking the two forks.",
-      simulate: "Scenario: \u201ca user places an order, and inventory, billing, analytics, and email all need to react.\u201d Walk it: many consumers? Yes. Do all of them need replay? Analytics does (it may reprocess), email does not. That mix points to a durable log (Kafka) for the analytics path plus fan-out (SNS \u2192 SQS) for the notification paths.",
-      observe: "Notice one event can justify two technologies at once, because different consumers have different retention needs. Naming that split is the senior answer, not forcing everything onto one broker.",
-      stretch: "Redesign for \u201ceach order must be processed exactly once by billing, in order per customer.\u201d Which fork changes? (Per-customer ordering \u2192 Kafka partitioned by customer_id, or an SQS FIFO queue keyed by customer.)"
     }
   },
   keyTakeaways: [

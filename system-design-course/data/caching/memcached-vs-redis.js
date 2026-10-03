@@ -46,11 +46,34 @@ window.COURSE_CONTENT["memcached-vs-redis"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (both images); `redis-benchmark` and `memtier_benchmark` or Memcached's own bench tools.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis` and `docker run -d -p 11211:11211 memcached`.",
-      simulate: "Run equivalent SET/GET benchmarks against both with the same concurrency (`redis-benchmark -t set,get -n 100000 -c 50` and the Memcached equivalent) and compare raw ops/sec. Then try storing a 2MB value in each: Redis accepts it, Memcached's default 1MB limit rejects it outright.",
-      observe: "Memcached's multi-threaded design potentially outperforming single-threaded Redis on raw GET/SET throughput at high concurrency on a multi-core machine, a real, measurable case where simpler wins on its one job.",
-      stretch: "Try to build a leaderboard (from 7.3's ZADD/ZREVRANGE) using only Memcached's plain key-value model, and notice how much manual sorting logic you would write client-side that Redis's Sorted Set gave you for free."
+      goal: "Benchmark Redis against Memcached head-to-head and hit Memcached's 1MB item limit, seeing exactly where the simpler tool wins and where it stops.",
+      stack: "Redis and Memcached in Docker, benchmarked with <code>redis-benchmark</code> and <code>memtier_benchmark</code>. Local and free.",
+      steps: [
+        {
+          title: "Start both caches",
+          code: "docker run -d --name redis -p 6379:6379 redis\ndocker run -d --name memcached -p 11211:11211 memcached",
+          lang: "bash"
+        },
+        {
+          title: "Benchmark Redis SET/GET",
+          code: "docker exec redis redis-benchmark -t set,get -n 100000 -c 50 -q",
+          lang: "bash"
+        },
+        {
+          title: "Benchmark Memcached at the same concurrency",
+          body: "<code>memtier_benchmark</code> speaks the Memcached text protocol with <code>--protocol=memcache_text</code>.",
+          code: "docker run --rm --network host redislabs/memtier_benchmark \\\n  --protocol=memcache_text --server=127.0.0.1 --port=11211 \\\n  -n 100000 -c 50 --threads=4 --ratio=1:1 --hide-histogram",
+          lang: "bash"
+        },
+        {
+          title: "Store a 2MB value in each",
+          body: "Redis accepts values up to 512MB. Memcached rejects anything over its 1MB default item size.",
+          code: "# Redis: accepts it\ndocker exec redis sh -c 'redis-cli SET big $(head -c 2000000 /dev/zero | tr \"\\0\" x) | cat'\ndocker exec redis redis-cli STRLEN big\n\n# Memcached: rejects it (SERVER_ERROR object too large for cache)\nprintf 'set big 0 0 2000000\\r\\n%.0sx' {1..2000000} | nc -q1 127.0.0.1 11211 | head -c 60",
+          lang: "bash"
+        }
+      ],
+      observe: "On a multi-core machine Memcached's multi-threaded design can edge out single-threaded Redis on raw GET/SET ops/sec at high concurrency: a measurable case where simpler wins on its one job. But the 2MB write exposes the ceiling: Redis stores it and <code>STRLEN</code> reports 2000000, while Memcached returns <code>SERVER_ERROR object too large for cache</code>.",
+      stretch: "Try to build the leaderboard from 7.3 (<code>ZADD</code>/<code>ZREVRANGE</code>) using only Memcached's plain key-value model, and notice how much sorting logic you would write client-side that Redis's Sorted Set gave you for free."
     }
   },
   keyTakeaways: [

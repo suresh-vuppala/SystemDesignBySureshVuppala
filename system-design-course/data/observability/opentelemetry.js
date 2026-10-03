@@ -67,11 +67,40 @@ window.COURSE_CONTENT["opentelemetry"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (the OTel Collector official free image); the Jaeger and Prometheus setups from 13.2/13.3.",
-      setup: "Local and free: add an OTel Collector container between your app and both backends, configured with one Receiver (OTLP) and two Exporters (Jaeger for traces, Prometheus for metrics).",
-      simulate: "Switch your app\u2019s instrumentation from talking directly to Jaeger/Prometheus to talking only to the OTel Collector via one OTLP endpoint. Confirm traces still show up in Jaeger and metrics still show up in Prometheus, with zero changes to which backends you use.",
-      observe: "Your application code no longer needs to know which backend it sends to. Swap the Collector\u2019s exporter config to add a second Exporter sending the same data to a local Zipkin instance, and confirm your app code did not change at all, just the Collector config. Vendor-neutrality, demonstrated instead of asserted.",
-      stretch: "Add a Processor to the Collector pipeline that drops any span with <code>http.method: GET</code> on a specific health-check path, reducing noise before it ever reaches your trace backend."
+      goal: "Put an OTel Collector between your app and its backends so that adding a second trace backend is a config edit, not a code change, proving vendor-neutrality instead of asserting it.",
+      stack: "OpenTelemetry Collector in Docker in front of the Jaeger and Prometheus setups from 13.2/13.3. Local and free.",
+      steps: [
+        {
+          title: "Write the Collector config",
+          body: "Save as <code>otel-collector.yaml</code>. One OTLP receiver fans out to Jaeger (traces) and a Prometheus scrape endpoint (metrics).",
+          code: "receivers:\n  otlp:\n    protocols:\n      http:\n        endpoint: 0.0.0.0:4318\n      grpc:\n        endpoint: 0.0.0.0:4317\n\nprocessors:\n  batch: {}\n\nexporters:\n  otlp/jaeger:\n    endpoint: jaeger:4317\n    tls:\n      insecure: true\n  prometheus:\n    endpoint: 0.0.0.0:8889\n\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp/jaeger]\n    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [prometheus]",
+          lang: "yaml"
+        },
+        {
+          title: "Start the Collector",
+          code: "docker run -d --name otelcol --net obs -p 4318:4318 -p 4317:4317 -p 8889:8889 -v \"$PWD/otel-collector.yaml:/etc/otelcol/config.yaml\" otel/opentelemetry-collector:0.102.1",
+          lang: "bash"
+        },
+        {
+          title: "Point the app at the Collector only",
+          body: "The app now exports OTLP to the Collector and no longer names any backend. This is the one line that changes.",
+          code: "new OTLPTraceExporter({ url: 'http://localhost:4318/v1/traces' });",
+          lang: "javascript"
+        },
+        {
+          title: "Verify traces in Jaeger and metrics on the Collector",
+          code: "curl http://localhost:3000/\n# traces: browse to http://localhost:16686 (Jaeger)\ncurl -s http://localhost:8889/metrics | head",
+          lang: "bash"
+        },
+        {
+          title: "Add a Zipkin exporter with no app change",
+          body: "Start Zipkin (<code>docker run -d --name zipkin --net obs -p 9411:9411 openzipkin/zipkin</code>), then add the exporter and list it in the traces pipeline. Restart the Collector. Your app code is untouched.",
+          code: "exporters:\n  zipkin:\n    endpoint: http://zipkin:9411/api/v2/spans\n\nservice:\n  pipelines:\n    traces:\n      exporters: [otlp/jaeger, zipkin]",
+          lang: "yaml"
+        }
+      ],
+      observe: "The same app code keeps sending to one OTLP endpoint, yet traces now land in both Jaeger and Zipkin and metrics still reach Prometheus. Adding a backend was purely a Collector config edit. Vendor-neutrality, demonstrated instead of asserted.",
+      stretch: "Add a <code>filter</code> processor to the traces pipeline that drops any span with <code>http.request.method</code> GET on a <code>/healthz</code> path, cutting health-check noise before it ever reaches a trace backend."
     }
   },
   keyTakeaways: [

@@ -50,11 +50,38 @@ window.COURSE_CONTENT["docker-k8s"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Desktop (includes a local Kubernetes) or `kind`/`minikube`, both free, plus `kubectl`.",
-      setup: "Local and free: `kind create cluster`. Cloud free-tier: GKE's free cluster tier or EKS with a free-tier node.",
-      simulate: "`kubectl apply` a Deployment with 3 replicas of a simple app, then a Service exposing it. Scale it live with `kubectl scale deployment myapp --replicas=6` and watch new Pods appear with `kubectl get pods -w`. Kill one Pod directly (`kubectl delete pod <name>`) and watch the Deployment controller recreate it automatically within seconds.",
-      observe: "Desired-state reconciliation happening with no manual intervention: you deleted a Pod, and Kubernetes noticed the actual state (5 Pods) did not match the desired state (6) and fixed it itself.",
-      stretch: "Update the Deployment's image tag and watch `kubectl rollout status` show a Rolling update replacing Pods one at a time with zero downtime, then run `kubectl rollout undo` and confirm it reverts cleanly."
+      goal: "Deploy a 3-replica app to a local Kubernetes cluster, scale it live, delete a Pod, and watch the controller reconcile actual state back to desired state on its own.",
+      stack: "<code>kind</code> (Kubernetes in Docker) plus <code>kubectl</code>, running <code>traefik/whoami</code>. Local and free.",
+      steps: [
+        {
+          title: "Create a local cluster",
+          code: "kind create cluster --name lab",
+          lang: "bash"
+        },
+        {
+          title: "Declare a Deployment and Service",
+          body: "Save as <code>app.yaml</code>. Three replicas plus a stable Service endpoint in front of them.",
+          code: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: myapp\n  template:\n    metadata:\n      labels:\n        app: myapp\n    spec:\n      containers:\n        - name: web\n          image: traefik/whoami\n          ports:\n            - containerPort: 80\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: myapp\nspec:\n  selector:\n    app: myapp\n  ports:\n    - port: 80",
+          lang: "yaml"
+        },
+        {
+          title: "Apply it and list the Pods",
+          code: "kubectl apply -f app.yaml\nkubectl get pods -l app=myapp",
+          lang: "bash"
+        },
+        {
+          title: "Scale live and watch new Pods appear",
+          code: "kubectl scale deployment myapp --replicas=6\nkubectl get pods -l app=myapp -w",
+          lang: "bash"
+        },
+        {
+          title: "Kill a Pod and watch it come back",
+          code: "kubectl delete pod \"$(kubectl get pods -l app=myapp -o jsonpath='{.items[0].metadata.name}')\"\nkubectl get pods -l app=myapp",
+          lang: "bash"
+        }
+      ],
+      observe: "You deleted a Pod, and within seconds Kubernetes noticed the actual count fell below the desired 6 and recreated one, with no manual step. That is desired-state reconciliation, the whole point of a Deployment.",
+      stretch: "Roll out a new image with <code>kubectl set image deployment/myapp web=traefik/whoami:v1.10</code>, watch <code>kubectl rollout status deployment/myapp</code> replace Pods one at a time, then run <code>kubectl rollout undo deployment/myapp</code> and confirm it reverts cleanly."
     }
   },
   keyTakeaways: [

@@ -28,11 +28,40 @@ window.COURSE_CONTENT["realtime"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js.",
-      setup: "Local and free only.",
-      simulate: "Build the same \u201clive counter\u201d feature 3 ways: short polling (client fetches `GET /count` every 2s), long polling (server holds the request open until the count actually changes, up to a 30s timeout), and WebSocket (server pushes the new count the instant it changes). Open each in a browser tab and watch the Network tab.",
-      observe: "The request-volume difference: short polling fires a request every 2s regardless of whether anything changed; long polling and WebSocket only produce traffic when there is an actual update. Count total requests sent over a 60-second idle period for each approach.",
-      stretch: "Open 50 browser tabs (or simulate 50 clients with a script) against your long-polling server and watch server memory and connection count climb: a rough, laptop-scale feel for why long polling's per-server ceiling is 1K to 10K, not 100K+."
+      goal: "Build one live counter three ways (short poll, long poll, WebSocket) and compare how much idle traffic each generates.",
+      stack: "Node.js + Express + <code>ws</code>, watched in the browser Network tab and <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir realtime-lab && cd realtime-lab\nnpm init -y && npm install express ws",
+          lang: "bash"
+        },
+        {
+          title: "Serve all three delivery modes from one server",
+          body: "The count changes every 8 seconds; short poll always answers now, long poll holds the request until a change, WebSocket pushes on change. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst { WebSocketServer } = require('ws');\nconst app = express();\nlet count = 0;\nconst waiters = [];\n\n// short polling: answer immediately\napp.get('/count', (req, res) => res.json({ count }));\n\n// long polling: hold open until the count changes (30s cap)\napp.get('/count/long', (req, res) => {\n  const timer = setTimeout(() => { res.json({ count, changed: false }); }, 30000);\n  waiters.push({ res, timer });\n});\n\nconst server = app.listen(3000, () => console.log('http://localhost:3000'));\nconst wss = new WebSocketServer({ server });\n\n// a change happens every 8s: wake long-pollers and push to sockets\nsetInterval(() => {\n  count++;\n  while (waiters.length) { const w = waiters.pop(); clearTimeout(w.timer); w.res.json({ count, changed: true }); }\n  wss.clients.forEach(c => c.send(JSON.stringify({ count })));\n}, 8000);",
+          lang: "javascript"
+        },
+        {
+          title: "Run the server",
+          code: "node server.js",
+          lang: "bash"
+        },
+        {
+          title: "Short poll every 2 seconds",
+          body: "Fires a request on a fixed timer whether or not anything changed.",
+          code: "while true; do curl -s localhost:3000/count; echo; sleep 2; done",
+          lang: "bash"
+        },
+        {
+          title: "Long poll and open a WebSocket",
+          body: "The long poll returns only when the count changes; the socket receives a push at the same moment.",
+          code: "# long poll: this hangs, then returns on the next change\ncurl -s localhost:3000/count/long\n\n# WebSocket: install once, then connect\nnpx wscat -c ws://localhost:3000",
+          lang: "bash"
+        }
+      ],
+      observe: "Over a 60-second idle window, short polling fires about 30 requests regardless of activity, while long polling and the WebSocket produce traffic only on the roughly 7 real changes. Same feature, very different request volume.",
+      stretch: "Simulate 50 clients against the long-polling endpoint and watch the open connection count and server memory climb: a laptop-scale feel for why long polling's per-server ceiling is 1K to 10K, not 100K+."
     }
   },
   keyTakeaways: [

@@ -129,11 +129,35 @@ window.COURSE_CONTENT["replication"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Postgres with streaming replication, or a ready-made Compose file).",
-      setup: "Local and free: 1 Postgres primary + 1 streaming replica via Docker Compose.",
-      simulate: "Write a row on the primary and immediately try to read it from the replica in a tight loop, measuring the delay until it appears (replication lag, even locally, is rarely exactly 0). Then stop the primary container and manually promote the replica (<code>pg_ctl promote</code>) and confirm it now accepts writes.",
-      observe: "A real, measured replication lag window where the replica briefly disagrees with the primary: the async trade-off quantified instead of asserted. Then time how long the promotion takes: that is your real failover downtime for a single-leader setup.",
-      stretch: "Configure synchronous replication (<code>synchronous_commit=on</code>, <code>synchronous_standby_names</code>) and repeat the write. Confirm the write now blocks until the replica acknowledges, trading latency for the stronger durability guarantee."
+      goal: "Run a Postgres primary with a streaming replica, measure the async replication lag window, then kill the primary and promote the replica to see failover downtime.",
+      stack: "Two Bitnami PostgreSQL containers (primary plus streaming replica) via Docker Compose. Local and free.",
+      steps: [
+        {
+          title: "Define a primary and a streaming replica",
+          body: "Bitnami wires up streaming replication from environment variables. Save as <code>docker-compose.yml</code>.",
+          code: "services:\n  primary:\n    image: bitnami/postgresql:16\n    ports: [\"5432:5432\"]\n    environment:\n      POSTGRESQL_REPLICATION_MODE: master\n      POSTGRESQL_REPLICATION_USER: repl\n      POSTGRESQL_REPLICATION_PASSWORD: replpw\n      POSTGRESQL_USERNAME: postgres\n      POSTGRESQL_PASSWORD: pw\n      POSTGRESQL_DATABASE: app\n  replica:\n    image: bitnami/postgresql:16\n    ports: [\"5433:5432\"]\n    depends_on: [primary]\n    environment:\n      POSTGRESQL_REPLICATION_MODE: slave\n      POSTGRESQL_REPLICATION_USER: repl\n      POSTGRESQL_REPLICATION_PASSWORD: replpw\n      POSTGRESQL_MASTER_HOST: primary\n      POSTGRESQL_MASTER_PORT_NUMBER: 5432\n      POSTGRESQL_USERNAME: postgres\n      POSTGRESQL_PASSWORD: pw",
+          lang: "yaml"
+        },
+        {
+          title: "Start the pair",
+          code: "docker compose up -d\nsleep 10",
+          lang: "bash"
+        },
+        {
+          title: "Write on the primary and read the replica, measuring lag",
+          body: "<code>pg_last_xact_replay_timestamp()</code> on the replica reveals how far it trails the primary.",
+          code: "docker compose exec primary psql -U postgres -d app -c \"CREATE TABLE t(id serial, ts timestamptz default now());\"\ndocker compose exec primary psql -U postgres -d app -c \"INSERT INTO t DEFAULT VALUES;\"\ndocker compose exec replica psql -U postgres -d app -c \"SELECT count(*) FROM t; SELECT now() - pg_last_xact_replay_timestamp() AS replay_lag;\"",
+          lang: "bash"
+        },
+        {
+          title: "Kill the primary and promote the replica",
+          body: "The former replica now accepts writes. Time from stopping the primary to a successful write is your failover downtime.",
+          code: "docker compose stop primary\ndocker compose exec replica pg_ctl -D /bitnami/postgresql/data promote\ndocker compose exec replica psql -U postgres -d app -c \"INSERT INTO t DEFAULT VALUES; SELECT count(*) FROM t;\"",
+          lang: "bash"
+        }
+      ],
+      observe: "The replica trails the primary by a small but nonzero <code>replay_lag</code>: the async trade-off measured, not asserted. After promotion the standby accepts writes, and the gap between stopping the primary and that first successful write is the real single-leader failover downtime.",
+      stretch: "Switch to synchronous replication (set <code>POSTGRESQL_SYNCHRONOUS_COMMIT_MODE=on</code> and one synchronous replica) and repeat the write. Confirm it now blocks until the replica acknowledges, trading latency for zero data loss."
     }
   },
   keyTakeaways: [

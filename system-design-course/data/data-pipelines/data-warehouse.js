@@ -39,11 +39,38 @@ window.COURSE_CONTENT["data-warehouse"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (ClickHouse\u2019s official free image); or BigQuery\u2019s free-tier sandbox (no credit card required for sandbox mode).",
-      setup: "Local and free: <code>docker run -d -p 8123:8123 clickhouse/clickhouse-server</code>.",
-      simulate: "Load the same 1M-row orders dataset from 12.4 into both a row-store (Postgres) and ClickHouse (columnar). Run <code>SELECT category, SUM(revenue) FROM orders GROUP BY category</code> against both and compare execution time, especially as you widen the table (add 20 more unused columns to both and rerun).",
-      observe: "Postgres\u2019s query time grows as you add more unused columns, since a row-store still reads full rows, while ClickHouse\u2019s time for the same aggregate stays essentially flat: it never reads the columns the query does not need. Check disk usage on both for the same data too, for the 10:1 compression claim.",
-      stretch: "Run a <code>SELECT *</code> (needs every column) against both and note that ClickHouse\u2019s advantage shrinks or disappears. Columnar storage helps aggregate queries touching few columns, not full-row lookups: the exact opposite access pattern from OLTP."
+      goal: "Load the same 1M-row orders dataset into a row-store (Postgres) and a columnar store (ClickHouse), then watch a category aggregate stay flat in ClickHouse as the table widens while Postgres slows down.",
+      stack: "Postgres + ClickHouse in Docker, identical data on both sides. Local and free.",
+      steps: [
+        {
+          title: "Start both databases",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker run -d --name ch -p 8123:8123 -p 9000:9000 clickhouse/clickhouse-server",
+          lang: "bash"
+        },
+        {
+          title: "Load 1M identical rows into each",
+          code: "docker exec -i pg psql -U postgres -c \"CREATE TABLE orders(id int, category text, revenue numeric);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO orders SELECT g, (ARRAY['books','toys','food','tools','games'])[1+floor(random()*5)], (random()*100)::numeric(10,2) FROM generate_series(1,1000000) g;\"\ndocker exec -i ch clickhouse-client -q \"CREATE TABLE orders(id UInt32, category String, revenue Float64) ENGINE=MergeTree ORDER BY id;\"\ndocker exec -i ch clickhouse-client -q \"INSERT INTO orders SELECT number, ['books','toys','food','tools','games'][1+(rand()%5)], (rand()%10000)/100 FROM numbers(1000000);\"",
+          lang: "bash"
+        },
+        {
+          title: "Run the same aggregate on both and time it",
+          code: "docker exec -i pg psql -U postgres -c \"EXPLAIN ANALYZE SELECT category, SUM(revenue) FROM orders GROUP BY category;\"\ndocker exec -i ch clickhouse-client --time -q \"SELECT category, SUM(revenue) FROM orders GROUP BY category\"",
+          lang: "bash"
+        },
+        {
+          title: "Widen both tables with 20 unused columns and rerun",
+          body: "The aggregate still only needs <code>category</code> and <code>revenue</code>.",
+          code: "for i in $(seq 1 20); do docker exec -i pg psql -U postgres -c \"ALTER TABLE orders ADD COLUMN pad$i text DEFAULT repeat('x',50);\"; done\nfor i in $(seq 1 20); do docker exec -i ch clickhouse-client -q \"ALTER TABLE orders ADD COLUMN pad$i String DEFAULT 'x';\"; done\ndocker exec -i pg psql -U postgres -c \"EXPLAIN ANALYZE SELECT category, SUM(revenue) FROM orders GROUP BY category;\"\ndocker exec -i ch clickhouse-client --time -q \"SELECT category, SUM(revenue) FROM orders GROUP BY category\"",
+          lang: "bash"
+        },
+        {
+          title: "Compare on-disk size",
+          code: "docker exec -i pg psql -U postgres -c \"SELECT pg_size_pretty(pg_total_relation_size('orders'));\"\ndocker exec -i ch clickhouse-client -q \"SELECT formatReadableSize(sum(bytes_on_disk)) FROM system.parts WHERE table='orders'\"",
+          lang: "bash"
+        }
+      ],
+      observe: "Postgres's query time grows as you add unused columns, since a row-store still reads full rows, while ClickHouse's time for the same aggregate stays essentially flat: it never reads the columns the query does not need. The on-disk sizes show the roughly 10:1 compression columnar storage buys you.",
+      stretch: "Run a <code>SELECT *</code> (needs every column) against both and note that ClickHouse's advantage shrinks or disappears. Columnar storage helps aggregate queries touching few columns, not full-row lookups: the exact opposite access pattern from OLTP."
     }
   },
   keyTakeaways: [

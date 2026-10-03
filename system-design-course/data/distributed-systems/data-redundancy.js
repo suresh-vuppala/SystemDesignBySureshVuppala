@@ -41,11 +41,40 @@ window.COURSE_CONTENT["data-redundancy"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The primary+replica Postgres setup from the replication lab; `pg_basebackup` for snapshots.",
-      setup: "Local and free: reuse the primary and replica Postgres containers.",
-      simulate: "Take a snapshot (`pg_basebackup`) of the primary, write 100 more rows, then simulate a disaster by killing the primary entirely (delete the container). Restore from your snapshot and measure (a) how many of those 100 rows are missing (your actual RPO) and (b) how long the restore plus restart took (your actual RTO).",
-      observe: "Real RPO/RTO numbers on your own setup instead of abstract targets: snapshot-based recovery losing exactly the rows written after your last snapshot, matching the \u201cRPO = hours since last snapshot\u201d claim, scaled to however often you snapshotted.",
-      stretch: "Repeat the disaster, but recover from the streaming replica (still running, up to date within its lag window) instead of the snapshot. Compare its RPO (near 0) and RTO (mostly just promotion time) against the snapshot-based recovery."
+      goal: "Measure your real RPO and RTO by snapshotting Postgres, writing more rows, destroying the primary, and restoring.",
+      stack: "A Postgres container in Docker with <code>pg_basebackup</code> for snapshots. Local and free.",
+      steps: [
+        {
+          title: "Seed a table and record the baseline",
+          body: "Assumes a running <code>pg-primary</code> container. Note the row count: this is the state your snapshot will capture.",
+          code: "docker exec -i pg-primary psql -U postgres -c \"CREATE TABLE IF NOT EXISTS events(id int, note text);\"\ndocker exec -i pg-primary psql -U postgres -c \"INSERT INTO events SELECT g,'seed-'||g FROM generate_series(1,1000) g;\"",
+          lang: "bash"
+        },
+        {
+          title: "Take a snapshot with pg_basebackup",
+          code: "docker exec pg-primary rm -rf /tmp/snap\ndocker exec pg-primary pg_basebackup -U postgres -D /tmp/snap -Ft -z\ndocker cp pg-primary:/tmp/snap ./snap",
+          lang: "bash"
+        },
+        {
+          title: "Write 100 more rows after the snapshot",
+          body: "These rows exist only on the primary, not in the snapshot: they are exactly what a snapshot-only recovery will lose.",
+          code: "docker exec -i pg-primary psql -U postgres -c \"INSERT INTO events SELECT g,'after-snap-'||g FROM generate_series(1001,1100) g;\"\ndocker exec -i pg-primary psql -U postgres -c \"SELECT count(*) FROM events;\"",
+          lang: "bash"
+        },
+        {
+          title: "Simulate a disaster",
+          body: "Destroy the primary entirely and start your restore timer now: elapsed time until queries work again is your RTO.",
+          code: "docker rm -f pg-primary",
+          lang: "bash"
+        },
+        {
+          title: "Restore from the snapshot and count survivors",
+          code: "mkdir -p restore && tar -xzf snap/base.tar.gz -C restore\ndocker run -d --name pg-restored -p 5433:5432 -v \"$PWD/restore:/var/lib/postgresql/data\" -e POSTGRES_PASSWORD=pw postgres\nsleep 5\ndocker exec -i pg-restored psql -U postgres -c \"SELECT count(*) FROM events;\"",
+          lang: "bash"
+        }
+      ],
+      observe: "The restored count is about 1000, missing the 100 rows written after the snapshot: that gap is your real RPO, matching the \"RPO = time since last snapshot\" claim scaled to however often you snapshot. The elapsed restore-plus-restart time is your real RTO.",
+      stretch: "Repeat the disaster but recover by promoting a streaming replica (up to date within its lag window) instead of the snapshot. Compare its RPO (near 0) and RTO (mostly just promotion time) against snapshot recovery."
     }
   },
   keyTakeaways: [

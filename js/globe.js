@@ -1,4 +1,4 @@
-/* ═══ HelloSDE — Dotted Globe (GitHub/Stripe style) ═══
+/* ═══ HelloSDE, Dotted Globe (GitHub/Stripe style) ═══
    Renders land as dots on a sphere. Clean, performant, no rendering artifacts.
    Land dot positions pre-computed from world map at load time.
 */
@@ -190,7 +190,7 @@ function draw(){
       ctx.fillText(count,p.x,p.y);
     }
 
-    // Label — always show country name for all visible markers
+    // Label, always show country name for all visible markers
     if(depth>0.2){
       ctx.font='600 8px Inter,system-ui,sans-serif';
       ctx.fillStyle='rgba(220,235,255,'+(0.7*depth)+')';

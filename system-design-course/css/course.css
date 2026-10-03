@@ -361,7 +361,7 @@ body.course-body{
    can be reachable and visually distinct at once on mobile. */
 .course-rail-toggle{
   display:none;
-  position:fixed;bottom:20px;right:20px;z-index:410;
+  position:fixed;bottom:88px;right:20px;z-index:410;
   width:46px;height:46px;border-radius:50%;
   background:var(--card);color:var(--text);border:1px solid var(--border-strong);
   align-items:center;justify-content:center;cursor:pointer;
@@ -737,6 +737,46 @@ body.course-body{
   background:var(--brand-soft);color:var(--brand-2);font-size:var(--fs-2xs);flex-shrink:0;
 }
 .ho-block p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal);margin:0}
+
+/* Structured, copy-paste hands-on lab */
+.ho-stack{
+  display:flex;align-items:center;gap:8px;
+  background:var(--brand-soft);border:1px solid var(--brand-border);border-radius:8px;
+  padding:10px 14px;margin:0 0 20px;font-size:var(--fs-sm);color:var(--text-2);
+}
+.ho-stack svg{width:16px;height:16px;color:var(--brand);flex-shrink:0}
+.ho-stack strong{color:var(--text)}
+.ho-steps{list-style:none;counter-reset:ho;padding:0;margin:0}
+.ho-step{counter-increment:ho;position:relative;padding:0 0 18px;margin:0 0 18px}
+.ho-step:not(:last-child){border-bottom:1px solid var(--border)}
+.ho-step-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ho-step-n{
+  width:24px;height:24px;border-radius:6px;flex-shrink:0;
+  background:var(--brand);color:var(--brand-fg);
+  font-size:var(--fs-2xs);font-weight:800;display:flex;align-items:center;justify-content:center;
+}
+.ho-step-n::before{content:counter(ho)}
+.ho-step-title{font-size:var(--fs-sm);font-weight:700;color:var(--text);line-height:var(--lh-tight)}
+.ho-step-body{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal);margin:0 0 10px}
+.ho-code{position:relative;margin:0}
+.ho-code pre{margin:0}
+.ho-copy{
+  position:absolute;top:7px;right:7px;z-index:2;
+  background:var(--card);color:var(--text-2);border:1px solid var(--border-strong);
+  border-radius:5px;padding:3px 10px;font-size:var(--fs-2xs);font-weight:600;
+  cursor:pointer;opacity:.9;transition:opacity .12s,background .12s,color .12s;
+}
+.ho-copy:hover{opacity:1;background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.ho-code-lang{
+  position:absolute;top:9px;right:60px;z-index:2;pointer-events:none;
+  font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;
+}
+.ho-callout{border:1px solid var(--border-strong);border-radius:10px;padding:14px 18px;margin-top:16px}
+.ho-callout h4{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);font-weight:700;color:var(--text);margin:0 0 6px}
+.ho-callout h4 svg{width:16px;height:16px;color:var(--brand);flex-shrink:0}
+.ho-callout p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal);margin:0}
+.ho-observe{background:var(--brand-soft);border-color:var(--brand-border)}
+.ho-stretch{background:var(--card-2)}
 
 /* ── Right rail ────────────────────────────────────────────── */
 .course-rail{

@@ -51,11 +51,40 @@ window.COURSE_CONTENT["batch-processing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (a single-node Spark image, free); Python (<code>pyspark</code>).",
-      setup: "Local and free: <code>docker run -d bitnami/spark</code> (single-node) or <code>pip install pyspark</code> for a local Spark session with no cluster at all.",
-      simulate: "Generate 1M synthetic order rows as a CSV, then write a PySpark job computing total revenue per product category (a groupBy/aggregate: the Map/Shuffle/Reduce shape happening under the hood). Time it, then write the equivalent as plain single-threaded Python (<code>pandas</code> or a manual loop) and time that too.",
-      observe: "Spark\u2019s job splits into stages visible in its Web UI (<code>localhost:4040</code>), showing the shuffle step explicitly, and depending on your machine\u2019s core count it outperforms the single-threaded version on the larger dataset: a felt version of a parallel, in-memory DAG.",
-      stretch: "Rerun the same aggregation as an iterative computation (for example 10 times against cached data) and compare Spark\u2019s in-memory caching (<code>.cache()</code>) against re-reading from disk each time: the roughly 100\u00d7 faster for iterative workloads claim, measured on your own hardware."
+      goal: "Compute revenue per product category over 1M rows with PySpark, watch the Map/Shuffle/Reduce stages in the Spark UI, and feel it against single-threaded pandas.",
+      stack: "PySpark (a local Spark session, no cluster) plus pandas, in Python. Local and free.",
+      steps: [
+        {
+          title: "Install Spark and pandas",
+          code: "pip install pyspark pandas",
+          lang: "bash"
+        },
+        {
+          title: "Generate 1M synthetic order rows",
+          body: "Save as <code>gen_data.py</code> and run it once to produce <code>orders.csv</code>.",
+          code: "import csv, random\ncats = [\"books\", \"toys\", \"food\", \"tools\", \"games\"]\nwith open(\"orders.csv\", \"w\", newline=\"\") as f:\n    w = csv.writer(f)\n    w.writerow([\"id\", \"category\", \"revenue\"])\n    for i in range(1_000_000):\n        w.writerow([i, random.choice(cats), round(random.random() * 100, 2)])\nprint(\"wrote orders.csv\")",
+          lang: "python"
+        },
+        {
+          title: "Aggregate with PySpark and time it",
+          body: "The <code>groupBy</code> is a Map -&gt; Shuffle -&gt; Reduce under the hood. Save as <code>spark_job.py</code>.",
+          code: "import time\nfrom pyspark.sql import SparkSession\nfrom pyspark.sql.functions import sum as _sum\n\nspark = SparkSession.builder.appName(\"revenue-by-category\").master(\"local[*]\").getOrCreate()\ndf = spark.read.option(\"header\", True).option(\"inferSchema\", True).csv(\"orders.csv\")\n\nt = time.time()\ndf.groupBy(\"category\").agg(_sum(\"revenue\").alias(\"revenue\")).show()\nprint(\"spark seconds:\", round(time.time() - t, 2))\n\ninput(\"Spark UI is at http://localhost:4040 - press Enter to exit\")\nspark.stop()",
+          lang: "python"
+        },
+        {
+          title: "Do the same single-threaded with pandas and time it",
+          body: "Save as <code>pandas_job.py</code>.",
+          code: "import time, pandas as pd\nt = time.time()\ndf = pd.read_csv(\"orders.csv\")\nprint(df.groupby(\"category\")[\"revenue\"].sum())\nprint(\"pandas seconds:\", round(time.time() - t, 2))",
+          lang: "python"
+        },
+        {
+          title: "Run all three and compare",
+          code: "python gen_data.py\npython spark_job.py\npython pandas_job.py",
+          lang: "bash"
+        }
+      ],
+      observe: "While <code>spark_job.py</code> waits at the prompt, open <code>http://localhost:4040</code>: the job splits into stages with the shuffle step shown explicitly. Depending on your machine's core count, Spark outperforms the single-threaded pandas run on the larger dataset, a felt version of a parallel, in-memory DAG.",
+      stretch: "Rerun the aggregation as an iterative computation (say 10 times against the same data) and compare Spark's in-memory caching (<code>df.cache()</code>) against re-reading from disk each pass: the roughly 100\u00d7 faster for iterative workloads claim, measured on your own hardware."
     }
   },
   keyTakeaways: [

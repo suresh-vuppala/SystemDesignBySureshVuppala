@@ -32,11 +32,39 @@ window.COURSE_CONTENT["api-gateway"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker, plus Kong or a lightweight alternative (`express-gateway`, or NGINX with a Lua/JS auth module for the minimal version).",
-      setup: "Local and free: `docker run -d --name kong <kong-image>` in DB-less/declarative mode, routing to 2 backend services you already built (for example the `/orders` API from Module 3 and a second mock service).",
-      simulate: "Configure Kong to route `/orders/*` to service A and `/users/*` to service B, then add a rate-limiting plugin (5 requests/minute) plus a key-auth plugin on the `/orders` route only. Hit both routes with and without an API key, and hit `/orders` 6 times in a minute.",
-      observe: "`/users` works with no key while `/orders` returns 401 without one, auth enforced centrally at the gateway instead of duplicated in each service's code. The 6th request to `/orders` within a minute returns 429, the shared rate-limiting concern enforced once instead of per service.",
-      stretch: "Add a second route pointing to a mobile-specific mock response (fewer fields) versus the web route's full response from the same underlying service, a minimal BFF pattern built at the gateway level."
+      goal: "Put a Kong gateway in front of two backends, enforce key-auth on one route plus a 5-per-minute rate limit, and prove both are applied at the edge instead of inside each service.",
+      stack: "Kong (DB-less) plus 2 <code>traefik/whoami</code> backends in Docker, driven with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start two backends on a Docker network",
+          code: "docker network create kongnet\ndocker run -d --name be-orders --network kongnet traefik/whoami\ndocker run -d --name be-users --network kongnet traefik/whoami",
+          lang: "bash"
+        },
+        {
+          title: "Declare routes, auth, and the rate limit",
+          body: "Save as <code>kong.yml</code>. The <code>/orders</code> route gets key-auth plus a 5/min limit; <code>/users</code> stays open.",
+          code: "_format_version: \"3.0\"\nservices:\n  - name: orders\n    url: http://be-orders:80\n    routes:\n      - name: orders-route\n        paths:\n          - /orders\n    plugins:\n      - name: key-auth\n      - name: rate-limiting\n        config:\n          minute: 5\n  - name: users\n    url: http://be-users:80\n    routes:\n      - name: users-route\n        paths:\n          - /users\nconsumers:\n  - username: alice\n    keyauth_credentials:\n      - key: secret123",
+          lang: "yaml"
+        },
+        {
+          title: "Start Kong in DB-less mode",
+          code: "docker run -d --name kong --network kongnet -p 8000:8000 \\\n  -v \"$PWD/kong.yml:/kong/kong.yml:ro\" \\\n  -e \"KONG_DATABASE=off\" \\\n  -e \"KONG_DECLARATIVE_CONFIG=/kong/kong.yml\" \\\n  -e \"KONG_PROXY_LISTEN=0.0.0.0:8000\" \\\n  kong:3.6",
+          lang: "bash"
+        },
+        {
+          title: "Hit the open route, then the guarded one",
+          body: "<code>/users</code> needs no key; <code>/orders</code> is 401 without one and 200 with it.",
+          code: "curl -s -o /dev/null -w \"users: %{http_code}\\n\" http://localhost:8000/users\ncurl -s -o /dev/null -w \"orders no key: %{http_code}\\n\" http://localhost:8000/orders\ncurl -s -o /dev/null -w \"orders with key: %{http_code}\\n\" http://localhost:8000/orders -H \"apikey: secret123\"",
+          lang: "bash"
+        },
+        {
+          title: "Trip the rate limit",
+          code: "for i in $(seq 6); do curl -s -o /dev/null -w \"%{http_code}\\n\" http://localhost:8000/orders -H \"apikey: secret123\"; done",
+          lang: "bash"
+        }
+      ],
+      observe: "<code>/users</code> returns 200 with no key while <code>/orders</code> returns 401 until you pass <code>apikey: secret123</code> (auth enforced once at the edge, not per service). The 6th request within a minute returns <code>429</code>, the shared rate limit applied centrally instead of duplicated everywhere.",
+      stretch: "Add a second route to the same <code>orders</code> service that trims fields for a mobile client (for example with a response-transformer plugin) alongside the full web route, a minimal BFF built at the gateway layer."
     }
   },
   keyTakeaways: [

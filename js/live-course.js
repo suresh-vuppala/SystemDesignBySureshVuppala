@@ -1,5 +1,5 @@
-﻿/* ═══ HelloSDE — Live Course Chat Widget ═══ */
-/* DISABLED — will enable in future */
+﻿/* ═══ HelloSDE, Live Course Chat Widget ═══ */
+/* DISABLED, will enable in future */
 (function(){
 return; // disabled
 

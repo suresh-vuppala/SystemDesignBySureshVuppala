@@ -59,11 +59,41 @@ window.COURSE_CONTENT["cache-invalidation"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Cache-Aside setup from 7.1; `redis-cli`; `hey` or `k6`.",
-      setup: "Local and free: the same Redis + Postgres containers from 7.1.",
-      simulate: "Reproduce Thundering Herd directly: pick one product ID, set its cache TTL to 5 seconds, then fire 500 concurrent requests for that exact ID (`hey -n 500 -c 500 <url>/products/42`) timed to land right as the TTL expires. Watch Postgres's active connection count spike (`SELECT count(*) FROM pg_stat_activity`) as hundreds of requests all miss at once. Then add a `SETNX lock:42 1 EX 5` guard so only the first miss queries Postgres while the rest wait, and repeat the same load test.",
-      observe: "The DB connection spike from the first run almost entirely disappears in the second, a direct, measured fix for the exact failure mode named above, not just a description of it.",
-      stretch: "Reproduce Cache Penetration by hammering `/products/999999` (an ID that does not exist) 1,000 times and watching every request hit Postgres. Fix it by caching the absence (`SET product:999999:miss \"\" EX 60`) and confirm the 1,000th request never touches the database."
+      goal: "Reproduce the Thundering Herd failure mode against a real database, then kill it with a Redis mutex lock and measure the difference.",
+      stack: "Redis + Postgres + Node.js in Docker, load-tested with <code>hey</code>. Reuses the Cache-Aside setup from 7.1. Local and free.",
+      steps: [
+        {
+          title: "Reuse the Redis and Postgres containers from 7.1",
+          body: "If they are not already running, start them and seed a products table.",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker run -d --name redis -p 6379:6379 redis\ndocker exec -i pg psql -U postgres -c \"CREATE TABLE IF NOT EXISTS products(id int primary key, name text, price numeric);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO products SELECT g, 'product '||g, (random()*100)::numeric(10,2) FROM generate_series(1,10000) g ON CONFLICT DO NOTHING;\"",
+          lang: "bash"
+        },
+        {
+          title: "Build one endpoint with a herd toggle",
+          body: "<code>/products/:id</code> uses a 5-second TTL. With <code>?lock=1</code> only the first miss queries Postgres via a <code>SET NX</code> mutex, the rest briefly wait and retry. Save as <code>herd.js</code>.",
+          code: "const express = require('express');\nconst { Pool } = require('pg');\nconst Redis = require('ioredis');\n\nconst pg = new Pool({ host: 'localhost', user: 'postgres', password: 'pw' });\nconst redis = new Redis();\nconst app = express();\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\n\napp.get('/products/:id', async (req, res) => {\n  const key = 'product:' + req.params.id;\n  const hit = await redis.get(key);\n  if (hit) return res.json(JSON.parse(hit));\n\n  if (req.query.lock) {\n    const lockKey = 'lock:' + req.params.id;\n    const got = await redis.set(lockKey, '1', 'NX', 'EX', 5);\n    if (!got) {\n      // someone else is rebuilding: wait and read the fresh value\n      await sleep(50);\n      const retry = await redis.get(key);\n      if (retry) return res.json(JSON.parse(retry));\n    }\n  }\n\n  const { rows } = await pg.query('SELECT * FROM products WHERE id = $1', [req.params.id]);\n  await redis.set(key, JSON.stringify(rows[0]), 'EX', 5);\n  res.json(rows[0]);\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Install dependencies and run it",
+          code: "npm init -y && npm install express pg ioredis\nnode herd.js",
+          lang: "bash"
+        },
+        {
+          title: "Fire the herd right as the TTL expires (no lock)",
+          body: "Let the key expire, then hit it with 500 concurrent requests that all miss at once.",
+          code: "docker exec redis redis-cli DEL product:42\nsleep 6\nhey -n 500 -c 500 http://localhost:3000/products/42",
+          lang: "bash"
+        },
+        {
+          title: "Watch Postgres connections spike, then repeat with the lock",
+          body: "Run the count during each load test. The first run stampedes the database; the second serializes the rebuild.",
+          code: "docker exec pg psql -U postgres -c \"SELECT count(*) FROM pg_stat_activity WHERE state = 'active';\"\n\n# now the guarded path\ndocker exec redis redis-cli DEL product:42\nsleep 6\nhey -n 500 -c 500 \"http://localhost:3000/products/42?lock=1\"",
+          lang: "bash"
+        }
+      ],
+      observe: "In the no-lock run the active-connection count jumps as hundreds of requests all miss and query Postgres together. With <code>?lock=1</code> that spike almost disappears: only the first miss reaches the database, the rest read the value the winner backfilled. This is a measured fix for the exact failure mode, not just a description of it.",
+      stretch: "Reproduce Cache Penetration by hammering <code>/products/999999</code> (an id that does not exist) 1,000 times and watching every request hit Postgres. Fix it by caching the absence (<code>SET product:999999:miss \"\" EX 60</code>) and confirm the 1,000th request never touches the database."
     }
   },
   keyTakeaways: [

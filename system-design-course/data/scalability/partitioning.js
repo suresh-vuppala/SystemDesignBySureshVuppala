@@ -117,11 +117,35 @@ window.COURSE_CONTENT["partitioning"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Citus, Postgres\u2019s sharding extension, has a free image).",
-      setup: "Local and free: Citus\u2019s official Docker Compose (1 coordinator + 2 worker nodes).",
-      simulate: "Create a distributed table partitioned by <code>hash(customer_id)</code> across the 2 workers (<code>create_distributed_table</code>), insert 10,000 rows spread across 100 different <code>customer_id</code>s, then run <code>EXPLAIN ANALYZE</code> on a query filtered by one specific <code>customer_id</code> versus an unfiltered aggregate.",
-      observe: "The filtered query touches only 1 worker (a single-shard query in the plan), while the unfiltered aggregate has to scatter-gather across both workers and combine results. The Hash strategy\u2019s exact trade-off, seen in a real query plan.",
-      stretch: "Create a second table Range-partitioned by an <code>order_date</code> column, insert data across a date range, and compare: a date-range query touches only the relevant partitions, while a query on a <em>different</em> column (for example <code>customer_id</code>) now scans every partition. A felt trade-off between the two schemes on data you control."
+      goal: "Distribute a table across two Citus workers by <code>hash(customer_id)</code> and watch a filtered query hit one shard while an unfiltered aggregate scatter-gathers across all of them.",
+      stack: "Citus (Postgres\u2019s distributed extension) in Docker: one coordinator plus two workers. Local and free.",
+      steps: [
+        {
+          title: "Start a Citus coordinator and two workers",
+          body: "All three share one Docker network so the coordinator can reach the workers by name.",
+          code: "docker network create citus\ndocker run -d --name coord --net citus -p 5432:5432 -e POSTGRES_PASSWORD=pw citusdata/citus:12.1\ndocker run -d --name w1 --net citus -e POSTGRES_PASSWORD=pw citusdata/citus:12.1\ndocker run -d --name w2 --net citus -e POSTGRES_PASSWORD=pw citusdata/citus:12.1",
+          lang: "bash"
+        },
+        {
+          title: "Register the workers with the coordinator",
+          code: "sleep 5\ndocker exec coord psql -U postgres -c \"SELECT citus_set_coordinator_host('coord', 5432);\"\ndocker exec coord psql -U postgres -c \"SELECT citus_add_node('w1', 5432);\"\ndocker exec coord psql -U postgres -c \"SELECT citus_add_node('w2', 5432);\"",
+          lang: "bash"
+        },
+        {
+          title: "Create a distributed table and seed 10,000 orders",
+          body: "Open a shell first with <code>docker exec -it coord psql -U postgres</code>, then run this. <code>create_distributed_table</code> hash-shards on <code>customer_id</code> across both workers.",
+          code: "CREATE TABLE orders(id bigserial, customer_id int, order_date date, amount numeric);\nSELECT create_distributed_table('orders', 'customer_id');\nINSERT INTO orders(customer_id, order_date, amount)\nSELECT (random()*100)::int, current_date - (random()*365)::int, (random()*500)::numeric(10,2)\nFROM generate_series(1, 10000);",
+          lang: "sql"
+        },
+        {
+          title: "Compare a single-shard read with a scatter-gather",
+          body: "The first query filters on the shard key; the second cannot be pruned and must touch every shard.",
+          code: "EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 42;\nEXPLAIN ANALYZE SELECT count(*), avg(amount) FROM orders;",
+          lang: "sql"
+        }
+      ],
+      observe: "The <code>customer_id = 42</code> plan shows a single task routed to one worker (<code>Task Count: 1</code>), while the unfiltered aggregate fans out to every shard on both workers and merges the partials. That is the Hash strategy trade-off (even spread and cheap point lookups, but no free cross-key scans) visible in a real query plan.",
+      stretch: "Create a second table with native Postgres declarative partitioning by <code>order_date</code>, load a year of rows, and compare: a date-range filter prunes to a few partitions while a filter on a different column (for example <code>customer_id</code>) now scans every partition. The trade-off between the two schemes, felt on data you control."
     }
   },
   keyTakeaways: [

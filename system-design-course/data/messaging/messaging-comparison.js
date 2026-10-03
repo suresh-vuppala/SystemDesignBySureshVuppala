@@ -38,11 +38,30 @@ window.COURSE_CONTENT["messaging-comparison"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The 3 labs already built in 8.1 (RabbitMQ/SQS), 8.2 (Kafka), and 8.3 (SNS+SQS).",
-      setup: "None new: reuse the running labs.",
-      simulate: "Send the same \u201cOrderPlaced\u201d event through all 3 setups and, for each, answer two questions: can a second independent application add itself as a new consumer later and see this event, and can that new consumer replay history from before it existed? Test it: subscribe a brand-new SQS queue to the exchange after messages were sent (nothing arrives, no replay); read from an early offset on the Kafka topic after adding a new consumer group (full history available); add a subscriber to the SNS topic after a publish (also nothing, SNS does not replay).",
-      observe: "Kafka is the only one of the 3 where a late-joining consumer group sees everything that happened before it existed: the concrete reason \u201creplayable\u201d is Kafka\u2019s specific differentiator, not just a label in a table.",
-      stretch: "None. This lesson\u2019s value is the direct 3-way comparison itself."
+      goal: "Run the same OrderPlaced event through the queue, the Kafka log, and Pub/Sub, then prove only Kafka lets a late-joining consumer replay history from before it existed.",
+      stack: "The three running labs from 8.1 (RabbitMQ), 8.2 (Kafka), and 8.3 (SNS+SQS). Local and free plus the AWS free tier, nothing new to install.",
+      steps: [
+        {
+          title: "Kafka: add a brand-new consumer group from the beginning",
+          body: "A new group reading <code>--from-beginning</code> sees the full retained topic, including events produced long before this group existed.",
+          code: "docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \\\n  --topic rides --group late-joiner --from-beginning \\\n  --bootstrap-server localhost:9092",
+          lang: "bash"
+        },
+        {
+          title: "RabbitMQ: declare a queue after the jobs were consumed",
+          body: "A queue only holds messages published after it exists and not yet ACKed. Bind one now and it starts empty: no history.",
+          code: "docker exec rabbit rabbitmqadmin declare queue name=latecomer durable=true\ndocker exec rabbit rabbitmqctl list_queues name messages",
+          lang: "bash"
+        },
+        {
+          title: "SNS: subscribe a new queue after a publish",
+          body: "Create a third queue, subscribe it now, then poll. Nothing arrives: SNS delivers live and does not replay past publishes.",
+          code: "aws sqs create-queue --queue-name orders-c\nC_URL=$(aws sqs get-queue-url --queue-name orders-c --query QueueUrl --output text)\nC_ARN=$(aws sqs get-queue-attributes --queue-url $C_URL --attribute-names QueueArn --query Attributes.QueueArn --output text)\naws sns subscribe --topic-arn $TOPIC --protocol sqs --notification-endpoint $C_ARN\naws sqs receive-message --queue-url $C_URL",
+          lang: "bash"
+        }
+      ],
+      observe: "Only Kafka shows the earlier events to the late joiner. The new RabbitMQ queue reports 0 messages and the new SNS subscription receives nothing: the concrete reason \"replayable\" is Kafka's specific differentiator, not just a label in a table.",
+      stretch: "Reset the Kafka group's offsets with <code>kafka-consumer-groups.sh --reset-offsets --to-earliest --group late-joiner --topic rides --execute</code> and reconsume, replaying the entire topic again on demand."
     }
   },
   keyTakeaways: [

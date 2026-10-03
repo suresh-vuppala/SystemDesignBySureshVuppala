@@ -30,11 +30,40 @@ window.COURSE_CONTENT["bigtable"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Cassandra cluster from earlier labs (a BigTable-lineage system you can actually run).",
-      setup: "Local and free: reuse the Cassandra container(s).",
-      simulate: "Write 10,000 rows to a wide-column table, then check `nodetool tablestats` for memtable size and SSTable count. Force a flush (`nodetool flush`) and watch a new SSTable appear on disk (`nodetool cfstats`, or inspect the data directory directly). Trigger compaction manually (`nodetool compact`) and compare SSTable count before and after.",
-      observe: "The exact write path (memtable \u2192 SSTable \u2192 compaction) happening on disk in front of you, on a system directly descended from BigTable\u2019s design: not an abstract diagram, your own table\u2019s files.",
-      stretch: "None. This reuses an existing lab to make the lineage concrete rather than requiring new infrastructure."
+      goal: "Watch the BigTable-lineage LSM write path (memtable to SSTable to compaction) happen on disk using Cassandra.",
+      stack: "A single Cassandra node in Docker, inspected with <code>cqlsh</code> and <code>nodetool</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a single Cassandra node",
+          body: "Give it a minute to finish booting before the next step.",
+          code: "docker run -d --name cass -p 9042:9042 cassandra",
+          lang: "bash"
+        },
+        {
+          title: "Create a wide-column table",
+          code: "docker exec -it cass cqlsh -e \"CREATE KEYSPACE lab WITH replication={'class':'SimpleStrategy','replication_factor':1}; CREATE TABLE lab.events (id int PRIMARY KEY, payload text);\"",
+          lang: "bash"
+        },
+        {
+          title: "Write 10,000 rows",
+          body: "Generate the inserts, copy them in, and run them so the writes land in the in-memory memtable.",
+          code: "for i in $(seq 1 10000); do echo \"INSERT INTO lab.events (id,payload) VALUES ($i,'row-$i');\"; done > load.cql\ndocker cp load.cql cass:/load.cql\ndocker exec -it cass cqlsh -f /load.cql",
+          lang: "bash"
+        },
+        {
+          title: "Flush the memtable to an SSTable",
+          body: "Check the stats before and after: the flush turns buffered writes into an immutable SSTable on disk.",
+          code: "docker exec cass nodetool tablestats lab.events\ndocker exec cass nodetool flush lab events\ndocker exec cass nodetool tablestats lab.events",
+          lang: "bash"
+        },
+        {
+          title: "Trigger compaction and compare",
+          code: "docker exec cass nodetool compact lab events\ndocker exec cass nodetool tablestats lab.events",
+          lang: "bash"
+        }
+      ],
+      observe: "The exact write path happening on disk in front of you: writes buffer in the memtable, <code>flush</code> materializes an immutable SSTable, and <code>compact</code> merges SSTables and drops the SSTable count, on a system directly descended from BigTable's design.",
+      stretch: "Write another batch and <code>flush</code> again before compacting, so multiple SSTables coexist. Then run <code>nodetool compact</code> and watch several SSTables merge back into one."
     }
   },
   keyTakeaways: [

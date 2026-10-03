@@ -1,4 +1,4 @@
-﻿/* ═══ Real-Time Problems — Module Navigation (compact pills) ═══ */
+﻿/* ═══ Real-Time Problems, Module Navigation (compact pills) ═══ */
 (function(){
 var page = location.pathname.split('/').pop() || 'index.html';
 var isIndex = (page === 'index.html' || page === '' || location.pathname.endsWith('/'));
@@ -52,7 +52,7 @@ navStyle.textContent = ''
   + '.mod-nav .mn-full{display:none}.mod-nav .mn-short{display:inline}}';
 document.head.appendChild(navStyle);
 
-// Build pills — monochrome. `active` toggles a class instead of inline colors.
+// Build pills, monochrome. `active` toggles a class instead of inline colors.
 var pills = modules.map(function(m){
   var link = isIndex ? m.anchor : (prefix + 'index.html' + m.anchor);
   var folderName = m.href.replace(/\/$/, '').replace(/\.html$/, '');

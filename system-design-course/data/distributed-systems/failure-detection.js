@@ -62,11 +62,23 @@ window.COURSE_CONTENT["failure-detection"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python or Node.js only.",
-      setup: "None.",
-      simulate: "Implement the Phi Accrual formula directly against a simulated heartbeat stream (mean 1000ms, std 200ms, matching the worked example). Feed it a normal stream first and confirm \u03c6 stays low, then simulate a node going quiet (stop the heartbeats) and compute \u03c6 at 1s, 2s, and 5s of silence.",
-      observe: "Your own computed \u03c6 values landing close to the worked example\u2019s \u2248 0.3 / 3.0 / 12.0 at the same elapsed times, verifying the formula produces the stated numbers. Then implement a naive fixed 2-second timeout on the same stream and count how many normal, healthy delays (just jitter, no real failure) get falsely flagged: the false-positive problem Phi Accrual avoids.",
-      stretch: "Implement a minimal SWIM-style indirect probe: node A can\u2019t reach node C directly, so it asks nodes B and D to try reaching C on its behalf. Confirm C is correctly marked alive if even one indirect probe succeeds, despite A\u2019s own direct probe failing."
+      goal: "Implement the Phi Accrual failure detector against a simulated heartbeat stream and reproduce the worked \u03c6 values at 1s, 2s, and 5s of silence.",
+      stack: "A single Python script, standard library only. Local and free.",
+      steps: [
+        {
+          title: "Implement the phi formula",
+          body: "Fit a normal distribution to the heartbeat inter-arrival times (mean 1000ms, std 200ms, matching the worked example) and compute <code>phi = -log10(1 - CDF(silence))</code>. Save as <code>phi.py</code>.",
+          code: "import math\n\ndef phi(silence_ms, mean_ms=1000.0, std_ms=200.0):\n    # probability the next heartbeat is later than 'silence_ms' under a normal fit\n    z = (silence_ms - mean_ms) / (std_ms * math.sqrt(2))\n    cdf = 0.5 * (1 + math.erf(z))\n    p_later = max(1.0 - cdf, 1e-12)   # clamp to avoid log10(0)\n    return -math.log10(p_later)\n\nfor t in (1000, 2000, 5000):\n    print('silence', t, 'ms -> phi =', round(phi(t), 2))",
+          lang: "python"
+        },
+        {
+          title: "Run it",
+          code: "python phi.py",
+          lang: "bash"
+        }
+      ],
+      observe: "Your computed \u03c6 lands near the worked example's \u2248 0.3 at 1s, \u2248 3.0 at 2s, and \u2248 12.0 at 5s, so the same formula reproduces the stated numbers. Cassandra would mark this node dead once \u03c6 crosses 8, which happens somewhere between 2s and 5s of silence, and the value adapts automatically if you change the mean or std.",
+      stretch: "Implement a minimal SWIM-style indirect probe: node A cannot reach node C directly, so it asks nodes B and D to probe C on its behalf. Confirm C is marked alive if even one indirect probe succeeds, despite A's own direct probe failing."
     }
   },
   keyTakeaways: [

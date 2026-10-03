@@ -113,11 +113,33 @@ window.COURSE_CONTENT["rate-limiting"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); Node.js or Python; <code>hey</code> or <code>k6</code>.",
-      setup: "Local and free: <code>docker run -d -p 6379:6379 redis</code>.",
-      simulate: "Implement Token Bucket (10 requests/sec, burst of 20) using a Redis Lua script for the atomic read-check-decrement, in front of a simple endpoint. Load-test with <code>hey -n 200 -c 50</code> and log the ratio of 200s to 429s. Then implement Fixed Window (a simple <code>INCR key EX 1</code>, reject above 10) and repeat the exact same load test, watching requests right at the window boundary.",
-      observe: "Token Bucket allows a controlled burst up to 20 before throttling, versus Fixed Window\u2019s known 2\u00d7 boundary-burst: send a burst straddling two windows and count how many got through in that boundary-crossing second.",
-      stretch: "Run the Lua-script version and a naive non-atomic version (<code>GET</code> then <code>SET</code> as two calls) side by side under high concurrency (<code>hey -c 200</code>). Count how many requests slip through the non-atomic version above the limit, the exact race the atomic script closes."
+      goal: "Put a Token Bucket limiter (atomic Redis Lua script) and a Fixed Window limiter in front of one endpoint, then load-test both to feel controlled bursts versus the 2x boundary burst.",
+      stack: "Redis in Docker, a Node.js/Express server, load-tested with <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis",
+          code: "docker run -d --name redis -p 6379:6379 redis",
+          lang: "bash"
+        },
+        {
+          title: "Write both limiters",
+          body: "<code>/tb</code> runs an atomic Token Bucket (rate 10/s, capacity 20) in a Lua script; <code>/fw</code> is a Fixed Window counter capped at 10 per second. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst Redis = require('ioredis');\nconst redis = new Redis();\nconst app = express();\n\n// atomic token bucket: rate=10/s, capacity=20\nconst TOKEN_BUCKET = `\nlocal key = KEYS[1]\nlocal rate = tonumber(ARGV[1])\nlocal cap = tonumber(ARGV[2])\nlocal now = tonumber(ARGV[3])\nlocal data = redis.call('HMGET', key, 'tokens', 'ts')\nlocal tokens = tonumber(data[1]) or cap\nlocal ts = tonumber(data[2]) or now\ntokens = math.min(cap, tokens + (now - ts) * rate)\nlocal allowed = 0\nif tokens >= 1 then tokens = tokens - 1 allowed = 1 end\nredis.call('HMSET', key, 'tokens', tokens, 'ts', now)\nredis.call('EXPIRE', key, 60)\nreturn allowed`;\n\napp.get('/tb', async (req, res) => {\n  const now = Date.now() / 1000;\n  const ok = await redis.eval(TOKEN_BUCKET, 1, 'rl:tb', 10, 20, now);\n  res.status(ok ? 200 : 429).end();\n});\n\n// fixed window: max 10 per second\napp.get('/fw', async (req, res) => {\n  const win = Math.floor(Date.now() / 1000);\n  const key = 'rl:fw:' + win;\n  const n = await redis.incr(key);\n  if (n === 1) await redis.expire(key, 1);\n  res.status(n <= 10 ? 200 : 429).end();\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Install dependencies and run it",
+          code: "npm init -y && npm install express ioredis\nnode server.js",
+          lang: "bash"
+        },
+        {
+          title: "Load-test both paths and count 200s vs 429s",
+          code: "hey -n 200 -c 50 http://localhost:3000/tb\nhey -n 200 -c 50 http://localhost:3000/fw",
+          lang: "bash"
+        }
+      ],
+      observe: "Token Bucket lets a controlled burst of about 20 through immediately, then throttles toward 10/s, while Fixed Window can pass up to 2x the limit across a boundary: fire a burst that straddles two one-second windows and count how many slipped through in that boundary-crossing second. Read the 200-vs-429 split in each <code>hey</code> status-code histogram.",
+      stretch: "Swap the atomic Lua for a naive non-atomic version (a <code>GET</code> then a <code>SET</code> as two round trips) and rerun under high concurrency (<code>hey -c 200</code>). Count how many requests slip past the limit, the exact race condition the single atomic script closes."
     }
   },
   keyTakeaways: [

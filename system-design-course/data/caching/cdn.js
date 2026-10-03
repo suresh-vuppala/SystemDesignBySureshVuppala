@@ -71,11 +71,36 @@ window.COURSE_CONTENT["cdn"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A Cloudflare free-tier account (or AWS free-tier CloudFront).",
-      setup: "Cloud free-tier: point a free Cloudflare zone at a small static site, or set up a CloudFront distribution in front of an S3 bucket (both free-tier eligible).",
-      simulate: "Request a static asset (an image) through the CDN twice in a row and check the response header (`cf-cache-status` on Cloudflare, `x-cache` on CloudFront): the first request shows a miss, the second a hit. Then purge the cache and immediately request it again from 2 different locations (a VPN or an online multi-region curl service) roughly simultaneously.",
-      observe: "The cache-status header flipping from MISS to HIT, and the measurable latency drop between the two requests, a real number next to \u201cavoid the round trip\u201d instead of just asserting it. If your plan exposes it, check the analytics dashboard for cache hit ratio and compare against the 95%/96% anchor from 7.1.",
-      stretch: "None. CDN behavior at true multi-PoP, shield-layer scale is not reproducible on a free tier; this lab demonstrates the core cache-at-the-edge mechanism, not the full scaling ladder."
+      goal: "Watch a real CDN edge flip an asset from MISS to HIT and measure the latency it shaves off the origin round trip.",
+      stack: "A free Cloudflare zone (or AWS free-tier CloudFront over S3) plus <code>curl</code>. Cloud free-tier, no cost.",
+      steps: [
+        {
+          title: "Put a CDN in front of a static asset",
+          body: "On Cloudflare: add a free zone and proxy (orange-cloud) a hostname serving one image. On AWS: create a CloudFront distribution with an S3 bucket origin. Both are free-tier eligible. Note your asset URL for the commands below.",
+          code: "export ASSET=https://your-zone.example.com/logo.png",
+          lang: "bash"
+        },
+        {
+          title: "First request: expect a MISS",
+          body: "The edge has nothing cached yet, so it fetches from the origin. Read the cache-status header (<code>cf-cache-status</code> on Cloudflare, <code>x-cache</code> on CloudFront).",
+          code: "curl -sS -o /dev/null -D - \"$ASSET\" | grep -iE 'cf-cache-status|x-cache'",
+          lang: "bash"
+        },
+        {
+          title: "Second request: expect a HIT, timed",
+          body: "Now served from the edge. <code>-w</code> prints the total time so you can compare it to the first call.",
+          code: "curl -sS -o /dev/null -w 'time_total: %{time_total}s\\n' -D - \"$ASSET\" | grep -iE 'cf-cache-status|x-cache|time_total'",
+          lang: "bash"
+        },
+        {
+          title: "Purge and confirm it drops back to MISS",
+          body: "Purge from the dashboard (or the API), then re-request: the header returns to MISS, proving the edge, not the origin, was answering.",
+          code: "# Cloudflare API purge (single file)\ncurl -sS -X POST \\\n  \"https://api.cloudflare.com/client/v4/zones/$ZONE_ID/purge_cache\" \\\n  -H \"Authorization: Bearer $CF_API_TOKEN\" \\\n  -H 'Content-Type: application/json' \\\n  --data \"{\\\"files\\\":[\\\"$ASSET\\\"]}\"\n\ncurl -sS -o /dev/null -D - \"$ASSET\" | grep -iE 'cf-cache-status|x-cache'",
+          lang: "bash"
+        }
+      ],
+      observe: "The cache-status header flips from <code>MISS</code> to <code>HIT</code>, and <code>time_total</code> drops noticeably on the second call: a real number next to \u201cavoid the round trip\u201d instead of an assertion. If your plan exposes analytics, compare the dashboard cache hit ratio against the 95%/96% anchor from 7.1.",
+      stretch: "Request the same asset through an online multi-region curl service (or a VPN) and confirm distant locations still return <code>HIT</code> with low latency, each served from a nearby PoP rather than your single origin."
     }
   },
   keyTakeaways: [

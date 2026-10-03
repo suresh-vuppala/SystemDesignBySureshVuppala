@@ -55,11 +55,33 @@ window.COURSE_CONTENT["graceful-degradation"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A simple app with two features (a \u201ccore\u201d endpoint and a \u201crecommendations\u201d endpoint that calls a slow downstream); a feature-flag library (Flagsmith or Unleash, both free-tier).",
-      setup: "Local and free: Unleash\u2019s official Docker image (self-hosted).",
-      simulate: "Wire the recommendations feature behind an Unleash flag, and write a small watchdog that monitors the core endpoint\u2019s p99 latency and flips the flag off automatically once p99 crosses a threshold you set (simulating the CPU &gt; 80% rule). Load-test hard enough to push latency past that threshold.",
-      observe: "The recommendations feature switches off automatically mid-test while the core endpoint keeps responding: partial availability instead of a full outage, triggered by your own measured metric instead of a manual toggle.",
-      stretch: "Implement request hedging on one call: fire the same request to two mock replica endpoints simultaneously and use whichever responds first, discarding the slower one. Measure how much it improves p99 under artificial jitter on one endpoint."
+      goal: "Build an app whose non-critical feature switches itself off automatically when the core endpoint\u2019s p99 latency crosses a threshold, staying partially up instead of fully down.",
+      stack: "Node.js and Express with an in-process feature flag and latency watchdog, load-tested with <code>hey</code>. The production equivalent is a flag service like Unleash or Flagsmith. Local and free.",
+      steps: [
+        {
+          title: "Write the app: core, flagged recommendations, watchdog",
+          body: "The watchdog samples the core endpoint\u2019s p99 and flips the recommendations flag off past 100ms (the CPU &gt; 80% rule, simulated). Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst app = express();\n\nlet recommendationsOn = true;\nconst latencies = [];\n\nfunction record(ms) {\n  latencies.push(ms);\n  if (latencies.length > 200) latencies.shift();\n}\nfunction p99() {\n  if (!latencies.length) return 0;\n  const s = [...latencies].sort((a, b) => a - b);\n  return s[Math.min(s.length - 1, Math.floor(s.length * 0.99))];\n}\n\n// core endpoint: must always stay up\napp.get('/core', (req, res) => {\n  const start = Date.now();\n  const end = start + 5;\n  while (Date.now() < end) {}\n  record(Date.now() - start);\n  res.json({ ok: true });\n});\n\n// non-critical: calls a slow downstream\napp.get('/recommendations', async (req, res) => {\n  if (!recommendationsOn) return res.status(503).json({ degraded: true });\n  await new Promise(r => setTimeout(r, 300));\n  res.json({ items: [1, 2, 3] });\n});\n\n// watchdog: shed the non-critical feature when core p99 crosses 100ms\nsetInterval(() => {\n  const now = p99();\n  if (now > 100 && recommendationsOn) {\n    recommendationsOn = false;\n    console.log('DEGRADE: recommendations OFF, core p99 =', now, 'ms');\n  } else if (now < 50 && !recommendationsOn) {\n    recommendationsOn = true;\n    console.log('RECOVER: recommendations ON, core p99 =', now, 'ms');\n  }\n}, 1000);\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Install dependencies and run it",
+          code: "npm init -y && npm install express\nnode server.js",
+          lang: "bash"
+        },
+        {
+          title: "Hammer the core endpoint to push p99 past the threshold",
+          code: "hey -z 60s -c 200 http://localhost:3000/core",
+          lang: "bash"
+        },
+        {
+          title: "Watch recommendations degrade in another terminal",
+          code: "while true; do curl -s -o /dev/null -w \"%{http_code}\\n\" http://localhost:3000/recommendations; sleep 1; done",
+          lang: "bash"
+        }
+      ],
+      observe: "Once the core p99 crosses 100ms under load, the watchdog logs <code>DEGRADE</code> and <code>/recommendations</code> starts returning 503 while <code>/core</code> keeps serving 200s: partial availability instead of a full outage, triggered by a measured metric rather than a manual toggle. When the load stops, it logs <code>RECOVER</code> and flips back on.",
+      stretch: "Add request hedging on one call: fire the same request to two mock replica endpoints at once and use whichever responds first, discarding the slower one. Measure how much p99 improves when you inject artificial jitter into one of the two replicas."
     }
   },
   keyTakeaways: [

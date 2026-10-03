@@ -50,11 +50,36 @@ window.COURSE_CONTENT["dns"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`dig` (macOS/Linux) or `nslookup` (Windows).",
-      setup: "None. A free-tier DNS zone on Route 53 or Cloudflare DNS is a good stretch option if you want to edit real records.",
-      simulate: "Run `dig google.com` and then `dig +trace google.com`. The second shows the full root \u2192 TLD \u2192 authoritative resolution path from the Overview, hop by hop, with the actual server IPs and TTLs at each step. Then run `dig MX google.com`, `dig TXT google.com`, and `dig NS google.com` to see 3 of the 8 record types on a real domain.",
-      observe: "The TTL value returned at each hop, and how it drops on a second `dig` run within that TTL window (cached, does not re-query) versus a fresh lookup after it expires.",
-      stretch: "With a free-tier Route 53 or Cloudflare DNS zone, create a Weighted or Failover routing record and query it repeatedly to watch the responses shift, the canary-rollout pattern named in the Overview, live."
+      goal: "Watch a name resolve down the full DNS hierarchy and see TTL caching happen between two lookups.",
+      stack: "<code>dig</code> (macOS/Linux) or <code>nslookup</code> (Windows). Local and free.",
+      steps: [
+        {
+          title: "Resolve a name to an address",
+          body: "The plain answer plus its TTL. On Windows use <code>nslookup google.com</code>.",
+          code: "dig google.com",
+          lang: "bash"
+        },
+        {
+          title: "Walk the hierarchy hop by hop",
+          body: "<code>+trace</code> shows the full root \u2192 TLD \u2192 authoritative path, with the real server IPs and TTLs at each step.",
+          code: "dig +trace google.com",
+          lang: "bash"
+        },
+        {
+          title: "Query different record types",
+          body: "Three of the record types from the Overview, on a real domain.",
+          code: "dig MX  google.com +short\ndig TXT google.com +short\ndig NS  google.com +short",
+          lang: "bash"
+        },
+        {
+          title: "See the TTL count down as it caches",
+          body: "Run twice inside the TTL window: the second answer comes from cache with a lower TTL, no re-query.",
+          code: "dig google.com +noall +answer\nsleep 5\ndig google.com +noall +answer",
+          lang: "bash"
+        }
+      ],
+      observe: "The TTL on the second lookup is lower than the first (it counted down inside the cache) and resets to a fresh value only after it expires. In <code>+trace</code>, notice the answer is built from the top of the hierarchy down, root to TLD to authoritative, not from a single server.",
+      stretch: "On a free-tier Route 53 or Cloudflare DNS zone, create a <strong>Weighted</strong> or <strong>Failover</strong> record and query it repeatedly with <code>dig</code> to watch the responses shift, the canary-rollout pattern from the Overview, live."
     }
   },
   keyTakeaways: [

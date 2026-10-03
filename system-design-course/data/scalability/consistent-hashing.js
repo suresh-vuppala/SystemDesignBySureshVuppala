@@ -49,11 +49,23 @@ window.COURSE_CONTENT["consistent-hashing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python or Node.js only.",
-      setup: "None: implement the ring yourself, this is the point of the lab.",
-      simulate: "Implement a basic consistent-hash ring with 4 servers, 100 virtual nodes each, and 10,000 synthetic keys. Add a 5th server (with its own 100 virtual nodes) and recompute which server each key maps to.",
-      observe: "This time only roughly 1/5 of keys move to the new server, versus the plain-modulo lab from 10.4 where almost everything moved. Print the exact percentage that moved and compare it directly against your 10.4 result.",
-      stretch: "Remove virtual nodes (1 ring position per server instead of 100) and rerun the same add-a-server test. Measure load-distribution variance across servers with and without virtual nodes, to feel why they exist rather than just reading the claim."
+      goal: "Build a consistent-hash ring with virtual nodes and measure that adding a server moves only ~1/N of keys, versus the ~80% the modulo lab (10.4) just charged you.",
+      stack: "Python 3 only (standard library, uses <code>hashlib</code> and <code>bisect</code>). Local and free.",
+      steps: [
+        {
+          title: "Write the ring with virtual nodes",
+          body: "Four servers with 100 virtual nodes each, 10,000 keys. Then add a fifth server and count what moves. Save as <code>consistent_hash.py</code>.",
+          code: "import hashlib\nfrom bisect import bisect\n\ndef h(s):\n    return int(hashlib.md5(s.encode()).hexdigest(), 16)\n\ndef build_ring(servers, vnodes):\n    ring = []\n    for name in servers:\n        for v in range(vnodes):\n            ring.append((h(name + \"#\" + str(v)), name))\n    ring.sort()\n    return [p for p, _ in ring], [name for _, name in ring]\n\ndef owner(ring, key):\n    positions, owners = ring\n    i = bisect(positions, h(key)) % len(positions)\n    return owners[i]\n\nkeys = [\"key\" + str(i) for i in range(10000)]\nbefore = build_ring([\"s1\", \"s2\", \"s3\", \"s4\"], 100)\nafter = build_ring([\"s1\", \"s2\", \"s3\", \"s4\", \"s5\"], 100)\n\nmoved = sum(1 for k in keys if owner(before, k) != owner(after, k))\nprint(\"keys moved when adding s5:\", moved, \"of\", len(keys),\n      \"(\", round(100 * moved / len(keys), 1), \"%)\")",
+          lang: "python"
+        },
+        {
+          title: "Run it",
+          code: "python3 consistent_hash.py",
+          lang: "bash"
+        }
+      ],
+      observe: "Only about 1/5 (roughly 20%) of keys move to the new server, versus the ~80% the plain-modulo lab in 10.4 remapped. Print the exact percentage and set it beside your 10.4 number: that gap is the entire reason the ring exists.",
+      stretch: "Rerun with <code>vnodes=1</code> (one ring position per server) and tally how many keys each server owns. The distribution is lumpy and uneven; bump vnodes back to 100 and watch the variance collapse, feeling why virtual nodes exist instead of just reading the claim."
     }
   },
   keyTakeaways: [

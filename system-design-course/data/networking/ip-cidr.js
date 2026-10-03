@@ -38,11 +38,36 @@ window.COURSE_CONTENT["ip-cidr"] = {
       ]
     },
     handsOn: {
-      prerequisites: "An AWS free-tier account (or `ipcalc` / an online CIDR calculator for the no-signup version).",
-      setup: "Cloud free-tier: the AWS VPC console (free, no running resources needed). Local/free: `ipcalc 10.0.0.0/24` or any online CIDR calculator.",
-      simulate: "Create a VPC with CIDR `10.0.0.0/16` (65,536 addresses), then carve 2 subnets from it: `10.0.1.0/24` (256 addresses, one AZ) and `10.0.2.0/24`. Calculate by hand how many usable IPs each subnet has (256 minus the 5 AWS reserves automatically), then verify against the console.",
-      observe: "Try to create a third subnet with an overlapping range like `10.0.1.128/25`. AWS rejects it, a direct and safe way to feel why CIDR blocks cannot overlap.",
-      stretch: "Check your home Wi-Fi range or Docker's default network (`docker network inspect bridge`) and confirm it sits inside `172.17.0.0/16`. That is exactly why a VPC should avoid that range if you will ever reach it over a VPN."
+      goal: "Size a VPC-style address block, split it into subnets by hand, and prove why overlapping ranges cannot coexist.",
+      stack: "<code>ipcalc</code> and Docker, both local and free; an AWS free-tier VPC console is an optional stretch.",
+      steps: [
+        {
+          title: "Install ipcalc and size a /24",
+          body: "The suffix counts network bits, so a /24 leaves 8 host bits, giving 256 addresses.",
+          code: "# Debian/Ubuntu: sudo apt install ipcalc    macOS: brew install ipcalc\nipcalc 10.0.0.0/24",
+          lang: "bash"
+        },
+        {
+          title: "Carve two subnets out of a /16 VPC",
+          body: "A /16 is 65,536 addresses; each /24 is one AZ-sized slice of 256.",
+          code: "ipcalc 10.0.1.0/24\nipcalc 10.0.2.0/24",
+          lang: "bash"
+        },
+        {
+          title: "See why an overlap is illegal",
+          body: "<code>10.0.1.128/25</code> sits entirely inside <code>10.0.1.0/24</code>, so the two ranges collide and cannot be peered.",
+          code: "ipcalc 10.0.1.0/24\nipcalc 10.0.1.128/25",
+          lang: "bash"
+        },
+        {
+          title: "Check Docker's default bridge range",
+          body: "Confirm it sits inside <code>172.17.0.0/16</code>, the range a VPC must avoid if you will ever reach it over a VPN.",
+          code: "docker network inspect bridge --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'",
+          lang: "bash"
+        }
+      ],
+      observe: "Compare the <code>Network</code> and <code>HostMin</code>/<code>HostMax</code> lines from the two overlapping blocks: the /25's range falls completely within the /24's, which is exactly the collision AWS rejects when you try to add an overlapping subnet.",
+      stretch: "In a free-tier AWS VPC console, create a VPC with <code>10.0.0.0/16</code>, add subnets <code>10.0.1.0/24</code> and <code>10.0.2.0/24</code>, then try to add <code>10.0.1.128/25</code> and watch the console reject it, the same overlap rule enforced live."
     }
   },
   keyTakeaways: [

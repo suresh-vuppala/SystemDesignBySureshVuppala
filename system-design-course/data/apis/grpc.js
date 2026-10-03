@@ -55,11 +55,46 @@ window.COURSE_CONTENT["grpc"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`protoc` and a gRPC library for your language (`grpc-tools` for Node, `grpcio` for Python).",
-      setup: "Local and free only.",
-      simulate: "Define a simple `.proto` with a `GetUser` unary RPC and a `ListOrders` server-streaming RPC, generate the client/server code with `protoc`, and implement both. Build the same `GetUser` call as a REST/JSON endpoint too. Load-test both with 1,000 sequential calls and compare total time and payload size per call.",
-      observe: "The gRPC payload is visibly smaller (binary vs JSON text) and the round trip is noticeably faster. Put your own numbers next to the \u201c10x faster\u201d claim from Trade-offs.",
-      stretch: "Implement the bidirectional-streaming `Chat()` pattern and connect two clients to it at once. Watch messages flow both directions on the same open connection, something a REST unary call structurally cannot do."
+      goal: "Define a <code>.proto</code> schema with a unary and a server-streaming RPC, run a gRPC server, and call both over HTTP/2.",
+      stack: "Node.js + <code>@grpc/grpc-js</code> + <code>@grpc/proto-loader</code> (no protoc code-gen needed), tested with <code>grpcurl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir grpc-lab && cd grpc-lab\nnpm init -y && npm install @grpc/grpc-js @grpc/proto-loader",
+          lang: "bash"
+        },
+        {
+          title: "Describe the service in a schema",
+          body: "One unary RPC (<code>GetUser</code>) and one server-streaming RPC (<code>ListOrders</code>). Save as <code>user.proto</code>.",
+          code: "syntax = \"proto3\";\npackage shop;\n\nservice Shop {\n  rpc GetUser (UserRequest) returns (User);\n  rpc ListOrders (UserRequest) returns (stream Order);\n}\n\nmessage UserRequest { int32 id = 1; }\nmessage User { int32 id = 1; string name = 2; }\nmessage Order { int32 id = 1; string item = 2; }",
+          lang: "proto"
+        },
+        {
+          title: "Implement the server",
+          body: "The unary handler returns once; the streaming handler calls <code>write</code> repeatedly then <code>end</code>. Save as <code>server.js</code>.",
+          code: "const grpc = require('@grpc/grpc-js');\nconst loader = require('@grpc/proto-loader');\nconst def = loader.loadSync('user.proto');\nconst proto = grpc.loadPackageDefinition(def).shop;\n\nfunction getUser(call, cb) {\n  cb(null, { id: call.request.id, name: 'Ada' });\n}\n\nfunction listOrders(call) {\n  for (let i = 1; i <= 3; i++) call.write({ id: i, item: 'item ' + i });\n  call.end();\n}\n\nconst server = new grpc.Server();\nserver.addService(proto.Shop.service, { GetUser: getUser, ListOrders: listOrders });\nserver.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), () => {\n  console.log('gRPC on :50051');\n});",
+          lang: "javascript"
+        },
+        {
+          title: "Run the server",
+          code: "node server.js",
+          lang: "bash"
+        },
+        {
+          title: "Call the unary RPC",
+          body: "Install grpcurl once (<code>brew install grpcurl</code> or download a release), then send a request.",
+          code: "grpcurl -plaintext -proto user.proto -d '{\"id\": 7}' localhost:50051 shop.Shop/GetUser",
+          lang: "bash"
+        },
+        {
+          title: "Call the server-streaming RPC",
+          body: "One request opens a stream; the server pushes multiple <code>Order</code> messages back on the same HTTP/2 connection.",
+          code: "grpcurl -plaintext -proto user.proto -d '{\"id\": 7}' localhost:50051 shop.Shop/ListOrders",
+          lang: "bash"
+        }
+      ],
+      observe: "<code>GetUser</code> returns a single object; <code>ListOrders</code> prints three separate <code>Order</code> messages arriving one after another over one connection. The wire payload is compact binary Protobuf, not JSON text, which is where the roughly 10x internal speedup comes from.",
+      stretch: "Add a bidirectional <code>rpc Chat (stream Msg) returns (stream Msg)</code> and connect two clients at once: messages flow both directions on one open connection, something a REST unary call structurally cannot do."
     }
   },
   keyTakeaways: [

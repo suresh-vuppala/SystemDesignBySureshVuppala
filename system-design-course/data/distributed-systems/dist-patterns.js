@@ -41,13 +41,6 @@ window.COURSE_CONTENT["dist-patterns"] = {
         { color: "blue", label: "Most of these get their own lesson:", body: "Phi Accrual is unpacked in <strong>Failure Detection</strong> (11.12), Merkle Trees in anti-entropy sync (9.2), and Fencing Tokens in the Redlock context (7.10). This lesson is the map, not the destination." },
         { color: "green", label: "You have already touched these:", body: "Quorum showed up in the Cassandra labs, Heartbeat and Lease in the etcd lab, Fencing Tokens in the Redlock lab, and Checksum in every TCP capture. The vocabulary was earned earlier; here it finally gets its formal name." }
       ]
-    },
-    handsOn: {
-      prerequisites: "None new. This lesson\u2019s value is recognizing patterns you already built in earlier labs.",
-      setup: "None.",
-      simulate: "Go back through your own labs from Modules 7 through 10 and, for each of the 14 named patterns, write down which lab already reproduced it (Quorum \u2192 the Cassandra lab; Heartbeat/Lease \u2192 the etcd lab; Fencing Tokens \u2192 the Redlock lab; Checksum \u2192 any TCP capture from Module 2).",
-      observe: "How many of these 14 \u201cdistributed systems fundamentals\u201d you already touched hands-on without the formal name attached. The point is realizing the vocabulary was already earned, not learning it fresh.",
-      stretch: "For any pattern you cannot match to a lab you have already run, note it. That gap is exactly what lessons 11.2 through 11.12 exist to cover."
     }
   },
   keyTakeaways: [

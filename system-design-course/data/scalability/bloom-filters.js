@@ -53,11 +53,23 @@ window.COURSE_CONTENT["bloom-filters"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python (<code>bitarray</code>) or Node.js (<code>bloomfilter</code> npm), or Redis\u2019s built-in Bloom module (RedisBloom, free Docker image).",
-      setup: "Local and free: a small script, or <code>docker run -d -p 6379:6379 redis/redis-stack-server</code> (includes RedisBloom).",
-      simulate: "Insert 100,000 taken usernames into a filter sized for <code>m/n=10, k=7</code>. Check 10,000 usernames you know are NOT in the set and count how many the filter incorrectly says \u201cprobably taken,\u201d then compare that count against the predicted p\u22480.82%.",
-      observe: "Your measured false-positive rate lands close to the formula\u2019s prediction. Then resize to <code>m/n=15, k=10</code> and confirm the rate drops toward the predicted 0.03%.",
-      stretch: "Benchmark a real disk-backed lookup (query Postgres for \u201cdoes this username exist\u201d) against the same check gated behind a Bloom filter first (skip the DB call when the filter says \u201cdefinitely not\u201d), on a workload where most checked usernames do not exist."
+      goal: "Build a Bloom filter from scratch, insert 100,000 usernames, and confirm the measured false-positive rate lands right on the <code>m/n=10, k=7</code> formula prediction of p\u22480.82%.",
+      stack: "Python 3 only (standard library, uses <code>hashlib</code> with the double-hashing trick). Local and free.",
+      steps: [
+        {
+          title: "Write the Bloom filter",
+          body: "Derive K bit positions from two SHA-256 halves (<code>h_i = h1 + i*h2</code>), insert 100,000 names, then probe 10,000 names never inserted and count false positives. Save as <code>bloom.py</code>.",
+          code: "import hashlib\n\nclass Bloom:\n    def __init__(self, n, bits_per_item, k):\n        self.m = n * bits_per_item\n        self.k = k\n        self.bits = bytearray((self.m + 7) // 8)\n\n    def _positions(self, item):\n        d = hashlib.sha256(item.encode()).digest()\n        h1 = int.from_bytes(d[:8], \"big\")\n        h2 = int.from_bytes(d[8:16], \"big\")\n        return [(h1 + i * h2) % self.m for i in range(self.k)]\n\n    def add(self, item):\n        for p in self._positions(item):\n            self.bits[p >> 3] |= (1 << (p & 7))\n\n    def __contains__(self, item):\n        return all(self.bits[p >> 3] & (1 << (p & 7)) for p in self._positions(item))\n\ndef run(bits_per_item, k):\n    n, trials = 100000, 10000\n    bf = Bloom(n, bits_per_item, k)\n    for i in range(n):\n        bf.add(\"user\" + str(i))\n    fp = sum(1 for i in range(n, n + trials) if (\"user\" + str(i)) in bf)\n    print(\"m/n=%d k=%d -> false positives %d/%d = %.3f%%\"\n          % (bits_per_item, k, fp, trials, 100 * fp / trials))\n\nrun(10, 7)\nrun(15, 10)",
+          lang: "python"
+        },
+        {
+          title: "Run it",
+          code: "python3 bloom.py",
+          lang: "bash"
+        }
+      ],
+      observe: "At <code>m/n=10, k=7</code> the measured false-positive rate lands near the predicted p\u22480.82%, and there are zero false negatives (every never-inserted probe that returns true is a genuine false positive). The <code>m/n=15, k=10</code> run drops the rate toward the predicted 0.03%, more bits per item buying accuracy.",
+      stretch: "Gate a real lookup behind the filter: seed the 100,000 names into Redis or Postgres, then for a miss-heavy workload only query the store when the filter says \u201cprobably present.\u201d Count how many round trips the filter skips when most checked names do not exist."
     }
   },
   keyTakeaways: [

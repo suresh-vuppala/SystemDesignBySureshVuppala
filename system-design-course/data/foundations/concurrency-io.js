@@ -310,11 +310,34 @@ window.COURSE_CONTENT["concurrency-io"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js and Python both installed (to compare a non-blocking runtime against a naive blocking one); `hey` or `k6` for load.",
-      setup: "Local and free only.",
-      simulate: "Write a server that handles 500 concurrent requests, each doing a 1-second I/O wait (simulate with sleep/setTimeout, standing in for a slow DB call). Build it two ways: (a) Python with a thread-per-request model and (b) Node.js's default event loop. Load-test both with `hey -n 500 -c 500 <url>`.",
-      observe: "The thread-per-request version's memory footprint and thread count climbing with concurrency (watch it via top/Task Manager), versus the event-loop version handling the same 500 concurrent waits on a handful of OS threads. The \u201cone thread, thousands of connections\u201d claim, measured, plus its concurrency number confirmed against Little's Law (500 in flight = 500 req \u00d7 1 sec).",
-      stretch: "Swap the 1-second I/O wait for genuine CPU-bound work (a busy-loop computing primes) instead of a sleep, and watch the event-loop version degrade badly. This proves the Blocking-vs-Non-Blocking caveat directly: non-blocking I/O does nothing for CPU-bound work."
+      goal: "Serve 500 concurrent requests that each wait 1 second on I/O, once on Node's event loop and once with Python thread-per-request, and watch which model pays in threads and memory.",
+      stack: "Node.js and Python (both built-in HTTP servers), load-tested with <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Non-blocking server on Node's event loop",
+          body: "<code>setTimeout</code> stands in for a slow DB call; the single loop thread is free while each request waits. Save as <code>server.js</code>.",
+          code: "const http = require('http');\nhttp.createServer((req, res) => {\n  setTimeout(() => res.end('done\\n'), 1000); // non-blocking 1s I/O wait\n}).listen(3000, () => console.log('node event loop on :3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Thread-per-request server in Python",
+          body: "<code>ThreadingHTTPServer</code> hands each request its own thread, and <code>time.sleep</code> blocks that thread for the full second. Save as <code>server.py</code>.",
+          code: "import time\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\n\nclass Handler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        time.sleep(1)  # blocking 1s I/O wait, holds a thread\n        self.send_response(200)\n        self.end_headers()\n        self.wfile.write(b'done\\n')\n\nThreadingHTTPServer(('', 3001), Handler).serve_forever()",
+          lang: "python"
+        },
+        {
+          title: "Run both servers",
+          code: "node server.js     # terminal 1, port 3000\npython3 server.py  # terminal 2, port 3001",
+          lang: "bash"
+        },
+        {
+          title: "Fire 500 concurrent requests at each",
+          code: "hey -n 500 -c 500 http://localhost:3000/   # Node event loop\nhey -n 500 -c 500 http://localhost:3001/   # Python thread-per-request",
+          lang: "bash"
+        }
+      ],
+      observe: "The thread-per-request version's thread count and memory footprint climb with concurrency (watch <code>top</code> or Task Manager), while the event-loop version absorbs the same 500 concurrent waits on a handful of OS threads. That is the \u201cone thread, thousands of connections\u201d claim measured directly, and the concurrency number matches Little's Law (500 in flight \u2248 500 req/sec \u00d7 1 sec).",
+      stretch: "Swap the 1-second wait for genuine CPU-bound work (a busy loop computing primes) instead of a sleep, and watch the event-loop version degrade badly. That proves the caveat: non-blocking I/O does nothing for CPU-bound work."
     }
   },
   keyTakeaways: [

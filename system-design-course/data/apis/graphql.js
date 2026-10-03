@@ -32,11 +32,40 @@ window.COURSE_CONTENT["graphql"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js; Apollo Server or `graphql-yoga` (both free, npm-installable).",
-      setup: "Local and free only.",
-      simulate: "Build a schema with `User { id, name, orders: [Order] }` and a naive resolver where `orders` triggers one DB query per user. Query a list of 20 users each with their orders, and log every DB call your resolver makes.",
-      observe: "21 queries firing (1 for users plus 20 for each user's orders): the N+1 problem, reproduced exactly as named in Failure Modes. Then add DataLoader to batch the `orders` lookups and re-run the same query.",
-      stretch: "Send a deliberately deep, nested query (for example `user { orders { user { orders { user } } } }` nested 10 levels) against your unprotected schema and watch resolution time balloon. Then add `graphql-depth-limit` and confirm the same query is rejected before it ever resolves."
+      goal: "Reproduce the N+1 query problem with a naive GraphQL resolver, then batch it away with DataLoader.",
+      stack: "Node.js + Apollo Server + DataLoader, queried with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir gql-lab && cd gql-lab\nnpm init -y && npm pkg set type=module\nnpm install @apollo/server graphql dataloader",
+          lang: "bash"
+        },
+        {
+          title: "Define the schema and a naive resolver",
+          body: "The <code>orders</code> field fires one <code>db</code> call per user. Every call is logged so you can count them. Save as <code>server.js</code>.",
+          code: "import { ApolloServer } from '@apollo/server';\nimport { startStandaloneServer } from '@apollo/server/standalone';\n\nconst users = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, name: 'user ' + (i + 1) }));\n\n// stand-in for a per-user DB round trip\nfunction ordersForUser(id) {\n  console.log('DB call: orders for user ' + id);\n  return [{ id: id * 10, item: 'item ' + id }];\n}\n\nconst typeDefs = `#graphql\n  type Order { id: Int, item: String }\n  type User { id: Int, name: String, orders: [Order] }\n  type Query { users: [User] }\n`;\n\nconst resolvers = {\n  Query: { users: () => users },\n  User: { orders: (u) => ordersForUser(u.id) },\n};\n\nconst server = new ApolloServer({ typeDefs, resolvers });\nconst { url } = await startStandaloneServer(server, { listen: { port: 4000 } });\nconsole.log('GraphQL at ' + url);",
+          lang: "javascript"
+        },
+        {
+          title: "Run it and query 20 users with their orders",
+          code: "node server.js\n# in another terminal:\ncurl -s localhost:4000 -H 'Content-Type: application/json' -d '{\"query\":\"{ users { id name orders { id item } } }\"}' > /dev/null",
+          lang: "bash"
+        },
+        {
+          title: "Count the DB calls in the server log",
+          body: "You will see 1 fetch for the user list plus 20 for each user's orders: 21 round trips, the N+1 problem named in Failure Modes.",
+          code: "# server terminal shows 20 lines of 'DB call: orders for user N'",
+          lang: "bash"
+        },
+        {
+          title: "Batch the lookups with DataLoader",
+          body: "Wrap the per-user fetch in a loader that collects all ids in one tick and resolves them together. Swap the <code>orders</code> resolver.",
+          code: "import DataLoader from 'dataloader';\n\nfunction batchOrders(ids) {\n  console.log('DB call: orders for ids ' + ids.join(','));\n  return Promise.resolve(ids.map(id => [{ id: id * 10, item: 'item ' + id }]));\n}\n\n// create one loader per request, then:\n//   User: { orders: (u, _a, ctx) => ctx.loader.load(u.id) }\n// pass context: async () => ({ loader: new DataLoader(batchOrders) })",
+          lang: "javascript"
+        }
+      ],
+      observe: "The naive version logs 20 separate <code>orders for user N</code> lines (plus the user fetch = 21 trips). After DataLoader, the same query logs a single batched <code>orders for ids 1,2,...,20</code> line: 21 round trips collapse to 2.",
+      stretch: "Send a deliberately deep nested query such as <code>user { orders { user { orders { user } } } }</code> against the unprotected schema and watch resolution time balloon, then add <code>graphql-depth-limit</code> and confirm the same query is rejected before it resolves."
     }
   },
   keyTakeaways: [

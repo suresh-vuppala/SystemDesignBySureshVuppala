@@ -96,11 +96,35 @@ window.COURSE_CONTENT["throughput-numbers"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`redis-benchmark`, a Postgres client, and optionally `hey` or `k6`.",
-      setup: "Local and free: reuse your Redis and Postgres containers from earlier labs.",
-      simulate: "Run `redis-benchmark -q` with defaults and note the reported ops/sec for SET and GET. Then run a sustained write benchmark against Postgres (a script doing 100,000 single-row inserts) and compute its inserts/sec. Compare both against the table above.",
-      observe: "Your two numbers should land in the expected relative order: Redis dramatically higher than a single-writer Postgres insert loop. That is the abstract comparison table turned into something you measured yourself.",
-      stretch: "Batch the Postgres inserts (a single multi-row INSERT, or a transaction wrapping 1,000 inserts) and remeasure. Quantify how much throughput a simple batching change buys, connecting directly back to the I/O-bound concurrency lesson."
+      goal: "Measure Redis ops/sec against single-row Postgres inserts/sec so the abstract throughput table becomes two numbers you produced.",
+      stack: "Redis and Postgres in Docker with the bundled <code>redis-benchmark</code> and <code>psql</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis and Postgres",
+          code: "docker run -d --name redis -p 6379:6379 redis\ndocker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres",
+          lang: "bash"
+        },
+        {
+          title: "Benchmark Redis SET and GET",
+          body: "Note the ops/sec it reports for each.",
+          code: "docker exec redis redis-benchmark -t set,get -n 100000 -q",
+          lang: "bash"
+        },
+        {
+          title: "Time 100,000 single-row Postgres inserts",
+          body: "One INSERT per statement is the slow, honest baseline. Read the <code>real</code> time it prints.",
+          code: "docker exec -i pg psql -U postgres -c \"CREATE TABLE t(id serial primary key, v int);\"\ndocker exec -i pg bash -c 'time (for i in $(seq 1 100000); do echo \"INSERT INTO t(v) VALUES ($i);\"; done | psql -U postgres -q)'",
+          lang: "bash"
+        },
+        {
+          title: "Divide 100000 by that time and compare",
+          body: "Set the inserts/sec you just computed next to the Redis ops/sec from step 2.",
+          code: "docker exec -i pg psql -U postgres -c \"SELECT count(*) FROM t;\"",
+          lang: "bash"
+        }
+      ],
+      observe: "Redis reports well into the 100K+ ops/sec range while the single-row insert loop lands orders of magnitude lower: the relative ordering from the throughput table, measured rather than asserted. The gap is per-statement round-trip and commit cost, not raw CPU.",
+      stretch: "Wrap the inserts in one transaction (<code>BEGIN ... COMMIT</code>) or use a single multi-row INSERT and remeasure: batching lifts Postgres inserts/sec dramatically, connecting straight back to the I/O-bound concurrency lesson (1.7)."
     }
   },
   keyTakeaways: [

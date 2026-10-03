@@ -1,4 +1,4 @@
-/* DP Engine — shared styles for Play / Expand diagram player */
+/* DP Engine, shared styles for Play / Expand diagram player */
 .dp-panel{position:relative;display:block}
 .dp-panel .dp-el{transition:opacity .25s ease}
 .dp-stepped .dp-el{opacity:0}

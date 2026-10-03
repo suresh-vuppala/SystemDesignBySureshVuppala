@@ -41,11 +41,36 @@ window.COURSE_CONTENT["redis-cluster"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Compose; `redis-cli`.",
-      setup: "Local and free: a 6-node Redis Cluster via `docker-compose` (3 primaries + 3 replicas is the standard minimal topology; use `redis-cli --cluster create` once the 6 containers are up).",
-      simulate: "Connect with `redis-cli -c` (cluster mode) and set keys with and without hash tags: `SET user:123:name Alice` and `SET user:123:email a@x.com` (may land on different slots) vs `SET {user:123}:name Alice` and `SET {user:123}:email a@x.com` (forced onto the same slot). Try an `MGET` across both pairs.",
-      observe: "The non-tagged keys potentially triggering a `MOVED` redirect or a cross-slot error on a multi-key operation, while the tagged pair always succeeds, the hash-tag mechanism working exactly as described.",
-      stretch: "Kill one primary node and watch `redis-cli --cluster check` report a failover to its replica, then confirm keys in that node's slot range are still reachable through the cluster (redirected automatically) with no client-side reconfiguration needed."
+      goal: "Stand up a 6-node Redis Cluster and see hash tags force related keys onto one slot so multi-key operations survive sharding.",
+      stack: "A local 6-node cluster (3 primaries + 3 replicas) in Docker, driven from <code>redis-cli -c</code>. Local and free.",
+      steps: [
+        {
+          title: "Launch a 6-node cluster locally",
+          body: "This image boots 3 primaries and 3 replicas on ports 7000-7005 and runs <code>redis-cli --cluster create</code> for you.",
+          code: "docker run -d --name redis-cluster -p 7000-7005:7000-7005 -e IP=0.0.0.0 grokzen/redis-cluster:latest\nsleep 15",
+          lang: "bash"
+        },
+        {
+          title: "Confirm the topology",
+          body: "You should see 3 masters, each owning a slice of the 16,384 hash slots.",
+          code: "docker exec redis-cluster redis-cli -p 7000 cluster info\ndocker exec redis-cluster redis-cli -p 7000 cluster nodes",
+          lang: "bash"
+        },
+        {
+          title: "Set untagged keys and watch them scatter",
+          body: "In cluster mode (<code>-c</code>) the client follows <code>MOVED</code> redirects. These two keys may hash to different slots.",
+          code: "docker exec -it redis-cluster redis-cli -c -p 7000 SET user:123:name Alice\ndocker exec -it redis-cluster redis-cli -c -p 7000 SET user:123:email a@x.com\ndocker exec -it redis-cluster redis-cli -c -p 7000 MGET user:123:name user:123:email",
+          lang: "bash"
+        },
+        {
+          title: "Force related keys onto one slot with a hash tag",
+          body: "The <code>{user:123}</code> braces mean only that substring is hashed, so both keys share a slot and cross-key ops work.",
+          code: "docker exec -it redis-cluster redis-cli -c -p 7000 SET '{user:123}:name' Alice\ndocker exec -it redis-cluster redis-cli -c -p 7000 SET '{user:123}:email' a@x.com\ndocker exec -it redis-cluster redis-cli -c -p 7000 MGET '{user:123}:name' '{user:123}:email'",
+          lang: "bash"
+        }
+      ],
+      observe: "The untagged <code>MGET</code> can fail with <code>CROSSSLOT Keys ... must hash to the same slot</code> (or trigger a <code>MOVED</code> hop), while the tagged pair always lands on one slot and returns both values: the hash-tag mechanism working exactly as described.",
+      stretch: "Kill one primary (<code>redis-cli -p 7000 shutdown nosave</code> for the right port) and watch <code>redis-cli --cluster check 127.0.0.1:7000</code> report a failover to its replica, then confirm keys in that slot range are still reachable through the cluster with no client-side reconfiguration."
     }
   },
   keyTakeaways: [

@@ -84,11 +84,44 @@ window.COURSE_CONTENT["load-balancer"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker, plus NGINX or HAProxy.",
-      setup: "Local and free: 3 Docker containers each running a tiny HTTP server that responds with its own container ID (`docker run -d -p 808X:80 ...`), plus an NGINX container configured as a Round Robin load balancer in front of them. Cloud free-tier: an AWS ALB with 3 free-tier EC2 targets.",
-      simulate: "Hit the load balancer's address 30 times in a row with `curl` in a loop and log which backend container ID answers each time. Switch the NGINX config from Round Robin to IP Hash and repeat from the same client IP.",
-      observe: "Round Robin cycles evenly across all 3 backends, while IP Hash sends every one of your 30 requests to the exact same backend, the sticky-session mechanism observed as a pattern in your own logs. Then stop one container and confirm the LB's health check removes it from rotation within a few seconds.",
-      stretch: "Switch the LB to Least Connections, artificially make one backend slow (add a `sleep` to its handler), and watch the LB route proportionally fewer new requests to it as its connection count climbs."
+      goal: "Stand up an NGINX Round Robin load balancer over 3 identical backends, watch requests spread evenly, then switch to IP Hash and watch them pin to one backend.",
+      stack: "NGINX plus 3 <code>traefik/whoami</code> backends in Docker, driven with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start 3 backends on one Docker network",
+          body: "Each <code>whoami</code> backend replies with its own hostname, so you can tell which one answered.",
+          code: "docker network create lbnet\ndocker run -d --name be1 --network lbnet traefik/whoami\ndocker run -d --name be2 --network lbnet traefik/whoami\ndocker run -d --name be3 --network lbnet traefik/whoami",
+          lang: "bash"
+        },
+        {
+          title: "Write a Round Robin NGINX config",
+          code: "cat > nginx.conf <<'EOF'\nevents {}\nhttp {\n  upstream backends {\n    server be1:80;\n    server be2:80;\n    server be3:80;\n  }\n  server {\n    listen 80;\n    location / { proxy_pass http://backends; }\n  }\n}\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "Start NGINX in front of the pool",
+          code: "docker run -d --name lb --network lbnet -p 8080:80 \\\n  -v \"$PWD/nginx.conf:/etc/nginx/nginx.conf:ro\" nginx",
+          lang: "bash"
+        },
+        {
+          title: "Send 30 requests and tally who answered",
+          code: "for i in $(seq 30); do curl -s http://localhost:8080/ | grep Hostname; done | sort | uniq -c",
+          lang: "bash"
+        },
+        {
+          title: "Switch to IP Hash and repeat",
+          body: "Add <code>ip_hash;</code> to the upstream, reload NGINX, and rerun the loop from the same client IP.",
+          code: "sed -i 's/upstream backends {/upstream backends {\\n    ip_hash;/' nginx.conf\ndocker cp nginx.conf lb:/etc/nginx/nginx.conf\ndocker exec lb nginx -s reload\nfor i in $(seq 30); do curl -s http://localhost:8080/ | grep Hostname; done | sort | uniq -c",
+          lang: "bash"
+        },
+        {
+          title: "Kill a backend and watch it drop out",
+          code: "docker stop be2\nfor i in $(seq 10); do curl -s http://localhost:8080/ | grep Hostname; done | sort | uniq -c",
+          lang: "bash"
+        }
+      ],
+      observe: "Round Robin spreads the 30 requests roughly 10/10/10 across all three hostnames; IP Hash sends every one of them to a single backend (sticky sessions, seen in your own tally). After <code>docker stop be2</code>, NGINX routes only to the survivors within a few seconds as its health check drops the dead one.",
+      stretch: "Switch the upstream to <code>least_conn</code>, make one backend slow (put it behind a handler that sleeps), and watch the balancer send proportionally fewer new requests to it as its open-connection count climbs."
     }
   },
   keyTakeaways: [

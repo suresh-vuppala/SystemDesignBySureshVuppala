@@ -41,10 +41,28 @@ window.COURSE_CONTENT["data-quality"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python; Great Expectations (<code>pip install great_expectations</code>, free).",
-      setup: "Local and free only.",
-      simulate: "Define expectations on your orders dataset: <code>expect_column_values_to_not_be_null(\"user_id\")</code>, <code>expect_column_values_to_be_between(\"score\", 0, 100)</code>, and a freshness check on the max timestamp. Run the validation against clean data (should pass), then inject a few bad rows (a null <code>user_id</code>, a <code>score</code> of 150) and rerun.",
-      observe: "Great Expectations produces a clear, itemized report of exactly which rows and which rule failed, instead of a downstream job silently consuming garbage and producing wrong aggregates: the quarantine-before-consumption principle working as a gate you can wire into a pipeline step.",
+      goal: "Put a Great Expectations quality gate in front of an orders dataset, watch clean data pass, then inject bad rows and get an itemized report of exactly which rule and how many rows failed.",
+      stack: "Python + Great Expectations validating a pandas DataFrame. Local and free.",
+      steps: [
+        {
+          title: "Install Great Expectations",
+          body: "Pin below 1.0 for the simple <code>from_pandas</code> validation API.",
+          code: "pip install \"great_expectations<1.0\" pandas",
+          lang: "bash"
+        },
+        {
+          title: "Define expectations and run them on clean then bad data",
+          body: "Same checks both times: <code>user_id</code> not null and <code>score</code> between 0 and 100. Save as <code>validate.py</code>.",
+          code: "import pandas as pd\nimport great_expectations as gx\n\ndef check(label, df):\n    g = gx.from_pandas(df)\n    results = [\n        (\"user_id not null\", g.expect_column_values_to_not_be_null(\"user_id\")),\n        (\"score in 0..100\", g.expect_column_values_to_be_between(\"score\", min_value=0, max_value=100)),\n    ]\n    print(\"==\", label, \"==\")\n    for name, r in results:\n        status = \"PASS\" if r.success else \"FAIL\"\n        bad = r.result.get(\"unexpected_count\", 0)\n        print(f\"  {name}: {status} (offending rows: {bad})\")\n\ncheck(\"clean\", pd.DataFrame({\"user_id\": [1, 2, 3], \"score\": [10, 55, 99]}))\ncheck(\"bad\",   pd.DataFrame({\"user_id\": [1, None, 3], \"score\": [10, 150, 99]}))",
+          lang: "python"
+        },
+        {
+          title: "Run the gate",
+          code: "python validate.py",
+          lang: "bash"
+        }
+      ],
+      observe: "The clean run reports all PASS; the bad run flips <code>user_id not null</code> and <code>score in 0..100</code> to FAIL with the exact offending-row counts, instead of a downstream job silently consuming garbage and producing wrong aggregates: the quarantine-before-consumption principle working as a gate you can wire into a pipeline step.",
       stretch: "Wire the validation as a dbt test (<code>dbt test</code>) directly on your 12.2 dbt models and configure it to fail the pipeline run (not just warn) when a critical check fails: quality enforced as a build step, not an afterthought."
     }
   },

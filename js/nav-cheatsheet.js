@@ -178,7 +178,7 @@ document.querySelectorAll('#topicNav .nc').forEach(card => {
   rail.id = 'pageRail';
   rail.setAttribute('aria-label','On this page');
   // Use module name from filename (e.g. "09-consistency.html" → "9. Consistency")
-  var pageTitle = document.title.split('—')[0].trim();
+  var pageTitle = document.title.split(', ')[0].trim();
   var moduleMatch = page.match(/^(\d+)-(.+)\.html$/);
   if(moduleMatch){
     pageTitle = parseInt(moduleMatch[1]) + '. ' + moduleMatch[2].replace(/-/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });

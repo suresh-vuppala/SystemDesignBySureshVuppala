@@ -1,4 +1,4 @@
-/* Firebase client config — this is PUBLIC configuration (not a secret).
+/* Firebase client config, this is PUBLIC configuration (not a secret).
    Firebase API keys are safe to expose in client code.
    Security is enforced by Firebase Auth + Firestore Security Rules.
    See: https://firebase.google.com/docs/projects/api-keys */

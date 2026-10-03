@@ -39,11 +39,35 @@ window.COURSE_CONTENT["redis"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); `redis-cli`.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis`.",
-      simulate: "Build a leaderboard with `ZADD leaderboard 1500 \"alice\"`, `ZADD leaderboard 2200 \"bob\"`, add 8 more players, then get the top 5 with `ZREVRANGE leaderboard 0 4 WITHSCORES`, no application-side sorting at all. Separately, count unique visitors with `PFADD visitors:today user1 user2 ...` for 100,000 synthetic user IDs and compare `PFCOUNT visitors:today` against the true distinct count.",
-      observe: "`ZREVRANGE`'s output already sorted, and `PFCOUNT` landing within roughly 1% of the true count while `MEMORY USAGE visitors:today` reports only a few KB whether you inserted 10,000 or 10,000,000 IDs, the fixed ~12KB claim verified.",
-      stretch: "Build a simple job queue with `LPUSH jobs '{\"task\":\"resize\"}'` and 3 worker scripts calling `BRPOP jobs 0` in a loop. Start all 3, push 10 jobs, and watch them get distributed across workers with no job processed twice."
+      goal: "Prove Redis is a data-structure server by building a leaderboard and a unique-visitor counter with zero application-side logic.",
+      stack: "Redis in Docker, driven entirely from <code>redis-cli</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis and open a CLI",
+          code: "docker run -d --name redis -p 6379:6379 redis\ndocker exec -it redis redis-cli",
+          lang: "bash"
+        },
+        {
+          title: "Build a leaderboard with a Sorted Set",
+          body: "Add 10 players with scores, then read the top 5 already ranked. No sorting in your code.",
+          code: "ZADD leaderboard 1500 alice 2200 bob 1800 carol 900 dave 3100 erin\nZADD leaderboard 2600 frank 1200 grace 2900 heidi 700 ivan 2000 judy\nZREVRANGE leaderboard 0 4 WITHSCORES",
+          lang: "bash"
+        },
+        {
+          title: "Count 100,000 unique visitors with HyperLogLog",
+          body: "Load synthetic ids from the shell, then compare the estimate to the true count of 100000.",
+          code: "docker exec redis sh -c 'for i in $(seq 1 100000); do echo \"PFADD visitors:today user$i\"; done | redis-cli'\ndocker exec redis redis-cli PFCOUNT visitors:today",
+          lang: "bash"
+        },
+        {
+          title: "Check the memory footprint",
+          body: "A HyperLogLog stays around 12KB no matter how many ids you add.",
+          code: "docker exec redis redis-cli MEMORY USAGE visitors:today",
+          lang: "bash"
+        }
+      ],
+      observe: "<code>ZREVRANGE</code> returns players already sorted by score, and <code>PFCOUNT</code> lands within roughly 1% of the true 100,000 while <code>MEMORY USAGE</code> reports only a few KB whether you inserted 10,000 or 10,000,000 ids: the fixed \u224812KB claim verified.",
+      stretch: "Build a simple job queue with <code>LPUSH jobs '{\"task\":\"resize\"}'</code> and 3 worker shells each calling <code>BRPOP jobs 0</code> in a loop. Push 10 jobs and watch them distribute across workers with no job processed twice."
     }
   },
   keyTakeaways: [

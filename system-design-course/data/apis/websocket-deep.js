@@ -151,11 +151,41 @@ window.COURSE_CONTENT["websocket-deep"] = {
     },
 
     handsOn: {
-      prerequisites: "Node.js with the `ws` library; Docker for Redis.",
-      setup: "Local and free: start with one Node.js WebSocket server, then a second on another port (simulating 2 app servers) plus `docker run -d -p 6379:6379 redis` for fan-out.",
-      simulate: "Build your first WebSocket: a server that accepts a connection and echoes any message back, and a browser client that opens `ws://localhost:PORT`, logs `onopen`/`onmessage`/`onclose`, and sends a line on a button click. Watch the Network tab show the `101 Switching Protocols` handshake, then frames instead of new requests. Next, add fan-out: run 2 servers, have both `SUBSCRIBE chat` on Redis, connect Client A to server-1 and Client B to server-2; when A sends, server-1 does `PUBLISH chat <msg>` and server-2 pushes it to B.",
-      observe: "First, the single `101` handshake followed by frames with no further HTTP requests, the persistent connection made visible. Then Client B receiving a message that originated on a server it never connected to (fan-out working end to end). Kill server-1 mid-conversation and watch Client A\u2019s `onclose` fire with code `1006`.",
-      stretch: "Add a ping/pong heartbeat and the exponential-backoff-with-jitter reconnect formula on the client, then kill and restart the server 3 times and log each reconnect attempt\u2019s actual delay to confirm it grows and jitters as specified."
+      goal: "Build a WebSocket echo server, see the <code>101</code> upgrade, then fan a message across two servers so a client receives it from a server it never connected to.",
+      stack: "Node.js + <code>ws</code> + Redis Pub/Sub (Docker), tested with <code>wscat</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis and set up the project",
+          code: "docker run -d --name redis -p 6379:6379 redis\nmkdir ws-lab && cd ws-lab\nnpm init -y && npm install ws ioredis",
+          lang: "bash"
+        },
+        {
+          title: "Write a minimal echo server",
+          body: "It accepts a connection and echoes every message back. Save as <code>echo.js</code>.",
+          code: "const { WebSocketServer } = require('ws');\nconst wss = new WebSocketServer({ port: 3001 });\nwss.on('connection', (ws) => {\n  ws.on('message', (m) => ws.send('echo: ' + m));\n});\nconsole.log('echo ws on ws://localhost:3001');",
+          lang: "javascript"
+        },
+        {
+          title: "Connect and watch frames replace requests",
+          body: "Run the server, then connect. Anything you type comes straight back over the one open connection.",
+          code: "node echo.js &\nnpx wscat -c ws://localhost:3001\n# type 'hi' and see 'echo: hi'",
+          lang: "bash"
+        },
+        {
+          title: "Add cross-server fan-out via Redis Pub/Sub",
+          body: "Each server subscribes to <code>chat</code>; an inbound message is published, and every server pushes it to its own clients. Reads <code>PORT</code> from the env. Save as <code>fanout.js</code>.",
+          code: "const { WebSocketServer } = require('ws');\nconst Redis = require('ioredis');\nconst port = Number(process.env.PORT) || 3001;\nconst pub = new Redis();\nconst sub = new Redis();\nconst wss = new WebSocketServer({ port });\n\nsub.subscribe('chat');\nsub.on('message', (_ch, msg) => wss.clients.forEach(c => c.send(msg)));\n\nwss.on('connection', (ws) => {\n  ws.on('message', (data) => pub.publish('chat', data.toString()));\n});\nconsole.log('fan-out ws on ' + port);",
+          lang: "javascript"
+        },
+        {
+          title: "Run two servers and connect one client to each",
+          body: "Client A talks to server 3001, Client B to server 3002. Send from A and watch it reach B.",
+          code: "PORT=3001 node fanout.js &\nPORT=3002 node fanout.js &\n# terminal A:\nnpx wscat -c ws://localhost:3001\n# terminal B:\nnpx wscat -c ws://localhost:3002",
+          lang: "bash"
+        }
+      ],
+      observe: "In the browser Network tab the connection shows a single <code>101 Switching Protocols</code> handshake, then frames with no further HTTP requests. In the fan-out run, Client B receives a message that originated on a server it never connected to. Kill server 3001 mid-conversation and Client A's <code>onclose</code> fires with code <code>1006</code>.",
+      stretch: "Add a ping/pong heartbeat and an exponential-backoff-with-jitter reconnect on the client, then kill and restart the server three times and log each reconnect's actual delay to confirm it grows and jitters."
     }
   },
   keyTakeaways: [

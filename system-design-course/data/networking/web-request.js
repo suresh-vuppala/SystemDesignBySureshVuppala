@@ -39,11 +39,36 @@ window.COURSE_CONTENT["web-request"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A Chrome or Firefox browser (DevTools built in).",
-      setup: "None, this uses the browser you already have.",
-      simulate: "Open DevTools' Network tab, hard-refresh (Ctrl+Shift+R) a site you don't visit often (so DNS and TLS aren't warm), and click the very first request. Read its timing waterfall: DNS Lookup, Initial Connection (TCP), SSL (TLS), Waiting (TTFB), Content Download, the same 8 steps with real millisecond numbers next to each.",
-      observe: "Which step actually dominates for that site, often DNS or TLS on a cold connection, almost always \u201cWaiting\u201d (server processing) if the backend is slow. Reload once more and watch DNS and Connection collapse to ~0ms on the warm cache and connection.",
-      stretch: "Repeat on a site served over HTTP/2 vs one still on HTTP/1.1 (check the \u201cProtocol\u201d column), and open 6+ resources from the same origin to see HTTP/1.1's per-connection request limit vs HTTP/2 multiplexing them over one."
+      goal: "Measure where each millisecond of a page load actually goes, mapping real numbers onto the 8-step journey from DNS to render.",
+      stack: "<code>curl</code> timing output plus your browser's DevTools Network tab and console. Local and free.",
+      steps: [
+        {
+          title: "Break a page load into its phases from the command line",
+          body: "curl's <code>-w</code> prints the timing of each connection phase, and each line maps to a step in the journey.",
+          code: "curl -w \"dns:   %{time_namelookup}s\\ntcp:   %{time_connect}s\\ntls:   %{time_appconnect}s\\nttfb:  %{time_starttransfer}s\\ntotal: %{time_total}s\\n\" -o /dev/null -s https://example.com",
+          lang: "bash"
+        },
+        {
+          title: "Run it twice to feel a warm connection",
+          body: "The second call reuses the OS DNS cache, so <code>time_namelookup</code> drops toward zero. Connection setup (steps 2 to 4) is overhead you pay once.",
+          code: "for i in 1 2; do curl -w \"run $i  dns=%{time_namelookup}s  tcp=%{time_connect}s  total=%{time_total}s\\n\" -o /dev/null -s https://example.com; done",
+          lang: "bash"
+        },
+        {
+          title: "Read the same phases inside the browser",
+          body: "Open DevTools (F12), the Network tab, tick <strong>Disable cache</strong>, hard-refresh with Ctrl+Shift+R, then paste this in the Console to print the Navigation Timing breakdown.",
+          code: "const t = performance.getEntriesByType('navigation')[0];\nconsole.table({\n  dns: t.domainLookupEnd - t.domainLookupStart,\n  tcp: t.connectEnd - t.connectStart,\n  tls: t.secureConnectionStart ? t.connectEnd - t.secureConnectionStart : 0,\n  ttfb: t.responseStart - t.requestStart,\n  download: t.responseEnd - t.responseStart,\n  render: t.domComplete - t.responseEnd\n});",
+          lang: "javascript"
+        },
+        {
+          title: "Check which HTTP version you negotiated",
+          body: "HTTP/2 multiplexes many requests over one connection, so it does not need the ~6 parallel sockets HTTP/1.1 opens per origin.",
+          code: "curl -sI -o /dev/null -w \"http_version=%{http_version}\\n\" https://example.com",
+          lang: "bash"
+        }
+      ],
+      observe: "On the first curl run, <code>time_namelookup</code> and <code>time_connect</code> are real costs; on the second they collapse toward 0 because DNS and the route are warm. In the DevTools waterfall, look at which band is widest: DNS or TLS on a cold connection, or <strong>Waiting (TTFB)</strong> when the backend is slow.",
+      stretch: "Run the version check against a site on HTTP/2 and one still on HTTP/1.1 and compare. Then in DevTools open a page with 6+ resources from one origin and watch HTTP/1.1 queue them across ~6 connections while HTTP/2 multiplexes them over a single one."
     }
   },
   keyTakeaways: [

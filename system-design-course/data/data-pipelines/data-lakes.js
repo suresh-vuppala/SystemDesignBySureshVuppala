@@ -39,9 +39,37 @@ window.COURSE_CONTENT["data-lakes"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python (<code>pyarrow</code>, <code>pandas</code>); MinIO or an S3 free tier for the lake storage.",
-      setup: "Local and free: MinIO (<code>docker run -d -p 9000:9000 minio/minio server /data</code>) as an S3-compatible bucket.",
-      simulate: "Write your 1M-row orders dataset as both a CSV and a Parquet file, upload both to your MinIO bucket, and compare file sizes. Query just 2 columns out of 20 from each format using <code>pyarrow</code> (which reads Parquet column-by-column without loading the whole file) versus <code>pandas.read_csv</code> (which must parse every column).",
+      goal: "Write a 20-column, 1M-row dataset to a MinIO bucket as both CSV and Parquet, then prove Parquet is far smaller and that reading 2 columns out of 20 is much cheaper.",
+      stack: "MinIO (S3-compatible object store) in Docker + Python (pandas, pyarrow, s3fs). Local and free.",
+      steps: [
+        {
+          title: "Start MinIO as an S3-compatible bucket store",
+          code: "docker run -d --name minio -p 9000:9000 -p 9001:9001 \\\n  -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \\\n  minio/minio server /data --console-address \":9001\"",
+          lang: "bash"
+        },
+        {
+          title: "Install the Python client libraries",
+          code: "pip install pandas pyarrow s3fs",
+          lang: "bash"
+        },
+        {
+          title: "Write the same data as CSV and Parquet",
+          body: "18 filler columns plus <code>category</code> and <code>revenue</code>, uploaded straight to the lake bucket. Save as <code>write_lake.py</code>.",
+          code: "import numpy as np, pandas as pd, s3fs\n\nstorage = {\"key\": \"minioadmin\", \"secret\": \"minioadmin\",\n           \"client_kwargs\": {\"endpoint_url\": \"http://localhost:9000\"}}\nfs = s3fs.S3FileSystem(**storage)\nif not fs.exists(\"lake\"):\n    fs.mkdir(\"lake\")\n\nn = 1_000_000\ndf = pd.DataFrame({f\"col{i}\": np.random.rand(n) for i in range(18)})\ndf[\"category\"] = np.random.choice([\"books\", \"toys\", \"food\"], n)\ndf[\"revenue\"] = np.random.rand(n) * 100\n\ndf.to_csv(\"s3://lake/orders.csv\", index=False, storage_options=storage)\ndf.to_parquet(\"s3://lake/orders.parquet\", index=False, storage_options=storage)\nprint(\"uploaded both\")",
+          lang: "python"
+        },
+        {
+          title: "Compare sizes and time a 2-column read of each",
+          body: "Parquet reads only the 2 column chunks it needs; CSV must scan every row. Save as <code>compare.py</code>.",
+          code: "import time, pandas as pd, s3fs\n\nstorage = {\"key\": \"minioadmin\", \"secret\": \"minioadmin\",\n           \"client_kwargs\": {\"endpoint_url\": \"http://localhost:9000\"}}\nfs = s3fs.S3FileSystem(**storage)\nprint(\"csv bytes    :\", fs.info(\"lake/orders.csv\")[\"size\"])\nprint(\"parquet bytes:\", fs.info(\"lake/orders.parquet\")[\"size\"])\n\nt = time.time()\npd.read_csv(\"s3://lake/orders.csv\", usecols=[\"category\", \"revenue\"], storage_options=storage)\nprint(\"csv 2-col read    :\", round(time.time() - t, 2))\n\nt = time.time()\npd.read_parquet(\"s3://lake/orders.parquet\", columns=[\"category\", \"revenue\"], storage_options=storage)\nprint(\"parquet 2-col read:\", round(time.time() - t, 2))",
+          lang: "python"
+        },
+        {
+          title: "Run both scripts",
+          code: "python write_lake.py\npython compare.py",
+          lang: "bash"
+        }
+      ],
       observe: "The Parquet file lands roughly 10x smaller than the CSV, and the column-selective Parquet read finishes noticeably faster than the CSV read that parses columns you do not even want. Put your own numbers next to the roughly 10x smaller than CSV claim.",
       stretch: "Install Delta Lake or Iceberg locally (both have free, pip/Docker-installable versions), write the same data as a Delta table, update a few rows, then use time travel to query the table as of the version before your update: a lakehouse feature a plain Parquet-on-S3 setup does not have."
     }

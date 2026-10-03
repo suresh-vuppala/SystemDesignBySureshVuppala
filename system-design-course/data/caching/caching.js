@@ -55,11 +55,44 @@ window.COURSE_CONTENT["caching"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis + Postgres); Node.js or Python; `redis-benchmark` (ships with Redis) and `k6` or `hey`.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis` and `docker run -d -p 5432:5432 postgres`. Cloud free-tier: AWS ElastiCache free tier plus RDS free tier for the real-infra version.",
-      simulate: "Seed Postgres with a `products` table (10,000 rows) and build `GET /products/:id` two ways: (a) hits Postgres directly every time, (b) Cache-Aside, checks Redis first, on a miss reads Postgres and writes the result to Redis with `EXPIRE 300`. Load-test both at 1,000 concurrent users, 10,000 requests, with 80% of requests hitting the same 20% of product IDs: `hey -n 10000 -c 1000 <url>`.",
-      observe: "Version (a)'s p99 latency and Postgres CPU (`docker stats`) climb under load, while version (b)'s p99 stays flat once the cache warms. Measure your own hit rate with `redis-cli INFO stats` (`keyspace_hits` / (`keyspace_hits`+`keyspace_misses`)) and compare against the above-95% benchmark.",
-      stretch: "Implement Write-Through on `PUT /products/:id` (write Postgres and Redis in one request) and confirm a read right after a write is never stale. Then implement Write-Back instead (Redis only, flush to Postgres every 10s) and measure how much faster writes get, and how much data you would lose if the process crashed before a flush."
+      goal: "Put Redis in front of Postgres with Cache-Aside and watch p99 latency and database load collapse under identical traffic.",
+      stack: "Redis + Postgres + Node.js in Docker, load-tested with <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis and Postgres",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker run -d --name redis -p 6379:6379 redis",
+          lang: "bash"
+        },
+        {
+          title: "Seed 10,000 products",
+          code: "docker exec -i pg psql -U postgres -c \"CREATE TABLE products(id int primary key, name text, price numeric);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO products SELECT g, 'product '||g, (random()*100)::numeric(10,2) FROM generate_series(1,10000) g;\"",
+          lang: "bash"
+        },
+        {
+          title: "Build the same endpoint two ways",
+          body: "<code>/direct/:id</code> always hits Postgres. <code>/cached/:id</code> checks Redis first and only reads Postgres on a miss, then backfills with a 5-minute TTL. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst { Pool } = require('pg');\nconst Redis = require('ioredis');\n\nconst pg = new Pool({ host: 'localhost', user: 'postgres', password: 'pw' });\nconst redis = new Redis();\nconst app = express();\n\n// (a) always hits the database\napp.get('/direct/:id', async (req, res) => {\n  const { rows } = await pg.query('SELECT * FROM products WHERE id = $1', [req.params.id]);\n  res.json(rows[0]);\n});\n\n// (b) cache-aside: Redis first, DB on miss, then backfill\napp.get('/cached/:id', async (req, res) => {\n  const key = 'product:' + req.params.id;\n  const hit = await redis.get(key);\n  if (hit) return res.json(JSON.parse(hit));\n  const { rows } = await pg.query('SELECT * FROM products WHERE id = $1', [req.params.id]);\n  await redis.set(key, JSON.stringify(rows[0]), 'EX', 300);\n  res.json(rows[0]);\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Install dependencies and run it",
+          code: "npm init -y && npm install express pg ioredis\nnode server.js",
+          lang: "bash"
+        },
+        {
+          title: "Load-test both paths with identical traffic",
+          body: "Same hot key both times: the direct path pays the database on every request; cache-aside pays once, then serves from RAM.",
+          code: "hey -n 20000 -c 200 http://localhost:3000/direct/42\nhey -n 20000 -c 200 http://localhost:3000/cached/42",
+          lang: "bash"
+        },
+        {
+          title: "Read your cache hit rate",
+          code: "docker exec redis redis-cli INFO stats | grep keyspace",
+          lang: "bash"
+        }
+      ],
+      observe: "The <code>/direct</code> run's p99 and Postgres CPU (watch <code>docker stats pg</code>) climb with load, while <code>/cached</code> stays flat and low once warm. Your <code>keyspace_hits / (keyspace_hits + keyspace_misses)</code> should sit above 0.95 after the first request, the same above-95% benchmark real systems target.",
+      stretch: "Add <code>PUT /cached/:id</code> as Write-Through (update Postgres and Redis in one request) and confirm a read right after a write is never stale. Then try Write-Back instead (write Redis only, flush to Postgres every 10s) and reason about exactly how many writes you would lose if the process crashed before a flush."
     }
   },
   keyTakeaways: [

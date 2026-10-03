@@ -65,11 +65,34 @@ window.COURSE_CONTENT["db-indexing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Postgres); `psql` or any SQL client.",
-      setup: "Local and free: `docker run -d -p 5432:5432 postgres`.",
-      simulate: "Create a `users` table, seed it with 500,000 rows (`generate_series` makes this a one-liner), then run `EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'user250000@test.com'` with no index on `email`. Add `CREATE INDEX idx_email ON users(email)` and run the exact same query again.",
-      observe: "The query plan switches from \u201cSeq Scan\u201d (reads all 500K rows) to \u201cIndex Scan\u201d (reads a handful of blocks), and the reported execution time drops from milliseconds-times-hundreds-of-thousands-of-rows to near-instant. Note the actual numbers `EXPLAIN ANALYZE` reports for both.",
-      stretch: "Build a covering index (`CREATE INDEX ... ON users(email) INCLUDE (name)`) and confirm via `EXPLAIN ANALYZE` that the plan now shows \u201cIndex Only Scan,\u201d the table itself is never touched, exactly the \u201cno table access needed\u201d property."
+      goal: "Watch a Postgres query plan flip from a full <code>Seq Scan</code> over 500,000 rows to an <code>Index Scan</code> that reads a handful of blocks, and read the before/after timings straight out of <code>EXPLAIN ANALYZE</code>.",
+      stack: "Postgres in Docker, driven with <code>psql</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres",
+          lang: "bash"
+        },
+        {
+          title: "Seed 500,000 users in one line",
+          body: "<code>generate_series</code> makes the seed a single statement.",
+          code: "docker exec -i pg psql -U postgres -c \"CREATE TABLE users(id int primary key, name text, email text);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO users SELECT g, 'user '||g, 'user'||g||'@test.com' FROM generate_series(1,500000) g;\"",
+          lang: "bash"
+        },
+        {
+          title: "Query with NO index and read the plan",
+          body: "Look for <code>Seq Scan</code> and note the reported execution time.",
+          code: "EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'user250000@test.com';",
+          lang: "sql"
+        },
+        {
+          title: "Add the index and run the exact same query",
+          code: "CREATE INDEX idx_email ON users(email);\nEXPLAIN ANALYZE SELECT * FROM users WHERE email = 'user250000@test.com';",
+          lang: "sql"
+        }
+      ],
+      observe: "The plan switches from <code>Seq Scan</code> (reads all 500K rows) to <code>Index Scan</code> (reads a handful of blocks), and the execution time <code>EXPLAIN ANALYZE</code> reports drops from many milliseconds to near-instant. Note the actual numbers on both runs.",
+      stretch: "Build a covering index (<code>CREATE INDEX idx_email_cov ON users(email) INCLUDE (name)</code>) and confirm via <code>EXPLAIN ANALYZE</code> that the plan now shows <code>Index Only Scan</code>, meaning the table itself is never touched: the \u201cno table access needed\u201d property."
     }
   },
   keyTakeaways: [

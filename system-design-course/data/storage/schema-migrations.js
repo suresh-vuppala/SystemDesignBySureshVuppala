@@ -34,11 +34,40 @@ window.COURSE_CONTENT["schema-migrations"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Postgres); Flyway or Alembic (both free).",
-      setup: "Local and free: `docker run -d -p 5432:5432 postgres`.",
-      simulate: "Seed a `users` table with 1M rows, then rename a column directly with `ALTER TABLE users RENAME COLUMN email TO email_address` and time how long it takes and whether the table locks. Then do the same change properly via Expand-Contract: add `email_address` as a new column, backfill it in batches (`UPDATE ... WHERE id BETWEEN x AND y`, not one giant UPDATE), switch the app to read the new column, then drop the old one in a separate, later migration.",
-      observe: "The direct rename's lock duration scales with table size (measurable via wall-clock time), while the Expand-Contract version's individual steps each stay fast because no single step ever locks the whole table for the full backfill.",
-      stretch: "Use Flyway to version both migrations (`V1__add_column.sql`, `V2__drop_old_column.sql`) and run `flyway info` to see the applied/pending state: the audit trail a manual `ALTER TABLE` in a terminal never leaves."
+      goal: "On a 1M-row table, contrast a risky direct column rename against the Expand-Contract pattern (add, backfill in batches, switch reads, drop later) so no single step locks the whole table.",
+      stack: "Postgres in Docker, driven with <code>psql</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres and seed 1M rows",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker exec -i pg psql -U postgres -c \"CREATE TABLE users(id int primary key, email text);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO users SELECT g, 'user'||g||'@test.com' FROM generate_series(1,1000000) g;\"",
+          lang: "bash"
+        },
+        {
+          title: "Time a direct rename",
+          body: "Run inside <code>psql</code> with timing on. Note the duration and that it takes an exclusive lock.",
+          code: "\\timing on\nALTER TABLE users RENAME COLUMN email TO email_address;",
+          lang: "sql"
+        },
+        {
+          title: "Expand: add the new column (fast, no rewrite)",
+          code: "ALTER TABLE users ADD COLUMN email_addr text;",
+          lang: "sql"
+        },
+        {
+          title: "Backfill in batches, never one giant UPDATE",
+          body: "Each iteration is its own transaction touching a 50k slice, so locks release between batches instead of being held for the whole backfill.",
+          code: "for lo in $(seq 0 50000 950000); do\n  hi=$((lo + 50000))\n  docker exec -i pg psql -U postgres -c \\\n    \"UPDATE users SET email_addr = email WHERE id > $lo AND id <= $hi;\"\ndone",
+          lang: "bash"
+        },
+        {
+          title: "Contract: drop the old column in a later migration",
+          body: "Only after the app reads <code>email_addr</code> everywhere.",
+          code: "ALTER TABLE users DROP COLUMN email;",
+          lang: "sql"
+        }
+      ],
+      observe: "The direct rename's lock duration scales with table size (visible via <code>\\timing</code>), while each Expand-Contract step stays fast because no single statement locks the whole table for the full backfill.",
+      stretch: "Version both changes with Flyway (<code>V1__add_column.sql</code>, <code>V2__drop_old_column.sql</code>) and run <code>flyway info</code> to see applied/pending state: the audit trail a manual <code>ALTER TABLE</code> in a terminal never leaves."
     }
   },
   keyTakeaways: [

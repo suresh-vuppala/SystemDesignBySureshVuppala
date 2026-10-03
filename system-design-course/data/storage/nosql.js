@@ -43,11 +43,40 @@ window.COURSE_CONTENT["nosql"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (MongoDB and Cassandra images); a client for each (`mongosh`, `cqlsh`).",
-      setup: "Local and free: `docker run -d -p 27017:27017 mongo` and `docker run -d -p 9042:9042 cassandra`.",
-      simulate: "Model the same data (a user with a list of orders) 2 ways: as one nested MongoDB document, vs normalized rows across a Cassandra table partitioned by `user_id`. Fetch \u201cuser plus all their orders\u201d from each and compare query complexity (1 MongoDB `findOne` vs a Cassandra query scoped to one partition).",
-      observe: "MongoDB returns the full nested structure in one call (flexible schema, no join needed), while Cassandra requires your data model to already be shaped around the query you will run: the partition key must match your access pattern, or the query fans out expensively across the cluster.",
-      stretch: "In a multi-node local Cassandra cluster (`docker-compose` with 2 to 3 nodes), set consistency `ONE` for a write and `ONE` for a read immediately after on a different node; occasionally read a stale value. Repeat with `QUORUM` on both and confirm it disappears."
+      goal: "Model the same data (a user with their orders) two ways: one nested MongoDB document versus a Cassandra table partitioned by <code>user_id</code>, and feel how each shape forces a different query.",
+      stack: "MongoDB and Cassandra in Docker, driven with <code>mongosh</code> and <code>cqlsh</code>. Local and free.",
+      steps: [
+        {
+          title: "Start MongoDB and Cassandra",
+          body: "Cassandra takes a minute to accept connections on first boot.",
+          code: "docker run -d --name mongo -p 27017:27017 mongo\ndocker run -d --name cass -p 9042:9042 cassandra",
+          lang: "bash"
+        },
+        {
+          title: "MongoDB: store the user and orders as one nested document",
+          code: "docker exec -it mongo mongosh --eval '\ndb.users.insertOne({\n  _id: 1,\n  name: \"Alice\",\n  orders: [ { id: 101, total: 40 }, { id: 102, total: 15 } ]\n});\n'",
+          lang: "bash"
+        },
+        {
+          title: "MongoDB: fetch user plus all orders in one call",
+          body: "One <code>findOne</code> returns the whole nested structure, no join.",
+          code: "docker exec -it mongo mongosh --eval 'db.users.findOne({ _id: 1 })'",
+          lang: "bash"
+        },
+        {
+          title: "Cassandra: model the table AROUND the query first",
+          body: "The partition key <code>user_id</code> must match your read pattern up front.",
+          code: "docker exec -it cass cqlsh -e \"\nCREATE KEYSPACE IF NOT EXISTS shop WITH replication = {'class':'SimpleStrategy','replication_factor':1};\nCREATE TABLE shop.orders_by_user (user_id int, order_id int, total int, PRIMARY KEY (user_id, order_id));\nINSERT INTO shop.orders_by_user (user_id, order_id, total) VALUES (1, 101, 40);\nINSERT INTO shop.orders_by_user (user_id, order_id, total) VALUES (1, 102, 15);\n\"",
+          lang: "bash"
+        },
+        {
+          title: "Cassandra: read scoped to one partition",
+          code: "docker exec -it cass cqlsh -e \"SELECT * FROM shop.orders_by_user WHERE user_id = 1;\"",
+          lang: "bash"
+        }
+      ],
+      observe: "MongoDB returns the full nested structure in one call (flexible schema, no join), while Cassandra only stays cheap because the partition key matches the access pattern. Query anything other than <code>user_id</code> and Cassandra makes you add <code>ALLOW FILTERING</code> or fan out across the cluster.",
+      stretch: "In a multi-node local Cassandra cluster (<code>docker compose</code> with 2 to 3 nodes), write with consistency <code>ONE</code> and immediately read with <code>ONE</code> from a different node: you will occasionally read a stale value. Repeat with <code>QUORUM</code> on both and confirm it disappears."
     }
   },
   keyTakeaways: [

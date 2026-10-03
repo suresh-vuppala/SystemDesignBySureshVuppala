@@ -66,11 +66,46 @@ window.COURSE_CONTENT["schema-registry"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Confluent\u2019s Schema Registry image); the Kafka lab from 8.2; `avro-tools` or a language\u2019s Avro library.",
-      setup: "Local and free: Confluent\u2019s `cp-schema-registry` image pointed at your Kafka broker.",
-      simulate: "Register an Avro schema for your `rides` topic (`{trip_id: string, status: string}`), set compatibility mode to Backward, and produce a few events. Then try registering a new version that adds an optional field with a default (should succeed under Backward) versus one that removes a required field (should be rejected).",
-      observe: "The Schema Registry actively refusing the breaking change at registration time: \u201cit broke prod\u201d prevented before a single event with the bad shape is ever produced, not caught after the fact by a confused consumer.",
-      stretch: "Switch the compatibility mode to None, register the same breaking change (now allowed), produce an event with the new shape, and watch an old consumer expecting the removed field fail when it tries to read it: the exact failure this lesson exists to prevent, reproduced on purpose."
+      goal: "Register an Avro schema for the rides topic and watch the registry reject a breaking change at registration time, before a single bad-shaped event is ever produced.",
+      stack: "Confluent <code>cp-schema-registry</code> in Docker pointed at the Kafka broker from 8.2 + <code>curl</code> against its REST API. Local and free.",
+      steps: [
+        {
+          title: "Run the Schema Registry against your broker",
+          body: "Host networking lets the registry reach Kafka on <code>localhost:9092</code>. On macOS or Windows, use a shared Docker network and the broker's container name instead.",
+          code: "docker run -d --name schema-registry --network host \\\n  -e SCHEMA_REGISTRY_HOST_NAME=localhost \\\n  -e SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=localhost:9092 \\\n  -e SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081 \\\n  confluentinc/cp-schema-registry:latest",
+          lang: "bash"
+        },
+        {
+          title: "Register v1 and set Backward compatibility",
+          body: "The subject <code>rides-value</code> starts with two required string fields.",
+          code: `curl -s -X POST http://localhost:8081/subjects/rides-value/versions \\
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+  -d '{"schema":"{\\"type\\":\\"record\\",\\"name\\":\\"Ride\\",\\"fields\\":[{\\"name\\":\\"trip_id\\",\\"type\\":\\"string\\"},{\\"name\\":\\"status\\",\\"type\\":\\"string\\"}]}"}'
+
+curl -s -X PUT http://localhost:8081/config/rides-value \\
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+  -d '{"compatibility":"BACKWARD"}'`,
+          lang: "bash"
+        },
+        {
+          title: "Register a backward-compatible change (accepted)",
+          body: "Adding an optional field with a default is safe under Backward, so this returns a new schema id.",
+          code: `curl -s -X POST http://localhost:8081/subjects/rides-value/versions \\
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+  -d '{"schema":"{\\"type\\":\\"record\\",\\"name\\":\\"Ride\\",\\"fields\\":[{\\"name\\":\\"trip_id\\",\\"type\\":\\"string\\"},{\\"name\\":\\"status\\",\\"type\\":\\"string\\"},{\\"name\\":\\"driver_id\\",\\"type\\":[\\"null\\",\\"string\\"],\\"default\\":null}]}"}'`,
+          lang: "bash"
+        },
+        {
+          title: "Try a breaking change (rejected)",
+          body: "Removing the required <code>status</code> field breaks consumers on the old schema, so the registry refuses it.",
+          code: `curl -s -X POST http://localhost:8081/subjects/rides-value/versions \\
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+  -d '{"schema":"{\\"type\\":\\"record\\",\\"name\\":\\"Ride\\",\\"fields\\":[{\\"name\\":\\"trip_id\\",\\"type\\":\\"string\\"}]}"}'`,
+          lang: "bash"
+        }
+      ],
+      observe: "The compatible change returns a new schema id (HTTP 200), while the breaking change returns HTTP 409 with a message like \"Schema being registered is incompatible with an earlier schema\": the registry refuses the breaking change at registration time, so \"it broke prod\" is prevented before any bad-shaped event is produced, not caught later by a confused consumer.",
+      stretch: "Set compatibility to <code>NONE</code> with a PUT to <code>/config/rides-value</code>, register the same breaking change (now allowed), produce an event with the new shape, and watch a consumer expecting the removed field fail on read: the exact failure this lesson exists to prevent, reproduced on purpose."
     }
   },
   keyTakeaways: [

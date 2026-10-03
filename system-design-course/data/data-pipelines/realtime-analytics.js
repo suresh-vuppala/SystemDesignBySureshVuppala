@@ -40,11 +40,33 @@ window.COURSE_CONTENT["realtime-analytics"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Kafka lab from 8.2; ClickHouse from 12.5.",
-      setup: "Local and free: reuse both, plus ClickHouse\u2019s native Kafka table engine (built in, no extra service needed) to consume directly from a topic.",
-      simulate: "Create a ClickHouse table using the <code>Kafka</code> engine pointed at your <code>rides</code> topic from 8.2, plus a materialized view that continuously inserts consumed rows into a regular ClickHouse table. Produce a burst of events to the topic and query the materialized table immediately after.",
-      observe: "Query results reflect events produced just seconds earlier, with zero manual run-an-ETL-job step: data flows continuously from Kafka into a queryable analytical table, the sub-second-fresh claim measured by timing produce-to-queryable latency yourself.",
-      stretch: "Compare this against querying your 12.5 batch-loaded warehouse table (populated by a scheduled dbt run) for the same recent events: the batch table simply will not have them yet, a direct, felt contrast between the two freshness models."
+      goal: "Stream events from Kafka straight into ClickHouse and query them seconds after producing, with no manual ETL step, proving the sub-second-freshness claim.",
+      stack: "Kafka plus ClickHouse in Docker, using ClickHouse's built-in Kafka table engine. Local and free.",
+      steps: [
+        {
+          title: "Start Kafka and ClickHouse on one network",
+          code: "docker network create rtnet 2>/dev/null || true\ndocker run -d --name kafka --network rtnet -p 9092:9092 apache/kafka:latest\ndocker run -d --name clickhouse --network rtnet -p 8123:8123 clickhouse/clickhouse-server",
+          lang: "bash"
+        },
+        {
+          title: "Create the topic and produce a burst of rides",
+          code: "docker exec kafka /opt/kafka/bin/kafka-topics.sh --create --topic rides --bootstrap-server localhost:9092\ndocker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh --topic rides --bootstrap-server localhost:9092 <<'EOF'\n{\"id\":1,\"fare\":12}\n{\"id\":2,\"fare\":30}\n{\"id\":3,\"fare\":7}\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "Wire a Kafka engine table plus a materialized view",
+          body: "The Kafka engine consumes the topic; the materialized view continuously inserts consumed rows into a regular table you can query. Save as <code>rt.sql</code>.",
+          code: "CREATE TABLE rides_queue (id UInt64, fare UInt32)\n  ENGINE = Kafka SETTINGS kafka_broker_list = 'kafka:9092',\n  kafka_topic_list = 'rides', kafka_group_name = 'ch', kafka_format = 'JSONEachRow';\n\nCREATE TABLE rides (id UInt64, fare UInt32) ENGINE = MergeTree ORDER BY id;\n\nCREATE MATERIALIZED VIEW rides_mv TO rides AS SELECT id, fare FROM rides_queue;",
+          lang: "sql"
+        },
+        {
+          title: "Load the SQL and query the fresh data",
+          code: "docker exec -i clickhouse clickhouse-client --multiquery < rt.sql\ndocker exec clickhouse clickhouse-client -q \"SELECT count(), avg(fare) FROM rides\"",
+          lang: "bash"
+        }
+      ],
+      observe: "The query returns a count and average for events you produced seconds earlier, with no run-an-ETL-job step: data flows continuously from Kafka into a queryable analytical table. Time the produce-to-queryable gap yourself and watch it stay in the seconds range.",
+      stretch: "Query your 12.5 batch-loaded warehouse table (populated by a scheduled dbt run) for the same recent events: it simply will not have them yet, a direct, felt contrast between streaming and batch freshness."
     }
   },
   keyTakeaways: [

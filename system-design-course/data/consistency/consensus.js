@@ -53,11 +53,30 @@ window.COURSE_CONTENT["consensus"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Compose; a 5-node etcd cluster (official image, easy to Compose).",
-      setup: "Local and free: a 5-node etcd cluster via Docker Compose.",
-      simulate: "Write a key via `etcdctl put`, then check `etcdctl endpoint status` on all 5 nodes to identify the current leader. Kill the leader's container and immediately try another write against a follower's endpoint.",
-      observe: "A brief unavailability window (the write fails or hangs) followed by a new leader being elected and writes succeeding again. Check `etcdctl endpoint status` again to confirm a different node is now leader, and note roughly how long the election took.",
-      stretch: "Kill 3 of the 5 nodes at once (more than a minority) and confirm the remaining 2 can no longer elect a leader or accept writes: the f-failures-with-2f+1-nodes formula (5 nodes tolerates 2 failures, not 3), hit exactly at its documented limit."
+      goal: "Watch Raft elect a new leader after you kill the current one on a 5-node etcd cluster, then hit the 2f+1 fault limit by killing a majority.",
+      stack: "A 5-node etcd cluster in Docker on one network, driven with <code>etcdctl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a 5-node etcd cluster",
+          body: "5 nodes tolerate f = 2 failures, since 2f+1 = 5.",
+          code: "docker network create raftnet\nCLUSTER=\"e1=http://e1:2380,e2=http://e2:2380,e3=http://e3:2380,e4=http://e4:2380,e5=http://e5:2380\"\nfor n in e1 e2 e3 e4 e5; do\n  docker run -d --name $n --network raftnet quay.io/coreos/etcd:v3.5.9 etcd --name $n --advertise-client-urls http://$n:2379 --listen-client-urls http://0.0.0.0:2379 --initial-advertise-peer-urls http://$n:2380 --listen-peer-urls http://0.0.0.0:2380 --initial-cluster \"$CLUSTER\" --initial-cluster-state new --initial-cluster-token raft\ndone",
+          lang: "bash"
+        },
+        {
+          title: "Write a key and find the current leader",
+          body: "The status table has an IS LEADER column: exactly one node shows true.",
+          code: "docker exec e1 etcdctl put color blue\nEP=e1:2379,e2:2379,e3:2379,e4:2379,e5:2379\ndocker exec e1 etcdctl --endpoints=$EP endpoint status --write-out=table",
+          lang: "bash"
+        },
+        {
+          title: "Kill the leader and write through a follower",
+          body: "Replace e3 below with whichever node showed IS LEADER = true. The write may hang for a moment while Raft elects a replacement, then succeeds.",
+          code: "docker stop e3\ndocker exec e1 etcdctl --command-timeout=5s put color green\ndocker exec e1 etcdctl --endpoints=$EP endpoint status --write-out=table",
+          lang: "bash"
+        }
+      ],
+      observe: "Right after the leader dies the write briefly stalls, then a follower wins the election and the write commits; the second status table shows a different node with IS LEADER = true. You just watched Raft survive one failure inside its f = 2 budget.",
+      stretch: "Stop a third node so only 2 of 5 remain (<code>docker stop e2 e1</code>). The surviving 2 are a minority, cannot form a quorum, and every write now fails: the f-failures-with-2f+1-nodes formula hit exactly at its limit (5 nodes tolerate 2 failures, not 3)."
     }
   },
   keyTakeaways: [

@@ -103,11 +103,23 @@ window.COURSE_CONTENT["sharding"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python or Node.js only: this is a pure algorithm exercise.",
-      setup: "None.",
-      simulate: "Implement <code>shard = hash(user_id) % 4</code> for 10,000 synthetic user IDs and count how many land in each of the 4 shards (should be roughly even, confirm it). Then change <code>% 4</code> to <code>% 5</code> (simulating adding one shard) and recompute how many of the original 10,000 users now map to a <em>different</em> shard.",
-      observe: "The overwhelming majority of users remap to a different shard from a single shard-count change. This is the exact problem 10.5 exists to solve, felt as a real percentage on your own data before you ever see the fix.",
-      stretch: "Implement directory-based sharding instead, a simple <code>{userId: shardId}</code> lookup table, and confirm that adding a 5th shard now only requires moving whichever specific users you choose, with zero forced remapping for anyone else."
+      goal: "Prove on your own data that <code>hash(user_id) % N</code> spreads evenly but remaps almost every key the moment N changes, the exact pain consistent hashing (10.5) fixes.",
+      stack: "Python 3 only (standard library), a pure algorithm exercise. Local and free.",
+      steps: [
+        {
+          title: "Write the modulo-sharding script",
+          body: "Hash 10,000 user IDs across 4 shards, then recompute for 5 shards and count how many move. Save as <code>shard.py</code>.",
+          code: "import hashlib\n\ndef shard(user_id, n):\n    h = int(hashlib.md5(str(user_id).encode()).hexdigest(), 16)\n    return h % n\n\nusers = list(range(10000))\n\n# distribution across 4 shards\ncounts = {}\nfor u in users:\n    s = shard(u, 4)\n    counts[s] = counts.get(s, 0) + 1\nprint(\"distribution across 4 shards:\", dict(sorted(counts.items())))\n\n# how many keys move when we go from 4 to 5 shards\nmoved = sum(1 for u in users if shard(u, 4) != shard(u, 5))\nprint(\"moved when 4 -> 5:\", moved, \"of\", len(users),\n      \"(\", round(100 * moved / len(users), 1), \"%)\")",
+          lang: "python"
+        },
+        {
+          title: "Run it",
+          code: "python3 shard.py",
+          lang: "bash"
+        }
+      ],
+      observe: "The 4-shard counts sit near 2,500 each (an even spread), but going from 4 to 5 shards remaps the overwhelming majority of users (roughly 80%). That massive forced migration from a single node change is exactly the problem 10.5 exists to solve, felt as a real percentage before you ever see the fix.",
+      stretch: "Replace modulo with a directory table (a plain <code>{user_id: shard_id}</code> dict), then add a fifth shard by reassigning only a handful of users you choose. Count the forced remaps: zero, versus the ~80% modulo just charged you."
     }
   },
   keyTakeaways: [

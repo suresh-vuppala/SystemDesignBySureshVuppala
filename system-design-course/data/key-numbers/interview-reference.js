@@ -86,13 +86,6 @@ window.COURSE_CONTENT["interview-reference"] = {
       callouts: [
         { color: "green", label: "Sanity checks:", body: "Is RPS reasonable for the system type? (Social media 100K+, SaaS 1-10K.) Is storage growing faster than you can afford? (Over 1 PB/year needs tiered storage.) Is bandwidth cost dominant? (If yes, add a CDN.) Are you over-provisioning? (Target 60-70% utilization.)" }
       ]
-    },
-    handsOn: {
-      prerequisites: "None. A closed-book recall drill.",
-      setup: "Cover the tables above. Keep only a blank sheet.",
-      simulate: "From memory, write out all 20 anchor numbers in their 4 categories. Then pick one derivation pattern (say Server Count) and work it end to end for a new prompt: \u201c200M users, 15% DAU, 20 actions/day.\u201d Use only anchors you recalled, no lookups.",
-      observe: "Check how many of the 20 you got within an order of magnitude, and whether your derivation chained cleanly from anchor to answer. Gaps show you exactly which category to review.",
-      stretch: "Re-derive the same prompt applying the three mnemonics explicitly (100\u00d7 for tier reasoning, 1000\u00d7 for storage scaling, Time Rule for the seconds conversion) and confirm the answers match your first pass."
     }
   },
   keyTakeaways: [

@@ -44,11 +44,39 @@ window.COURSE_CONTENT["cicd"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A free GitHub account, plus GitHub Actions (free tier for public repos).",
-      setup: "Local and free: a GitHub repo with a `.github/workflows/deploy.yml` pipeline. Cloud free-tier: a deploy target on Render, Railway, or Fly.io free tier.",
-      simulate: "Build a pipeline with stages: run tests \u2192 build \u2192 deploy to staging \u2192 (manual approval gate) \u2192 deploy to production. Push a commit that fails a test and watch the pipeline stop before ever reaching deploy. Fix it, push again, and watch it flow through to staging automatically.",
-      observe: "The pipeline's own log becomes the \u201cwho deployed what, when\u201d audit trail from the problem statement: every deploy has a commit SHA, a timestamp, and a pass/fail test result attached, automatically.",
-      stretch: "Add a canary step: deploy to 1 of 3 instances first, run a smoke test against just that instance, then promote to the other 2 only if it passes, a minimal version of the 5% \u2192 25% \u2192 100% ramp."
+      goal: "Build a GitHub Actions pipeline that gates deploy behind tests, push a failing commit and watch it stop before deploy, then fix it and watch it flow through automatically.",
+      stack: "A GitHub repo plus GitHub Actions (free for public repos), scaffolded with the <code>gh</code> CLI and Node/Jest. Local and free.",
+      steps: [
+        {
+          title: "Scaffold a tiny tested app",
+          code: "mkdir ci-demo && cd ci-demo\nnpm init -y && npm pkg set scripts.test=\"jest\"\nnpm install --save-dev jest\ncat > sum.js <<'EOF'\nmodule.exports = (a, b) => a + b;\nEOF\ncat > sum.test.js <<'EOF'\nconst sum = require('./sum');\ntest('adds', () => { expect(sum(2, 3)).toBe(5); });\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "Add the pipeline",
+          body: "Save as <code>.github/workflows/deploy.yml</code>. Deploy jobs depend on <code>test</code>, so a failing test blocks the whole path.",
+          code: "name: deploy\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 20\n      - run: npm ci\n      - run: npm test\n  deploy-staging:\n    needs: test\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"deploying to staging\"\n  deploy-prod:\n    needs: deploy-staging\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"deploying to production\"",
+          lang: "yaml"
+        },
+        {
+          title: "Push it to GitHub",
+          code: "git init && git add -A && git commit -m \"initial pipeline\"\ngh repo create ci-demo --public --source=. --push\ngh run watch",
+          lang: "bash"
+        },
+        {
+          title: "Break a test and push",
+          body: "The deploy jobs never start because <code>test</code> fails first.",
+          code: "sed -i 's/a + b/a - b/' sum.js\ngit commit -am \"break sum\" && git push\ngh run watch",
+          lang: "bash"
+        },
+        {
+          title: "Fix it and watch it flow through",
+          code: "sed -i 's/a - b/a + b/' sum.js\ngit commit -am \"fix sum\" && git push\ngh run watch",
+          lang: "bash"
+        }
+      ],
+      observe: "The broken commit stops at the <code>test</code> job and never reaches <code>deploy-staging</code>; the fix flows straight through. The Actions run log is the \u201cwho deployed what, when\u201d audit trail: every run carries a commit SHA, a timestamp, and a pass/fail result, automatically.",
+      stretch: "Add a canary job that deploys to 1 of 3 targets, runs a smoke test against only that one, and promotes to the other 2 only on success, a minimal version of the 5% \u2192 25% \u2192 100% ramp."
     }
   },
   keyTakeaways: [

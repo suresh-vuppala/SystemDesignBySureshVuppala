@@ -28,7 +28,7 @@
   if(inRealtime) activeSection = 'realtime';
   if(inCourse) activeSection = 'course';
   if(page === 'engineering-blogs.html') activeSection = 'blogs';
-  if(page === 'master-system-design.html' || page === 'master-ai-engineering.html') activeSection = 'courses';
+  if(page === 'master-system-design.html' || page === 'master-ai-engineering.html' || page === 'master-dsa.html') activeSection = 'courses';
 
   // Calculate prefix to reach the project root. Course lesson pages live
   // two levels deep (system-design-course/<module>/<lesson>.html), one
@@ -53,8 +53,9 @@
   ];
 
   var courses = [
-    {href: prefix+'master-system-design.html', label:'Master System Design', desc:'8-week live weekend cohort'},
-    {href: prefix+'master-ai-engineering.html', label:'Master AI Engineering', desc:'8-week live RAG & Agents cohort'}
+    {href: prefix+'master-system-design.html', label:'Master Advanced System Design', desc:'8-week live weekend cohort'},
+    {href: prefix+'master-ai-engineering.html', label:'Master AI Engineering', desc:'8-week live RAG & Agents cohort'},
+    {href: prefix+'master-dsa.html', label:'Master Advanced Data Structures and Algorithms', desc:'14-week live coding & DSA cohort'}
   ];
 
   var navItems = links.map(function(l){
@@ -114,7 +115,20 @@
     + '<button class="sh-toggle" aria-label="Menu" aria-expanded="false">☰</button>'
     + '</header>';
 
-  document.body.insertAdjacentHTML('afterbegin', html);
+  // Early-15 promo announcement bar, sits above the header on non-course
+  // pages (the course app shell is a fixed-height layout the bar would
+  // disrupt). Always shown (non-dismissible) while the offer runs.
+  var promoHtml = '';
+  if(!inCourse){
+    var promoWa = 'https://wa.me/919100880133?text=' + encodeURIComponent("Hi, I'd like to claim the Early 15 Offer (15% off on a course)");
+    promoHtml = '<div class="sh-promo" id="sh-promo">'
+      + '<span class="sh-promo-spark" aria-hidden="true">\u26A1</span>'
+      + '<span class="sh-promo-text"><strong>Early\u201115 Offer</strong> \u00b7 <strong>15% OFF</strong> any course \u00b7 only the first <strong>15 seats</strong></span>'
+      + '<a class="sh-promo-cta" href="' + promoWa + '" target="_blank" rel="noopener">Claim 15% OFF <span class="sh-promo-arrow" aria-hidden="true">\u2192</span></a>'
+      + '</div>';
+  }
+
+  document.body.insertAdjacentHTML('afterbegin', promoHtml + html);
 
   // Theme toggle behavior
   var themeToggle = document.getElementById('sh-theme-toggle');
@@ -168,15 +182,45 @@
   umami.setAttribute('data-website-id', 'be293e2f-a06e-4259-a351-c871c789893b');
   document.head.appendChild(umami);
 
+  // Floating WhatsApp button, injected on every page (including the course
+  // app shell). Clicking opens WhatsApp with a default "course details"
+  // message prefilled.
+  var waText = "Hi, I'm looking for Course details";
+  var waFab = '<a class="wa-fab" href="https://wa.me/919100880133?text=' + encodeURIComponent(waText) + '"'
+    + ' target="_blank" rel="noopener"'
+    + ' aria-label="Chat with us on WhatsApp about course details"'
+    + ' title="Course details? Chat on WhatsApp">'
+    + '<svg class="wa-fab-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.892c0 2.096.549 4.142 1.595 5.945L0 24l6.335-1.652a12.062 12.062 0 005.71 1.447h.005c6.582 0 11.945-5.335 11.948-11.896C24 8.455 22.761 5.46 20.521 3.45"/></svg>'
+    + '<span class="wa-fab-label">Course details?</span>'
+    + '</a>';
+  document.body.insertAdjacentHTML('beforeend', waFab);
+
   // Footer: skipped on the course app shell, which is a fixed-height,
   // internally-scrolling layout (sidebar + main + rail) that a trailing
   // footer would break rather than complement.
   if(!inCourse){
+    // Social links default to each platform's home page, swap in the real
+    // channel URLs when they exist.
+    var social = [
+      {href:'https://www.linkedin.com', label:'LinkedIn', svg:'<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>'},
+      {href:'https://www.youtube.com', label:'YouTube', svg:'<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/>'},
+      {href:'https://www.instagram.com', label:'Instagram', svg:'<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>'}
+    ];
+    var socialItems = social.map(function(s){
+      return '<a href="'+s.href+'" target="_blank" rel="noopener" aria-label="'+s.label+'" title="'+s.label+'">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+s.svg+'</svg>'
+        + '</a>';
+    }).join('');
+
     var footer = '<footer class="site-footer">'
-      + '<p>'
-      + '<svg width="14" height="14" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="var(--brand)"/></svg>'
-      + '<a href="'+prefix+'index.html">HelloSDE.com</a> · System Design for Senior Engineers'
-      + '</p>'
+      + '<a class="footer-brand" href="'+prefix+'index.html" aria-label="HelloSDE home">'
+      +   '<span class="sh-brand-word"><span class="sh-brand-underlined">'
+      +     '<span class="sh-brand-hello">Hello</span><span class="sh-brand-sde">SDE</span>'
+      +     '<svg class="sh-brand-underline" viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path d="M3,9 Q46,13 82,6 T118,3" fill="none" stroke-width="3.2" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>'
+      +   '</span><span class="sh-brand-dot">.com</span></span>'
+      + '</a>'
+      + '<p>System Design for Senior Engineers</p>'
+      + '<div class="footer-social">'+socialItems+'</div>'
       + '<a href="https://wa.me/919100880133" target="_blank" rel="noopener" class="footer-wa">Need any help?</a>'
       + '</footer>';
     document.body.insertAdjacentHTML('beforeend', footer);

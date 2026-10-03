@@ -67,11 +67,46 @@ window.COURSE_CONTENT["logging"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Compose (the ELK or EFK stack, free official images).",
-      setup: "Local and free: run Elasticsearch + Kibana + Filebeat via a standard Compose file. Many free reference configs exist for this exact stack.",
-      simulate: "Write a small app that emits structured JSON logs (<code>{level, trace_id, message, timestamp}</code>) at INFO and ERROR levels. Point Filebeat at its log file, confirm the logs land in Elasticsearch, and search <code>level:ERROR</code> in Kibana to confirm only error lines return.",
-      observe: "Try an unstructured <code>console.log(\"user \" + id + \" logged in\")</code> line and watch it become nearly impossible to query in Kibana (you need a fragile text match), versus structured JSON that filters cleanly on <code>level</code> or <code>trace_id</code>. The anti-pattern, felt directly by trying both side by side.",
-      stretch: "Log a fake password field by accident, then write a Filebeat processor or Logstash filter that redacts any field named <code>password</code> before it reaches Elasticsearch. A real mitigation for the PII-in-logs anti-pattern, not just a warning."
+      goal: "Ship structured JSON logs into Elasticsearch with Filebeat, prove a field query like <code>level:ERROR</code> beats unstructured text, then redact a leaked <code>password</code> field before it lands.",
+      stack: "Elasticsearch + Kibana + Filebeat in Docker, fed by a tiny Node.js app. Local and free.",
+      steps: [
+        {
+          title: "Start Elasticsearch and Kibana",
+          code: "docker network create obs\ndocker run -d --name es --net obs -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false docker.elastic.co/elasticsearch/elasticsearch:8.13.0\ndocker run -d --name kibana --net obs -p 5601:5601 -e ELASTICSEARCH_HOSTS=http://es:9200 docker.elastic.co/kibana/kibana:8.13.0",
+          lang: "bash"
+        },
+        {
+          title: "Emit structured JSON logs from an app",
+          body: "Each line is one JSON object with <code>timestamp</code>, <code>level</code>, <code>trace_id</code>, and <code>message</code>. Save as <code>app.js</code> and run it with <code>node app.js</code> so the file keeps growing.",
+          code: "const fs = require('fs');\nconst out = fs.createWriteStream('app.log', { flags: 'a' });\nfunction log(level, message, extra) {\n  const line = Object.assign(\n    { timestamp: new Date().toISOString(), level, trace_id: Math.random().toString(16).slice(2, 10), message },\n    extra || {}\n  );\n  out.write(JSON.stringify(line) + '\\n');\n}\nsetInterval(() => {\n  log('INFO', 'order placed', { order_id: Math.floor(Math.random() * 1000) });\n  if (Math.random() < 0.2) log('ERROR', 'payment gateway timeout');\n}, 500);\nconsole.log('writing app.log ...');",
+          lang: "javascript"
+        },
+        {
+          title: "Configure Filebeat to parse the NDJSON",
+          body: "Save as <code>filebeat.yml</code>. The <code>ndjson</code> parser promotes every JSON key to a top-level searchable field.",
+          code: "filebeat.inputs:\n  - type: filestream\n    id: app\n    paths:\n      - /logs/app.log\n    parsers:\n      - ndjson:\n          target: \"\"\n          overwrite_keys: true\n          add_error_key: true\n\noutput.elasticsearch:\n  hosts: [\"http://es:9200\"]\n  index: \"app-logs-%{+yyyy.MM.dd}\"\n\nsetup.template.name: \"app-logs\"\nsetup.template.pattern: \"app-logs-*\"\nsetup.ilm.enabled: false",
+          lang: "yaml"
+        },
+        {
+          title: "Start Filebeat pointing at the log file",
+          code: "docker run -d --name filebeat --net obs -v \"$PWD/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro\" -v \"$PWD/app.log:/logs/app.log:ro\" docker.elastic.co/beats/filebeat:8.13.0 filebeat -e --strict.perms=false",
+          lang: "bash"
+        },
+        {
+          title: "Query only the ERROR lines by field",
+          body: "One structured field, one clean query. No fragile text matching.",
+          code: "curl -s \"http://localhost:9200/app-logs-*/_search?q=level:ERROR&size=5\" | jq \".hits.hits[]._source\"",
+          lang: "bash"
+        },
+        {
+          title: "Redact a leaked password field before indexing",
+          body: "Add this to <code>filebeat.yml</code> and restart the Filebeat container. Any field named <code>password</code> is dropped before it reaches Elasticsearch.",
+          code: "processors:\n  - drop_fields:\n      fields: [\"password\"]\n      ignore_missing: true",
+          lang: "yaml"
+        }
+      ],
+      observe: "The <code>level:ERROR</code> query returns only error lines cleanly. If you had instead logged <code>console.log('user ' + id + ' logged in')</code>, you would be stuck writing a fragile full-text match. That side by side is the structured versus unstructured anti-pattern, felt directly.",
+      stretch: "Log a fake <code>password</code> field on purpose, then confirm the <code>drop_fields</code> processor strips it before it ever reaches Elasticsearch. A real mitigation for the PII-in-logs anti-pattern, not just a warning."
     }
   },
   keyTakeaways: [

@@ -54,11 +54,73 @@ window.COURSE_CONTENT["vector-db"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Qdrant or Chroma, both free); Python.",
-      setup: "Local and free: `docker run -d -p 6333:6333 qdrant/qdrant`. Cloud free-tier: Qdrant Cloud's or Pinecone's free tier.",
-      simulate: "Embed 1,000 short sentences with a free local model (`sentence-transformers`, no API key needed) to get 384-dim vectors, insert them into Qdrant, then query with a new sentence's embedding and ask for the top 5 nearest neighbors.",
-      observe: "The returned results are semantically similar to your query even when they share zero exact words: the \u201cmatches on meaning, not exact text\u201d distinction, felt directly, contrasted against Elasticsearch's exact and fuzzy term matching.",
-      stretch: "Insert 100,000 vectors (synthetic random ones are fine for a timing test) and compare query latency using HNSW (Qdrant's default) versus forcing an exact brute-force search: the accuracy-for-speed trade-off ANN algorithms make, measured."
+      goal: "Embed sentences with a free local model, store them in Qdrant, and see nearest-neighbor search return semantically similar results even when they share zero exact words with the query.",
+      stack: "Qdrant in Docker plus Python <code>sentence-transformers</code> (no API key). Local and free.",
+      steps: [
+        {
+          title: "Start Qdrant",
+          code: "docker run -d --name qdrant -p 6333:6333 qdrant/qdrant",
+          lang: "bash"
+        },
+        {
+          title: "Install the Python client and embedding model",
+          code: "pip install qdrant-client sentence-transformers",
+          lang: "bash"
+        },
+        {
+          title: "Embed sentences and load them into Qdrant",
+          body: "The model produces 384-dim vectors. Save as <code>load.py</code> and run it.",
+          code: `# load.py - embed sentences and upsert into Qdrant
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
+
+model = SentenceTransformer("all-MiniLM-L6-v2")   # 384 dims, downloads once
+sentences = [
+    "the cat sat on the mat",
+    "a feline rested on the rug",
+    "the stock market fell sharply today",
+    "shares dropped in heavy trading",
+    "how to bake sourdough bread",
+]
+vecs = model.encode(sentences)
+
+client = QdrantClient(url="http://localhost:6333")
+client.recreate_collection(
+    "notes",
+    vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+)
+client.upsert("notes", [
+    PointStruct(id=i, vector=v.tolist(), payload={"text": s})
+    for i, (s, v) in enumerate(zip(sentences, vecs))
+])
+print("loaded", len(sentences), "sentences")`,
+          lang: "python"
+        },
+        {
+          title: "Query by meaning and read the top matches",
+          body: "The query shares no words with \u201ca feline rested on the rug\u201d yet should rank it first. Save as <code>query.py</code>.",
+          code: `# query.py - nearest neighbors for a fresh sentence
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+client = QdrantClient(url="http://localhost:6333")
+
+q = model.encode("a kitten lay on a carpet").tolist()
+hits = client.search("notes", query_vector=q, limit=3)
+for h in hits:
+    print(round(h.score, 3), h.payload["text"])`,
+          lang: "python"
+        },
+        {
+          title: "Run both",
+          code: "python load.py\npython query.py",
+          lang: "bash"
+        }
+      ],
+      observe: "The top results are semantically close to the query even with zero shared words (the cat/feline sentences rank above the bread one): matches on meaning, not exact text, unlike Elasticsearch's term matching.",
+      stretch: "Insert 100,000 vectors (synthetic random ones are fine for timing) and compare query latency using HNSW (Qdrant's default) versus an exact brute-force search: the accuracy-for-speed trade-off ANN algorithms make, measured."
     }
   },
   keyTakeaways: [

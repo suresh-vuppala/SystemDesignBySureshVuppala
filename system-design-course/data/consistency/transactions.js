@@ -74,11 +74,35 @@ window.COURSE_CONTENT["transactions"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js or Python; the Kafka lab from 8.2 or a simple queue.",
-      setup: "Local and free: 2 small services (\u201cOrder Service\u201d and \u201cPayment Service\u201d), each with its own SQLite/Postgres instance, plus a message queue between them.",
-      simulate: "Implement the Outbox Pattern in Order Service: in one local transaction, insert the order row AND an `OrderCreated` event row into an `outbox` table. A separate poller reads unpublished outbox rows, publishes them to the queue, and marks them published. Payment Service consumes `OrderCreated` and either charges or publishes `PaymentFailed`, which Order Service listens for and compensates by cancelling the order.",
-      observe: "Kill the poller right after the DB transaction commits but before it publishes: the event is safely sitting in the outbox, unpublished, and gets picked up once the poller restarts, with zero events lost. Contrast with a naive \u201cwrite to DB, then publish\u201d: kill the process between those steps and the event is gone forever, the exact dual-write problem Outbox exists to close.",
-      stretch: "Force `PaymentFailed` and confirm Order Service's compensating action actually cancels the order: the Saga's compensation step, executed rather than described."
+      goal: "Implement the Outbox pattern so an order and its <code>OrderCreated</code> event commit in one local transaction, and prove the event is never lost even if the publisher crashes before publishing.",
+      stack: "Node.js with <code>better-sqlite3</code> (embedded database, zero setup). Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "npm init -y\nnpm install better-sqlite3",
+          lang: "bash"
+        },
+        {
+          title: "Write the order and event in one transaction",
+          body: "Save as <code>outbox-write.js</code>. The order row and the outbox event row commit together, so the event can never go missing after the order exists.",
+          code: "const Database = require('better-sqlite3');\nconst db = new Database('orders.db');\n\ndb.exec(`\n  CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY, item TEXT, status TEXT);\n  CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY, type TEXT, payload TEXT, published INTEGER DEFAULT 0);\n`);\n\n// one atomic local transaction: order row AND event row commit together\nconst placeOrder = db.transaction((item) => {\n  const info = db.prepare('INSERT INTO orders (item, status) VALUES (?, ?)').run(item, 'CREATED');\n  const id = info.lastInsertRowid;\n  db.prepare('INSERT INTO outbox (type, payload) VALUES (?, ?)')\n    .run('OrderCreated', JSON.stringify({ orderId: id, item }));\n  return id;\n});\n\nconst id = placeOrder('book');\nconsole.log('order', id, 'committed with its OrderCreated event still unpublished');",
+          lang: "javascript"
+        },
+        {
+          title: "Poll and publish the outbox separately",
+          body: "Save as <code>outbox-poller.js</code>. It marks each row published only after it publishes, so re-running never double-sends.",
+          code: "const Database = require('better-sqlite3');\nconst db = new Database('orders.db');\n\nfunction pump() {\n  const rows = db.prepare('SELECT * FROM outbox WHERE published = 0 ORDER BY id').all();\n  for (const row of rows) {\n    console.log('PUBLISH', row.type, row.payload); // real code sends to Kafka or SQS here\n    db.prepare('UPDATE outbox SET published = 1 WHERE id = ?').run(row.id);\n  }\n}\n\nsetInterval(pump, 1000);\nconsole.log('poller running, Ctrl-C to stop');",
+          lang: "javascript"
+        },
+        {
+          title: "Place an order, inspect the outbox, then publish",
+          body: "The event sits durably in the outbox before anything publishes it. Only the poller moves it out.",
+          code: "node outbox-write.js\nnode -e \"const d=require('better-sqlite3')('orders.db'); console.log(d.prepare('SELECT id,type,published FROM outbox').all());\"\nnode outbox-poller.js",
+          lang: "bash"
+        }
+      ],
+      observe: "After <code>outbox-write.js</code>, the outbox row exists with <code>published = 0</code> even though nothing published it: the event is safe in the same database that holds the order. Start the poller and it prints <code>PUBLISH</code> once, flips the row to published, and never republishes on restart. A naive write-then-publish would lose the event if the process died between the two steps, which is exactly the dual-write problem the outbox closes.",
+      stretch: "Add a Payment consumer that reads <code>OrderCreated</code> and, on failure, writes a <code>PaymentFailed</code> event to its own outbox; have the Order side consume it and set the order status to <code>CANCELLED</code>, the Saga compensation step executed rather than described."
     }
   },
   keyTakeaways: [

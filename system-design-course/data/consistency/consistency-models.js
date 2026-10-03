@@ -53,11 +53,30 @@ window.COURSE_CONTENT["consistency-models"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The 3-node Cassandra cluster from 9.1.",
-      setup: "Local and free: the same cluster.",
-      simulate: "Write a key with `CONSISTENCY ONE` (fast, weak), then read it back immediately from a different node also at `ONE`: occasionally you see the old value because the write has not propagated yet. Repeat the same write/read pair with `CONSISTENCY QUORUM` on both sides.",
-      observe: "The `ONE`/`ONE` combination occasionally returns stale data (the inequality fails: 1 + 1 = 2, not &gt; 3), while `QUORUM`/`QUORUM` (2 + 2 = 4 &gt; 3) never does. The tunable-consistency formula, verified by deliberately breaking it and watching it fail, then fixing it and watching it stop.",
-      stretch: "Run `nodetool repair` after intentionally creating a divergence (write at `ONE` while one node is disconnected, then reconnect) and confirm all replicas converge to the same value afterward: anti-entropy observed instead of described."
+      goal: "Verify the quorum inequality <code>W + R &gt; N</code> by writing and reading the same key at ONE (which breaks it) and then at QUORUM (which satisfies it) on a 3-node Cassandra cluster.",
+      stack: "The 3-node Cassandra cluster from 9.1, driven with <code>cqlsh</code> over <code>docker exec</code>. Local and free.",
+      steps: [
+        {
+          title: "Create a keyspace with replication factor 3",
+          body: "N = 3 replicas per key, so QUORUM = 2.",
+          code: "docker exec cass1 cqlsh -e \"CREATE KEYSPACE IF NOT EXISTS demo WITH replication = {'class':'SimpleStrategy','replication_factor':3};\"\ndocker exec cass1 cqlsh -e \"CREATE TABLE IF NOT EXISTS demo.kv (k text PRIMARY KEY, v text);\"",
+          lang: "sql"
+        },
+        {
+          title: "Weak path: write and read at ONE from different nodes",
+          body: "W = 1 and R = 1, so 1 + 1 = 2, not greater than N = 3. Loop so you catch the occasional stale read before replication catches up.",
+          code: "for i in $(seq 1 50); do\n  docker exec cass1 cqlsh -e \"CONSISTENCY ONE; INSERT INTO demo.kv (k,v) VALUES ('k','v$i');\"\n  docker exec cass2 cqlsh -e \"CONSISTENCY ONE; SELECT v FROM demo.kv WHERE k='k';\"\ndone",
+          lang: "bash"
+        },
+        {
+          title: "Strong path: write and read at QUORUM from different nodes",
+          body: "W = 2 and R = 2, so 2 + 2 = 4, greater than N = 3, which guarantees the read and write replica sets overlap.",
+          code: "for i in $(seq 1 50); do\n  docker exec cass1 cqlsh -e \"CONSISTENCY QUORUM; INSERT INTO demo.kv (k,v) VALUES ('k','q$i');\"\n  docker exec cass2 cqlsh -e \"CONSISTENCY QUORUM; SELECT v FROM demo.kv WHERE k='k';\"\ndone",
+          lang: "bash"
+        }
+      ],
+      observe: "The ONE/ONE loop occasionally returns the previous value (the inequality fails: 1 + 1 = 2, not &gt; 3), while the QUORUM/QUORUM loop always returns the latest write (2 + 2 = 4 &gt; 3). The tunable-consistency formula, verified by deliberately breaking it and then fixing it.",
+      stretch: "Disconnect one node (<code>docker network disconnect capnet cass3</code>), write at ONE so only the majority sees it, reconnect, run <code>docker exec cass1 nodetool repair demo</code>, and confirm all replicas converge to the same value: anti-entropy observed instead of described."
     }
   },
   keyTakeaways: [

@@ -91,6 +91,9 @@
     "graphql": "graphql",
     "message queue": "message-queues",
     "message queues": "message-queues",
+    "rabbitmq": "message-queues",
+    "quorum queue": "message-queues",
+    "quorum queues": "message-queues",
     "dead letter queue": "dlq",
     "dead-letter queue": "dlq",
     "kafka": "kafka",
@@ -606,6 +609,17 @@
     });
   }
 
+  // A copy-paste code block for hands-on labs: escaped content plus a Copy
+  // button (wired in wireCopyButtons). Optional language shows as a label.
+  function renderCodeBlock(code, lang){
+    var label = lang ? '<span class="ho-code-lang">' + escapeHtml(lang) + '</span>' : '';
+    return '<div class="ho-code">'
+      + '<button class="ho-copy" type="button" aria-label="Copy to clipboard">Copy</button>'
+      + label
+      + '<pre><code>' + escapeHtml(code) + '</code></pre>'
+      + '</div>';
+  }
+
   function renderCardGrid(cards){
     if(!cards || !cards.length) return '';
     var html = '<div class="cc-card-grid">';
@@ -974,12 +988,31 @@
     } else if(tabKey === 'handsOn'){
       var h = lessonData.tabs.handsOn;
       html += '<h3 class="cc-heading">' + iconSvg('tool') + 'Hands-On Lab</h3>';
-      html += '<p class="cc-intro">Reproduce this lesson\u2019s problem yourself, or read through to understand exactly how you would.</p>';
-      html += '<div class="ho-block"><h4><span class="ho-icon">1</span>Prerequisites</h4><p>' + h.prerequisites + '</p></div>';
-      html += '<div class="ho-block"><h4><span class="ho-icon">2</span>Setup</h4><p>' + h.setup + '</p></div>';
-      html += '<div class="ho-block"><h4><span class="ho-icon">3</span>Simulate the Scenario</h4><p>' + h.simulate + '</p></div>';
-      html += '<div class="ho-block"><h4><span class="ho-icon">4</span>What to Observe</h4><p>' + h.observe + '</p></div>';
-      html += '<div class="ho-block"><h4><span class="ho-icon">\u2605</span>Stretch Goal</h4><p>' + h.stretch + '</p></div>';
+      if(h.steps && h.steps.length){
+        // Structured, copy-paste lab: a one-line goal, a one-line stack, then
+        // numbered steps each with an optional runnable code block.
+        if(h.goal) html += '<p class="cc-intro">' + h.goal + '</p>';
+        if(h.stack) html += '<div class="ho-stack">' + iconSvg('layers') + '<span><strong>Stack:</strong> ' + h.stack + '</span></div>';
+        html += '<ol class="ho-steps">';
+        h.steps.forEach(function(st){
+          html += '<li class="ho-step">';
+          html += '<div class="ho-step-head"><span class="ho-step-n"></span><span class="ho-step-title">' + (st.title || '') + '</span></div>';
+          if(st.body) html += '<p class="ho-step-body">' + st.body + '</p>';
+          if(st.code) html += renderCodeBlock(st.code, st.lang);
+          html += '</li>';
+        });
+        html += '</ol>';
+        if(h.observe) html += '<div class="ho-callout ho-observe"><h4>' + iconSvg('star') + 'What to look for</h4><p>' + h.observe + '</p></div>';
+        if(h.stretch) html += '<div class="ho-callout ho-stretch"><h4>' + iconSvg('plus') + 'Stretch goal</h4><p>' + h.stretch + '</p></div>';
+      } else {
+        // Legacy prose format (kept for any lesson not yet migrated).
+        html += '<p class="cc-intro">Reproduce this lesson\u2019s problem yourself, or read through to understand exactly how you would.</p>';
+        html += '<div class="ho-block"><h4><span class="ho-icon">1</span>Prerequisites</h4><p>' + h.prerequisites + '</p></div>';
+        html += '<div class="ho-block"><h4><span class="ho-icon">2</span>Setup</h4><p>' + h.setup + '</p></div>';
+        html += '<div class="ho-block"><h4><span class="ho-icon">3</span>Simulate the Scenario</h4><p>' + h.simulate + '</p></div>';
+        html += '<div class="ho-block"><h4><span class="ho-icon">4</span>What to Observe</h4><p>' + h.observe + '</p></div>';
+        html += '<div class="ho-block"><h4><span class="ho-icon">\u2605</span>Stretch Goal</h4><p>' + h.stretch + '</p></div>';
+      }
     } else if(tabKey === 'related'){
       html += '<h3 class="cc-heading">' + iconSvg('link') + 'Related Lessons</h3>';
       if(lessonData.related && lessonData.related.length){
@@ -1018,6 +1051,33 @@
     wireDiagramControls();
     wireCarousels();
     wireImageZoom();
+    wireCopyButtons();
+  }
+
+  // Copy-to-clipboard for hands-on code blocks. Reads the code element's
+  // textContent (browser has already un-escaped entities), with a legacy
+  // execCommand fallback for older/non-secure contexts.
+  function wireCopyButtons(){
+    document.querySelectorAll('.ho-copy').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var code = btn.parentElement.querySelector('code');
+        var text = code ? code.textContent : '';
+        var done = function(){ btn.textContent = 'Copied'; setTimeout(function(){ btn.textContent = 'Copy'; }, 1500); };
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).then(done).catch(function(){ legacyCopy(code, done); });
+        } else {
+          legacyCopy(code, done);
+        }
+      });
+    });
+  }
+  function legacyCopy(code, done){
+    if(!code) return;
+    try{
+      var r = document.createRange(); r.selectNodeContents(code);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      document.execCommand('copy'); sel.removeAllRanges(); done();
+    }catch(e){}
   }
 
   /* -- Right rail -- */
@@ -1048,7 +1108,7 @@
       + '<span class="cr-promo-badge">\uD83D\uDD34 Live Cohort</span>'
       + '<h5 class="cr-promo-title">Learn this live, hands-on</h5>'
       + '<p class="cr-promo-text">These lessons are your foundation. Go further in a small live cohort: build real systems, weekly labs, and mentor feedback.</p>'
-      + '<a class="cr-promo-btn" href="' + ROOT_PREFIX + 'master-system-design.html">Master System Design \u203a</a>'
+      + '<a class="cr-promo-btn" href="' + ROOT_PREFIX + 'master-system-design.html">Master Advanced System Design \u203a</a>'
       + '<a class="cr-promo-btn cr-promo-btn-alt" href="' + ROOT_PREFIX + 'master-ai-engineering.html">Master AI Engineering \u203a</a>'
       + '</div>';
 

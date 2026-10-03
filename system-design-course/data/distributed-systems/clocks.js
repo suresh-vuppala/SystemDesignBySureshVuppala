@@ -42,11 +42,23 @@ window.COURSE_CONTENT["clocks"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python or Node.js only.",
-      setup: "None, a pure algorithm lab.",
-      simulate: "Implement Lamport timestamps for 3 simulated nodes exchanging messages (local events increment a counter; on receive set <code>counter = max(local, received) + 1</code>). Then implement vector clocks for the same 3 nodes (each tracks a 3-element vector). Construct a scenario with 2 genuinely concurrent events and check what each clock type reports.",
-      observe: "Lamport timestamps still assigning a total order to the 2 concurrent events (one number is just bigger), falsely implying one happened first, while vector clocks correctly report them as concurrent (neither vector dominates): the exact limitation caught by your own test case instead of trusted as a claim.",
-      stretch: "Implement a basic Hybrid Logical Clock (physical time + a logical tie-breaker) and confirm it stays close to wall-clock time for widely separated events while still correctly ordering rapid-fire events that land in the same physical millisecond."
+      goal: "Implement Lamport and vector clocks for 3 nodes and catch Lamport falsely ordering two genuinely concurrent events.",
+      stack: "A single Python script, standard library only. Local and free.",
+      steps: [
+        {
+          title: "Implement both clocks and a concurrent scenario",
+          body: "Node 0 and node 1 each perform an independent local event with no message between them, so the events are genuinely concurrent. Save as <code>clocks.py</code>.",
+          code: "# --- Lamport timestamps ---\ndef lamport_demo():\n    c = [0, 0, 0]  # one counter per node\n    def local_event(i):\n        c[i] += 1\n        return c[i]\n    a = local_event(0)   # event A on node 0 (independent)\n    b = local_event(1)   # event B on node 1 (independent)\n    order = 'A < B' if a < b else 'B <= A'\n    print('Lamport: A =', a, 'B =', b, '->', order, '(a total order is forced)')\n\n# --- Vector clocks ---\ndef vector_demo():\n    def dominates(x, y):\n        return all(p >= q for p, q in zip(x, y)) and x != y\n    va, vb = [0, 0, 0], [0, 0, 0]\n    va[0] += 1   # event A on node 0 -> [1,0,0]\n    vb[1] += 1   # event B on node 1 -> [0,1,0]\n    concurrent = not dominates(va, vb) and not dominates(vb, va)\n    verdict = 'concurrent' if concurrent else 'ordered'\n    print('Vector: A =', va, 'B =', vb, '->', verdict)\n\nlamport_demo()\nvector_demo()",
+          lang: "python"
+        },
+        {
+          title: "Run it",
+          code: "python clocks.py",
+          lang: "bash"
+        }
+      ],
+      observe: "Lamport assigns A and B different numbers, so one looks like it happened first even though they are concurrent, while the vector clocks report them as concurrent because neither vector dominates the other. The exact limitation is caught by your own test case instead of trusted as a claim.",
+      stretch: "Add a basic Hybrid Logical Clock (physical time plus a logical tie-breaker) and confirm it stays close to wall-clock time for widely separated events while still ordering rapid-fire events that land in the same millisecond."
     }
   },
   keyTakeaways: [

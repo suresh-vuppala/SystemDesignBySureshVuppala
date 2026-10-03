@@ -50,11 +50,35 @@ window.COURSE_CONTENT["concurrency"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Postgres); 2 `psql` sessions.",
-      setup: "Local and free: `docker run -d -p 5432:5432 postgres`.",
-      simulate: "Create an `accounts` table with `balance` and `version`. Reproduce the lost-update bug: in session A, `SELECT balance FROM accounts WHERE id=1` (reads 100) and pause; in session B, do the same read, then `UPDATE accounts SET balance=90 WHERE id=1` and commit; back in A, use its stale read to `UPDATE accounts SET balance=90 WHERE id=1`, and B's update is silently gone. Now fix it with optimistic locking: `UPDATE accounts SET balance=90, version=version+1 WHERE id=1 AND version=<the version you read>`.",
-      observe: "The silent, undetected lost update in the first run versus the 0-rows-affected signal in the second: an invisible bug turned into a detectable, retryable one because the version had moved.",
-      stretch: "Repeat with `SELECT ... FOR UPDATE` (pessimistic) instead: session B's read blocks until session A commits or rolls back, preventing the interleaving entirely rather than detecting it after the fact."
+      goal: "Reproduce the silent lost-update bug in Postgres with two concurrent sessions, then stop it cold with an optimistic version check.",
+      stack: "Postgres in Docker, two <code>psql</code> sessions. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres and seed one account",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\nsleep 5\ndocker exec -i pg psql -U postgres -c \"CREATE TABLE accounts (id int primary key, balance int, version int);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO accounts VALUES (1, 100, 1);\"",
+          lang: "bash"
+        },
+        {
+          title: "Open two psql sessions",
+          body: "Run each line in its own terminal so you can interleave them by hand.",
+          code: "# terminal 1 (session A)\ndocker exec -it pg psql -U postgres\n\n# terminal 2 (session B)\ndocker exec -it pg psql -U postgres",
+          lang: "bash"
+        },
+        {
+          title: "Interleave the two sessions to lose an update",
+          body: "A reads 100 and stalls; B commits a change; A then writes based on its stale read and clobbers B.",
+          code: "-- session A: read, then wait (do NOT commit yet)\nBEGIN;\nSELECT balance, version FROM accounts WHERE id = 1;  -- balance=100, version=1\n\n-- session B: read, deduct 10, commit\nBEGIN;\nUPDATE accounts SET balance = 90 WHERE id = 1;\nCOMMIT;\n\n-- session A: act on the stale 100, write 90, commit (B's change is gone)\nUPDATE accounts SET balance = 90 WHERE id = 1;\nCOMMIT;",
+          lang: "sql"
+        },
+        {
+          title: "Fix it with an optimistic version check",
+          body: "Reset, then let B move first and bump the version. A's write is conditioned on the version it originally read.",
+          code: "UPDATE accounts SET balance = 100, version = 1 WHERE id = 1;\n\n-- session B moves first, bumping the version\nUPDATE accounts SET balance = 90, version = version + 1 WHERE id = 1 AND version = 1;\n\n-- session A uses the version it read (1): matches 0 rows, so it must retry\nUPDATE accounts SET balance = 95, version = version + 1 WHERE id = 1 AND version = 1;",
+          lang: "sql"
+        }
+      ],
+      observe: "In the first run Postgres raises no error and B's write simply vanishes: a textbook lost update. In the second run A's conditional update reports <code>UPDATE 0</code> (zero rows affected) because the version already moved, turning the invisible bug into a detectable, retryable signal.",
+      stretch: "Rerun the interleaving but open session A with <code>SELECT balance FROM accounts WHERE id = 1 FOR UPDATE;</code> inside its transaction. Session B's <code>UPDATE</code> now blocks until A commits or rolls back, preventing the interleaving entirely (pessimistic) rather than detecting it after the fact."
     }
   },
   keyTakeaways: [

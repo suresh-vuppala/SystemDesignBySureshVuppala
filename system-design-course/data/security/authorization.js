@@ -51,11 +51,33 @@ window.COURSE_CONTENT["authorization"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js; the auth API from 4.1.",
-      setup: "Local and free only.",
-      simulate: "Implement RBAC first: a `roles` table (`admin`, `editor`, `viewer`) and middleware that checks `req.user.role` against a required role per route. Then add one ABAC rule on top: \u201ceditors can only edit documents created in the last 24 hours.\u201d Try deleting another user's document as a `viewer`, then as an `editor` outside the 24-hour window, then as an `editor` inside it.",
-      observe: "The same user/role combination is allowed or denied purely based on the document's `createdAt` attribute. RBAC alone cannot express that rule; it needed ABAC's extra condition, exactly the limitation named in the overview.",
-      stretch: "Install OpenFGA locally (`docker run -d -p 8080:8080 openfga/openfga run`) and model \u201cowner of this document\u201d as a ReBAC relationship tuple. Query `check` against it and get a sub-millisecond allow/deny, a small-scale version of what Zanzibar does at Google's scale."
+      goal: "Build RBAC role middleware, layer one ABAC rule on top, and watch the same editor be allowed or denied purely by a document's age.",
+      stack: "Node.js + Express, tested with <code>curl</code> (optional OpenFGA via Docker for the stretch). Local and free.",
+      steps: [
+        {
+          title: "Install Express",
+          code: "npm init -y && npm install express",
+          lang: "bash"
+        },
+        {
+          title: "Write RBAC middleware plus one ABAC rule",
+          body: "<code>requireRole</code> is pure RBAC. The 24-hour check inside the handler is the ABAC condition RBAC alone cannot express. The role comes from a header here, standing in for the verified JWT from lesson 4.1. Save as <code>app.js</code>.",
+          code: "const express = require('express');\nconst app = express();\n\nconst docs = {\n  d1: { owner: 'bob', createdAt: Date.now() - 2 * 3600 * 1000 },   // 2h old\n  d2: { owner: 'bob', createdAt: Date.now() - 48 * 3600 * 1000 }   // 48h old\n};\n\napp.use((req, res, next) => {\n  req.user = { name: req.header('x-user') || 'anon', role: req.header('x-role') || 'viewer' };\n  next();\n});\n\n// RBAC: caller must hold one of these roles\nconst requireRole = (...roles) => (req, res, next) =>\n  roles.includes(req.user.role) ? next() : res.status(403).json({ error: 'RBAC: role denied' });\n\napp.delete('/docs/:id', requireRole('admin', 'editor'), (req, res) => {\n  const doc = docs[req.params.id];\n  if (!doc) return res.status(404).json({ error: 'not found' });\n  // ABAC: editors may only touch docs created in the last 24h\n  const ageHours = (Date.now() - doc.createdAt) / 3600000;\n  if (req.user.role === 'editor' && ageHours > 24) {\n    return res.status(403).json({ error: 'ABAC: document older than 24h' });\n  }\n  delete docs[req.params.id];\n  res.json({ deleted: req.params.id });\n});\n\napp.listen(3000, () => console.log('authz on :3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run it",
+          code: "node app.js",
+          lang: "bash"
+        },
+        {
+          title: "Try the same action across role and attribute",
+          code: "# viewer: blocked by RBAC before the rule even runs\ncurl -s -X DELETE -H \"x-role: viewer\" http://localhost:3000/docs/d1\n\n# editor, document 48h old: blocked by ABAC\ncurl -s -X DELETE -H \"x-role: editor\" http://localhost:3000/docs/d2\n\n# editor, document 2h old: allowed\ncurl -s -X DELETE -H \"x-role: editor\" http://localhost:3000/docs/d1",
+          lang: "bash"
+        }
+      ],
+      observe: "The same editor is allowed or denied purely based on the document's <code>createdAt</code> attribute. RBAC alone cannot express that rule; it needed ABAC's extra condition, exactly the limitation named in the overview.",
+      stretch: "Run OpenFGA locally with <code>docker run -d -p 8080:8080 openfga/openfga run</code> and model \u201cowner of this document\u201d as a ReBAC relationship tuple. Query <code>check</code> against it and get a sub-millisecond allow/deny, a small-scale version of what Zanzibar does at Google's scale."
     }
   },
   keyTakeaways: [

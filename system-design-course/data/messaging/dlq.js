@@ -66,11 +66,83 @@ window.COURSE_CONTENT["dlq"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The SQS setup from 8.1 (or RabbitMQ with a dead-letter exchange).",
-      setup: "Local and free: RabbitMQ with a queue configured with `x-dead-letter-exchange`. Cloud free-tier: an SQS queue with a Redrive Policy pointing at a second SQS queue as its DLQ, `maxReceiveCount: 3`.",
-      simulate: "Send a message with a deliberately malformed payload (invalid JSON, or missing a required field) and have your consumer throw on every attempt without ACKing. Watch it get redelivered 3 times, then land in the DLQ automatically.",
-      observe: "The main queue\u2019s count dropping to 0 and the DLQ\u2019s count incrementing by exactly 1 at the moment `maxReceiveCount` is hit: the Poison Message category, reproduced and automatically quarantined instead of retried forever.",
-      stretch: "Fix the handler\u2019s bug, then use the redrive API (`StartMessageMoveTask` on AWS, or the Shovel plugin on RabbitMQ) to move the message back to the main queue and confirm it now processes successfully: the full Alert \u2192 Inspect \u2192 Identify \u2192 Fix \u2192 Redrive \u2192 Verify sequence, walked end to end."
+      goal: "Wire a RabbitMQ dead-letter exchange with a timed retry loop so a poison message auto-quarantines after 3 failed attempts instead of blocking the main queue forever.",
+      stack: "RabbitMQ (with the management UI) in Docker + Node.js <code>amqplib</code>. Local and free.",
+      steps: [
+        {
+          title: "Start RabbitMQ",
+          code: "docker run -d --name rabbit -p 5672:5672 -p 15672:15672 rabbitmq:3-management",
+          lang: "bash"
+        },
+        {
+          title: "Install the client",
+          code: "npm init -y && npm install amqplib",
+          lang: "bash"
+        },
+        {
+          title: "Declare main, retry, and dead-letter queues",
+          body: "Save as <code>setup.js</code>. Failed messages dead-letter to <code>jobs.retry</code>, which waits 2s then routes them back to <code>jobs</code>. Each cycle bumps the <code>x-death</code> count.",
+          code: `const amqp = require('amqplib');
+(async () => {
+  const conn = await amqp.connect('amqp://localhost');
+  const ch = await conn.createChannel();
+  await ch.assertQueue('jobs.dlq', { durable: true });
+  await ch.assertQueue('jobs', { durable: true, arguments: {
+    'x-dead-letter-exchange': '',
+    'x-dead-letter-routing-key': 'jobs.retry'
+  }});
+  await ch.assertQueue('jobs.retry', { durable: true, arguments: {
+    'x-dead-letter-exchange': '',
+    'x-dead-letter-routing-key': 'jobs',
+    'x-message-ttl': 2000
+  }});
+  console.log('queues ready');
+  await ch.close();
+  await conn.close();
+})();`,
+          lang: "javascript"
+        },
+        {
+          title: "Write a consumer that gives up after 3 attempts",
+          body: "Save as <code>consumer.js</code>. It reads the retry count from the <code>x-death</code> header; a NACK sends the message to the retry loop, and on the 3rd attempt it routes to <code>jobs.dlq</code>.",
+          code: `const amqp = require('amqplib');
+const MAX = 3;
+const attempts = (msg) => {
+  const xd = msg.properties.headers['x-death'];
+  return xd && xd[0] ? xd[0].count : 0;
+};
+(async () => {
+  const conn = await amqp.connect('amqp://localhost');
+  const ch = await conn.createChannel();
+  ch.prefetch(1);
+  ch.consume('jobs', (msg) => {
+    const n = attempts(msg) + 1;
+    console.log('attempt ' + n + ': ' + msg.content.toString());
+    try {
+      JSON.parse(msg.content.toString());
+      ch.ack(msg);
+    } catch (e) {
+      if (n >= MAX) {
+        console.log('giving up -> jobs.dlq');
+        ch.sendToQueue('jobs.dlq', msg.content, { persistent: true });
+        ch.ack(msg);
+      } else {
+        ch.nack(msg, false, false);
+      }
+    }
+  });
+})();`,
+          lang: "javascript"
+        },
+        {
+          title: "Run it, then publish one poison message",
+          body: "The payload is invalid JSON, so <code>JSON.parse</code> throws on every attempt.",
+          code: "node setup.js\nnode consumer.js &\ndocker exec rabbit rabbitmqadmin publish routing_key=jobs payload='{bad json'",
+          lang: "bash"
+        }
+      ],
+      observe: "The consumer logs attempt 1, then attempt 2 and 3 roughly 2 seconds apart (the retry TTL), then <code>giving up -&gt; jobs.dlq</code>. In the management UI at <code>http://localhost:15672</code> the <code>jobs</code> queue settles back to 0 while <code>jobs.dlq</code> increments by exactly 1: the Poison Message category, automatically quarantined instead of retried forever.",
+      stretch: "Fix the bug (publish valid JSON), then redrive: republish the message from <code>jobs.dlq</code> back to <code>jobs</code> and confirm it now processes and ACKs, walking the full Alert, Inspect, Identify, Fix, Redrive, Verify sequence end to end."
     }
   },
   keyTakeaways: [

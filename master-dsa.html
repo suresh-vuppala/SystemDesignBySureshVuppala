@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Master Advanced Data Structures and Algorithms, 14-Week Live Cohort · HelloSDE</title>
+<meta name="description" content="Stop grinding problems at random. Master Advanced Data Structures and Algorithms is a 14-week live cohort that teaches one pattern at a time, then has you apply it immediately, arrays, binary search, trees, graphs, and DP, in the right order.">
+<meta name="keywords" content="DSA course, data structures and algorithms, coding interview prep, live DSA cohort, leetcode patterns, FAANG coding interview, competitive programming course">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://hellosde.com/master-dsa.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hellosde.com/master-dsa.html">
+<meta property="og:title" content="Master Advanced Data Structures and Algorithms, 14-Week Live Cohort">
+<meta property="og:description" content="Learn a pattern, then immediately apply it. 14 weeks, live, from arrays and hashing all the way to graphs and dynamic programming.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "name": "Master Advanced Data Structures and Algorithms",
+  "description": "A 14-week live cohort that teaches data structures and algorithms one pattern at a time and applies each immediately through guided problem solving, from arrays, hashing, and binary search through trees, graphs, and dynamic programming. Built for engineers preparing for coding interviews.",
+  "url": "https://hellosde.com/master-dsa.html",
+  "provider": { "@type": "Organization", "name": "HelloSDE", "url": "https://hellosde.com" },
+  "offers": { "@type": "Offer", "category": "Paid", "price": "29999", "priceCurrency": "INR", "url": "https://hellosde.com/master-dsa.html" },
+  "hasCourseInstance": {
+    "@type": "CourseInstance",
+    "courseMode": "online",
+    "startDate": "2026-10-29",
+    "location": { "@type": "VirtualLocation", "url": "https://hellosde.com/master-dsa.html" }
+  }
+}
+</script>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* ── Course page, monochrome, theme-aware (shared with master-system-design.html) ── */
+.course-hero{
+  padding:56px 24px 40px;text-align:center;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+}
+.course-kicker{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--text-2);background:transparent;border:1px solid var(--border-strong);
+  padding:5px 14px;border-radius:2px;margin-bottom:16px;
+}
+.course-hero h1{font-size:var(--fs-3xl);font-weight:700;letter-spacing:var(--ls-tight);color:var(--text);margin:0;line-height:var(--lh-tight)}
+.course-hero h1 .u{
+  position:relative;white-space:nowrap;
+  border-bottom:2px solid var(--brand);padding-bottom:2px;
+}
+.course-sub{color:var(--text-2);max-width:660px;margin:18px auto 0;font-size:var(--fs-md);line-height:var(--lh-loose)}
+.course-sub strong{color:var(--text);font-weight:700}
+.course-hook{margin:14px auto 0;font-size:var(--fs-lg);font-weight:700;color:var(--text);letter-spacing:var(--ls-tight)}
+
+/* Quick facts strip */
+.facts{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:900px;margin:28px auto 0}
+.fact{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:16px 18px;text-align:left}
+.fact .fact-ic{font-size:var(--fs-md);margin-bottom:6px;filter:grayscale(1);opacity:.85}
+.fact .fact-lbl{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);color:var(--muted);margin-bottom:3px}
+.fact .fact-val{font-size:var(--fs-sm);font-weight:700;color:var(--text)}
+
+.course-cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:30px}
+.btn-wa{
+  display:inline-flex;align-items:center;gap:9px;padding:12px 22px;border-radius:3px;
+  background:transparent;color:var(--text);border:1px solid var(--border-strong);
+  font-weight:600;font-size:var(--fs-sm);text-decoration:none;transition:background-color .12s;
+}
+.btn-wa:hover{background:var(--card-2);text-decoration:none}
+.btn-pay{
+  display:inline-flex;align-items:center;gap:9px;padding:13px 26px;border-radius:3px;
+  border:1px solid var(--brand);cursor:pointer;font:inherit;
+  background:var(--brand);color:var(--brand-fg);font-weight:700;font-size:var(--fs-sm);text-decoration:none;
+  transition:background-color .12s,transform .12s,box-shadow .12s;
+  box-shadow:0 3px 12px rgba(201,74,12,.25);
+}
+.btn-pay:hover{background:var(--brand-2);border-color:var(--brand-2);transform:translateY(-1px);box-shadow:0 5px 18px rgba(201,74,12,.32);text-decoration:none}
+.btn-pay .pay-sec{font-size:var(--fs-2xs);font-weight:600;opacity:.85;display:flex;align-items:center;gap:4px;margin-left:2px}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:3px;
+  background:transparent;border:1px solid var(--border-strong);color:var(--text);
+  font-weight:600;font-size:var(--fs-sm);text-decoration:none;transition:background-color .12s;
+}
+.btn-ghost:hover{background:var(--card-2);text-decoration:none}
+.hero-trust{margin-top:22px;font-size:var(--fs-xs);color:var(--muted)}
+.hero-trust b{color:var(--text)}
+
+/* Content wrapper */
+.course-wrap{max-width:940px;margin:0 auto;padding:48px 24px 80px}
+.sec-title{font-size:var(--fs-xl);font-weight:700;color:var(--text);margin:0 0 6px;letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+.sec-lead{color:var(--muted);font-size:var(--fs-md);margin:0 0 24px;line-height:var(--lh-normal)}
+.course-section{margin-bottom:60px}
+
+/* Pain points */
+.pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pain{
+  background:var(--card);border:1px solid var(--border);
+  border-left:3px solid var(--border-strong);border-radius:3px;padding:16px 18px;
+}
+.pain p{margin:0;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose)}
+.pain .q{color:var(--text);font-weight:700;display:block;margin-bottom:4px}
+.pain-turn{
+  margin-top:18px;background:var(--bg-2);
+  border:1px solid var(--border);border-left:3px solid var(--text);
+  border-radius:3px;padding:16px 18px;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose);
+}
+.pain-turn b{color:var(--text)}
+
+/* Method flow */
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.flow-step{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px;position:relative}
+.flow-step .step-n{position:absolute;top:14px;right:20px;font-size:var(--fs-xl);font-weight:700;color:var(--card-2);line-height:1}
+.flow-step h3{font-size:var(--fs-md);color:var(--text);margin:0 0 6px;font-weight:700}
+.flow-step p{font-size:var(--fs-sm);color:var(--text-2);margin:0;line-height:var(--lh-loose)}
+
+/* Roadmap accordion */
+.week{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:10px;overflow:hidden}
+.week[open]{border-color:var(--border-strong)}
+.week summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:14px;transition:background .12s}
+.week summary::-webkit-details-marker{display:none}
+.week summary:hover{background:var(--card-2)}
+.week-tag{
+  flex-shrink:0;font-size:var(--fs-2xs);font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;
+  color:var(--text);background:var(--brand-soft);border:1px solid var(--brand-border);
+  padding:4px 10px;border-radius:2px;min-width:78px;text-align:center;
+}
+.week-head{flex:1;min-width:0}
+.week-head h3{font-size:var(--fs-md);color:var(--text);margin:0;font-weight:700;line-height:var(--lh-tight)}
+.week-head p{font-size:var(--fs-xs);color:var(--muted);margin:2px 0 0}
+.week-caret{flex-shrink:0;color:var(--muted);transition:transform .2s}
+.week[open] .week-caret{transform:rotate(180deg);color:var(--text)}
+.week-body{padding:6px 20px 20px;border-top:1px solid var(--border)}
+.week-body .wb-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+@media(max-width:640px){.week-body .wb-row{grid-template-columns:1fr}}
+.wb-col h4{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:var(--ls-caps);margin:0 0 8px;font-weight:700;color:var(--muted)}
+.wb-list{list-style:none;padding:0;margin:0}
+.wb-list li{font-size:var(--fs-sm);color:var(--text-2);padding:4px 0 4px 18px;position:relative;line-height:var(--lh-normal)}
+.wb-col.blocks .wb-list li::before{content:'›';position:absolute;left:0;color:var(--text);font-weight:700}
+.wb-col.apply .wb-list li::before{content:'+';position:absolute;left:0;color:var(--text);font-weight:700}
+
+/* Outcomes */
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.outcome{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:3px;padding:14px 16px}
+.outcome .ic{color:var(--text);font-weight:700;flex-shrink:0;margin-top:1px;min-width:14px}
+.outcome span{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal)}
+.outcome b{color:var(--text)}
+
+/* Audience */
+.aud-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.aud{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px}
+.aud h3{font-size:var(--fs-md);margin:0 0 12px;font-weight:700;color:var(--text)}
+.aud ul{list-style:none;padding:0;margin:0}
+.aud li{font-size:var(--fs-sm);color:var(--text-2);padding:6px 0 6px 22px;position:relative;line-height:var(--lh-normal)}
+.aud.for li::before{content:'+';position:absolute;left:0;color:var(--text);font-weight:700}
+.aud.notfor li::before{content:'\2212';position:absolute;left:0;color:var(--text);font-weight:700}
+
+/* Bonuses */
+.bonus-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:700px){.bonus-grid{grid-template-columns:1fr}}
+.bonus{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;text-align:center}
+.bonus .bic{font-size:var(--fs-xl);margin-bottom:8px;filter:grayscale(1);opacity:.85}
+.bonus h4{font-size:var(--fs-sm);color:var(--text);margin:0 0 5px;font-weight:700}
+.bonus p{font-size:var(--fs-xs);color:var(--muted);margin:0;line-height:var(--lh-normal)}
+
+/* Testimonials */
+.tst-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.tst-grid{grid-template-columns:1fr}.pain-grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.outcomes{grid-template-columns:1fr}.aud-grid{grid-template-columns:1fr}}
+.tst{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px 22px}
+.tst p{font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose);margin:0 0 14px;font-style:italic}
+.tst .who{display:flex;align-items:center;gap:10px}
+.tst .ava{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--text);color:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:var(--fs-xs);flex-shrink:0;
+}
+.tst .who b{display:block;color:var(--text);font-size:var(--fs-sm)}
+.tst .who span{font-size:var(--fs-2xs);color:var(--muted)}
+
+/* Pricing */
+.price-card{
+  max-width:480px;margin:0 auto;
+  background:var(--card);border:1px solid var(--border-strong);border-radius:6px;
+  padding:32px 28px;text-align:center;position:relative;
+}
+.price-batch{
+  display:inline-block;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--ls-caps);
+  color:var(--text-2);background:transparent;border:1px solid var(--border-strong);
+  padding:4px 12px;border-radius:2px;margin-bottom:16px;
+}
+.price-amt{font-size:var(--fs-3xl);font-weight:700;color:var(--text);line-height:1;letter-spacing:var(--ls-tight)}
+.price-amt .cur{font-size:var(--fs-lg);font-weight:700;color:var(--muted);vertical-align:super;margin-right:2px}
+.price-note{color:var(--muted);font-size:var(--fs-xs);margin:8px 0 22px}
+.price-includes{list-style:none;padding:0;margin:0 0 24px;text-align:left}
+.price-includes li{padding:6px 0 6px 22px;position:relative;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-normal)}
+.price-includes li::before{content:'+';position:absolute;left:0;top:6px;color:var(--text);font-weight:700}
+
+/* Urgency */
+.urgency{
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  margin:0 auto 22px;max-width:480px;
+  background:var(--bg-2);border:1px solid var(--border);border-left:3px solid var(--danger);
+  border-radius:3px;padding:11px 16px;font-size:var(--fs-xs);color:var(--text-2);
+}
+.urgency b{color:var(--text);font-weight:700}
+
+/* FAQ */
+.faq{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:8px;overflow:hidden}
+.faq summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:600;color:var(--text);font-size:var(--fs-sm);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';color:var(--muted);font-size:var(--fs-lg);font-weight:400;line-height:1;flex-shrink:0}
+.faq[open] summary::after{content:'\2212'}
+.faq summary:hover{background:var(--card-2)}
+.faq-body{padding:0 18px 16px;font-size:var(--fs-sm);color:var(--text-2);line-height:var(--lh-loose)}
+
+@media(max-width:640px){
+  .course-hero h1{font-size:var(--fs-2xl)}
+  .course-wrap{padding:36px 16px 60px}
+  .bonus-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="css/course-landing.css">
+</head>
+<body>
+
+<!--
+  NOTE: Enrollment CTAs on this page route to WhatsApp (not the Razorpay
+  enrollCourse() flow), because that flow is hardcoded to the System Design
+  course id/price in js/auth.js. Fee (INR 29,999), timing (Sat & Sun 4-8 PM IST),
+  and next batch (Oct 29) are set below; still TODO: wire a dedicated payment config.
+-->
+
+<!-- ── HERO ── -->
+<section class="course-hero">
+  <span class="course-kicker">Live Cohort · 14 Weeks · Limited Seats</span>
+  <h1>Master Advanced Data Structures and <span class="u">Algorithms</span></h1>
+  <p class="course-hook">Stop grinding at random. Start recognizing patterns.</p>
+  <p class="course-sub">You can solve 300 LeetCode problems and still stall on a problem you haven't seen before. This 14-week live cohort fixes that, you learn one <strong>pattern</strong> at a time in the right order, then <strong>apply it immediately</strong> through guided problem solving until spotting the approach becomes instinct.</p>
+
+  <div class="facts">
+    <div class="fact"><div class="fact-ic">📅</div><div class="fact-lbl">Duration</div><div class="fact-val">14 Weeks · Live</div></div>
+    <div class="fact"><div class="fact-ic">⏰</div><div class="fact-lbl">Timing</div><div class="fact-val">Sat &amp; Sun · 4–8 PM IST</div></div>
+    <div class="fact"><div class="fact-ic">💸</div><div class="fact-lbl">Fee</div><div class="fact-val">₹29,999</div></div>
+    <div class="fact"><div class="fact-ic">🚀</div><div class="fact-lbl">Next Batch</div><div class="fact-val">Oct 29</div></div>
+  </div>
+
+  <div class="course-cta-row">
+    <a class="btn-pay" href="https://wa.me/919100880133?text=Hi%2C%20I%27m%20interested%20in%20the%20Master%20Data%20Structures%20and%20Algorithms%20(14-week)%20live%20course"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Enroll, Message us on WhatsApp</a>
+    <a class="btn-ghost" href="#roadmap">See the 14-week roadmap ↓</a>
+  </div>
+  <p class="hero-trust">Pattern-first curriculum · <b>24 modules</b> from arrays to dynamic programming · built for coding interviews</p>
+</section>
+
+<div class="course-wrap">
+
+  <!-- ── PAIN POINTS ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Sound familiar?</h2>
+    <p class="sec-lead">Most engineers don't fail coding rounds because they're not smart. They fail because they practiced problems at random instead of learning the patterns in order.</p>
+    <div class="pain-grid">
+      <div class="pain"><p><span class="q">"I've done 300 problems but still freeze on new ones."</span>You solved them once, but never extracted the reusable pattern, so a fresh variant feels brand new.</p></div>
+      <div class="pain"><p><span class="q">"I can brute force, but I can't optimize."</span>You get a working solution, then go blank when asked for better time or space, you don't see the right data structure.</p></div>
+      <div class="pain"><p><span class="q">"DP makes my brain hurt."</span>Nobody taught you how to define the state and transition, so every DP problem feels like starting from zero.</p></div>
+      <div class="pain"><p><span class="q">"I run out of time in the interview."</span>You know the idea but code it slowly and buggily, with no clean templates to lean on.</p></div>
+    </div>
+    <div class="pain-turn">The fix isn't <b>more problems</b>. It's <b>pattern-first structured practice</b>, learn one pattern, apply it the same session, build a reusable template, repeat until recognition is automatic.</div>
+  </section>
+
+  <!-- ── METHOD ── -->
+  <section class="course-section" id="format">
+    <h2 class="sec-title">The learn → apply method</h2>
+    <p class="sec-lead">Every pattern is followed by hands-on problem solving, that's how recognition is built.</p>
+    <div class="flow">
+      <div class="flow-step"><span class="step-n">1</span><h3>Learn a pattern</h3><p>One core technique at a time, taught in a deliberate sequence so each new idea builds on the last. No random topic-hopping.</p></div>
+      <div class="flow-step"><span class="step-n">2</span><h3>Apply it immediately</h3><p>The same session, we solve representative problems live and distill a clean, reusable code template while it's fresh.</p></div>
+      <div class="flow-step"><span class="step-n">3</span><h3>Combine the patterns</h3><p>As your toolkit grows, problems get harder, we compose multiple patterns (two-pointer + hashing, binary search + greedy) on real interview questions.</p></div>
+      <div class="flow-step"><span class="step-n">4</span><h3>Perform under pressure</h3><p>Timed contests and live mock interviews in the back half, so speed, correctness, and communication all become second nature.</p></div>
+    </div>
+  </section>
+
+  <!-- ── DETAILED ROADMAP ── -->
+  <section class="course-section" id="roadmap">
+    <h2 class="sec-title">The 14-week roadmap</h2>
+    <p class="sec-lead">24 modules across 14 weeks, in a deliberate learning sequence. Tap any week to expand. <strong>Every week = learn the pattern, then apply it through guided problem solving.</strong> Each week also lists bonus add-on topics that round out the live time.</p>
+
+    <details class="week" open>
+      <summary>
+        <span class="week-tag">Week 1</span>
+        <span class="week-head"><h3>Foundations &amp; Essential Math</h3><p>Complexity, language internals, and the math you actually need</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Time &amp; space complexity (iterative + recursive), common constraints</li>
+          <li>STL / Collections internals: vector, string, hashmap, treemap, stack/queue/PQ</li>
+          <li>Language essentials: pass by value vs reference, comparators, iterators</li>
+          <li>Number theory: GCD/LCM, primes, sieve, prime factorization</li>
+          <li>Modular arithmetic + modular inverse, nCr/nPr, basic game theory</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Fast I/O templates &amp; a reusable boilerplate/snippet pack</li>
+          <li>Binary (fast) exponentiation + modular exponentiation</li>
+          <li>Extended Euclid &amp; Fermat's little theorem</li>
+          <li>Sieve variants (SPF / linear) · Euler's totient <em>(optional)</em></li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 2</span>
+        <span class="week-head"><h3>Arrays &amp; Hashing</h3><p>The workhorse pattern behind half of all problems</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Hash map / set fundamentals: Two Sum, anagrams, isomorphic strings</li>
+          <li>Frequency counting: group anagrams, majority element, valid sudoku</li>
+          <li>Array manipulation &amp; matrix: product-except-self, rotate image, spiral</li>
+          <li>Advanced hashing: longest consecutive sequence, first missing positive</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Boyer–Moore majority vote (with proof)</li>
+          <li>Cyclic sort pattern (index-as-hash) for missing/duplicate problems</li>
+          <li>Hashing pitfalls: collisions, load factor, anti-hash custom hashing</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 3</span>
+        <span class="week-head"><h3>Sorting &amp; Searching</h3><p>Sort smart, then search in log time</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Merge sort + count inversions · quick sort + QuickSelect (Kth element)</li>
+          <li>Stable vs unstable, merge vs quick, complexity analysis</li>
+          <li>Binary search core + first/last occurrence, square root</li>
+          <li>Rotated &amp; mountain arrays · median of two sorted arrays</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Counting / radix / bucket sort &amp; the n log n lower bound</li>
+          <li><code>lower_bound</code>/<code>upper_bound</code> from scratch; search on floats</li>
+          <li>Ternary search on unimodal functions; rotated array with duplicates</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 4</span>
+        <span class="week-head"><h3>Binary Search on Answer &amp; Two Pointers</h3><p>Search the answer space; sweep with pointers</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Minimize-maximum: allocate pages, painter's partition, split array</li>
+          <li>Maximize-minimum: aggressive cows, magnetic force</li>
+          <li>Capacity/rate: ship packages in D days, Koko eating bananas</li>
+          <li>Two pointers (same &amp; opposite): 3Sum, 4Sum, trapping rain water, sort colors</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>The predicate + monotonicity framework (prove before coding)</li>
+          <li>Fast/slow pointer as a two-pointer variant (bridges to linked lists)</li>
+          <li>Generalized k-Sum recursion &amp; dedup strategy</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 5</span>
+        <span class="week-head"><h3>Sliding Window &amp; Prefix Sum</h3><p>Windows that grow and shrink; ranges in O(1)</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Fixed window: max sum size K, sliding window maximum, anagrams</li>
+          <li>Variable window (longest / shortest / counting)</li>
+          <li>Longest substring without repeating · minimum window substring</li>
+          <li>Prefix sum: subarray sum = K, 2D range sum, divisible by K</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>"At most K − at most (K−1) = exactly K" counting template</li>
+          <li>Monotonic deque as the engine behind window max/min</li>
+          <li>Difference arrays (1D &amp; 2D), prefix XOR · Fenwick tree intro <em>(optional)</em></li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 6</span>
+        <span class="week-head"><h3>Recursion / Backtracking &amp; Bit Manipulation</h3><p>Explore the decision tree; think in bits</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Recursion tree &amp; recurrence · subsets / subsequences / permutations</li>
+          <li>Combination sum, palindrome partitioning</li>
+          <li>Constraint satisfaction: N-Queens, Sudoku, rat in a maze, word search</li>
+          <li>Bit basics, XOR patterns (single/missing number), subset bitmask</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Pruning &amp; constraint propagation; iterative deepening <em>(optional)</em></li>
+          <li>Memoized backtracking as the explicit bridge into DP</li>
+          <li>Submask enumeration, Gray code, XOR basis <em>(optional)</em></li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 7</span>
+        <span class="week-head"><h3>Stacks &amp; Queues</h3><p>LIFO/FIFO, and the monotonic-stack superpower</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Stack applications: balanced parens, infix→postfix, decode string</li>
+          <li>Monotonic stack: next greater, daily temperatures, largest rectangle</li>
+          <li>Advanced: min stack, celebrity problem, remove K digits</li>
+          <li>Queues: circular queue, deque, sliding window minimum</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Monotonic-stack decision template (next/prev greater/smaller)</li>
+          <li>Expression evaluation with precedence &amp; unary operators</li>
+          <li>Amortized O(1) reasoning for stack/queue operations</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 8</span>
+        <span class="week-head"><h3>Linked Lists</h3><p>Pointer surgery without the edge-case bugs</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Core ops, reversal (iterative/recursive/K-groups)</li>
+          <li>Fast/slow pointer: cycle detect + start, Nth from end, palindrome</li>
+          <li>Merge &amp; sort, reorder, rotate, partition, add two numbers</li>
+          <li>Doubly &amp; circular lists · LRU &amp; LFU cache</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Dummy-head / prev-pointer templates to kill edge cases</li>
+          <li>LRU/LFU as a design bridge (hashmap + doubly linked list)</li>
+          <li>Brent's vs Floyd's cycle detection <em>(optional)</em></li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 9</span>
+        <span class="week-head"><h3>Trees</h3><p>Traversals and the "return struct from DFS" pattern</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>All traversals (recursive + iterative) · Morris traversal</li>
+          <li>Structural: balanced, diameter, symmetric, subtree check</li>
+          <li>Path problems: root-to-leaf, max path sum, LCA, count paths with sum</li>
+          <li>Modification: invert, flatten, prune, trim</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>"Return a struct from DFS" one-pass pattern (height + balance + sum)</li>
+          <li>Euler tour / flattening (previews subtree-range queries)</li>
+          <li>LCA via parent pointers / binary-lifting preview</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 10</span>
+        <span class="week-head"><h3>BST &amp; Heaps</h3><p>Ordered structures and Top-K thinking</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>BST core, validate, Kth smallest, LCA, two-sum in BST</li>
+          <li>Transformations, views (left/right/top/bottom), construction + serialization</li>
+          <li>Heap fundamentals + heap sort · Top-K frequent, Kth largest</li>
+          <li>Two-heap median of a data stream</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Self-balancing overview: AVL &amp; Red–Black rotations</li>
+          <li>Order-statistics tree (rank queries); build_heap O(n) proof</li>
+          <li>Indexed heap with decrease-key (feeds Dijkstra)</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 11</span>
+        <span class="week-head"><h3>Trie &amp; Advanced Trees</h3><p>Prefix trees, bitwise tries, and range queries</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Trie core, prefix problems, Word Search II, autocomplete</li>
+          <li>Binary (bitwise) trie: maximum XOR of two numbers</li>
+          <li>Prefix+suffix, palindrome pairs, search suggestion system</li>
+          <li>DP on trees: tree cameras, re-rooting, nodes at distance K, binary lifting</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Segment tree (point update / range query) + lazy propagation</li>
+          <li>Fenwick/BIT problems (inversion count, range sum with updates)</li>
+          <li>Sparse table + Euler tour for O(1) LCA · Aho–Corasick <em>(optional)</em></li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 12</span>
+        <span class="week-head"><h3>Graphs</h3><p>Traversal, shortest paths, DSU, and MST</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>BFS/DFS, cycle detection, bipartite, grid patterns (islands, rotting oranges)</li>
+          <li>Topological sort (DFS + Kahn's) · course schedule</li>
+          <li>Shortest path: Dijkstra, 0-1 BFS, Bellman-Ford, Floyd-Warshall</li>
+          <li>DSU + MST (Kruskal, Prim), clone graph, alien dictionary</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>DSU with union-by-rank + path compression (α(n) analysis)</li>
+          <li>Tarjan / Kosaraju SCC; bridges &amp; articulation points</li>
+          <li>Topo + DP on a DAG; min-cut/max-flow intro <em>(optional)</em></li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 13</span>
+        <span class="week-head"><h3>Greedy &amp; Dynamic Programming (Part 1)</h3><p>When greedy works, and the DP recipe</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>Greedy: intervals (merge, meeting rooms), scheduling, jump game, candy</li>
+          <li>Greedy-vs-DP: when each applies</li>
+          <li>DP fundamentals: memoization ↔ tabulation, 1D DP (house robber, Kadane)</li>
+          <li>Tile/counting DP · grid DP (unique paths, min path sum, cherry pickup)</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>Exchange-argument proof technique (justify a greedy choice)</li>
+          <li>Huffman coding (greedy + heap case study)</li>
+          <li>The DP recipe (state → transition → base → order) + space optimization</li>
+        </ul></div>
+      </div></div>
+    </details>
+
+    <details class="week">
+      <summary>
+        <span class="week-tag">Week 14</span>
+        <span class="week-head"><h3>DP (Part 2), Strings &amp; Capstone</h3><p>The hard DP, string algorithms, and mock interviews</p></span>
+        <svg class="week-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="week-body"><div class="wb-row">
+        <div class="wb-col blocks"><h4>Patterns &amp; Topics</h4><ul class="wb-list">
+          <li>String DP: LCS, edit distance, regex/wildcard matching</li>
+          <li>Classic DP: 0/1 &amp; unbounded knapsack, coin change, MCM, burst balloons</li>
+          <li>LIS (n log n) &amp; state DP: stock buy/sell I–IV, cooldown</li>
+          <li>String &amp; rolling hash, substring matching, meet-in-the-middle</li>
+        </ul></div>
+        <div class="wb-col apply"><h4>Practice &amp; Add-ons</h4><ul class="wb-list">
+          <li>String matching: KMP, Z-algorithm, Rabin–Karp (rolling hash)</li>
+          <li>Bitmask DP (TSP) &amp; digit DP <em>(optional)</em></li>
+          <li><strong>Capstone:</strong> timed mixed-topic contest + live mock interviews</li>
+        </ul></div>
+      </div></div>
+    </details>
+  </section>
+
+  <!-- ── OUTCOMES ── -->
+  <section class="course-section">
+    <h2 class="sec-title">What you'll walk away with</h2>
+    <p class="sec-lead">By week 14, a new problem stops being scary, you recognize the pattern and reach for the right tool.</p>
+    <div class="outcomes">
+      <div class="outcome"><span class="ic">+</span><span>Instantly <b>recognize the pattern</b> behind a problem instead of starting from scratch.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Pick the <b>optimal data structure</b> and justify the time/space tradeoff.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Write <b>clean, bug-free templates</b> fast, two-pointer, binary search, DFS, DP.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Define <b>DP state &amp; transition</b> confidently, and optimize space.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Handle <b>graphs</b>, traversal, shortest path, DSU, MST, without panic.</span></div>
+      <div class="outcome"><span class="ic">+</span><span>Walk into <b>coding rounds</b> calm, structured, and fast.</span></div>
+    </div>
+  </section>
+
+  <!-- ── AUDIENCE ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Is this for you?</h2>
+    <div class="aud-grid">
+      <div class="aud for">
+        <h3>Perfect if you're…</h3>
+        <ul>
+          <li>A student or SWE prepping for coding interviews (FAANG, product, startups)</li>
+          <li>Someone who's solved problems but can't yet recognize patterns</li>
+          <li>Strong on syntax but shaky on choosing the right approach</li>
+          <li>Tired of random problem lists and want a structured sequence</li>
+          <li>Returning to interviews and rusty on DSA</li>
+        </ul>
+      </div>
+      <div class="aud notfor">
+        <h3>Not for you if…</h3>
+        <ul>
+          <li>You want a "memorize 50 solutions" shortcut</li>
+          <li>You can't commit to 2 weekend sessions + practice per week</li>
+          <li>You're looking for system design (see Master Advanced System Design instead)</li>
+          <li>You expect to learn by watching, not by solving</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BONUSES ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Everything included</h2>
+    <p class="sec-lead">One price, full access, no upsells.</p>
+    <div class="bonus-grid">
+      <div class="bonus"><div class="bic">🎥</div><h4>28 Live Sessions</h4><p>2 per week (Sat &amp; Sun) for 14 weeks, fully recorded if you miss one.</p></div>
+      <div class="bonus"><div class="bic">🧩</div><h4>500+ Problems</h4><p>Curated, pattern-ordered problem bank across 24 modules.</p></div>
+      <div class="bonus"><div class="bic">📑</div><h4>Pattern Cheat-Sheets</h4><p>A reusable template per pattern, two-pointer, binary search, DP, graphs.</p></div>
+      <div class="bonus"><div class="bic">🏁</div><h4>Weekly Contests</h4><p>Timed rounds to build speed and accuracy under pressure.</p></div>
+      <div class="bonus"><div class="bic">🎯</div><h4>Live Mock Interviews</h4><p>Real interview simulation with structured feedback.</p></div>
+      <div class="bonus"><div class="bic">💬</div><h4>Mentor Access</h4><p>Direct doubt-clearing in the cohort group, never stay stuck.</p></div>
+    </div>
+  </section>
+
+  <!-- ── TESTIMONIALS (sample) ── -->
+  <section class="course-section">
+    <h2 class="sec-title">What learners say</h2>
+    <div class="tst-grid">
+      <div class="tst"><p>"The pattern-first sequence changed everything. I stopped memorizing and started recognizing, new problems finally feel solvable."</p><div class="who"><div class="ava">RK</div><div><b>Rahul K.</b><span>New grad → SDE, product company</span></div></div></div>
+      <div class="tst"><p>"The learn-then-solve format forced me to actually code every session. My interview speed doubled."</p><div class="who"><div class="ava">AS</div><div><b>Ananya S.</b><span>SDE-1 → SDE-2</span></div></div></div>
+      <div class="tst"><p>"DP used to terrify me. The state → transition recipe made it mechanical. Cleared my loop two months later."</p><div class="who"><div class="ava">VT</div><div><b>Vikram T.</b><span>Backend engineer, 4 yrs</span></div></div></div>
+      <div class="tst"><p>"Graphs and tries were always my weak spots. The templates here made them routine."</p><div class="who"><div class="ava">PM</div><div><b>Pooja M.</b><span>Full-stack engineer</span></div></div></div>
+    </div>
+  </section>
+
+  <!-- ── PRICING / ENROLL ── -->
+  <section class="course-section" id="enroll">
+    <h2 class="sec-title" style="text-align:center">Reserve your seat</h2>
+    <p class="sec-lead" style="text-align:center">Small cohort · personal attention · limited seats.</p>
+    <div class="urgency">🔥 <b>Next batch starts Oct 29</b> · seats fill fast, message us to lock your spot</div>
+    <div class="price-card">
+      <span class="price-batch">Next Batch · Oct 29</span>
+      <div class="price-amt"><span class="cur">₹</span>29,999</div>
+      <div class="price-note">One-time · 14 weeks · 28 live sessions + recordings + problem bank</div>
+      <ul class="price-includes">
+        <li>28 live sessions (Sat &amp; Sun, 4–8 PM IST)</li>
+        <li>Learn-then-apply format with 500+ curated problems</li>
+        <li>Pattern cheat-sheets &amp; reusable code templates</li>
+        <li>Weekly timed contests</li>
+        <li>Live mock interviews with feedback</li>
+        <li>Session recordings &amp; direct mentor access</li>
+      </ul>
+      <a class="btn-pay" style="width:100%;justify-content:center" href="https://wa.me/919100880133?text=Hi%2C%20I%27d%20like%20to%20enroll%20in%20the%20Master%20Data%20Structures%20and%20Algorithms%20(14-week)%20live%20course"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Enroll, Message us on WhatsApp</a>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section class="course-section">
+    <h2 class="sec-title">Frequently asked</h2>
+    <details class="faq"><summary>I'm a working professional. Can I keep up?</summary><div class="faq-body">Yes, that's why sessions are weekend-only (Sat &amp; Sun, 4–8 PM IST), 2 per week. They're recorded, so if you miss one you can catch up. Expect a few hours of practice between sessions, that's where the real learning happens.</div></details>
+    <details class="faq"><summary>What language is the course in?</summary><div class="faq-body">The patterns and templates are language-agnostic; examples are shown in C++ and Java (the STL/Collections internals are covered for both), and you can solve in the language of your choice.</div></details>
+    <details class="faq"><summary>Do I need prior DSA experience?</summary><div class="faq-body">No. We start from foundations (complexity, STL, essential math) and build up in sequence. You just need to be comfortable writing basic code.</div></details>
+    <details class="faq"><summary>Is it live or recorded?</summary><div class="faq-body">100% live and interactive, you solve alongside the instructor and get real-time feedback. Recordings are provided for revision and missed sessions.</div></details>
+    <details class="faq"><summary>How is this different from Master Advanced System Design?</summary><div class="faq-body">This course is about <strong>coding rounds</strong>, data structures and algorithms. Master Advanced System Design covers architecture/design rounds. Many engineers take both.</div></details>
+    <details class="faq"><summary>How do I enroll?</summary><div class="faq-body">Tap any "Enroll" button to message us on WhatsApp. We'll confirm the next batch date, pricing, and onboarding details.</div></details>
+  </section>
+
+  <!-- ── FINAL CTA ── -->
+  <section class="course-section" style="text-align:center">
+    <h2 class="sec-title" style="text-align:center">Fourteen weeks from now…</h2>
+    <p class="sec-lead" style="text-align:center;max-width:620px;margin-left:auto;margin-right:auto">…you could be the candidate who reads a problem, names the pattern, and codes the clean solution while the timer still has plenty left.</p>
+    <div class="course-cta-row">
+      <a class="btn-pay" href="https://wa.me/919100880133?text=Hi%2C%20I%27d%20like%20to%20enroll%20in%20the%20Master%20Data%20Structures%20and%20Algorithms%20(14-week)%20live%20course"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Claim your seat, Message us</a>
+    </div>
+  </section>
+
+</div>
+
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+<script>const b=document.getElementById('topBtn');window.addEventListener('scroll',()=>{b.style.display=window.scrollY>400?'flex':'none'})</script>
+<script src="js/header.js"></script>
+</body>
+</html>

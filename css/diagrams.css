@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Diagram primitives — monochrome. Nodes distinguished by
+   Diagram primitives, monochrome. Nodes distinguished by
    luminance (4-step ramp), not hue.
    ═══════════════════════════════════════════════════════════════ */
 
@@ -34,7 +34,7 @@
 .d-node.server{width:40px;height:40px;border-radius:50%;border:2px solid var(--border-strong);font-size:.72rem}
 .d-node.key{width:28px;height:28px;border-radius:50%;font-size:.65rem;opacity:.95}
 
-/* Node "colors" — mapped to greyscale luminance ramp.
+/* Node "colors", mapped to greyscale luminance ramp.
    Kept as class names for backward compatibility with existing HTML. */
 .d-blue,.d-purple{background:var(--node-1)}
 .d-green,.d-teal,.d-cyan{background:var(--node-2)}
@@ -80,7 +80,7 @@
 .d-panel{background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
 .d-panel h4{font-size:.75rem;font-weight:700;margin-bottom:6px;color:var(--text);text-transform:uppercase;letter-spacing:.6px}
 
-/* Callout badges — prefix with "+" / "−" instead of color */
+/* Callout badges, prefix with "+" / "−" instead of color */
 .d-badge{
   display:inline-block;padding:2px 9px;border-radius:2px;font-size:.72rem;font-weight:700;
   margin:3px;background:transparent;border:1px solid var(--border-strong);color:var(--text);
@@ -108,7 +108,7 @@
 .d-cross{color:var(--text);font-weight:700}
 .d-cross::before{content:"\2212 "}
 
-/* Diagram title — modern chevron indicator instead of boxed triangle.
+/* Diagram title, modern chevron indicator instead of boxed triangle.
    Hide the original ▸ character in .num and inject a clean › via ::after. */
 .d-title{
   font-size:var(--fs-sm,.88rem);font-weight:700;

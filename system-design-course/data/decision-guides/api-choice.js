@@ -37,13 +37,6 @@ window.COURSE_CONTENT["api-choice"] = {
         { label: "REST as the sensible default", body: "For public, resource-oriented APIs where responses are cacheable and clients are diverse, REST wins on simplicity, tooling, and HTTP cache semantics. Reach past it only when a specific pain (fetching shape, latency, or streaming) justifies it." },
         { label: "Streaming picks based on direction", body: "Bidirectional and low-latency (chat, gaming) needs <strong>WebSocket</strong>. Server-to-client only (AI token streams, live feeds) is simpler with <strong>SSE</strong>, which auto-reconnects over plain HTTP. Fall back to <strong>Long Polling</strong> only for legacy constraints." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. A pen, or a whiteboard tool.",
-      setup: "Take one real requirement and run it through the tree end to end, saying each fork out loud.",
-      simulate: "Scenario: \u201cAn internal pricing service is called 50,000 times/sec by other backend services, latency budget under 5ms.\u201d Walk the tree: client-facing or internal? Internal \u2192 gRPC. Now a second scenario: \u201cA public mobile app where the home screen and the settings screen need very different subsets of the same user object.\u201d Walk it: client-facing, over/under-fetching a concern? Yes \u2192 GraphQL.",
-      observe: "Notice that you never compared all styles at once. You answered two or three yes/no questions and the style fell out. That is the whole point of a decision guide: replace \u201cwhich is best?\u201d with \u201cwhat does this requirement force?\u201d",
-      stretch: "Now break your own answer: for the gRPC scenario, add \u201ca browser dashboard also needs to call it directly.\u201d What changes? (A REST or GraphQL gateway in front, or gRPC-Web with a proxy.) Defending the edge case is the interview skill."
     }
   },
   keyTakeaways: [

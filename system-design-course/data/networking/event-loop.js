@@ -170,11 +170,29 @@ window.COURSE_CONTENT["event-loop"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Linux or macOS (for <code>strace</code> / <code>dtruss</code>); Node.js or Python; <code>hey</code> for load.",
-      setup: "Local and free only.",
-      simulate: "Run a simple Node.js server under <code>strace -e trace=network -f node server.js</code> (Linux) and fire 50 concurrent connections at it with <code>hey -n 500 -c 50 http://localhost:3000</code>. Watch the syscall trace, and look specifically for <code>epoll_wait</code> calls.",
-      observe: "One thread issuing a small number of <code>epoll_wait</code> calls that each report back <strong>multiple ready sockets at once</strong>, instead of one syscall per connection per check. That is the O(1) \u201ctell me only the ready ones\u201d claim seen directly in the trace rather than taken on faith.",
-      stretch: "Run the same 50-connection test against a naive thread-per-connection server and compare thread counts with <code>ps -eLf | wc -l</code> before and during load: dozens of new OS threads appearing versus the event-loop version's thread count staying flat. Then add a deliberate 300 ms busy-loop inside one handler and watch every other connection stall, that is the never-block-the-loop rule, measured."
+      goal: "Trace a Node server under load and see one thread answer many connections with a few <code>epoll_wait</code> calls, not one syscall per connection.",
+      stack: "Node.js, <code>strace</code> (Linux) or <code>dtruss</code> (macOS), and <code>hey</code> for load. Local and free.",
+      steps: [
+        {
+          title: "A tiny HTTP server",
+          code: "// server.js\nrequire('http').createServer((req, res) => {\n  res.end('ok\\n');\n}).listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Trace its network syscalls under load",
+          body: "Run the server under strace in one terminal, fire 50 concurrent connections from another, then grep the trace. On macOS use <code>sudo dtruss -n node</code>.",
+          code: "# terminal 1 (Linux)\nstrace -f -e trace=network -o trace.log node server.js\n\n# terminal 2\nhey -n 500 -c 50 http://localhost:3000/\n\n# then inspect\ngrep epoll_wait trace.log | head",
+          lang: "bash"
+        },
+        {
+          title: "Compare thread counts against thread-per-connection",
+          body: "While the load test runs, the event loop's thread count barely moves.",
+          code: "# in a third terminal, during the load test:\nps -eLf | grep node | wc -l",
+          lang: "bash"
+        }
+      ],
+      observe: "In <code>trace.log</code> you see a small number of <code>epoll_wait</code> calls, each returning <strong>several ready sockets at once</strong>, instead of one syscall per connection. The Node process's thread count stays flat under load, not one thread per connection.",
+      stretch: "Add a deliberate <code>while (Date.now() - start &lt; 300) {}</code> busy-loop inside the request handler and rerun the load: every other connection stalls behind it, because one thread runs every callback to completion. That is the never-block-the-loop rule, measured."
     }
   },
   keyTakeaways: [

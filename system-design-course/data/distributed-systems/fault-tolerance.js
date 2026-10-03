@@ -52,11 +52,28 @@ window.COURSE_CONTENT["fault-tolerance"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js; `opossum` (Node\u2019s circuit-breaker library, free) or Resilience4j (Java).",
-      setup: "Local and free only.",
-      simulate: "Wrap a call to a deliberately flaky downstream mock (fails 60% of the time) with `opossum`, configured to open after 5 failures in 10 seconds with a 10-second reset timeout. Hammer it with 50 sequential calls and log the circuit\u2019s state (Closed / Open / Half-Open) before and after each call.",
-      observe: "The circuit flipping to Open after the failure threshold: subsequent calls fail instantly with no network call attempted at all (check the mock\u2019s own hit count to confirm calls actually stopped reaching it), then flipping to Half-Open after the timeout and testing one trial call before deciding to close or reopen.",
-      stretch: "Compute the availability math on a 3-tier chain: App Server 99.9% \u2192 the flaky dependency\u2019s raw 40% success rate, without a breaker, versus the same chain with the breaker\u2019s cached fallback substituted in during Open. Show numerically how the fallback lifts the user-facing success rate even though the dependency itself never improved."
+      goal: "Wrap a flaky dependency in an <code>opossum</code> circuit breaker and watch it trip to Open, fail fast with a fallback, then self-heal through Half-Open.",
+      stack: "Node.js with the <code>opossum</code> circuit-breaker library. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "npm init -y && npm install opossum",
+          lang: "bash"
+        },
+        {
+          title: "Wrap a 60%-flaky dependency in a breaker",
+          body: "The breaker opens once the error rate crosses the threshold over a minimum volume of calls, short-circuits to a cached fallback while Open, then allows a trial call after the reset timeout. Save as <code>breaker.js</code>.",
+          code: "const CircuitBreaker = require('opossum');\n\nlet reached = 0;\n// downstream that fails ~60% of the time\nfunction flakyDependency() {\n  reached++;\n  return new Promise((resolve, reject) => {\n    Math.random() < 0.6 ? reject(new Error('downstream failed')) : resolve('ok');\n  });\n}\n\nconst breaker = new CircuitBreaker(flakyDependency, {\n  timeout: 500,\n  errorThresholdPercentage: 50,\n  volumeThreshold: 5,\n  resetTimeout: 3000\n});\nbreaker.fallback(() => 'cached-fallback');\n\nbreaker.on('open', () => console.log('>> circuit OPEN'));\nbreaker.on('halfOpen', () => console.log('>> circuit HALF-OPEN'));\nbreaker.on('close', () => console.log('>> circuit CLOSED'));\n\n(async () => {\n  for (let i = 1; i <= 50; i++) {\n    const result = await breaker.fire().catch(e => e.message);\n    const state = breaker.opened ? 'OPEN' : (breaker.halfOpen ? 'HALF' : 'CLOSED');\n    console.log(i, state, '->', result);\n    await new Promise(r => setTimeout(r, 200));\n  }\n  console.log('calls that actually reached downstream:', reached);\n})();",
+          lang: "javascript"
+        },
+        {
+          title: "Run it and watch the state transitions",
+          code: "node breaker.js",
+          lang: "bash"
+        }
+      ],
+      observe: "After the failure threshold is crossed the circuit flips to Open, and subsequent calls return <code>cached-fallback</code> instantly with no downstream attempt (the <code>reached</code> counter stops climbing). After the 3s reset timeout it goes Half-Open and tries one trial call before deciding to close or reopen.",
+      stretch: "Compute the availability math on a 3-tier chain: App Server 99.9% in front of a dependency at only 40% success, without a breaker, versus the same chain with the breaker's cached fallback during Open. Show numerically how the fallback lifts the user-facing success rate even though the dependency never improved."
     }
   },
   keyTakeaways: [

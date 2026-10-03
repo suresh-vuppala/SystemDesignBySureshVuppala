@@ -67,11 +67,93 @@ window.COURSE_CONTENT["event-sourcing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js or Python; Docker (Postgres, as a simple event store).",
-      setup: "Local and free: `docker run -d -p 5432:5432 postgres`.",
-      simulate: "Create an `events` table (`aggregateId, eventType, payload, version, timestamp`) instead of a normal `accounts` table. Model a bank account with only events: `AccountOpened`, `MoneyDeposited`, `MoneyWithdrawn`. Write a function that replays all events for one `aggregateId` in order and computes the balance by folding over them. Insert 20 events for one account, then call your replay function.",
-      observe: "The computed balance matches what you would expect from summing deposits minus withdrawals: current state genuinely derived, not stored. Then add a `SnapshotTaken` event every 10 events and confirm replay from the most recent snapshot plus only later events produces the same answer, much faster than replaying from zero.",
-      stretch: "Handle a GDPR-style erasure request without deleting event history: implement crypto-shredding by encrypting each account\u2019s events with a per-account key, then discard that key to make the events permanently unreadable while the log itself stays intact."
+      goal: "Model a bank account as an append-only event log in Postgres and derive its balance by folding over events, never storing current state, then speed up replay with a snapshot.",
+      stack: "Postgres in Docker + Node.js (<code>pg</code>). Local and free.",
+      steps: [
+        {
+          title: "Start Postgres",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres",
+          lang: "bash"
+        },
+        {
+          title: "Create an events table (no accounts table)",
+          code: "docker exec -i pg psql -U postgres -c \"CREATE TABLE events(id serial primary key, aggregate_id text, event_type text, payload jsonb, version int, ts timestamptz default now());\"",
+          lang: "bash"
+        },
+        {
+          title: "Install the client",
+          code: "npm init -y && npm install pg",
+          lang: "bash"
+        },
+        {
+          title: "Append 20 events, then replay to derive the balance",
+          body: "Save as <code>es.js</code>. <code>apply</code> folds each event into state; the balance is computed, never stored. Ten deposits of 100 and nine withdrawals of 30 leave 730.",
+          code: `const { Pool } = require('pg');
+const pg = new Pool({ host: 'localhost', user: 'postgres', password: 'pw' });
+const ACC = 'acc-1';
+
+async function append(type, payload) {
+  const { rows } = await pg.query(
+    'SELECT COALESCE(MAX(version),0)+1 v FROM events WHERE aggregate_id=$1', [ACC]);
+  await pg.query(
+    'INSERT INTO events(aggregate_id,event_type,payload,version) VALUES($1,$2,$3,$4)',
+    [ACC, type, payload, rows[0].v]);
+}
+
+function apply(state, e) {
+  if (e.event_type === 'MoneyDeposited') return { balance: state.balance + e.payload.amount };
+  if (e.event_type === 'MoneyWithdrawn') return { balance: state.balance - e.payload.amount };
+  return state;
+}
+
+async function replay() {
+  const { rows } = await pg.query(
+    'SELECT * FROM events WHERE aggregate_id=$1 ORDER BY version', [ACC]);
+  return rows.reduce(apply, { balance: 0 });
+}
+
+(async () => {
+  await append('AccountOpened', {});
+  for (let i = 1; i <= 19; i++) {
+    if (i % 2) await append('MoneyDeposited', { amount: 100 });
+    else await append('MoneyWithdrawn', { amount: 30 });
+  }
+  console.log('derived balance:', (await replay()).balance);
+  await pg.end();
+})();`,
+          lang: "javascript"
+        },
+        {
+          title: "Snapshot, then replay only the tail",
+          body: "Save as <code>snapshot.js</code>. Store current state as a <code>SnapshotTaken</code> event, then replay starting from the snapshot instead of from event 0.",
+          code: `const { Pool } = require('pg');
+const pg = new Pool({ host: 'localhost', user: 'postgres', password: 'pw' });
+const ACC = 'acc-1';
+const apply = (s, e) =>
+  e.event_type === 'MoneyDeposited' ? { balance: s.balance + e.payload.amount } :
+  e.event_type === 'MoneyWithdrawn' ? { balance: s.balance - e.payload.amount } : s;
+
+(async () => {
+  const full = (await pg.query('SELECT * FROM events WHERE aggregate_id=$1 ORDER BY version', [ACC]))
+    .rows.reduce(apply, { balance: 0 });
+  const max = (await pg.query('SELECT MAX(version) v FROM events WHERE aggregate_id=$1', [ACC])).rows[0].v;
+  await pg.query('INSERT INTO events(aggregate_id,event_type,payload,version) VALUES($1,$2,$3,$4)',
+    [ACC, 'SnapshotTaken', { balance: full.balance }, max + 1]);
+
+  const snap = (await pg.query(
+    "SELECT * FROM events WHERE aggregate_id=$1 AND event_type='SnapshotTaken' ORDER BY version DESC LIMIT 1",
+    [ACC])).rows[0];
+  const tail = (await pg.query(
+    'SELECT * FROM events WHERE aggregate_id=$1 AND version>$2 ORDER BY version', [ACC, snap.version]))
+    .rows.reduce(apply, { balance: snap.payload.balance });
+  console.log('full replay:', full.balance, ' snapshot + tail:', tail.balance);
+  await pg.end();
+})();`,
+          lang: "javascript"
+        }
+      ],
+      observe: "The derived balance is 730, computed by folding events, not read from a stored column: current state genuinely derived. The snapshot run prints the same balance from both the full replay and the snapshot-plus-tail path, but the second reads far fewer rows: the replay shortcut real event stores rely on for large aggregates.",
+      stretch: "Handle a GDPR erasure request without deleting history: implement crypto-shredding by encrypting each account's event payloads with a per-account key, then discard that key so the events become permanently unreadable while the log itself stays intact."
     }
   },
   keyTakeaways: [

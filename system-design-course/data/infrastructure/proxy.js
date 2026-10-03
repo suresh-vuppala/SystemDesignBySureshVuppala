@@ -21,11 +21,39 @@ window.COURSE_CONTENT["proxy"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker, plus `squid` (forward proxy) and `nginx` (reverse proxy) images.",
-      setup: "Local and free: `docker run -d -p 3128:3128 ubuntu/squid` for the forward proxy; a plain NGINX container configured with `proxy_pass` for the reverse proxy.",
-      simulate: "Configure `curl --proxy localhost:3128 https://example.com` and check the request logs on the Squid container: you will see the client's request relayed outward, hiding the client from example.com's perspective. Separately, configure NGINX to `proxy_pass` to a backend app and hit NGINX directly, then check the backend's logs for the source IP it sees (NGINX's, not the real client's, unless `X-Forwarded-For` is set).",
-      observe: "From the destination server's point of view in each case: the forward proxy hides the client's identity from the destination; the reverse proxy hides the backend's identity from the client. Same proxy pattern, two different things being hidden.",
-      stretch: "Add `proxy_set_header X-Forwarded-For $remote_addr;` to the NGINX config and confirm the backend now sees the real client IP in that header, the standard way reverse proxies avoid losing this information."
+      goal: "Run a Squid forward proxy and an NGINX reverse proxy side by side and see exactly which side each one hides.",
+      stack: "Squid (forward) and NGINX (reverse) plus a <code>traefik/whoami</code> backend in Docker, driven with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a Squid forward proxy",
+          code: "docker run -d --name squid -p 3128:3128 ubuntu/squid",
+          lang: "bash"
+        },
+        {
+          title: "Send a request through it and read Squid's log",
+          body: "The destination sees Squid, not you; Squid's access log shows your request relayed outward.",
+          code: "curl -s --proxy http://localhost:3128 http://example.com -o /dev/null\ndocker exec squid tail -n 5 /var/log/squid/access.log",
+          lang: "bash"
+        },
+        {
+          title: "Start a backend behind an NGINX reverse proxy",
+          code: "docker network create proxynet\ndocker run -d --name backend --network proxynet traefik/whoami\ncat > rev.conf <<'EOF'\nevents {}\nhttp {\n  server {\n    listen 80;\n    location / { proxy_pass http://backend:80; }\n  }\n}\nEOF\ndocker run -d --name rproxy --network proxynet -p 8080:80 \\\n  -v \"$PWD/rev.conf:/etc/nginx/nginx.conf:ro\" nginx",
+          lang: "bash"
+        },
+        {
+          title: "See what address the backend thinks it is talking to",
+          code: "curl -s http://localhost:8080/ | grep -E 'RemoteAddr|X-Forwarded-For'",
+          lang: "bash"
+        },
+        {
+          title: "Forward the real client IP",
+          body: "Add <code>X-Forwarded-For</code> so the backend can recover the original client address.",
+          code: "sed -i 's#location / {#location / {\\n      proxy_set_header X-Forwarded-For $remote_addr;#' rev.conf\ndocker cp rev.conf rproxy:/etc/nginx/nginx.conf\ndocker exec rproxy nginx -s reload\ncurl -s http://localhost:8080/ | grep -E 'RemoteAddr|X-Forwarded-For'",
+          lang: "bash"
+        }
+      ],
+      observe: "Through Squid, <code>example.com</code> only ever sees Squid's address (the forward proxy hides the client). Through NGINX, the backend's <code>RemoteAddr</code> is NGINX's container IP, not yours (the reverse proxy hides the backend); after the last step an <code>X-Forwarded-For</code> header carries your real address through. Same pattern, opposite side hidden.",
+      stretch: "Put a second backend behind the same NGINX and turn it into a load balancer with an <code>upstream</code> block, showing a reverse proxy and a load balancer are the same tool wearing different hats."
     }
   },
   keyTakeaways: [

@@ -39,11 +39,35 @@ window.COURSE_CONTENT["iac"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Terraform (free) installed, plus an AWS/GCP free-tier account.",
-      setup: "Local and free: Terraform pointed at a free-tier cloud account.",
-      simulate: "Write a `.tf` file provisioning one free-tier resource (an S3 bucket or a small EC2 instance). Run `terraform plan` and read the diff before applying anything, then `terraform apply`. Manually change one setting on that resource directly in the cloud console (a ClickOps change), then run `terraform plan` again.",
-      observe: "Terraform detects the manual drift and shows it as a diff it wants to \u201ccorrect\u201d back to what is in code: the exact ClickOps anti-pattern, caught automatically instead of silently persisting.",
-      stretch: "Delete the resource with `terraform destroy`, then intentionally corrupt the local state file and try `terraform plan` again. See the error Terraform raises, and why teams store state remotely with locking (S3 + DynamoDB) instead of a local file that any one person could break."
+      goal: "Provision one free-tier resource with Terraform, then make a ClickOps change in the cloud console and watch <code>terraform plan</code> catch the drift automatically.",
+      stack: "Terraform plus the AWS CLI against a free-tier account. Free cloud tier.",
+      steps: [
+        {
+          title: "Declare one free-tier resource",
+          body: "Save as <code>main.tf</code>. Pick a globally unique bucket name.",
+          code: "terraform {\n  required_providers {\n    aws = { source = \"hashicorp/aws\" }\n  }\n}\n\nprovider \"aws\" {\n  region = \"us-east-1\"\n}\n\nresource \"aws_s3_bucket\" \"demo\" {\n  bucket = \"iac-demo-your-unique-suffix\"\n  tags = {\n    Env = \"lab\"\n  }\n}",
+          lang: "hcl"
+        },
+        {
+          title: "Init, preview the plan, then apply",
+          body: "Read the <code>plan</code> diff before you <code>apply</code>: it is a free, reversible preview of every change.",
+          code: "terraform init\nterraform plan\nterraform apply -auto-approve",
+          lang: "bash"
+        },
+        {
+          title: "Make a ClickOps change out of band",
+          body: "Change a tag directly through the CLI (standing in for a console click), bypassing Terraform.",
+          code: "aws s3api put-bucket-tagging --bucket iac-demo-your-unique-suffix \\\n  --tagging 'TagSet=[{Key=Env,Value=prod},{Key=Owner,Value=clickops}]'",
+          lang: "bash"
+        },
+        {
+          title: "Re-plan and see the drift",
+          code: "terraform plan",
+          lang: "bash"
+        }
+      ],
+      observe: "The final <code>terraform plan</code> reports the tags as drifted and offers to \u201ccorrect\u201d them back to what is in code: the ClickOps anti-pattern caught automatically instead of silently persisting until something breaks.",
+      stretch: "Run <code>terraform destroy</code>, then intentionally corrupt <code>terraform.tfstate</code> and run <code>terraform plan</code> again. Read the error, and see why teams keep state remote with locking (S3 + DynamoDB) instead of a local file any one person can break."
     }
   },
   keyTakeaways: [

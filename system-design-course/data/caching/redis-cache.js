@@ -34,11 +34,30 @@ window.COURSE_CONTENT["redis-cache"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); `redis-cli`.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis --maxmemory 10mb --maxmemory-policy noeviction` (deliberately tiny, to hit the limit fast).",
-      simulate: "Write a script that inserts keys until Redis rejects a write (`OOM command not allowed`) under `noeviction`. Then switch the policy live with `CONFIG SET maxmemory-policy allkeys-lru` and repeat: Redis now silently evicts old keys instead of erroring.",
-      observe: "The exact behavioral difference at the moment memory fills: `noeviction` breaking your writes outright (correct for a real data store you cannot afford to lose data from), `allkeys-lru` staying available by discarding the least-recently-used entries (correct for a pure cache where staleness beats downtime).",
-      stretch: "Set `volatile-lru` instead, insert a mix of keys with and without a TTL, and confirm only the TTL'd keys are ever eligible for eviction. Keys with no expiry survive even as memory fills, exactly matching the policy name."
+      goal: "Fill a deliberately tiny Redis to its memory limit and watch the eviction policy decide between breaking writes and dropping old keys.",
+      stack: "Redis in Docker capped at 10mb, driven from <code>redis-cli</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a tiny Redis that rejects writes when full",
+          body: "10mb with <code>noeviction</code> hits the limit fast and refuses new writes rather than dropping data.",
+          code: "docker run -d --name redis -p 6379:6379 redis --maxmemory 10mb --maxmemory-policy noeviction",
+          lang: "bash"
+        },
+        {
+          title: "Insert keys until Redis says OOM",
+          body: "Push 1KB values in a loop until you see <code>OOM command not allowed</code>.",
+          code: "docker exec redis sh -c 'i=0; while true; do i=$((i+1)); redis-cli SET key:$i $(head -c 1000 /dev/zero | tr \"\\0\" x) | grep -q OOM && { echo \"stopped at $i\"; break; }; done'",
+          lang: "bash"
+        },
+        {
+          title: "Switch to LRU eviction live and keep writing",
+          body: "No restart needed. Now Redis silently evicts the least-recently-used keys instead of erroring.",
+          code: "docker exec redis redis-cli CONFIG SET maxmemory-policy allkeys-lru\ndocker exec redis sh -c 'for i in $(seq 1 20000); do redis-cli SET more:$i $(head -c 1000 /dev/zero | tr \"\\0\" x) > /dev/null; done; echo done'\ndocker exec redis redis-cli INFO stats | grep evicted_keys",
+          lang: "bash"
+        }
+      ],
+      observe: "The exact behavioral difference at the moment memory fills: <code>noeviction</code> breaks your writes with <code>OOM</code> (correct for a data store you cannot afford to lose data from), while <code>allkeys-lru</code> stays available and reports a rising <code>evicted_keys</code> count (correct for a pure cache where staleness beats downtime).",
+      stretch: "Set <code>volatile-lru</code> instead, insert a mix of keys with and without a TTL, and confirm only the TTL'd keys are ever eligible for eviction. Keys with no expiry survive even as memory fills, exactly matching the policy name."
     }
   },
   keyTakeaways: [

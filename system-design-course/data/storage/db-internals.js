@@ -89,11 +89,86 @@ window.COURSE_CONTENT["db-internals"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python or Node.js; a text editor. No database needed, this is a from-scratch build.",
-      setup: "Local and free only. You will build a tiny key-value store on a plain text file.",
-      simulate: "Build Steps 1 to 4 yourself, in order. (1) A naive \u201cappend a line, rewrite the whole file to update it\u201d store; time an update on a 10,000-line file. (2) Switch to pure append-only writes (never rewrite, just append new versions); time the same update. (3) Add a simple in-memory hash index (`{key: byteOffset}`) built by scanning the file once at startup; time a point lookup before and after.",
-      observe: "Step 1's update time grows with file size (it rewrites the whole file each time) while step 2's stays flat: the O(n) vs O(1) claim, timed with your own stopwatch instead of assumed. Then step 3's lookup drops from \u201cscan the whole file\u201d to \u201cone seek.\u201d",
-      stretch: "Implement simple compaction: merge 2 append-only segments, keeping only the latest value per key, and measure file size before and after on a file with many overwritten keys."
+      goal: "Build a tiny key-value store on a plain text file and prove, with your own stopwatch, that append-only writes are O(1) while whole-file rewrites are O(n), then add a hash index that turns a full scan into a single seek.",
+      stack: "Python 3 and a plain text file as the storage engine. No database. Local and free.",
+      steps: [
+        {
+          title: "Seed 10,000 rows and time a naive rewrite update",
+          body: "The naive store updates a key by reading every line and rewriting the whole file. Save as <code>naive.py</code> and run it.",
+          code: `# naive.py - updating a key rewrites the entire file
+import time
+
+def seed(path, n):
+    with open(path, "w") as f:
+        for i in range(n):
+            f.write(str(i) + ",value" + str(i) + "\\n")
+
+def update_naive(path, key, value):
+    with open(path) as f:
+        lines = f.readlines()
+    with open(path, "w") as f:
+        for line in lines:
+            k = line.split(",", 1)[0]
+            f.write(key + "," + value + "\\n" if k == key else line)
+
+seed("naive.db", 10000)
+t = time.time()
+update_naive("naive.db", "5000", "updated")
+print("naive update:", round((time.time() - t) * 1000, 3), "ms")`,
+          lang: "python"
+        },
+        {
+          title: "Switch to append-only writes and time the same update",
+          body: "An append-only store never rewrites: an update just appends a new version at the end, so the latest line for a key wins. Save as <code>append.py</code>.",
+          code: `# append.py - updating a key just appends a new version
+import time
+
+def append(path, key, value):
+    with open(path, "a") as f:
+        f.write(key + "," + value + "\\n")
+
+open("append.db", "w").close()
+for i in range(10000):
+    append("append.db", str(i), "value" + str(i))
+
+t = time.time()
+append("append.db", "5000", "updated")
+print("append update:", round((time.time() - t) * 1000, 4), "ms")`,
+          lang: "python"
+        },
+        {
+          title: "Build an in-memory hash index and do a point lookup",
+          body: "Scan the file once at startup to build <code>{key: byteOffset}</code> (later versions overwrite earlier offsets), then a lookup is a single <code>seek</code> instead of a full scan.",
+          code: `# index.py - hash index maps key -> byte offset of its latest line
+def build_index(path):
+    index = {}
+    with open(path, "rb") as f:
+        offset = f.tell()
+        line = f.readline()
+        while line:
+            key = line.split(b",", 1)[0].decode()
+            index[key] = offset
+            offset = f.tell()
+            line = f.readline()
+    return index
+
+def get(path, index, key):
+    with open(path, "rb") as f:
+        f.seek(index[key])
+        return f.readline().decode().strip()
+
+idx = build_index("append.db")
+print("lookup 5000 ->", get("append.db", idx, "5000"))`,
+          lang: "python"
+        },
+        {
+          title: "Run all three and compare the timings",
+          code: "python naive.py\npython append.py\npython index.py",
+          lang: "bash"
+        }
+      ],
+      observe: "The naive update time grows as you raise the seed count (it rewrites the whole file each time) while the append-only update stays flat: the O(n) vs O(1) claim, timed instead of assumed. The hash-index lookup returns <code>updated</code> from one <code>seek</code> rather than scanning every line.",
+      stretch: "Implement simple compaction: merge two append-only segments, keeping only the latest value per key, and measure file size before and after on a file with many overwritten keys."
     }
   },
   keyTakeaways: [

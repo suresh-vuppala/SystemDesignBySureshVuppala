@@ -41,13 +41,6 @@ window.COURSE_CONTENT["db-choice"] = {
         { label: "The specialized tail", body: "Relationship traversal \u2192 <strong>Neo4j</strong> (graph). Full-text and relevance ranking \u2192 <strong>Elasticsearch</strong>. Global strong consistency at scale \u2192 <strong>Spanner</strong>, which buys geo-distributed ACID at real cost and operational complexity." },
         { label: "Polyglot persistence is normal", body: "Real systems rarely pick one. A single product may use Postgres for orders, Redis for sessions, Elasticsearch for search, and Kafka for the event log. The tree runs once per data type, not once per system." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. A requirement and the tree above.",
-      setup: "Take a real feature and route each of its data types through the tree separately.",
-      simulate: "Scenario: an e-commerce checkout. Route each data type: order records (need ACID + joins \u2192 SQL), user sessions (sub-ms lookup \u2192 Redis), product search (full-text \u2192 Elasticsearch), clickstream events (high write, replay \u2192 wide-column or a log). Write down the fork you took for each.",
-      observe: "One product used four storage families, and each choice was forced by a different axis. That is polyglot persistence, and articulating why each type went where is exactly the design-interview signal.",
-      stretch: "Now add a constraint: \u201cthe order data must stay strongly consistent across three continents.\u201d Which branch changes? (Postgres \u2192 Spanner, trading cost and latency for global ACID.) Defending that jump is the senior move."
     }
   },
   keyTakeaways: [

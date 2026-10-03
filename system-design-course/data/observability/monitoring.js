@@ -54,11 +54,41 @@ window.COURSE_CONTENT["monitoring"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Prometheus + Grafana setup from 13.2; Prometheus Alertmanager (free, ships alongside Prometheus).",
-      setup: "Local and free: add Alertmanager to your existing Compose stack.",
-      simulate: "Define 2 alert rules: a bad one (<code>cpu_usage &gt; 50</code>, fires on any busy moment) and a good burn-rate one (error budget consumption over both a 5-min and 1-hour window at a 14.4\u00d7 threshold). Generate a brief error spike and a longer, low-grade one, and watch which alert fires for which scenario.",
-      observe: "The naive CPU alert fires constantly during normal load spikes (alert fatigue), while the burn-rate alert stays quiet during brief blips but fires clearly once a sustained error rate would actually exhaust the SLO budget. A felt difference between a bad and good alert.",
-      stretch: "Configure Alertmanager grouping and inhibition so a downstream service\u2019s alert is automatically suppressed while its known upstream dependency is already alerting, reducing 10 correlated pages down to 1 actionable one."
+      goal: "Define one naive threshold alert and one multi-window burn-rate alert, then drive load at the app from 13.2 to see which one cries wolf and which one stays quiet until it matters.",
+      stack: "Prometheus + Alertmanager in Docker, on the metrics stack and instrumented app from 13.2. Local and free.",
+      steps: [
+        {
+          title: "Define a bad alert and a good burn-rate alert",
+          body: "Save as <code>rules.yml</code>. <code>HighTraffic</code> fires on any busy moment (not actionable). The burn-rate alert fires only when both a 5m and a 1h window agree the 99.9% SLO budget is burning too fast.",
+          code: "groups:\n  - name: demo\n    rules:\n      - alert: HighTraffic\n        expr: sum(rate(http_server_duration_ms_count[1m])) > 5\n        labels: { severity: noisy }\n        annotations:\n          summary: \"Traffic over 5 rps (fires on any busy moment, not actionable)\"\n\n      - record: job:error_ratio:rate5m\n        expr: sum(rate(http_server_duration_ms_count{status=~'5..'}[5m])) / sum(rate(http_server_duration_ms_count[5m]))\n      - record: job:error_ratio:rate1h\n        expr: sum(rate(http_server_duration_ms_count{status=~'5..'}[1h])) / sum(rate(http_server_duration_ms_count[1h]))\n\n      - alert: ErrorBudgetFastBurn\n        expr: job:error_ratio:rate5m > (14.4 * 0.001) and job:error_ratio:rate1h > (14.4 * 0.001)\n        for: 2m\n        labels: { severity: page }\n        annotations:\n          runbook: \"https://runbooks.local/error-budget\"\n          summary: \"Burning the 30-day budget in ~2 days\"",
+          lang: "yaml"
+        },
+        {
+          title: "Point Prometheus at the rules and Alertmanager",
+          body: "Append to your <code>prometheus.yml</code> from 13.2.",
+          code: "rule_files:\n  - /etc/prometheus/rules.yml\n\nalerting:\n  alertmanagers:\n    - static_configs:\n        - targets: [\"alertmanager:9093\"]",
+          lang: "yaml"
+        },
+        {
+          title: "Add a minimal Alertmanager route",
+          body: "Save as <code>alertmanager.yml</code>. Grouping by <code>alertname</code> is enough for the demo.",
+          code: "route:\n  receiver: log\n  group_by: ['alertname']\nreceivers:\n  - name: log",
+          lang: "yaml"
+        },
+        {
+          title: "Start Alertmanager and reload Prometheus with the rules",
+          code: "docker run -d --name alertmanager --net obs -p 9093:9093 -v \"$PWD/alertmanager.yml:/etc/alertmanager/alertmanager.yml\" prom/alertmanager\ndocker rm -f prom\ndocker run -d --name prom --net obs -p 9090:9090 -v \"$PWD/prometheus.yml:/etc/prometheus/prometheus.yml\" -v \"$PWD/rules.yml:/etc/prometheus/rules.yml\" prom/prometheus",
+          lang: "bash"
+        },
+        {
+          title: "See which alert is firing",
+          body: "Drive load with <code>hey -z 60s -c 50 http://localhost:3000/</code> in another terminal, then poll the alerts.",
+          code: "curl -s http://localhost:9090/api/v1/alerts | jq \".data.alerts[] | {name: .labels.alertname, state: .state}\"",
+          lang: "bash"
+        }
+      ],
+      observe: "<code>HighTraffic</code> flips to firing the moment load arrives (alert fatigue), while <code>ErrorBudgetFastBurn</code> stays quiet through brief blips and only fires once both the 5m and 1h windows confirm a sustained burn. The felt difference between a bad and a good alert.",
+      stretch: "Configure Alertmanager grouping and inhibition so a downstream service\u2019s alert is automatically suppressed while its known upstream dependency is already alerting, collapsing 10 correlated pages into 1 actionable one."
     }
   },
   keyTakeaways: [

@@ -124,11 +124,35 @@ window.COURSE_CONTENT["redis-pubsub"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); 2 terminal windows for `redis-cli`.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis`.",
-      simulate: "In terminal A, run `redis-cli SUBSCRIBE chat:room1` and leave it running. In terminal B, run `redis-cli PUBLISH chat:room1 \"hello\"` and watch it appear instantly in A. Now close terminal A (unsubscribe), publish another message from B, then reopen a subscriber in A.",
-      observe: "The message published while nobody was subscribed simply never appears anywhere, no history, no replay, exactly as stated, made concrete instead of asserted. Then open 3 subscriber terminals at once and confirm a single `PUBLISH` reaches all 3 simultaneously.",
-      stretch: "Use `PSUBSCRIBE chat:*` in one terminal and publish to `chat:room1`, `chat:room2`, and `chat:general` from another. Confirm the pattern subscriber catches all 3 while a plain `SUBSCRIBE chat:room1` subscriber only catches the first."
+      goal: "See Redis Pub/Sub broadcast to every live subscriber in real time, then prove it drops anything published while nobody is listening.",
+      stack: "Redis in Docker with two or more <code>redis-cli</code> terminals. Local and free.",
+      steps: [
+        {
+          title: "Start Redis",
+          code: "docker run -d --name redis -p 6379:6379 redis",
+          lang: "bash"
+        },
+        {
+          title: "Subscribe in terminal A",
+          body: "Leave this running; it blocks waiting for messages.",
+          code: "docker exec -it redis redis-cli SUBSCRIBE chat:room1",
+          lang: "bash"
+        },
+        {
+          title: "Publish from terminal B",
+          body: "The message appears instantly in terminal A. <code>PUBLISH</code> returns the number of subscribers that received it.",
+          code: "docker exec redis redis-cli PUBLISH chat:room1 \"hello\"",
+          lang: "bash"
+        },
+        {
+          title: "Prove there is no replay",
+          body: "Stop the subscriber in A (Ctrl-C), publish while nobody listens, then re-subscribe in A.",
+          code: "# in terminal B, with A stopped:\ndocker exec redis redis-cli PUBLISH chat:room1 \"you will never see this\"\n\n# now restart the subscriber in terminal A:\ndocker exec -it redis redis-cli SUBSCRIBE chat:room1",
+          lang: "bash"
+        }
+      ],
+      observe: "The message published while nobody was subscribed never appears anywhere: no history, no replay, made concrete instead of asserted. Open 3 subscriber terminals at once and a single <code>PUBLISH</code> reaches all 3 simultaneously, each in under a millisecond.",
+      stretch: "Run <code>PSUBSCRIBE chat:*</code> in one terminal and publish to <code>chat:room1</code>, <code>chat:room2</code>, and <code>chat:general</code> from another. The pattern subscriber catches all 3 while a plain <code>SUBSCRIBE chat:room1</code> subscriber only catches the first."
     }
   },
   keyTakeaways: [

@@ -65,11 +65,41 @@ window.COURSE_CONTENT["tracing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Jaeger\u2019s official all-in-one image, free); an OpenTelemetry SDK for your language.",
-      setup: "Local and free: <code>docker run -d -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one</code>.",
-      simulate: "Build 3 tiny services (API Gateway \u2192 Service A \u2192 Service B) that call each other over HTTP, each instrumented with an OTel SDK exporting to Jaeger and propagating the <code>traceparent</code> header on every outgoing call. Make a request through the whole chain and view the trace in Jaeger\u2019s UI (<code>localhost:16686</code>).",
-      observe: "One trace shows all 3 services as nested spans with exact per-service latency. You can visually identify which service is the actual bottleneck for a slow request, answered directly instead of guessed at from separate logs.",
-      stretch: "Add a Kafka hop in the middle (Service A publishes an event Service B consumes asynchronously) and manually propagate the trace context through the message headers. Confirm the trace still connects across the queue boundary, showing up as a span link rather than a strict parent-child span."
+      goal: "Run 3 tiny HTTP services instrumented with OpenTelemetry that call each other in a chain, and read one trace in Jaeger that breaks the latency down span by span.",
+      stack: "Jaeger all-in-one in Docker + the OpenTelemetry Node SDK with auto-instrumentation. Local and free.",
+      steps: [
+        {
+          title: "Start Jaeger all-in-one",
+          body: "Port 16686 is the UI; 4318 is the OTLP/HTTP ingest endpoint.",
+          code: "docker run -d --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:1.57",
+          lang: "bash"
+        },
+        {
+          title: "Write a shared OTel bootstrap",
+          body: "Save as <code>tracing.js</code>. Preloading it auto-instruments the built-in <code>http</code> module, which injects and reads the <code>traceparent</code> header for you.",
+          code: "const { NodeSDK } = require('@opentelemetry/sdk-node');\nconst { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');\nconst { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');\n\nconst sdk = new NodeSDK({\n  serviceName: process.env.SVC || 'unknown',\n  traceExporter: new OTLPTraceExporter({ url: 'http://localhost:4318/v1/traces' }),\n  instrumentations: [getNodeAutoInstrumentations()]\n});\nsdk.start();",
+          lang: "javascript"
+        },
+        {
+          title: "Write three tiny chained services",
+          body: "gateway (3000) calls serviceA (3001) calls serviceB (3002). serviceB sleeps 120ms so it is the obvious bottleneck.",
+          code: "// gateway.js\nconst http = require('http');\nhttp.createServer((req, res) => {\n  http.get('http://localhost:3001/', up => up.on('data', () => {}).on('end', () => res.end('gateway ok')));\n}).listen(3000);\n\n// serviceA.js\nconst http = require('http');\nhttp.createServer((req, res) => {\n  http.get('http://localhost:3002/', up => up.on('data', () => {}).on('end', () => res.end('A ok')));\n}).listen(3001);\n\n// serviceB.js\nconst http = require('http');\nhttp.createServer((req, res) => setTimeout(() => res.end('B ok'), 120)).listen(3002);",
+          lang: "javascript"
+        },
+        {
+          title: "Install deps and run all three with the tracer preloaded",
+          code: "npm init -y\nnpm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-http\nSVC=serviceB node -r ./tracing.js serviceB.js &\nSVC=serviceA node -r ./tracing.js serviceA.js &\nSVC=gateway node -r ./tracing.js gateway.js &",
+          lang: "bash"
+        },
+        {
+          title: "Fire one request and open the trace",
+          body: "In the Jaeger UI pick service <code>gateway</code> and open the newest trace.",
+          code: "curl http://localhost:3000/\n# then browse to http://localhost:16686",
+          lang: "bash"
+        }
+      ],
+      observe: "One trace shows gateway, serviceA, and serviceB as nested spans with exact per-service timing, and serviceB\u2019s ~120ms sleep is visibly the bottleneck. The <code>traceparent</code> header was propagated automatically by auto-instrumentation, so the chain stays connected without any manual header code.",
+      stretch: "Add a Kafka hop in the middle (serviceA publishes an event serviceB consumes asynchronously) and manually inject the trace context into the message headers. Confirm the trace still connects across the queue as a span link rather than a strict parent-child span."
     }
   },
   keyTakeaways: [

@@ -41,11 +41,39 @@ window.COURSE_CONTENT["gfs-hdfs"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (a single-node Hadoop/HDFS image; several free ones exist, e.g. `apache/hadoop`).",
-      setup: "Local and free: a single-node HDFS via Docker.",
-      simulate: "Upload a file larger than the configured block size (lower it to something small like 1MB for the lab, via `dfs.blocksize`, so you can see splitting without a huge file) and run `hdfs fsck /yourfile -files -blocks` to see it split into multiple blocks. Check the replication factor with `hdfs dfsadmin -report`.",
-      observe: "One logical file represented as several fixed-size blocks under the hood, each with its own replica count: the large-block, metadata-minimizing design seen directly in `fsck` output instead of taken as a claim.",
-      stretch: "None. A true multi-DataNode HDFS cluster with rack awareness needs more nodes than a single laptop comfortably runs; this lab demonstrates the block and replication concept at single-node scale."
+      goal: "Upload one file into a single-node HDFS with a small block size and watch it split into several fixed-size, checksummed blocks.",
+      stack: "A single-node HDFS from the <code>apache/hadoop</code> Docker image, driven with the <code>hdfs</code> CLI. Local and free.",
+      steps: [
+        {
+          title: "Open a shell in the Hadoop image",
+          code: "docker run -it --name hdfs apache/hadoop:3 bash",
+          lang: "bash"
+        },
+        {
+          title: "Format and start a single-node HDFS",
+          body: "Format the NameNode once, then start the NameNode and a DataNode as background daemons.",
+          code: "hdfs namenode -format -force\nhdfs --daemon start namenode\nhdfs --daemon start datanode",
+          lang: "bash"
+        },
+        {
+          title: "Upload a 5MB file with a 1MB block size",
+          body: "Lowering <code>dfs.blocksize</code> to 1MB lets you see splitting without needing a huge file.",
+          code: "head -c 5m /dev/urandom > big.bin\nhdfs dfs -mkdir -p /lab\nhdfs dfs -D dfs.blocksize=1048576 -put big.bin /lab/big.bin",
+          lang: "bash"
+        },
+        {
+          title: "Inspect how the file was split into blocks",
+          code: "hdfs fsck /lab/big.bin -files -blocks",
+          lang: "bash"
+        },
+        {
+          title: "Check the replication factor and DataNode report",
+          code: "hdfs dfsadmin -report",
+          lang: "bash"
+        }
+      ],
+      observe: "One logical file shows up as several 1MB blocks in the <code>fsck</code> output, each with its own block id and replica count: the large-block, metadata-minimizing design seen directly instead of taken as a claim. On a single node the replication factor reports as 1.",
+      stretch: "Re-upload the same file with the default 128MB block size and rerun <code>fsck</code>: confirm it now occupies a single block, showing how block size alone changes the split count."
     }
   },
   keyTakeaways: [

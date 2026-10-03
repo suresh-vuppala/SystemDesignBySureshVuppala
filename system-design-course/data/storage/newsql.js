@@ -30,11 +30,40 @@ window.COURSE_CONTENT["newsql"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (CockroachDB's official free image).",
-      setup: "Local and free: `docker run -d -p 26257:26257 -p 8080:8080 cockroachdb/cockroach start-single-node --insecure`.",
-      simulate: "Connect with `cockroach sql`, create a table, and run the same MVCC-conflict test from the Postgres lab (2 sessions, one holds an uncommitted update, the other tries to update the same row). Then open CockroachDB's built-in Admin UI at `localhost:8080` for its replication and consensus visualizations.",
-      observe: "The same ACID guarantees as Postgres, but explicitly built on Raft consensus across nodes (visible in the Admin UI once you add more than one node): the familiar SQL interface, felt directly by running SQL you already know against a fundamentally different, distributed engine underneath.",
-      stretch: "Spin up a 3-node local cluster (`cockroach start --join=...`) and kill one node mid-query. Confirm the cluster keeps serving reads and writes via the remaining majority: a live instance of Raft/Paxos consensus."
+      goal: "Run the familiar Postgres MVCC-conflict test against CockroachDB and see identical ACID behavior from a distributed engine built on Raft consensus underneath.",
+      stack: "CockroachDB single node in Docker, its <code>cockroach sql</code> shell and built-in Admin UI. Local and free.",
+      steps: [
+        {
+          title: "Start a single-node CockroachDB",
+          code: "docker run -d --name crdb -p 26257:26257 -p 8080:8080 cockroachdb/cockroach start-single-node --insecure",
+          lang: "bash"
+        },
+        {
+          title: "Create a table",
+          code: "docker exec -it crdb ./cockroach sql --insecure -e \"CREATE TABLE accounts(id int primary key, balance int); INSERT INTO accounts VALUES (1, 100);\"",
+          lang: "bash"
+        },
+        {
+          title: "Session A: open a transaction and update without committing",
+          body: "Open a shell with <code>docker exec -it crdb ./cockroach sql --insecure</code>, then run:",
+          code: "BEGIN;\nUPDATE accounts SET balance = 999 WHERE id = 1;\n-- leave open",
+          lang: "sql"
+        },
+        {
+          title: "Session B: try the same row in a second shell, watch it serialize",
+          body: "Open a second <code>cockroach sql</code> shell. This write waits on session A, exactly like Postgres row locking.",
+          code: "UPDATE accounts SET balance = 500 WHERE id = 1;",
+          lang: "sql"
+        },
+        {
+          title: "Open the Admin UI for the consensus view",
+          body: "Browse to the dashboard to see replication and range/consensus metrics.",
+          code: "open http://localhost:8080   # or just paste the URL into a browser",
+          lang: "bash"
+        }
+      ],
+      observe: "The same ACID guarantees as Postgres, but the Admin UI shows the work is happening over Raft ranges: identical SQL you already know, a fundamentally different distributed engine underneath.",
+      stretch: "Spin up a 3-node local cluster (<code>cockroach start --join=...</code>) and kill one node mid-query. Confirm the cluster keeps serving reads and writes through the remaining majority: Raft consensus, live."
     }
   },
   keyTakeaways: [

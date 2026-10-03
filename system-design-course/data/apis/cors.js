@@ -48,11 +48,40 @@ window.COURSE_CONTENT["cors"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A browser; Node.js/Express.",
-      setup: "Local and free only. Serve a static HTML page from `localhost:3000` and an API from `localhost:4000` (two different origins, exactly what triggers CORS).",
-      simulate: "From the page on `:3000`, `fetch()` the API on `:4000` with no CORS headers set: open DevTools console and watch the browser block it. Add `Access-Control-Allow-Origin: http://localhost:3000` on the server and retry: it succeeds. Add a custom header (for example `X-Custom-Header`) to the fetch and watch the Network tab show a preflight `OPTIONS` firing before your actual `GET`.",
-      observe: "The exact console error message browsers give for a CORS block, and the preflight `OPTIONS` request appearing only once headers or methods go beyond what counts as a \u201csimple request.\u201d",
-      stretch: "Set `Access-Control-Allow-Origin: *` together with `credentials: \u2019include\u2019` on the fetch call and confirm the browser refuses the combination exactly as described in the Failure Mode."
+      goal: "Trigger a real CORS block in the browser between two origins, then unblock it with one header and watch a preflight <code>OPTIONS</code> appear.",
+      stack: "Node.js + Express: a page on <code>:3000</code> calling an API on <code>:4000</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir cors-lab && cd cors-lab\nnpm init -y && npm install express",
+          lang: "bash"
+        },
+        {
+          title: "Serve a page that calls the other origin",
+          body: "Save as <code>page.js</code>; it serves an HTML page on <code>:3000</code> that fetches the API on <code>:4000</code>.",
+          code: "const express = require('express');\nconst app = express();\napp.get('/', (req, res) => res.send(`\n  <button onclick=\"go()\">call API</button>\n  <script>\n    async function go() {\n      const r = await fetch('http://localhost:4000/data');\n      console.log(await r.json());\n    }\n  </script>`));\napp.listen(3000, () => console.log('page on http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Serve the API with CORS headers off (toggleable)",
+          body: "Set <code>ALLOW=1</code> to send the allow-origin header, leave it unset to block. Save as <code>api.js</code>.",
+          code: "const express = require('express');\nconst app = express();\napp.get('/data', (req, res) => {\n  if (process.env.ALLOW) res.set('Access-Control-Allow-Origin', 'http://localhost:3000');\n  res.json({ ok: true });\n});\napp.listen(4000, () => console.log('api on http://localhost:4000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run both and watch the browser block it",
+          body: "Open <code>http://localhost:3000</code>, click the button, and read the DevTools console.",
+          code: "node page.js &\nnode api.js &\n# then open http://localhost:3000 and click 'call API'",
+          lang: "bash"
+        },
+        {
+          title: "Turn the header on and retry",
+          code: "kill %2\nALLOW=1 node api.js &\n# reload the page and click again: it now succeeds",
+          lang: "bash"
+        }
+      ],
+      observe: "With the header off, the console shows the classic <code>blocked by CORS policy: No 'Access-Control-Allow-Origin' header</code> error and the fetch fails. With <code>ALLOW=1</code>, the same call succeeds. Add a custom header to the fetch and the Network tab shows a preflight <code>OPTIONS</code> firing before your <code>GET</code>.",
+      stretch: "Set <code>Access-Control-Allow-Origin: *</code> together with <code>credentials: 'include'</code> on the fetch and confirm the browser refuses the combination, exactly as described in the Failure Mode."
     }
   },
   keyTakeaways: [

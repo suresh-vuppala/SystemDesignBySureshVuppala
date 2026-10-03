@@ -22,11 +22,53 @@ window.COURSE_CONTENT["timeseries"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Prometheus or InfluxDB image).",
-      setup: "Local and free: `docker run -d -p 9090:9090 prom/prometheus`.",
-      simulate: "Write a tiny script that exposes a `/metrics` endpoint in Prometheus's text format (a counter that increments every second), configure Prometheus to scrape it every 5s, and let it run for a few minutes. Query it via Prometheus's own UI at `localhost:9090` with `rate(my_counter[1m])`.",
-      observe: "Prometheus automatically builds a time-series history from repeated scrapes with zero manual \u201cinsert a row\u201d code on your part: pull-based ingestion, exactly as named, versus every other lesson's push-based writes.",
-      stretch: "Configure a retention policy (`--storage.tsdb.retention.time=1h`) and confirm data older than that window disappears from queries: the automatic TTL cleanup claim, observed instead of assumed."
+      goal: "Expose a counter metric, point Prometheus at it, and watch a time-series history build itself from repeated scrapes with zero \u201cinsert a row\u201d code: pull-based ingestion, felt directly.",
+      stack: "Prometheus in Docker plus a tiny Python <code>/metrics</code> endpoint. Local and free.",
+      steps: [
+        {
+          title: "Expose a metric in Prometheus text format",
+          body: "A counter that climbs every second. Save as <code>metrics.py</code> and run <code>python metrics.py</code> (serves on port 8000).",
+          code: `# metrics.py - a counter exposed in Prometheus text format
+import http.server, time
+
+start = time.time()
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        value = int(time.time() - start)  # climbs ~1 per second
+        body = "# TYPE my_counter counter\\nmy_counter " + str(value) + "\\n"
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+http.server.HTTPServer(("0.0.0.0", 8000), Handler).serve_forever()`,
+          lang: "python"
+        },
+        {
+          title: "Write a scrape config",
+          body: "Scrape the endpoint every 5 seconds. Save as <code>prometheus.yml</code>. <code>host.docker.internal</code> lets the container reach your host.",
+          code: `global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: demo
+    static_configs:
+      - targets: ["host.docker.internal:8000"]`,
+          lang: "yaml"
+        },
+        {
+          title: "Start Prometheus with that config",
+          code: "docker run -d --name prom -p 9090:9090 -v ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus",
+          lang: "bash"
+        },
+        {
+          title: "Query the per-second rate in the UI",
+          body: "Open <code>http://localhost:9090</code>, let it run a few minutes, and run this in the expression box.",
+          code: "rate(my_counter[1m])",
+          lang: "text"
+        }
+      ],
+      observe: "Prometheus builds a time-series history from repeated scrapes with no manual insert code on your part: pull-based ingestion, exactly as named, versus every other lesson's push-based writes.",
+      stretch: "Restart Prometheus with <code>--storage.tsdb.retention.time=1h</code> and confirm data older than that window disappears from queries: the automatic TTL cleanup claim, observed instead of assumed."
     }
   },
   keyTakeaways: [

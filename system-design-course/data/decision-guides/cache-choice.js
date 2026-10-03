@@ -37,13 +37,6 @@ window.COURSE_CONTENT["cache-choice"] = {
         { label: "Write-Around avoids cache pollution", body: "For data written often but read rarely, writing straight to the database keeps the cache from filling with entries nobody reads. The trade-off: the first read after a write is always a miss." },
         { label: "The red flag: Write-Back data loss", body: "Write-Back is the pattern most likely to bite you. Because the database lags the cache, an unclean shutdown drops any unflushed writes. Treat it as a deliberate, documented choice, never a silent default, and pair it with replication or a persistent write log if the data matters." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. A workload profile and the tree above.",
-      setup: "Profile one endpoint by its read/write ratio and consistency need, then route it.",
-      simulate: "Scenario: a product catalog read 10,000\u00d7 for every 1 write. Walk it: read-heavy, does the app control cache logic? Usually yes \u2192 Cache-Aside. Second scenario: a live leaderboard updated thousands of times per second where a few lost points are acceptable. Walk it: write-heavy, need strong consistency? No \u2192 Write-Back (with a note about the loss risk).",
-      observe: "The read/write ratio alone narrowed the choice to two patterns, and the consistency question picked the final one. You never weighed all five at once.",
-      stretch: "Flip the leaderboard requirement to \u201cno lost points, ever.\u201d Which branch changes? (Write-Back \u2192 Write-Through, trading write latency for durability, or Write-Back backed by a durable append log.)"
     }
   },
   keyTakeaways: [

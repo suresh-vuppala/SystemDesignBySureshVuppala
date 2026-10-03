@@ -37,11 +37,36 @@ window.COURSE_CONTENT["soap"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`curl` or SoapUI (free).",
-      setup: "Local and free only. Most public SOAP demo services (for example a public currency-conversion or weather WSDL demo endpoint) work without signup.",
-      simulate: "Fetch a public WSDL file with `curl &lt;wsdl-url&gt;?wsdl` and read its structure; note the strict typed contract compared to an OpenAPI JSON spec. Then send a raw SOAP XML envelope via `curl -X POST -H \u201cContent-Type: text/xml\u201d` with the request body from the WSDL's documented example.",
-      observe: "How much more verbose the XML envelope is versus an equivalent REST JSON call, and how strictly the response has to match the WSDL's declared types: a direct, felt comparison instead of an abstract trade-off claim.",
-      stretch: "None. This lesson's value is the contrast with REST, not depth."
+      goal: "Read a real WSDL contract, then hand-write a SOAP XML envelope and call the operation, feeling how verbose it is versus REST JSON.",
+      stack: "<code>curl</code> against a free public SOAP demo (the dneonline calculator). Local and free, only a network connection needed.",
+      steps: [
+        {
+          title: "Fetch the WSDL and read its typed contract",
+          body: "The WSDL declares operations and their exact parameter types up front, stricter than an OpenAPI JSON spec.",
+          code: "curl -s \"http://www.dneonline.com/calculator.asmx?WSDL\" | head -60",
+          lang: "bash"
+        },
+        {
+          title: "Write the SOAP envelope from the documented example",
+          body: "Every call is wrapped in an <code>Envelope</code> and a <code>Body</code>. Save it as <code>add.xml</code>.",
+          code: "cat > add.xml <<'EOF'\n<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Body>\n    <Add xmlns=\"http://tempuri.org/\">\n      <intA>5</intA>\n      <intB>7</intB>\n    </Add>\n  </soap:Body>\n</soap:Envelope>\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "POST the envelope with the SOAPAction header",
+          body: "SOAP needs the operation named in a <code>SOAPAction</code> header and the content type set to <code>text/xml</code>.",
+          code: "curl -s -X POST \"http://www.dneonline.com/calculator.asmx\" \\\n  -H \"Content-Type: text/xml; charset=utf-8\" \\\n  -H \"SOAPAction: http://tempuri.org/Add\" \\\n  --data @add.xml",
+          lang: "bash"
+        },
+        {
+          title: "Compare the payload weight against JSON",
+          body: "Measure the envelope size next to the two numbers an equivalent REST call would send.",
+          code: "wc -c add.xml\necho -n '{\"intA\":5,\"intB\":7}' | wc -c",
+          lang: "bash"
+        }
+      ],
+      observe: "The response comes back as another XML <code>Envelope</code> wrapping <code>&lt;AddResult&gt;12&lt;/AddResult&gt;</code>, and the response must match the WSDL's declared types exactly. Your <code>wc -c</code> numbers show the SOAP request is many times larger than the tiny JSON body: the verbosity trade-off, felt directly.",
+      stretch: "Send a malformed body (drop <code>intB</code>) and watch SOAP return a structured <code>&lt;soap:Fault&gt;</code> element rather than a plain HTTP 400: fault handling is part of the contract."
     }
   },
   keyTakeaways: [

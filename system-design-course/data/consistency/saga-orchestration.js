@@ -74,11 +74,42 @@ window.COURSE_CONTENT["saga-orchestration"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js; the free tier of Temporal Cloud, or a local Temporal dev server (`temporal server start-dev`, free, one command).",
-      setup: "Local and free: `temporal server start-dev`.",
-      simulate: "Build a 3-step saga as a Temporal Workflow: Reserve Inventory, Charge Payment, Ship Order, each a separate Activity with a compensating Activity (Release Inventory, Refund Payment, Cancel Shipment). Force \u201cCharge Payment\u201d to fail and watch Temporal's Web UI show the execution history, including which compensations ran.",
-      observe: "Temporal tracks exactly which steps completed before the failure and runs only the needed compensations (Release Inventory only, since Charge Payment never succeeded and Ship Order never started): orchestration's central visibility, seen directly in the UI.",
-      stretch: "Kill the Temporal worker mid-workflow and restart it: the workflow resumes exactly where it left off, because Temporal persists workflow state independent of any single worker process."
+      goal: "Build a 3-step orchestrated saga on Temporal, force the middle step to fail, and watch it run only the compensations for the steps that actually completed.",
+      stack: "Temporal dev server (single binary, with a Web UI) plus the Temporal TypeScript SDK on Node.js. Local and free.",
+      steps: [
+        {
+          title: "Install the Temporal CLI and start a dev server",
+          body: "This also serves the Web UI at <code>http://localhost:8233</code>.",
+          code: "curl -sSf https://temporal.download/cli.sh | sh\ntemporal server start-dev",
+          lang: "bash"
+        },
+        {
+          title: "Scaffold a Temporal TypeScript project",
+          body: "The official template wires up a worker and a client starter for you.",
+          code: "npx @temporalio/create@latest saga --sample hello-world\ncd saga",
+          lang: "bash"
+        },
+        {
+          title: "Define three activities and their compensations",
+          body: "Replace <code>src/activities.ts</code>. Charge Payment throws on purpose so the saga has to unwind.",
+          code: "export async function reserveInventory(): Promise<void> { console.log('reserved inventory'); }\nexport async function releaseInventory(): Promise<void> { console.log('compensation: released inventory'); }\nexport async function chargePayment(): Promise<void> { throw new Error('payment declined'); }\nexport async function refundPayment(): Promise<void> { console.log('compensation: refunded payment'); }\nexport async function shipOrder(): Promise<void> { console.log('shipped order'); }\nexport async function cancelShipment(): Promise<void> { console.log('compensation: cancelled shipment'); }",
+          lang: "javascript"
+        },
+        {
+          title: "Write the saga workflow with a compensation stack",
+          body: "Replace <code>src/workflows.ts</code>. Each completed step pushes its undo action; a failure unwinds them in reverse order.",
+          code: "import { proxyActivities } from '@temporalio/workflow';\nimport type * as activities from './activities';\n\nconst acts = proxyActivities<typeof activities>({ startToCloseTimeout: '1 minute' });\n\nexport async function orderSaga(): Promise<void> {\n  const compensations: Array<() => Promise<void>> = [];\n  try {\n    await acts.reserveInventory(); compensations.unshift(acts.releaseInventory);\n    await acts.chargePayment();    compensations.unshift(acts.refundPayment);\n    await acts.shipOrder();        compensations.unshift(acts.cancelShipment);\n  } catch (err) {\n    for (const undo of compensations) await undo(); // recover backward, reverse order\n    throw err;\n  }\n}",
+          lang: "javascript"
+        },
+        {
+          title: "Run the worker and trigger the saga",
+          body: "Point the starter at <code>orderSaga</code> in <code>src/client.ts</code>, then run the two commands in separate terminals.",
+          code: "# terminal 1: run the worker\nnpm run start.watch\n\n# terminal 2: start one saga execution\nnpm run workflow",
+          lang: "bash"
+        }
+      ],
+      observe: "The Web UI at <code>http://localhost:8233</code> shows the execution history for <code>orderSaga</code>: reserveInventory succeeds, chargePayment throws, and only the completed step is compensated (releaseInventory runs; refundPayment and cancelShipment do not, because those steps never happened). That is orchestration's central visibility, seen directly.",
+      stretch: "Kill the worker (Ctrl-C in terminal 1) mid-run and restart it with <code>npm run start.watch</code>: Temporal replays the persisted history and the workflow resumes exactly where it left off, because workflow state lives in the server, not in any single worker process."
     }
   },
   keyTakeaways: [

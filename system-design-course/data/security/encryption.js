@@ -87,10 +87,38 @@ window.COURSE_CONTENT["encryption"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`openssl` or a language crypto library (Node's `crypto`, Python's `cryptography`).",
-      setup: "Local and free only.",
-      simulate: "Encrypt a short string with AES-256-GCM using a random key and IV, then try to decrypt it with the correct key but a different IV (fails or produces garbage), then with the correct key and IV (succeeds). Separately, hash the same password with MD5, SHA-1, and bcrypt, then time each.",
-      observe: "MD5 and SHA-1 are near-instant (bad for passwords, exactly why they are banned), while bcrypt is deliberately slow. That slowness (tunable via its cost factor) is the actual defense against brute-forcing a leaked hash: a fast hash is a liability specifically for passwords, even though speed is a virtue everywhere else.",
+      goal: "Encrypt with AES-256-GCM and watch a wrong nonce fail authentication, then time MD5, SHA-1, and bcrypt to feel why a slow hash is the point for passwords.",
+      stack: "Node.js built-in <code>crypto</code> plus <code>bcryptjs</code> (pure JS, no native build). Local and free.",
+      steps: [
+        {
+          title: "Install the password-hashing library",
+          code: "npm init -y && npm install bcryptjs",
+          lang: "bash"
+        },
+        {
+          title: "Encrypt once, then decrypt with a wrong and a correct nonce",
+          body: "AES-256-GCM authenticates the ciphertext, so decrypting with a different IV fails instead of silently returning garbage. Save as <code>aes.js</code>.",
+          code: "const crypto = require('crypto');\n\nconst key = crypto.randomBytes(32); // AES-256 key\nconst iv = crypto.randomBytes(12);  // GCM nonce\n\nfunction encrypt(text, iv) {\n  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);\n  const ct = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);\n  return { ct, tag: cipher.getAuthTag() };\n}\n\nfunction decrypt(ct, tag, iv) {\n  const d = crypto.createDecipheriv('aes-256-gcm', key, iv);\n  d.setAuthTag(tag);\n  return Buffer.concat([d.update(ct), d.final()]).toString('utf8');\n}\n\nconst { ct, tag } = encrypt('transfer 1000 to alice', iv);\nconsole.log('ciphertext:', ct.toString('hex'));\n\ntry {\n  console.log('wrong IV   ->', decrypt(ct, tag, crypto.randomBytes(12)));\n} catch (e) {\n  console.log('wrong IV   -> FAILED:', e.message);\n}\nconsole.log('correct IV ->', decrypt(ct, tag, iv));",
+          lang: "javascript"
+        },
+        {
+          title: "Run the AES demo",
+          code: "node aes.js",
+          lang: "bash"
+        },
+        {
+          title: "Time three ways to hash the same password",
+          body: "MD5 and SHA-1 are general-purpose fast hashes; bcrypt is deliberately slow, tuned by its cost factor. Save as <code>hash.js</code>.",
+          code: "const crypto = require('crypto');\nconst bcrypt = require('bcryptjs');\n\nconst password = 'hunter2';\n\nfunction time(label, fn) {\n  const t = process.hrtime.bigint();\n  fn();\n  const ms = Number(process.hrtime.bigint() - t) / 1e6;\n  console.log(label, ms.toFixed(3), 'ms');\n}\n\ntime('MD5   ', () => crypto.createHash('md5').update(password).digest('hex'));\ntime('SHA-1 ', () => crypto.createHash('sha1').update(password).digest('hex'));\ntime('bcrypt', () => bcrypt.hashSync(password, 12)); // cost factor 12",
+          lang: "javascript"
+        },
+        {
+          title: "Run the hashing benchmark",
+          code: "node hash.js",
+          lang: "bash"
+        }
+      ],
+      observe: "MD5 and SHA-1 finish in a fraction of a millisecond (bad for passwords, exactly why they are banned), while bcrypt takes tens of milliseconds. That slowness, tunable via the cost factor, is the actual defense against brute-forcing a leaked hash: fast is a liability specifically for passwords, even though speed is a virtue everywhere else.",
       stretch: "Build a tiny envelope-encryption demo: generate a DEK, encrypt your data with it, then encrypt the DEK itself with a second \u201cKEK\u201d key. Rotate the KEK (re-encrypt only the small DEK) and confirm you never touched the original encrypted data, the exact reason envelope encryption exists."
     }
   },

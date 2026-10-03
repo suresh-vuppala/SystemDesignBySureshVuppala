@@ -34,11 +34,33 @@ window.COURSE_CONTENT["blob"] = {
       ]
     },
     handsOn: {
-      prerequisites: "AWS free-tier account (the S3 free tier is generous).",
-      setup: "Cloud free-tier: an S3 bucket. Local and free: MinIO (`docker run -d -p 9000:9000 minio/minio server /data`) as an S3-compatible local alternative.",
-      simulate: "Upload a file, immediately read it back (confirm strong read-after-write). Generate a pre-signed URL (`aws s3 presign s3://bucket/key --expires-in 300`) and use `curl` to upload directly to it from your terminal, with the app server never touching the file's bytes. Set up a lifecycle rule transitioning objects to Infrequent Access after 30 days (visible in the console even without waiting).",
-      observe: "The pre-signed URL upload succeeds with zero involvement from your app server beyond generating the URL itself: the exact pattern for large uploads that should not proxy through your backend.",
-      stretch: "Enable versioning on the bucket, overwrite the same key twice, and list all versions (`aws s3api list-object-versions`). Confirm both old versions are still retrievable."
+      goal: "Upload an object, read it straight back (strong read-after-write), then generate a pre-signed URL and upload through it with <code>curl</code> so the app server never touches the file's bytes.",
+      stack: "MinIO (S3-compatible) in Docker plus the AWS CLI. Works identically against a real S3 free-tier bucket. Local and free.",
+      steps: [
+        {
+          title: "Start MinIO and point the AWS CLI at it",
+          code: "docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=admin -e MINIO_ROOT_PASSWORD=password123 minio/minio server /data\nexport AWS_ACCESS_KEY_ID=admin\nexport AWS_SECRET_ACCESS_KEY=password123\nexport EP=\"--endpoint-url http://localhost:9000\"",
+          lang: "bash"
+        },
+        {
+          title: "Create a bucket and upload a file",
+          code: "echo 'hello blob storage' > hello.txt\naws $EP s3 mb s3://demo\naws $EP s3 cp hello.txt s3://demo/hello.txt",
+          lang: "bash"
+        },
+        {
+          title: "Read it back immediately (strong read-after-write)",
+          code: "aws $EP s3 cp s3://demo/hello.txt -",
+          lang: "bash"
+        },
+        {
+          title: "Generate a pre-signed URL and upload straight to it",
+          body: "The app server only generates the URL. The bytes go from <code>curl</code> directly to storage.",
+          code: "URL=$(aws $EP s3 presign s3://demo/direct.txt --expires-in 300)\ncurl -X PUT --upload-file hello.txt \"$URL\"\naws $EP s3 ls s3://demo/",
+          lang: "bash"
+        }
+      ],
+      observe: "The pre-signed <code>PUT</code> succeeds with zero involvement from your app server beyond generating the URL: the exact pattern for large uploads that should not proxy through your backend.",
+      stretch: "Enable versioning on the bucket, overwrite the same key twice, and list all versions with <code>aws $EP s3api list-object-versions --bucket demo</code>. Confirm both old versions are still retrievable."
     }
   },
   keyTakeaways: [

@@ -25,11 +25,34 @@ window.COURSE_CONTENT["api-versioning"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The `/orders` API from the REST lesson.",
-      setup: "Local and free only.",
-      simulate: "Change the response shape of `GET /orders/:id` (rename a field, say `total` \u2192 `totalAmount`) directly in place, with no versioning. Then implement it properly: keep `/v1/orders/:id` returning the old shape and add `/v2/orders/:id` returning the new one, both served from the same codebase.",
-      observe: "A client hardcoded to read `total` breaks silently (reading `undefined`) against your unversioned change, while the same client keeps working against `/v1` even after `/v2` ships: the entire point of versioning, demonstrated as a before/after rather than asserted.",
-      stretch: "None. This lesson's value is the before/after contrast."
+      goal: "Ship a breaking field rename behind <code>/v2</code> while <code>/v1</code> keeps its old shape, and prove an old client survives.",
+      stack: "Node.js + Express serving both versions from one codebase, tested with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir versioning-lab && cd versioning-lab\nnpm init -y && npm install express",
+          lang: "bash"
+        },
+        {
+          title: "Serve both versions from the same handler data",
+          body: "<code>/v1</code> returns <code>total</code>; <code>/v2</code> renames it to <code>totalAmount</code>. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst app = express();\nconst order = { id: 5, item: 'book', amount: 42 };\n\n// v1: original shape, kept stable forever\napp.get('/v1/orders/:id', (req, res) => {\n  res.json({ id: order.id, item: order.item, total: order.amount });\n});\n\n// v2: breaking rename total -> totalAmount\napp.get('/v2/orders/:id', (req, res) => {\n  res.json({ id: order.id, item: order.item, totalAmount: order.amount });\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run the server",
+          code: "node server.js",
+          lang: "bash"
+        },
+        {
+          title: "Read the field an old client depends on, both ways",
+          body: "The old client only knows about <code>.total</code>. It keeps working on v1 and reads <code>null</code> on v2.",
+          code: "curl -s localhost:3000/v1/orders/5 | node -e \"process.stdin.on('data',d=>console.log('v1 total =', JSON.parse(d).total))\"\ncurl -s localhost:3000/v2/orders/5 | node -e \"process.stdin.on('data',d=>console.log('v2 total =', JSON.parse(d).total))\"",
+          lang: "bash"
+        }
+      ],
+      observe: "The v1 line prints <code>v1 total = 42</code>; the v2 line prints <code>v2 total = undefined</code> because the field was renamed. Had you renamed in place with no version, every old client would silently read <code>undefined</code>. Behind <code>/v1</code>, that same client keeps working even after <code>/v2</code> ships.",
+      stretch: "Move the version from the URL path into an <code>Accept: application/vnd.api.v2+json</code> header and route on that instead, comparing how cacheable and browseable each approach is."
     }
   },
   keyTakeaways: [

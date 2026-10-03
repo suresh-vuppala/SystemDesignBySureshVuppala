@@ -32,11 +32,58 @@ window.COURSE_CONTENT["connection-pooling"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Postgres + PgBouncer images).",
-      setup: "Local and free: `docker run -d -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres -c max_connections=20` (a deliberately small cap) plus a PgBouncer container in front of it in transaction mode.",
-      simulate: "Write a script that opens 50 direct connections to Postgres concurrently (no pooler) and watch it start erroring with \u201ctoo many connections\u201d once it crosses 20. Repeat the exact same script pointed at PgBouncer instead.",
-      observe: "PgBouncer absorbs all 50 client connections while holding only a small pool (say 10) of actual connections open to Postgres underneath: the many-clients-few-real-connections multiplexing that makes the serverless math work.",
-      stretch: "Switch PgBouncer from transaction mode to session mode and re-run the same 50-connection test. Watch it behave more like the no-pooler case, since session mode holds one backend connection per client for the whole session instead of only during an active transaction."
+      goal: "Cap Postgres at 20 connections, watch 50 direct clients start erroring with \u201ctoo many connections,\u201d then put PgBouncer in front and see the same 50 clients succeed over a small backend pool.",
+      stack: "Postgres (capped) and PgBouncer in Docker, load script in Python. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres with a deliberately small connection cap",
+          code: "docker network create pool-net\ndocker run -d --name pg --network pool-net -e POSTGRES_HOST_AUTH_METHOD=trust postgres -c max_connections=20",
+          lang: "bash"
+        },
+        {
+          title: "Open 50 concurrent connections directly, no pooler",
+          body: "Save as <code>flood.py</code>. It holds each connection open so they pile up past the cap. Run against port 5432 first.",
+          code: `# flood.py - open N connections at once and hold them
+import sys, threading, time
+import psycopg2
+
+host, port = sys.argv[1], int(sys.argv[2])
+errors = []
+
+def hold():
+    try:
+        c = psycopg2.connect(host=host, port=port, user="postgres", dbname="postgres")
+        c.cursor().execute("SELECT pg_sleep(5)")
+    except Exception as e:
+        errors.append(str(e).strip())
+
+threads = [threading.Thread(target=hold) for _ in range(50)]
+for t in threads: t.start()
+for t in threads: t.join()
+print("failed:", len(errors))
+if errors: print("example:", errors[0])`,
+          lang: "python"
+        },
+        {
+          title: "Run it straight at Postgres and watch it fail",
+          body: "Expose Postgres on the host, install the driver, and flood it.",
+          code: "docker run -d --name pg-direct --network pool-net -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres -c max_connections=20\npip install psycopg2-binary\npython flood.py localhost 5432",
+          lang: "bash"
+        },
+        {
+          title: "Put PgBouncer in transaction mode in front",
+          body: "PgBouncer accepts all 50 clients but keeps only a small pool open to Postgres.",
+          code: "docker run -d --name pgbouncer --network pool-net -p 6432:6432 \\\n  -e DATABASES_HOST=pg -e DATABASES_PORT=5432 -e DATABASES_USER=postgres -e DATABASES_DBNAME=postgres \\\n  -e POOL_MODE=transaction -e DEFAULT_POOL_SIZE=10 -e AUTH_TYPE=trust \\\n  edoburu/pgbouncer",
+          lang: "bash"
+        },
+        {
+          title: "Rerun the same flood through PgBouncer",
+          code: "python flood.py localhost 6432",
+          lang: "bash"
+        }
+      ],
+      observe: "Straight at Postgres, connections past 20 fail with \u201csorry, too many clients already.\u201d Through PgBouncer, all 50 clients succeed while only ~10 real backend connections exist: many clients multiplexed over few connections, the math that makes serverless work.",
+      stretch: "Switch PgBouncer to <code>POOL_MODE=session</code> and rerun the 50-connection flood. It behaves more like the no-pooler case, since session mode holds one backend connection per client for the whole session instead of only during an active transaction."
     }
   },
   keyTakeaways: [

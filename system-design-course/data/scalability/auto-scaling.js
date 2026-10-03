@@ -54,11 +54,36 @@ window.COURSE_CONTENT["auto-scaling"] = {
       ]
     },
     handsOn: {
-      prerequisites: "A local Kubernetes cluster (kind or minikube); <code>kubectl</code>; a load generator (<code>hey</code> or <code>k6</code>).",
-      setup: "Local and free: kind or minikube with the metrics-server add-on enabled (required for HPA to read CPU metrics).",
-      simulate: "Deploy an app with a <code>HorizontalPodAutoscaler</code> targeting 50% CPU, starting at 2 replicas, max 10. Load-test with increasing concurrency (<code>hey -z 5m -c 200 &lt;url&gt;</code>) and watch <code>kubectl get hpa -w</code> and <code>kubectl get pods -w</code> in two terminals.",
-      observe: "Replica count climbs as CPU crosses the 50% target, and, the important part, the speed asymmetry: scale-up appears within ~30\u201360s of crossing the threshold, while scale-down deliberately waits several minutes of sustained low usage to avoid flapping.",
-      stretch: "Install KEDA and scale on RabbitMQ queue depth instead of CPU. Confirm it reacts to a backlog building even when CPU on the existing pods is low, a distinct signal HPA alone cannot see."
+      goal: "Drive a HorizontalPodAutoscaler with real CPU load and watch replicas climb fast on the way up but drain slowly on the way down.",
+      stack: "A local Kubernetes cluster (minikube) with metrics-server, <code>kubectl</code>, and the classic <code>hpa-example</code> workload. Local and free.",
+      steps: [
+        {
+          title: "Start a cluster with metrics-server",
+          body: "The metrics-server add-on is required so the HPA can read CPU.",
+          code: "minikube start\nminikube addons enable metrics-server",
+          lang: "bash"
+        },
+        {
+          title: "Define a CPU-bound app and a service",
+          body: "The <code>hpa-example</code> image burns CPU per request. Save as <code>app.yaml</code>.",
+          code: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: php-apache\nspec:\n  replicas: 2\n  selector:\n    matchLabels: { run: php-apache }\n  template:\n    metadata:\n      labels: { run: php-apache }\n    spec:\n      containers:\n      - name: php-apache\n        image: registry.k8s.io/hpa-example\n        ports:\n        - containerPort: 80\n        resources:\n          requests:\n            cpu: 200m\n          limits:\n            cpu: 500m\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: php-apache\nspec:\n  selector: { run: php-apache }\n  ports:\n  - port: 80",
+          lang: "yaml"
+        },
+        {
+          title: "Deploy it and create the autoscaler",
+          body: "Target 50% CPU, min 2 replicas, max 10.",
+          code: "kubectl apply -f app.yaml\nkubectl autoscale deployment php-apache --cpu-percent=50 --min=2 --max=10",
+          lang: "bash"
+        },
+        {
+          title: "Generate load and watch it scale",
+          body: "Run the load pod in one terminal and the watch in another.",
+          code: "kubectl run load --image=busybox --restart=Never -- /bin/sh -c \"while true; do wget -q -O- http://php-apache; done\"\nkubectl get hpa -w\nkubectl get pods -w",
+          lang: "bash"
+        }
+      ],
+      observe: "Replica count climbs from 2 toward 10 as CPU crosses the 50% target, and the important part is the asymmetry: scale-up appears within roughly 30-60s of crossing the threshold, while scale-down waits several minutes of sustained low usage (the stabilization window) to avoid flapping. Delete the load pod and time how much longer it takes to shrink back.",
+      stretch: "Install KEDA and scale on RabbitMQ queue depth instead of CPU. Confirm it reacts to a backlog building even when CPU on the existing pods is low, a leading-indicator signal plain HPA cannot see."
     }
   },
   keyTakeaways: [

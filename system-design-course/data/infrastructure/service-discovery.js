@@ -56,11 +56,33 @@ window.COURSE_CONTENT["service-discovery"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker, plus Consul (free, official image).",
-      setup: "Local and free: `docker run -d -p 8500:8500 consul agent -dev`.",
-      simulate: "Register 2 instances of a mock service with Consul (`curl -X PUT` to its registration API, or a client SDK), then query Consul's DNS interface (`dig @127.0.0.1 -p 8600 myservice.service.consul`) and its HTTP API (`curl localhost:8500/v1/health/service/myservice`) for the current healthy instances. Kill one instance's health-check endpoint (return 500 instead of 200) and re-query after Consul's check interval passes.",
-      observe: "The failed instance disappears from the healthy-instances list within one check interval, with zero manual deregistration: the registry actively pruning stale entries, the opposite of the \u201cno health checks\u201d anti-pattern.",
-      stretch: "Hardcode one instance's IP in a client instead of querying Consul, then kill that specific instance. The client keeps trying the dead IP forever, a direct, felt version of the \u201chardcoded IPs\u201d anti-pattern."
+      goal: "Register two instances of a service in Consul, look them up by DNS and HTTP API, then fail one health check and watch the registry prune it automatically.",
+      stack: "Consul (dev mode) in Docker, driven with <code>curl</code> and <code>dig</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Consul in dev mode",
+          code: "docker run -d --name consul -p 8500:8500 -p 8600:8600/udp \\\n  hashicorp/consul agent -dev -client=0.0.0.0",
+          lang: "bash"
+        },
+        {
+          title: "Register two instances with TTL health checks",
+          code: "curl -s -X PUT http://localhost:8500/v1/agent/service/register \\\n  -d '{\"ID\":\"web-1\",\"Name\":\"web\",\"Port\":9001,\"Check\":{\"CheckID\":\"web-1-ttl\",\"TTL\":\"30s\"}}'\ncurl -s -X PUT http://localhost:8500/v1/agent/service/register \\\n  -d '{\"ID\":\"web-2\",\"Name\":\"web\",\"Port\":9002,\"Check\":{\"CheckID\":\"web-2-ttl\",\"TTL\":\"30s\"}}'\ncurl -s -X PUT http://localhost:8500/v1/agent/check/pass/web-1-ttl\ncurl -s -X PUT http://localhost:8500/v1/agent/check/pass/web-2-ttl",
+          lang: "bash"
+        },
+        {
+          title: "Look up the healthy instances two ways",
+          body: "Consul answers over DNS (port 8600) and its HTTP API; <code>?passing</code> returns only healthy instances.",
+          code: "dig @127.0.0.1 -p 8600 web.service.consul SRV +short\ncurl -s \"http://localhost:8500/v1/health/service/web?passing\"",
+          lang: "bash"
+        },
+        {
+          title: "Fail one instance and re-query",
+          code: "curl -s -X PUT http://localhost:8500/v1/agent/check/fail/web-1-ttl\ncurl -s \"http://localhost:8500/v1/health/service/web?passing\"",
+          lang: "bash"
+        }
+      ],
+      observe: "After failing <code>web-1-ttl</code>, only <code>web-2</code> comes back from the <code>?passing</code> query, with zero manual deregistration. The registry actively prunes stale entries, the exact opposite of the \u201cno health checks\u201d anti-pattern.",
+      stretch: "Hardcode <code>web-1</code>'s address in a small client instead of querying Consul, then fail or stop that instance. The client keeps hammering the dead address forever, a felt version of the \u201chardcoded IPs\u201d anti-pattern."
     }
   },
   keyTakeaways: [

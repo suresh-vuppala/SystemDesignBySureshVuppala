@@ -43,11 +43,34 @@ window.COURSE_CONTENT["redis-locks"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Redis); Node.js or Python.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis`.",
-      simulate: "Write 2 worker processes that both try `SET lock:resource1 <workerId> NX EX 5` in a tight retry loop against the same resource. Confirm only one worker wins the lock at a time and the other keeps retrying. Then simulate the Redlock failure: have worker A acquire the lock, artificially pause it (a `sleep(6000)` longer than the 5-second TTL, standing in for a GC pause), let the lock expire and worker B acquire it, then let worker A wake up and act as if it still held the lock.",
-      observe: "Both workers believing they hold the lock during the overlap window, the exact split-brain scenario reproduced on purpose. Then add a fencing token (an incrementing counter returned with each grant) and have the protected resource reject any write carrying a token older than the last it accepted; worker A's stale write now gets rejected instead of corrupting data.",
-      stretch: "None. This lesson's value is the failure reproduction, and it is already fairly involved."
+      goal: "Reproduce the Redlock split-brain on purpose (two clients holding one lock) and then defeat it with a fencing token.",
+      stack: "Redis in Docker plus Node.js with <code>ioredis</code>. Local and free.",
+      steps: [
+        {
+          title: "Start Redis",
+          code: "docker run -d --name redis -p 6379:6379 redis",
+          lang: "bash"
+        },
+        {
+          title: "Write a lock worker with a fencing token",
+          body: "Acquire with <code>SET ... NX EX 5</code>. Each grant also bumps a monotonic <code>INCR</code> token. The protected resource records the highest token it has accepted. Save as <code>worker.js</code>.",
+          code: "const Redis = require('ioredis');\nconst redis = new Redis();\nconst who = process.argv[2] || 'A';\nconst stall = Number(process.argv[3] || 0); // ms to pause after acquiring\nconst sleep = (ms) => new Promise(r => setTimeout(r, ms));\n\nasync function main() {\n  // 1) acquire\n  let token;\n  while (true) {\n    const got = await redis.set('lock:resource1', who, 'NX', 'EX', 5);\n    if (got) { token = await redis.incr('lock:resource1:fence'); break; }\n    await sleep(200);\n  }\n  console.log(`${who} acquired lock with fence token ${token}`);\n\n  // 2) simulate a GC pause longer than the 5s TTL\n  if (stall) { console.log(`${who} stalling ${stall}ms...`); await sleep(stall); }\n\n  // 3) try to write, guarded by the fencing token\n  const accepted = Number(await redis.get('resource:last_token')) || 0;\n  if (token >= accepted) {\n    await redis.set('resource:last_token', token);\n    console.log(`${who} WRITE ACCEPTED (token ${token} >= ${accepted})`);\n  } else {\n    console.log(`${who} WRITE REJECTED (stale token ${token} < ${accepted})`);\n  }\n  process.exit(0);\n}\nmain();",
+          lang: "javascript"
+        },
+        {
+          title: "Install ioredis",
+          code: "npm init -y && npm install ioredis",
+          lang: "bash"
+        },
+        {
+          title: "Force the overlap: A stalls past its TTL, B grabs the lock",
+          body: "A holds the lock, then pauses 7s (longer than the 5s TTL). While it sleeps the lock expires and B acquires it. Run A in the background, B right after.",
+          code: "node worker.js A 7000 &\nsleep 1\nnode worker.js B 0\nwait",
+          lang: "bash"
+        }
+      ],
+      observe: "During the overlap both workers believe they hold the lock, the exact split-brain reproduced on purpose. But B writes first with the newer fence token, so when A wakes its write prints <code>WRITE REJECTED (stale token ...)</code> instead of corrupting data: the fencing token catches what the lock alone could not.",
+      stretch: "Drop the fencing check (write unconditionally) and rerun: A's stale write now clobbers B's, showing the silent corruption the token prevented. Then move <code>resource:last_token</code> enforcement into a Lua script so the compare-and-set is atomic."
     }
   },
   keyTakeaways: [

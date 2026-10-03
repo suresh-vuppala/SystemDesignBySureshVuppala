@@ -27,11 +27,35 @@ window.COURSE_CONTENT["openapi"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js (for Prism); a text editor.",
-      setup: "Local and free only.",
-      simulate: "Write an `openapi.yaml` spec for the `/orders` API (paths, request/response schemas). Run it through `npx @stoplight/prism-cli mock openapi.yaml`: this spins up a working mock server directly from the spec, with zero handwritten server code. Hit it with `curl` and confirm it returns responses matching your declared schema.",
-      observe: "The mock server rejecting a request that does not match your declared schema (wrong field type, missing required field): the spec is actively enforced, not just documentation.",
-      stretch: "Run Spectral (`npx @stoplight/spectral-cli lint openapi.yaml`) against your spec and see it flag style and convention violations automatically."
+      goal: "Write an OpenAPI spec for <code>/orders</code> and get a working, schema-validating mock server from it with zero handwritten server code.",
+      stack: "Prism (<code>@stoplight/prism-cli</code>) via <code>npx</code>, tested with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Write the contract",
+          body: "Paths, request bodies, and response schemas, all machine-readable. Save as <code>openapi.yaml</code>.",
+          code: "openapi: 3.0.0\ninfo: { title: Orders API, version: 1.0.0 }\npaths:\n  /orders:\n    post:\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [item, qty]\n              properties:\n                item: { type: string }\n                qty: { type: integer }\n      responses:\n        '201':\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  id: { type: integer }\n                  item: { type: string }",
+          lang: "yaml"
+        },
+        {
+          title: "Spin up a mock server straight from the spec",
+          body: "Prism reads the spec and serves responses shaped like your schema, no server code written.",
+          code: "npx @stoplight/prism-cli mock openapi.yaml",
+          lang: "bash"
+        },
+        {
+          title: "Call a valid request",
+          code: "curl -s -X POST localhost:4010/orders \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"item\":\"book\",\"qty\":2}'",
+          lang: "bash"
+        },
+        {
+          title: "Send a request that violates the schema",
+          body: "Wrong type for <code>qty</code> and a missing required field: watch the spec get enforced.",
+          code: "curl -s -X POST localhost:4010/orders \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"item\":\"book\",\"qty\":\"two\"}'",
+          lang: "bash"
+        }
+      ],
+      observe: "The valid call returns a <code>201</code> body matching your declared schema. The invalid call is rejected with a validation error naming the bad field: the spec is actively enforced, not just documentation.",
+      stretch: "Run Spectral (<code>npx @stoplight/spectral-cli lint openapi.yaml</code>) against the spec and watch it flag style and convention violations automatically."
     }
   },
   keyTakeaways: [

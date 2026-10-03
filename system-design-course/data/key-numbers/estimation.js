@@ -104,13 +104,6 @@ window.COURSE_CONTENT["estimation"] = {
         { label: "Bandwidth implies a CDN decision", body: "~1 Gbps peak of egress is where serving static assets directly gets expensive, and a CDN starts paying for itself." },
         { label: "Add the supporting cast", body: "A real answer layers in a cache (Redis), DB read replicas, and a CDN for static assets on top of the bare server count." }
       ]
-    },
-    handsOn: {
-      prerequisites: "None. This is a timed estimation drill.",
-      setup: "Set a 5-minute timer. No tools, no lookups.",
-      simulate: "Estimate full RPS and storage/year for a food-delivery app: 50M total users, 20% DAU, 3 orders per active user per day, each order ~5 KB stored. Chain the formulas exactly: Users \u2192 DAU \u2192 requests/day \u2192 avg RPS \u2192 peak RPS \u2192 storage/year. Write down every intermediate number, not just the final answer.",
-      observe: "Check whether you finished the full chain inside 5 minutes without looking anything up. Compare your RPS against the \u201c10\u2074 RPS is Slack-scale\u201d anchor to confirm the number is even plausible.",
-      stretch: "Redo the estimate assuming DAU triples during a viral growth event and recompute every downstream number. This is the real skill an interviewer probes with \u201cwhat if traffic 10\u00d7\u2019d overnight.\u201d"
     }
   },
   keyTakeaways: [

@@ -67,11 +67,62 @@ window.COURSE_CONTENT["dashboards"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Grafana setup from 13.2.",
-      setup: "Local and free: reuse it.",
-      simulate: "Build one \u201cService Health\u201d dashboard following the RED model (request rate, error rate, p50/p95/p99 latency) with exactly 4 panels, all sharing the same time-range control. Add a deploy annotation at a specific timestamp, then generate a latency spike right after that marker.",
-      observe: "The annotation line makes it immediately obvious the spike correlates with a deploy. The \u201cannotations mark deploys/incidents on the graph\u201d principle works as an actual diagnostic aid during a simulated incident, not just a nice-to-have.",
-      stretch: "Build a second, deliberately bad dashboard with 20 panels, all averages-only, no annotations. Time how long it takes you or a teammate to spot the same latency spike on each dashboard. The difference is the real cost of the anti-patterns."
+      goal: "Build a 4-panel RED \u201cService Health\u201d dashboard in Grafana, drop a deploy annotation on the timeline, then trigger a latency spike right after it so the annotation visibly explains the change.",
+      stack: "Grafana + Prometheus from 13.2, driven by the instrumented app. Provisioned entirely over the HTTP API. Local and free.",
+      steps: [
+        {
+          title: "Add Prometheus as a Grafana datasource",
+          body: "Grafana is on port 3001 from 13.2; <code>prom</code> is the Prometheus container name on the <code>obs</code> network.",
+          code: "curl -s -X POST http://admin:admin@localhost:3001/api/datasources -H \"Content-Type: application/json\" -d '{\"name\":\"Prometheus\",\"type\":\"prometheus\",\"url\":\"http://prom:9090\",\"access\":\"proxy\",\"isDefault\":true}'",
+          lang: "bash"
+        },
+        {
+          title: "Define a 4-panel RED dashboard",
+          body: "Save as <code>dashboard.json</code>. Four panels only (rate, errors, latency percentiles, traffic by status), all sharing one time range. PromQL uses single quotes so the JSON stays clean.",
+          code: `{
+  "dashboard": {
+    "title": "Service Health (RED)",
+    "time": { "from": "now-15m", "to": "now" },
+    "panels": [
+      { "id": 1, "title": "Request rate (RPS)", "type": "timeseries", "gridPos": {"h":8,"w":12,"x":0,"y":0},
+        "targets": [ { "expr": "sum(rate(http_server_duration_ms_count[1m]))" } ] },
+      { "id": 2, "title": "Error rate", "type": "timeseries", "gridPos": {"h":8,"w":12,"x":12,"y":0},
+        "targets": [ { "expr": "sum(rate(http_server_duration_ms_count{status=~'5..'}[1m])) / sum(rate(http_server_duration_ms_count[1m]))" } ] },
+      { "id": 3, "title": "Latency p50/p95/p99", "type": "timeseries", "gridPos": {"h":8,"w":12,"x":0,"y":8},
+        "targets": [
+          { "expr": "histogram_quantile(0.50, sum(rate(http_server_duration_ms_bucket[1m])) by (le))" },
+          { "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_ms_bucket[1m])) by (le))" },
+          { "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_ms_bucket[1m])) by (le))" }
+        ] },
+      { "id": 4, "title": "Traffic by status", "type": "timeseries", "gridPos": {"h":8,"w":12,"x":12,"y":8},
+        "targets": [ { "expr": "sum by (status) (rate(http_server_duration_ms_count[1m]))" } ] }
+    ],
+    "schemaVersion": 39
+  },
+  "overwrite": true
+}`,
+          lang: "json"
+        },
+        {
+          title: "Import the dashboard via the API",
+          code: "curl -s -X POST http://admin:admin@localhost:3001/api/dashboards/db -H \"Content-Type: application/json\" -d @dashboard.json",
+          lang: "bash"
+        },
+        {
+          title: "Mark a deploy on the timeline",
+          body: "The annotations API stamps a vertical line at the current moment tagged <code>deploy</code>.",
+          code: "curl -s -X POST http://admin:admin@localhost:3001/api/annotations -H \"Content-Type: application/json\" -d \"{\\\"time\\\": $(($(date +%s)*1000)), \\\"tags\\\": [\\\"deploy\\\"], \\\"text\\\": \\\"v2.4.1 deployed\\\"}\"",
+          lang: "bash"
+        },
+        {
+          title: "Trigger a latency spike right after the marker",
+          body: "Restart the app with the slow branch cranked up (or just hammer it) so p99 jumps just after the annotation.",
+          code: "hey -z 60s -c 100 http://localhost:3000/",
+          lang: "bash"
+        }
+      ],
+      observe: "The vertical <code>deploy</code> line sits immediately before the p99 climb, so the correlation is obvious at a glance. The \u201cannotations mark deploys and incidents on the graph\u201d principle works as an actual diagnostic aid, not just a nice-to-have.",
+      stretch: "Build a second, deliberately bad dashboard with 20 panels, all averages-only and no annotations, then time how long it takes to spot the same spike on each. The gap is the real cost of the anti-patterns."
     }
   },
   keyTakeaways: [

@@ -42,11 +42,40 @@ window.COURSE_CONTENT["pubsub"] = {
       ]
     },
     handsOn: {
-      prerequisites: "AWS free-tier account (SNS and SQS are both in the free tier).",
-      setup: "Cloud free-tier: an SNS topic with 2 SQS queues subscribed to it (the standard SNS-fan-out-to-SQS pattern).",
-      simulate: "Publish one message to the SNS topic and confirm it independently arrives in <strong>both</strong> subscribed SQS queues, each with its own copy. Then have one consumer (a script polling queue A) process and delete its copy while queue B\u2019s message sits untouched, proving the two subscriptions are fully independent.",
-      observe: "Unlike a queue (one message, one consumer wins it), both subscribers get their own full copy: the broadcast/fan-out shape, confirmed by checking both queues\u2019 message counts after the publish.",
-      stretch: "Add a subscription filter policy on one queue (for example, only messages with attribute `region: eu`) and publish 2 messages, one matching and one not. Confirm the filtered queue only receives the matching one."
+      goal: "Fan one SNS publish out to two independent SQS queues and prove each subscriber gets its own full copy, unlike a queue where one consumer wins the message.",
+      stack: "AWS CLI driving SNS and SQS (both in the AWS free tier). No local broker to run.",
+      steps: [
+        {
+          title: "Create the topic and two queues",
+          code: "aws sns create-topic --name orders\naws sqs create-queue --queue-name orders-a\naws sqs create-queue --queue-name orders-b",
+          lang: "bash"
+        },
+        {
+          title: "Capture ARNs and subscribe both queues",
+          body: "Standard SNS-fan-out-to-SQS: each queue becomes an independent subscriber of the topic.",
+          code: "TOPIC=$(aws sns create-topic --name orders --query TopicArn --output text)\nA_URL=$(aws sqs get-queue-url --queue-name orders-a --query QueueUrl --output text)\nB_URL=$(aws sqs get-queue-url --queue-name orders-b --query QueueUrl --output text)\nA_ARN=$(aws sqs get-queue-attributes --queue-url $A_URL --attribute-names QueueArn --query Attributes.QueueArn --output text)\nB_ARN=$(aws sqs get-queue-attributes --queue-url $B_URL --attribute-names QueueArn --query Attributes.QueueArn --output text)\naws sns subscribe --topic-arn $TOPIC --protocol sqs --notification-endpoint $A_ARN\naws sns subscribe --topic-arn $TOPIC --protocol sqs --notification-endpoint $B_ARN",
+          lang: "bash"
+        },
+        {
+          title: "Allow SNS to deliver into the queues",
+          body: "Each queue needs an access policy granting SNS <code>sqs:SendMessage</code>, or the delivery is silently dropped.",
+          code: "POLICY='{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},\"Action\":\"sqs:SendMessage\",\"Resource\":\"*\"}]}'\naws sqs set-queue-attributes --queue-url $A_URL --attributes Policy=\"$POLICY\"\naws sqs set-queue-attributes --queue-url $B_URL --attributes Policy=\"$POLICY\"",
+          lang: "bash"
+        },
+        {
+          title: "Publish one message",
+          code: "aws sns publish --topic-arn $TOPIC --message '{\"event\":\"OrderPlaced\",\"id\":1}'",
+          lang: "bash"
+        },
+        {
+          title: "Read both queues, then delete from A only",
+          body: "Both queues hold their own copy of the single publish. Deleting A's copy leaves B's untouched.",
+          code: "aws sqs receive-message --queue-url $A_URL\naws sqs receive-message --queue-url $B_URL\nRH=$(aws sqs receive-message --queue-url $A_URL --query 'Messages[0].ReceiptHandle' --output text)\naws sqs delete-message --queue-url $A_URL --receipt-handle $RH\naws sqs get-queue-attributes --queue-url $B_URL --attribute-names ApproximateNumberOfMessages",
+          lang: "bash"
+        }
+      ],
+      observe: "The single publish arrives independently in <strong>both</strong> queues, each with its own copy: the broadcast / fan-out shape, not the one-consumer-wins model of a plain queue. After you delete A's copy, B still reports one message available, proving the two subscriptions are fully independent.",
+      stretch: "Add a subscription filter policy on one queue (for example attribute <code>region: eu</code>), publish two messages (one matching, one not), and confirm the filtered queue receives only the matching message."
     }
   },
   keyTakeaways: [

@@ -46,11 +46,29 @@ window.COURSE_CONTENT["ddos-defense"] = {
       ]
     },
     handsOn: {
-      prerequisites: "`k6` or `hey` installed; a cloud free-tier account if you want a WAF in front of the target.",
-      setup: "Local/free: your own local server behind a local rate limiter (NGINX's `limit_req` module). Cloud free-tier: a free-tier app behind AWS WAF or Cloudflare's free plan.",
-      simulate: "Run `hey -n 5000 -c 200 <your-local-url>` against a plain, undefended local server and watch it fall over or slow drastically. Then add NGINX's `limit_req_zone $binary_remote_addr zone=one:10m rate=10r/s;` in front of it and re-run the exact same load.",
-      observe: "Response codes shifting from mostly-200 (server overwhelmed or crashing) to a mix of 200s and <strong>429s (Too Many Requests)</strong> once the limiter is in place, the L7 defense pattern felt directly at laptop scale, standing in for the L3/L4 volumetric case that needs real edge infrastructure.",
-      stretch: "With a Cloudflare free-tier zone, enable \u201cI'm Under Attack\u201d mode and observe the JS challenge page it inserts in front of your origin during the same load test."
+      goal: "Flood an undefended server, then put NGINX rate limiting in front and watch the same flood turn into 429s instead of an outage.",
+      stack: "Docker (NGINX) and <code>hey</code> for load. Local and free.",
+      steps: [
+        {
+          title: "Flood an undefended origin",
+          body: "A plain server with no limiter slows or falls over under a burst.",
+          code: "docker run -d --name origin -p 8080:80 nginx\nhey -n 5000 -c 200 http://localhost:8080/",
+          lang: "bash"
+        },
+        {
+          title: "Write a rate-limited NGINX config",
+          body: "<code>limit_req</code> caps each client IP to 10 requests/second with a small burst.",
+          code: "cat > limited.conf <<'EOF'\nlimit_req_zone $binary_remote_addr zone=one:10m rate=10r/s;\nserver {\n  listen 80;\n  location / {\n    limit_req zone=one burst=20 nodelay;\n    return 200 \"ok\\n\";\n  }\n}\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "Restart NGINX with the limiter and rerun the identical flood",
+          code: "docker rm -f origin\ndocker run -d --name origin -p 8080:80 -v \"$PWD/limited.conf:/etc/nginx/conf.d/default.conf\" nginx\nhey -n 5000 -c 200 http://localhost:8080/",
+          lang: "bash"
+        }
+      ],
+      observe: "In the <code>hey</code> summary, the undefended run is mostly 200s while the server struggles; with the limiter the status-code breakdown shifts to a mix of 200s and <strong>429 (Too Many Requests)</strong>. That is the L7 rate-limit defense at laptop scale, standing in for the L3/L4 volumetric case that needs real edge infrastructure.",
+      stretch: "With a Cloudflare free-tier zone, enable <strong>I'm Under Attack</strong> mode and watch the JavaScript challenge page it inserts in front of your origin during the same load test."
     }
   },
   keyTakeaways: [

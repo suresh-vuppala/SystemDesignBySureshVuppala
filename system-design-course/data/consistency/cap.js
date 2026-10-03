@@ -48,11 +48,41 @@ window.COURSE_CONTENT["cap"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Compose; a 3-node Cassandra or a 3-node etcd cluster (both have official images).",
-      setup: "Local and free: a 3-node cluster via Docker Compose, plus a way to simulate a partition between nodes (`docker network disconnect`, or `iptables`/`tc` inside the containers).",
-      simulate: "With a 3-node etcd cluster running, disconnect one node from the other two (`docker network disconnect`) and write to the isolated minority node: it should refuse (CP, unavailable rather than inconsistent). Then repeat with a 3-node Cassandra cluster using `QUORUM`, disconnect one node, and write to the majority side: it succeeds (AP, available and consistent as long as quorum is met). Write directly to the isolated node with consistency `ONE` and it may still accept the write, now diverging from the majority.",
-      observe: "etcd's minority partition actively rejecting requests versus Cassandra's minority partition (at weak consistency) happily accepting writes that will conflict later. That is the CP vs AP choice, observed as two different real behaviors under the identical fault you injected.",
-      stretch: "Reconnect the partitioned Cassandra node and watch its divergent write get reconciled via read repair and anti-entropy, a preview of 9.7's conflict resolution."
+      goal: "Prove the CP vs AP choice by injecting one network partition into a 3-node etcd cluster and a 3-node Cassandra cluster, then watching one refuse writes while the other accepts divergent ones.",
+      stack: "etcd and Cassandra, 3 nodes each, in Docker on one user-defined network, partitioned with <code>docker network disconnect</code>. Local and free.",
+      steps: [
+        {
+          title: "Start a 3-node etcd cluster (the CP system)",
+          body: "One Docker network lets the nodes find each other by name.",
+          code: "docker network create capnet\nCLUSTER=\"etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380\"\nfor n in etcd1 etcd2 etcd3; do\n  docker run -d --name $n --network capnet quay.io/coreos/etcd:v3.5.9 etcd --name $n --advertise-client-urls http://$n:2379 --listen-client-urls http://0.0.0.0:2379 --initial-advertise-peer-urls http://$n:2380 --listen-peer-urls http://0.0.0.0:2380 --initial-cluster \"$CLUSTER\" --initial-cluster-state new --initial-cluster-token tkn\ndone",
+          lang: "bash"
+        },
+        {
+          title: "Partition one etcd node and write to the minority",
+          body: "The isolated node loses quorum, so the write times out instead of returning a possibly stale answer.",
+          code: "docker exec etcd1 etcdctl put foo bar\ndocker network disconnect capnet etcd3\n# the isolated minority node cannot reach a quorum: this fails\ndocker exec etcd3 etcdctl --command-timeout=3s put foo minority",
+          lang: "bash"
+        },
+        {
+          title: "Start a 3-node Cassandra cluster (the AP system)",
+          body: "cass1 is the seed; give each node time to join before starting the next.",
+          code: "docker run -d --name cass1 --network capnet -e CASSANDRA_CLUSTER_NAME=cap cassandra:4.1\nsleep 60\ndocker run -d --name cass2 --network capnet -e CASSANDRA_SEEDS=cass1 -e CASSANDRA_CLUSTER_NAME=cap cassandra:4.1\nsleep 60\ndocker run -d --name cass3 --network capnet -e CASSANDRA_SEEDS=cass1 -e CASSANDRA_CLUSTER_NAME=cap cassandra:4.1\nsleep 60\ndocker exec cass1 nodetool status",
+          lang: "bash"
+        },
+        {
+          title: "Create a replicated keyspace and table",
+          code: "docker exec cass1 cqlsh -e \"CREATE KEYSPACE demo WITH replication = {'class':'SimpleStrategy','replication_factor':3};\"\ndocker exec cass1 cqlsh -e \"CREATE TABLE demo.kv (k text PRIMARY KEY, v text);\"",
+          lang: "sql"
+        },
+        {
+          title: "Partition one Cassandra node and write to both sides",
+          body: "The majority side satisfies QUORUM and succeeds; the isolated node still accepts a write at consistency ONE, so the two sides now disagree.",
+          code: "docker network disconnect capnet cass3\ndocker exec cass1 cqlsh -e \"CONSISTENCY QUORUM; INSERT INTO demo.kv (k,v) VALUES ('x','majority');\"\ndocker exec cass3 cqlsh -e \"CONSISTENCY ONE; INSERT INTO demo.kv (k,v) VALUES ('x','minority');\"",
+          lang: "sql"
+        }
+      ],
+      observe: "The etcd minority <code>put</code> times out and fails (CP: it refuses rather than accept an inconsistent write), while Cassandra accepts the QUORUM write on the majority and the ONE write on the isolated node, leaving two divergent values for key <code>x</code>. Same injected fault, opposite behaviors: that is the CP vs AP choice seen directly.",
+      stretch: "Reconnect the isolated node (<code>docker network connect capnet cass3</code>), run <code>docker exec cass1 nodetool repair demo</code>, then read <code>x</code> at QUORUM and watch the divergent value reconcile via read repair and anti-entropy, a preview of 9.7's conflict resolution."
     }
   },
   keyTakeaways: [

@@ -52,11 +52,39 @@ window.COURSE_CONTENT["rest"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js or Python; `curl` or Postman.",
-      setup: "Local and free: a minimal Express/Flask app with `GET /orders`, `POST /orders`, `GET /orders/:id`, `DELETE /orders/:id` backed by an in-memory array. Optional cloud free-tier: deploy the same app to Render, Railway, or Fly.io to test it over real HTTPS.",
-      simulate: "Build the 4 endpoints following the naming conventions from Overview, then hit each with `curl -X POST`, `curl -X GET`, and `curl -X DELETE`. Confirm the status codes match each method's stated properties.",
-      observe: "Call `DELETE /orders/5` twice in a row: both should leave the system in the same state (idempotent). Then call `POST /orders` twice with the same body and watch it create two different resources with two different IDs.",
-      stretch: "Add cursor-based pagination to `GET /orders?after=&lt;id&gt;&amp;limit=20` and compare its behavior against a naive `?page=3&amp;size=20` version when you insert a new row mid-list: one shifts, the other does not."
+      goal: "Build a minimal REST <code>/orders</code> API with four endpoints and prove that DELETE is idempotent while POST is not.",
+      stack: "Node.js + Express, tested with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Create the project and install Express",
+          code: "mkdir rest-orders && cd rest-orders\nnpm init -y && npm install express",
+          lang: "bash"
+        },
+        {
+          title: "Write the four resource endpoints",
+          body: "Nouns in the URL, verbs in the HTTP method. Back it with an in-memory array. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst app = express();\napp.use(express.json());\n\nlet orders = [];\nlet nextId = 1;\n\n// list all\napp.get('/orders', (req, res) => res.json(orders));\n\n// create (not idempotent: each call makes a new resource)\napp.post('/orders', (req, res) => {\n  const order = { id: nextId++, ...req.body };\n  orders.push(order);\n  res.status(201).json(order);\n});\n\n// read one\napp.get('/orders/:id', (req, res) => {\n  const order = orders.find(o => o.id === Number(req.params.id));\n  if (!order) return res.status(404).json({ error: 'not found' });\n  res.json(order);\n});\n\n// delete (idempotent: same end state every time)\napp.delete('/orders/:id', (req, res) => {\n  orders = orders.filter(o => o.id !== Number(req.params.id));\n  res.status(204).end();\n});\n\napp.listen(3000, () => console.log('http://localhost:3000'));",
+          lang: "javascript"
+        },
+        {
+          title: "Run the server",
+          code: "node server.js",
+          lang: "bash"
+        },
+        {
+          title: "Exercise each verb and watch the status codes",
+          code: "curl -i -X POST localhost:3000/orders -H 'Content-Type: application/json' -d '{\"item\":\"book\"}'\ncurl -i localhost:3000/orders/1\ncurl -i localhost:3000/orders",
+          lang: "bash"
+        },
+        {
+          title: "Prove idempotency vs non-idempotency",
+          body: "DELETE the same id twice: both leave the system identical. POST the same body twice: two different ids appear.",
+          code: "curl -i -X DELETE localhost:3000/orders/1\ncurl -i -X DELETE localhost:3000/orders/1\ncurl -s -X POST localhost:3000/orders -H 'Content-Type: application/json' -d '{\"item\":\"pen\"}'\ncurl -s -X POST localhost:3000/orders -H 'Content-Type: application/json' -d '{\"item\":\"pen\"}'",
+          lang: "bash"
+        }
+      ],
+      observe: "POST returns <code>201</code> with a fresh <code>id</code> each time, so two identical bodies create two distinct resources. DELETE returns <code>204</code> both times and the collection is identical after each call: that sameness is idempotency.",
+      stretch: "Add cursor pagination to <code>GET /orders?after=&lt;id&gt;&amp;limit=20</code> and compare it to a naive <code>?page=3&amp;size=20</code>: insert a new row mid-list and watch the offset version shift results while the cursor version stays stable."
     }
   },
   keyTakeaways: [

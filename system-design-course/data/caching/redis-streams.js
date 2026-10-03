@@ -167,11 +167,41 @@ window.COURSE_CONTENT["redis-streams"] = {
     },
 
     handsOn: {
-      prerequisites: "Docker (Redis 5+); `redis-cli`; 2 terminal windows for the workers.",
-      setup: "Local and free: `docker run -d -p 6379:6379 redis`.",
-      simulate: "Build a stream: `XADD orders '*' item \"widget\" qty 3` a few times, then `XLEN orders` and `XRANGE orders - +` to see the ordered log and its `<ms>-<seq>` IDs. Create a group with `XGROUP CREATE orders workers '$'` and, in two terminals, loop `XREADGROUP GROUP workers worker1 COUNT 1 STREAMS orders >` (and `worker2` in the other). Add new entries and watch them split across the two workers, never duplicated. Now kill worker1 *before* it `XACK`s and run `XPENDING orders workers`: the unacked entry is still owed.",
-      observe: "A worker that was offline when entries were added still receiving everything it missed on reconnect (the durability Pub/Sub in 7.6 explicitly lacks), and the killed worker\u2019s entry sitting in the PEL until `XAUTOCLAIM orders workers worker2 60000 0` reassigns it to the survivor, message recovery made concrete.",
-      stretch: "Add `MAXLEN ~ 1000` to your `XADD` and confirm `XLEN` plateaus as you keep writing (retention working). Then benchmark a tight loop of 100,000 `XADD`s to feel the single-node ceiling, and contrast it with Kafka\u2019s numbers when you reach Module 8."
+      goal: "Build a durable Redis Stream, load-balance it across a consumer group, then recover an unacked entry from a worker you kill mid-flight.",
+      stack: "Redis 5+ in Docker with several <code>redis-cli</code> terminals. Local and free.",
+      steps: [
+        {
+          title: "Start Redis and append a few entries",
+          body: "Each <code>XADD</code> returns an <code>&lt;ms&gt;-&lt;seq&gt;</code> id. Inspect the ordered log.",
+          code: "docker run -d --name redis -p 6379:6379 redis\ndocker exec redis redis-cli XADD orders '*' item widget qty 3\ndocker exec redis redis-cli XADD orders '*' item gadget qty 1\ndocker exec redis redis-cli XLEN orders\ndocker exec redis redis-cli XRANGE orders - +",
+          lang: "bash"
+        },
+        {
+          title: "Create a consumer group from the current end",
+          code: "docker exec redis redis-cli XGROUP CREATE orders workers '$'",
+          lang: "bash"
+        },
+        {
+          title: "Run two workers that split the load",
+          body: "Open two terminals. Each reads new entries with <code>&gt;</code>; the group hands each entry to exactly one worker.",
+          code: "# terminal 1\ndocker exec -it redis redis-cli XREADGROUP GROUP workers worker1 COUNT 1 BLOCK 0 STREAMS orders '>'\n\n# terminal 2\ndocker exec -it redis redis-cli XREADGROUP GROUP workers worker2 COUNT 1 BLOCK 0 STREAMS orders '>'",
+          lang: "bash"
+        },
+        {
+          title: "Add work, then leave one entry unacked",
+          body: "Push new entries and let worker1 receive one without calling <code>XACK</code> (simulating a crash). The unacked entry is still owed.",
+          code: "docker exec redis redis-cli XADD orders '*' item bolt qty 9\ndocker exec redis redis-cli XADD orders '*' item nut qty 4\ndocker exec redis redis-cli XPENDING orders workers",
+          lang: "bash"
+        },
+        {
+          title: "Reassign the stuck entry to the survivor",
+          body: "<code>XAUTOCLAIM</code> transfers entries idle longer than the timeout to another consumer, who then processes and acks it.",
+          code: "docker exec redis redis-cli XAUTOCLAIM orders workers worker2 0 0",
+          lang: "bash"
+        }
+      ],
+      observe: "A worker that was offline when entries were added still receives everything it missed on reconnect (the durability Pub/Sub in 7.6 lacks), and the killed worker's entry sits in the Pending Entries List until <code>XAUTOCLAIM</code> reassigns it to the survivor: message recovery made concrete.",
+      stretch: "Add <code>MAXLEN ~ 1000</code> to your <code>XADD</code> and confirm <code>XLEN</code> plateaus as you keep writing (retention working). Then benchmark a tight loop of 100,000 <code>XADD</code>s to feel the single-node ceiling, and contrast it with Kafka's numbers when you reach Module 8."
     }
   },
 

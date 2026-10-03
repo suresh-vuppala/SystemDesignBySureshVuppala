@@ -68,10 +68,39 @@ window.COURSE_CONTENT["authentication"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Node.js with `jsonwebtoken`; jwt.io (free, in-browser) for decoding.",
-      setup: "Local and free only.",
-      simulate: "Sign a JWT with `jwt.sign({sub: \"user123\", role: \"admin\"}, secret, {algorithm: \"HS256\", expiresIn: \"15m\"})`, paste it into jwt.io, and read the decoded header/payload/signature, matching each field to the ones named in the overview. Then write a verify endpoint and call it with (a) the valid token, (b) the same token with one payload character changed, and (c) the token after its 15-minute expiry.",
-      observe: "Case (b) fails signature verification instantly (any change to header or payload invalidates the signature), and case (c) fails with a distinct \u201cexpired\u201d error: 2 different, deliberately distinguishable failure reasons.",
+      goal: "Sign a real JWT, decode it in the browser, then prove that tampering and expiry produce two distinct, deliberate verification failures.",
+      stack: "Node.js + <code>jsonwebtoken</code>, with jwt.io (free, in-browser) for decoding. Local and free.",
+      steps: [
+        {
+          title: "Install the library",
+          code: "npm init -y && npm install jsonwebtoken",
+          lang: "bash"
+        },
+        {
+          title: "Sign an HS256 token that expires in 15 minutes",
+          body: "Save as <code>sign.js</code>.",
+          code: "const jwt = require('jsonwebtoken');\nconst secret = 'dev-secret-change-me';\nconst token = jwt.sign(\n  { sub: 'user123', role: 'admin' },\n  secret,\n  { algorithm: 'HS256', expiresIn: '15m' }\n);\nconsole.log(token);",
+          lang: "javascript"
+        },
+        {
+          title: "Print it and decode it at jwt.io",
+          body: "Paste the printed token into jwt.io and match the decoded <strong>header</strong>, <strong>payload</strong>, and <strong>signature</strong> to the fields named in the overview.",
+          code: "node sign.js",
+          lang: "bash"
+        },
+        {
+          title: "Verify a valid, a tampered, and an expired token",
+          body: "Save as <code>verify.js</code>. The tampered token has its last signature characters overwritten; the expired one is signed with a negative lifetime.",
+          code: "const jwt = require('jsonwebtoken');\nconst secret = 'dev-secret-change-me';\n\nfunction check(label, token) {\n  try {\n    console.log(label, 'OK   ->', jwt.verify(token, secret));\n  } catch (e) {\n    console.log(label, 'FAIL ->', e.name + ':', e.message);\n  }\n}\n\nconst valid = jwt.sign({ sub: 'user123', role: 'admin' }, secret, { algorithm: 'HS256', expiresIn: '15m' });\nconst tampered = valid.slice(0, -4) + 'AAAA';\nconst expired = jwt.sign({ sub: 'user123' }, secret, { algorithm: 'HS256', expiresIn: '-1s' });\n\ncheck('(a) valid   ', valid);\ncheck('(b) tampered', tampered);\ncheck('(c) expired ', expired);",
+          lang: "javascript"
+        },
+        {
+          title: "Run the verifier",
+          code: "node verify.js",
+          lang: "bash"
+        }
+      ],
+      observe: "Case (b) fails signature verification instantly (any change to header or payload invalidates the signature), and case (c) fails with a distinct <code>TokenExpiredError</code>: two different, deliberately distinguishable failure reasons.",
       stretch: "Sign a token with HS256 using a secret, then try to verify it as if it were RS256 with a public key. This confirms why mixing algorithms across services without care is exploitable (the classic \u201calg confusion\u201d JWT attack), and why the shared-secret anti-pattern is a real, documented vulnerability class."
     }
   },

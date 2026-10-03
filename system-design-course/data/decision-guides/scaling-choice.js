@@ -36,13 +36,6 @@ window.COURSE_CONTENT["scaling-choice"] = {
         { label: "Vertical is simple but capped", body: "Scaling up (a bigger machine) needs no code changes and no distributed-systems tax, but it has a hard ceiling and a single point of failure. It is the correct first move, not the final one." },
         { label: "Horizontal is powerful but taxing", body: "Scaling out (load balancer + sharding + stateless services) has effectively no ceiling, but it forces statelessness, data partitioning, and coordination. Adopt it when the single-box ceiling is genuinely in sight, not preemptively." }
       ]
-    },
-    handsOn: {
-      prerequisites: "No install needed. A metrics dashboard, real or imagined, and the tree above.",
-      setup: "Diagnose the bottleneck first, then route it. Resist naming a tool before you name the saturated resource.",
-      simulate: "Scenario: \u201cthe product page is slow; the database CPU sits at 95% and 98% of queries are reads.\u201d Diagnose: read bottleneck. Route: cache the hot products in Redis, add a read replica, push images to a CDN. Second scenario: \u201cwrite latency spikes during flash sales; a single primary cannot absorb the order inserts.\u201d Diagnose: write bottleneck. Route: shard orders by customer_id, or buffer with a write-behind cache.",
-      observe: "In both cases the diagnosis chose the toolset before any tool was named. A team that reaches for sharding on a read bottleneck is solving the wrong problem at great cost.",
-      stretch: "Now the ambiguous case: \u201cboth reads and writes are saturated and traffic is still climbing.\u201d Walk the both-branch: could a bigger instance carry it for now (scale up, buy time) while you plan the harder horizontal move (LB + sharding + stateless)? Sequencing those two is the senior judgment call."
     }
   },
   keyTakeaways: [

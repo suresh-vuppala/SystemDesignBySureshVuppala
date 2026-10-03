@@ -45,11 +45,45 @@ window.COURSE_CONTENT["sql"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker (Postgres); `psql`.",
-      setup: "Local and free: `docker run -d -p 5432:5432 postgres`.",
-      simulate: "Open 2 `psql` sessions against the same table. In session A, start a transaction and update a row but do not commit. In session B, read that same row (default isolation): it sees the old value, proving readers are not blocked (MVCC). Then in session A, try to update a row that session B is concurrently updating in an uncommitted transaction, and watch session A block until B commits or rolls back.",
-      observe: "The exact moment session A's write blocks: that is row-level locking, distinct from the MVCC read that did not block. Then deliberately violate a constraint (insert a duplicate primary key) and watch Postgres reject it: Atomicity and Consistency, enforced.",
-      stretch: "Kill the Postgres container mid-transaction (before commit) and restart it. Confirm the uncommitted change is gone (rolled back) while an earlier committed change survives the crash: Durability made concrete."
+      goal: "Feel ACID and MVCC directly: prove an uncommitted writer never blocks a reader (snapshot reads), then watch two writers on the same row serialize via row-level locking.",
+      stack: "Postgres in Docker, two <code>psql</code> sessions. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres and seed a table",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker exec -i pg psql -U postgres -c \"CREATE TABLE accounts(id int primary key, balance int);\"\ndocker exec -i pg psql -U postgres -c \"INSERT INTO accounts VALUES (1, 100), (2, 200);\"",
+          lang: "bash"
+        },
+        {
+          title: "Open two separate sessions",
+          body: "Run each command in its own terminal. Session A is the writer, session B is the reader.",
+          code: "# terminal 1 (session A)\ndocker exec -it pg psql -U postgres\n\n# terminal 2 (session B)\ndocker exec -it pg psql -U postgres",
+          lang: "bash"
+        },
+        {
+          title: "Session A: update but do NOT commit",
+          code: "BEGIN;\nUPDATE accounts SET balance = 999 WHERE id = 1;\n-- leave this transaction open",
+          lang: "sql"
+        },
+        {
+          title: "Session B: read the same row (MVCC snapshot)",
+          body: "B still sees the committed value 100, not A's uncommitted 999: readers are not blocked.",
+          code: "SELECT balance FROM accounts WHERE id = 1;",
+          lang: "sql"
+        },
+        {
+          title: "Session B: try to write the same row, watch it block",
+          body: "This statement hangs until session A runs <code>COMMIT</code> or <code>ROLLBACK</code>: that is row-level locking.",
+          code: "UPDATE accounts SET balance = 500 WHERE id = 1;",
+          lang: "sql"
+        },
+        {
+          title: "Prove Consistency: reject a duplicate primary key",
+          code: "INSERT INTO accounts VALUES (1, 0);  -- errors: duplicate key violates unique constraint",
+          lang: "sql"
+        }
+      ],
+      observe: "The exact moment session B's write blocks is row-level locking, distinct from the MVCC read that did not block. The duplicate-key <code>INSERT</code> is rejected outright: Atomicity and Consistency enforced.",
+      stretch: "Kill the Postgres container mid-transaction with <code>docker restart pg</code> before committing, then reconnect. Confirm the uncommitted change is gone (rolled back) while an earlier committed change survives: Durability made concrete."
     }
   },
   keyTakeaways: [

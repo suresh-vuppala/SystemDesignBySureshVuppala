@@ -135,11 +135,42 @@ window.COURSE_CONTENT["tcp-udp"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Python 3 installed (`python --version`).",
-      setup: "Create two files. This lets you feel connection-oriented vs connectionless directly.",
-      simulate: "Write a tiny TCP echo server with `socket.socket(socket.AF_INET, socket.SOCK_STREAM)` (note SOCK_STREAM) that must `listen()` and `accept()` a connection before it can `recv()`. Then write a UDP version with `socket.SOCK_DGRAM` that skips accept entirely and just `recvfrom()` immediately. Send a message to each.",
-      observe: "The TCP client must `connect()` first, and if the server is not up you get \u201cconnection refused.\u201d The UDP client just fires a datagram into the void, if nothing is listening, it silently vanishes with no error. That is connection-oriented vs connectionless made concrete.",
-      stretch: "Run Wireshark while both are talking and watch the TCP conversation open with the SYN / SYN-ACK / ACK handshake and close with FIN / ACK, while the UDP traffic is just lone datagrams with no setup or teardown."
+      goal: "Build a TCP echo server and a UDP echo server side by side and feel connection-oriented versus connectionless directly.",
+      stack: "Python 3 standard-library sockets (<code>python --version</code>). Local and free.",
+      steps: [
+        {
+          title: "TCP echo server (SOCK_STREAM)",
+          body: "TCP must <code>listen()</code> and <code>accept()</code> a connection before it can read a byte.",
+          code: "# tcp_echo.py\nimport socket\ns = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\ns.bind(('127.0.0.1', 5000))\ns.listen()\nprint('TCP echo on 5000')\nwhile True:\n    conn, addr = s.accept()          # blocks until a client connects\n    data = conn.recv(1024)\n    print('got', data, 'from', addr)\n    conn.sendall(data)\n    conn.close()",
+          lang: "python"
+        },
+        {
+          title: "UDP echo server (SOCK_DGRAM)",
+          body: "UDP skips <code>accept()</code> entirely and reads a datagram the moment one arrives.",
+          code: "# udp_echo.py\nimport socket\ns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\ns.bind(('127.0.0.1', 5000))\nprint('UDP echo on 5000')\nwhile True:\n    data, addr = s.recvfrom(1024)    # no connection, just a datagram\n    print('got', data, 'from', addr)\n    s.sendto(data, addr)",
+          lang: "python"
+        },
+        {
+          title: "One client for both",
+          body: "The TCP client must <code>connect()</code> first; the UDP client just fires a datagram.",
+          code: "# client.py   ->   python client.py tcp   OR   python client.py udp\nimport socket, sys\nkind = sys.argv[1] if len(sys.argv) > 1 else 'tcp'\nif kind == 'tcp':\n    c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    c.connect(('127.0.0.1', 5000))               # fails loudly if nothing is listening\n    c.sendall(b'hello tcp')\n    print(c.recv(1024))\nelse:\n    c = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n    c.sendto(b'hello udp', ('127.0.0.1', 5000))  # fire and forget\n    c.settimeout(2)\n    try:\n        print(c.recvfrom(1024))\n    except socket.timeout:\n        print('no reply (datagram vanished)')",
+          lang: "python"
+        },
+        {
+          title: "Run a server, then the matching client",
+          body: "Start one server in its own terminal, then run the client in another.",
+          code: "python tcp_echo.py &      # terminal 1\npython client.py tcp      # terminal 2\n\n# stop that server, then try the UDP pair\npython udp_echo.py &      # terminal 1\npython client.py udp      # terminal 2",
+          lang: "bash"
+        },
+        {
+          title: "Now send with no server running",
+          body: "Kill both servers first, then rerun each client to compare the failure modes.",
+          code: "python client.py tcp   # -> ConnectionRefusedError\npython client.py udp   # -> prints 'no reply (datagram vanished)', no error",
+          lang: "bash"
+        }
+      ],
+      observe: "With no server up, the TCP client raises <strong>ConnectionRefusedError</strong> because <code>connect()</code> needs a live peer, while the UDP client sends its datagram into the void and simply times out with no error. That is connection-oriented versus connectionless made concrete.",
+      stretch: "Run a packet capture while both talk and watch TCP open with <code>SYN</code> / <code>SYN-ACK</code> / <code>ACK</code> and close with <code>FIN</code> / <code>ACK</code>, while UDP is just lone datagrams with no setup or teardown: <code>sudo tcpdump -i lo0 port 5000</code> on macOS, or <code>sudo tcpdump -i lo port 5000</code> on Linux (or open the same in Wireshark)."
     }
   },
   keyTakeaways: [

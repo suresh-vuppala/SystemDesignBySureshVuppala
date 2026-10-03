@@ -53,11 +53,28 @@ window.COURSE_CONTENT["conflict-resolution"] = {
       ]
     },
     handsOn: {
-      prerequisites: "JavaScript; a free CRDT library (`yjs` or `automerge`, both open-source).",
-      setup: "Local and free only.",
-      simulate: "Create 2 independent `Y.Doc` instances (Yjs) with no network between them, each an \u201coffline\u201d client. Have client A add 3 items to a shared array and client B add 2 different items to its own copy, entirely offline. Then merge the two documents' updates (`Y.applyUpdate`).",
-      observe: "All 5 items present in the merged result with no manual conflict-resolution code written: the CRDT's mathematical merge guarantee, observed directly, contrasted with what a naive Last-Writer-Wins merge would have done (silently kept only one client's list).",
-      stretch: "Have both clients edit the same text position concurrently (Yjs `Y.Text`) while offline, merge, and confirm both edits survive in a sensible order: the collaborative-text case that Google Docs' Operational Transform and CRDTs both solve, felt directly."
+      goal: "Merge two Yjs documents that were each edited entirely offline and watch every edit survive with zero conflict-resolution code.",
+      stack: "Node.js with the <code>yjs</code> CRDT library. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "npm init -y\nnpm install yjs",
+          lang: "bash"
+        },
+        {
+          title: "Edit two docs offline, then merge both directions",
+          body: "Save as <code>crdt.js</code>. The two clients never see each other until you exchange binary updates.",
+          code: "const Y = require('yjs');\n\n// two clients that never talk over a network\nconst docA = new Y.Doc();\nconst docB = new Y.Doc();\n\n// client A adds 3 items to a shared array, offline\ndocA.getArray('items').insert(0, ['a1', 'a2', 'a3']);\n\n// client B adds 2 different items to its own copy, also offline\ndocB.getArray('items').insert(0, ['b1', 'b2']);\n\n// exchange state as binary updates and merge each into the other\nconst updateA = Y.encodeStateAsUpdate(docA);\nconst updateB = Y.encodeStateAsUpdate(docB);\nY.applyUpdate(docA, updateB);\nY.applyUpdate(docB, updateA);\n\nconsole.log('A sees:', docA.getArray('items').toArray());\nconsole.log('B sees:', docB.getArray('items').toArray());",
+          lang: "javascript"
+        },
+        {
+          title: "Run it",
+          code: "node crdt.js",
+          lang: "bash"
+        }
+      ],
+      observe: "Both documents converge to the same 5 items in the same order, with no merge logic written by you: the CRDT's mathematical merge guarantee, observed directly. A naive Last-Writer-Wins merge would have kept only one client's list and silently dropped the other's.",
+      stretch: "Swap the array for a <code>Y.Text</code>, have both docs insert at the same position while offline, merge both ways, and confirm both insertions survive in a deterministic order: the collaborative-text case that Google Docs solves with Operational Transform and Yjs solves with a CRDT."
     }
   },
   keyTakeaways: [

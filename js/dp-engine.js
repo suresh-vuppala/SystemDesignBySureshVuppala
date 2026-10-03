@@ -1,4 +1,4 @@
-/* DP Engine — shared Play / Expand engine for every diagram page */
+/* DP Engine, shared Play / Expand engine for every diagram page */
 (function(){
   function ensureModal(){
     if(document.getElementById('dp-modal'))return;

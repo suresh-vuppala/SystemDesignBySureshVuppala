@@ -120,11 +120,45 @@ window.COURSE_CONTENT["stateless-stateful"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker installed; basic Node.js or Python.",
-      setup: "Local/free: 2 app instances (Docker or 2 terminal windows on different ports) storing session in local memory. Cloud free-tier: AWS ElastiCache free tier (or a local docker run -d -p 6379:6379 redis) as the shared store.",
-      simulate: "Build a 5-line login endpoint that stores {userId: loggedInAt} in a local in-memory object (stateful version). Log in against instance A, then send your next request to instance B (simulate a load balancer round-robining you). Observe it treats you as logged out. Now swap the in-memory store for redis.set(sessionId, userId) / redis.get(sessionId) and repeat. Both instances now recognize the session.",
-      observe: "The exact moment the \u201cdifferent server, same user\u201d failure happens with local state, and disappears once state moves to Redis.",
-      stretch: "Kill instance A entirely mid-session (stateful crash = session lost) vs kill it after moving to Redis (session survives, because it never lived on that instance)."
+      goal: "Reproduce the \u201cdifferent server, same user, logged out\u201d bug with in-memory sessions, then fix it by externalizing state to Redis.",
+      stack: "Node.js + Express for two app instances, Redis (via Docker) as the shared store, tested with <code>curl</code>. Local and free.",
+      steps: [
+        {
+          title: "Write a stateful login server (sessions in local memory)",
+          body: "The <code>sessions</code> object lives inside this one process. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst app = express();\nconst sessions = {}; // lives only in THIS process\n\napp.post('/login/:user', (req, res) => {\n  const sid = Math.random().toString(36).slice(2);\n  sessions[sid] = req.params.user;\n  res.json(sid);\n});\n\napp.get('/me/:sid', (req, res) => {\n  const user = sessions[req.params.sid];\n  res.json(user ? { loggedInAs: user } : { error: 'logged out' });\n});\n\nconst port = process.env.PORT || 3001;\napp.listen(port, () => console.log('instance up on ' + port));",
+          lang: "javascript"
+        },
+        {
+          title: "Run two instances on different ports",
+          body: "Two terminals, same code, simulating two servers behind a load balancer.",
+          code: "npm init -y && npm install express\nPORT=3001 node server.js   # terminal 1 (instance A)\nPORT=3002 node server.js   # terminal 2 (instance B)",
+          lang: "bash"
+        },
+        {
+          title: "Log in on A, then send the same session to B",
+          code: "SID=$(curl -s -X POST http://localhost:3001/login/alice | tr -d '\"')\ncurl -s http://localhost:3001/me/$SID   # instance A: knows you\ncurl -s http://localhost:3002/me/$SID   # instance B: logged out",
+          lang: "bash"
+        },
+        {
+          title: "Start a shared Redis and rewrite the store",
+          body: "Swap the in-process object for <code>redis.set</code> / <code>redis.get</code>. Save as <code>server.js</code> and reinstall.",
+          code: "docker run -d -p 6379:6379 redis\nnpm install ioredis",
+          lang: "bash"
+        },
+        {
+          title: "Redis-backed server (state lives outside the process)",
+          code: "const express = require('express');\nconst Redis = require('ioredis');\nconst redis = new Redis();\nconst app = express();\n\napp.post('/login/:user', async (req, res) => {\n  const sid = Math.random().toString(36).slice(2);\n  await redis.set(sid, req.params.user);\n  res.json(sid);\n});\n\napp.get('/me/:sid', async (req, res) => {\n  const user = await redis.get(req.params.sid);\n  res.json(user ? { loggedInAs: user } : { error: 'logged out' });\n});\n\nconst port = process.env.PORT || 3001;\napp.listen(port, () => console.log('instance up on ' + port));",
+          lang: "javascript"
+        },
+        {
+          title: "Restart both instances and replay the same session",
+          code: "PORT=3001 node server.js   # terminal 1\nPORT=3002 node server.js   # terminal 2\nSID=$(curl -s -X POST http://localhost:3001/login/alice | tr -d '\"')\ncurl -s http://localhost:3002/me/$SID   # now B recognizes you too",
+          lang: "bash"
+        }
+      ],
+      observe: "The exact moment the \u201cdifferent server, same user\u201d failure happens with local state, and how it disappears once state moves to Redis and both instances read from the same store.",
+      stretch: "Kill instance A mid-session and compare: with in-memory state the session is gone, but with Redis the session survives, because it never lived on that instance."
     }
   },
   keyTakeaways: [

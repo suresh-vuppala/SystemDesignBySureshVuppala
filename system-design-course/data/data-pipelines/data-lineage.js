@@ -31,11 +31,29 @@ window.COURSE_CONTENT["data-lineage"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The dbt models from 12.2; Marquez (free, Docker Compose official).",
-      setup: "Local and free: Marquez\u2019s official Docker Compose (includes its own Postgres and web UI).",
-      simulate: "Configure dbt to emit OpenLineage events on <code>dbt run</code> (a documented, supported integration) pointed at your local Marquez instance. Run your staging and aggregation models from 12.2 and open Marquez\u2019s UI to view the generated lineage graph.",
+      goal: "Instrument your dbt project to emit OpenLineage events into Marquez, then watch a lineage graph build itself linking raw table to staging model to aggregate, with zero hand-written documentation.",
+      stack: "Marquez (Docker Compose, its own Postgres + web UI) + dbt with the <code>openlineage-dbt</code> wrapper. Local and free.",
+      steps: [
+        {
+          title: "Start Marquez",
+          body: "Clones the project and brings up the API and web UI with one script.",
+          code: "git clone https://github.com/MarquezProject/marquez.git\ncd marquez\n./docker/up.sh\n# web UI: http://localhost:3000   API: http://localhost:5000",
+          lang: "bash"
+        },
+        {
+          title: "Install the OpenLineage dbt wrapper and point it at Marquez",
+          code: "pip install openlineage-dbt\nexport OPENLINEAGE_URL=http://localhost:5000\nexport OPENLINEAGE_NAMESPACE=shop",
+          lang: "bash"
+        },
+        {
+          title: "Run your 12.2 dbt models through the wrapper",
+          body: "<code>dbt-ol run</code> is a drop-in for <code>dbt run</code> that also emits lineage events as it executes.",
+          code: "cd shop         # the dbt project from lesson 12.2\ndbt-ol run      # same models, now emitting OpenLineage events\n# then open http://localhost:3000 and select the 'shop' namespace",
+          lang: "bash"
+        }
+      ],
       observe: "A visual graph automatically shows which raw table feeds which staging model feeds which aggregate, built with zero manual documentation, purely from instrumenting the actual <code>dbt run</code>. Trace one specific number in your aggregate table back to its raw source using only the graph.",
-      stretch: "Change a column in your raw table\u2019s schema and use the lineage graph to identify every downstream model that would be affected before you make the change: impact analysis before a schema change, exercised directly."
+      stretch: "Change a column in your raw table's schema and use the lineage graph to identify every downstream model that would be affected before you make the change: impact analysis before a schema change, exercised directly."
     }
   },
   keyTakeaways: [

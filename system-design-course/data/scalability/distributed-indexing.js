@@ -104,11 +104,30 @@ window.COURSE_CONTENT["distributed-indexing"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Citus cluster from 10.1; or Elasticsearch from an earlier storage lab.",
-      setup: "Local and free: reuse either lab.",
-      simulate: "On the Citus cluster, query the distributed table by a non-partition column and check <code>EXPLAIN</code>: every worker gets hit (a local index, scattered). On Elasticsearch, index documents across 2+ shards and search by a field: the coordinating node fans the query out and merges results, a local index pattern too, just abstracted away.",
-      observe: "Both systems do the same underlying scatter-gather work for a non-partition-key query. The local index cost is real regardless of which product hides it more smoothly.",
-      stretch: "No stretch goal here: this lesson\u2019s value is recognizing the same underlying cost across two different products you have already built labs for."
+      goal: "On the Citus cluster prove that a partition-key read hits one shard while a non-partition-key read scatter-gathers across all of them, even after you add a local index.",
+      stack: "The Citus cluster and <code>orders</code> table from Partitioning (10.1), driven through <code>psql</code>. Local and free.",
+      steps: [
+        {
+          title: "Confirm the distributed orders table is still there",
+          body: "If you tore down the 10.1 lab, rebuild it first (start the cluster, register the workers, run <code>create_distributed_table</code>, and reseed). Then open a shell:",
+          code: "docker exec -it coord psql -U postgres -c \"SELECT count(*) FROM orders;\"",
+          lang: "bash"
+        },
+        {
+          title: "Contrast a partition-key read with a non-partition-key read",
+          body: "The first filters on the shard key and prunes to one shard; the second filters on a non-key column, so every shard must search its own local index.",
+          code: "EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 42;\nEXPLAIN ANALYZE SELECT * FROM orders WHERE amount > 490;",
+          lang: "sql"
+        },
+        {
+          title: "Add a local secondary index and re-run",
+          body: "Citus builds the index inside each shard (local), so it speeds each shard\u2019s scan but does not remove the fan-out.",
+          code: "CREATE INDEX ON orders (amount);\nEXPLAIN ANALYZE SELECT * FROM orders WHERE amount > 490;",
+          lang: "sql"
+        }
+      ],
+      observe: "The <code>customer_id</code> query runs as a single task on one worker; the <code>amount</code> query runs a task on every shard across both workers and merges (a local index, scattered). Adding the index makes each per-shard scan faster but the coordinator still fans out to all shards. The local index cost is real regardless of which product hides it.",
+      stretch: "Start single-node Elasticsearch (<code>docker run -p 9200:9200 -e discovery.type=single-node docker.elastic.co/elasticsearch/elasticsearch:8.13.0</code>), create an index with 2 shards, add documents, and search a field: the coordinating node fans the query to both shards and merges by score, the same scatter-gather pattern the local index forces here."
     }
   },
   keyTakeaways: [

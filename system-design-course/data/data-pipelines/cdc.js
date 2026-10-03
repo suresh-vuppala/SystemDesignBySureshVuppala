@@ -50,11 +50,39 @@ window.COURSE_CONTENT["cdc"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker Compose (Postgres + Kafka + Debezium Connect, a well-documented free stack). Debezium\u2019s own tutorial Compose file works directly.",
-      setup: "Local and free: Debezium\u2019s official quickstart Docker Compose (Postgres + Kafka Connect + Debezium connector).",
-      simulate: "Enable logical replication on your Postgres table, register a Debezium connector pointing at it, then insert/update/delete a few rows directly in Postgres via <code>psql</code>, never touching Kafka directly. Consume the Kafka topic Debezium creates automatically and inspect the change events.",
-      observe: "A fully formed Kafka event appears for every row change the instant it commits in Postgres, generated entirely from the WAL: no application code publishing anything, no second write path, no polling query. Compare that against a naive query-based approach (<code>WHERE updated_at &gt; ?</code> on a timer) and note the latency and DB-load difference.",
-      stretch: "Delete a row in Postgres and confirm Debezium emits a tombstone/delete event with the row\u2019s prior state still in the payload, useful for downstream systems that need to know what was deleted, not just that something was."
+      goal: "Prove log-based CDC by streaming every Postgres row change into Kafka through Debezium, with zero application code doing the publishing.",
+      stack: "Postgres (logical replication) + Kafka + Debezium Connect via Docker Compose, the official Debezium tutorial stack. Local and free.",
+      steps: [
+        {
+          title: "Save the Debezium tutorial Compose file",
+          body: "The <code>example-postgres</code> image already ships with <code>wal_level=logical</code> enabled and a seeded <code>inventory</code> schema. Save as <code>docker-compose.yml</code>.",
+          code: "version: \"3.7\"\nservices:\n  zookeeper:\n    image: quay.io/debezium/zookeeper:2.5\n    ports: [\"2181:2181\"]\n  kafka:\n    image: quay.io/debezium/kafka:2.5\n    ports: [\"9092:9092\"]\n    environment:\n      - ZOOKEEPER_CONNECT=zookeeper:2181\n  postgres:\n    image: quay.io/debezium/example-postgres:2.5\n    ports: [\"5432:5432\"]\n    environment:\n      - POSTGRES_USER=postgres\n      - POSTGRES_PASSWORD=postgres\n  connect:\n    image: quay.io/debezium/connect:2.5\n    ports: [\"8083:8083\"]\n    environment:\n      - BOOTSTRAP_SERVERS=kafka:9092\n      - GROUP_ID=1\n      - CONFIG_STORAGE_TOPIC=my_connect_configs\n      - OFFSET_STORAGE_TOPIC=my_connect_offsets\n      - STATUS_STORAGE_TOPIC=my_connect_statuses",
+          lang: "yaml"
+        },
+        {
+          title: "Start the stack",
+          code: "docker compose up -d\n# wait until Kafka Connect answers on 8083\ncurl -s localhost:8083/ | head",
+          lang: "bash"
+        },
+        {
+          title: "Register a Debezium connector on the WAL",
+          body: "No polling and no app code: the connector reads the write-ahead log via <code>pgoutput</code> and creates its own Kafka topics.",
+          code: "curl -i -X POST -H \"Accept:application/json\" -H \"Content-Type:application/json\" \\\n  localhost:8083/connectors/ -d '{\n  \"name\": \"inventory-connector\",\n  \"config\": {\n    \"connector.class\": \"io.debezium.connector.postgresql.PostgresConnector\",\n    \"database.hostname\": \"postgres\",\n    \"database.port\": \"5432\",\n    \"database.user\": \"postgres\",\n    \"database.password\": \"postgres\",\n    \"database.dbname\": \"postgres\",\n    \"topic.prefix\": \"dbserver1\",\n    \"table.include.list\": \"inventory.customers\",\n    \"plugin.name\": \"pgoutput\"\n  }\n}'",
+          lang: "bash"
+        },
+        {
+          title: "Change rows directly in Postgres, never touching Kafka",
+          code: "docker compose exec postgres psql -U postgres -d postgres -c \"UPDATE inventory.customers SET first_name='Sally-Updated' WHERE id=1001;\"\ndocker compose exec postgres psql -U postgres -d postgres -c \"INSERT INTO inventory.customers VALUES (1005,'Ada','Lovelace','ada@math.org');\"\ndocker compose exec postgres psql -U postgres -d postgres -c \"DELETE FROM inventory.customers WHERE id=1005;\"",
+          lang: "bash"
+        },
+        {
+          title: "Consume the change-event topic Debezium created",
+          code: "docker compose exec kafka /kafka/bin/kafka-console-consumer.sh \\\n  --bootstrap-server kafka:9092 \\\n  --topic dbserver1.inventory.customers \\\n  --from-beginning",
+          lang: "bash"
+        }
+      ],
+      observe: "A fully formed change event lands in Kafka the instant each row commits in Postgres, generated entirely from the WAL: no application code publishing anything, no second write path, no polling query. Compare that against a naive query-based approach (<code>WHERE updated_at &gt; ?</code> on a timer) and note the latency and DB-load difference.",
+      stretch: "Watch the DELETE emit a change event whose <code>before</code> field still holds the row's prior state, followed by a null-valued tombstone record, so downstream systems know exactly what was deleted, not just that something was."
     }
   },
   keyTakeaways: [

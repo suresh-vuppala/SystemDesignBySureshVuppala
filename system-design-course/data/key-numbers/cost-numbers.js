@@ -102,13 +102,6 @@ window.COURSE_CONTENT["cost-numbers"] = {
         { label: "Data platforms: 40-50% storage", body: "When you retain petabytes, storage and its replication dominate, which is where tiering to Glacier earns its keep." },
         { label: "Optimization levers stack", body: "Reserved Instances for the steady base, Spot for fault-tolerant batch, right-sizing everywhere. Being able to say \u201cthis costs $X/month more, and here is why it is worth it\u201d is senior-level judgment applied to money." }
       ]
-    },
-    handsOn: {
-      prerequisites: "None needed. AWS\u2019s public Pricing Calculator (calculator.aws) requires no account.",
-      setup: "Open calculator.aws in a browser. No signup required.",
-      simulate: "Price out the food-delivery app you estimated in 14.4: pick EC2 instance types for your server count, an RDS instance for storage, and CloudFront for any media, then read the monthly total. Then compare On-Demand pricing against the same setup with Reserved Instances applied.",
-      observe: "Find the single line item that dominates the bill and check it against the \u201cbandwidth &gt; compute &gt; storage\u201d rule. See whether your specific app matches that ordering or deviates (a chat app with little media may have compute dominate instead).",
-      stretch: "Reprice the batch-processing piece using Spot Instances instead of On-Demand and quantify the savings against the 60-90% range."
     }
   },
   keyTakeaways: [

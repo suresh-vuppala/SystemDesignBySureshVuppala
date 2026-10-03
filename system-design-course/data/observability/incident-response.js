@@ -57,10 +57,40 @@ window.COURSE_CONTENT["incident-response"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Everything built across 13.1 to 13.6 (logs, metrics, traces, dashboards, alerts) pointed at the same small multi-service app.",
-      setup: "Local and free: reuse your existing observability stack.",
-      simulate: "Run a self-directed Game Day: inject a real fault (kill a downstream dependency container, or add artificial latency with <code>tc netem</code>) without telling yourself exactly when, then walk the full Detect \u2192 Triage \u2192 Mitigate \u2192 Resolve sequence using only your dashboards, alerts, logs, and traces. No peeking at container logs directly as a shortcut. Time how long detection takes (did an alert fire?) and how long triage takes using traces to find the failing dependency.",
-      observe: "Whether your observability setup from the earlier lessons was actually sufficient to diagnose a real, injected failure without cheating. Any gap you find (a missing alert, a dashboard that lacks the right signal) is a direct, concrete lesson for what is still missing.",
+      goal: "Run a self-directed Game Day: inject a real fault into the running multi-service app and walk Detect \u2192 Triage \u2192 Mitigate \u2192 Resolve using only your dashboards, alerts, and traces.",
+      stack: "The full observability stack from 13.1 to 13.6 (Jaeger, Prometheus, Grafana, Alertmanager) on the chained services from 13.3. Local and free.",
+      steps: [
+        {
+          title: "Keep steady traffic flowing",
+          body: "Run this in its own terminal so the signals keep moving throughout the exercise.",
+          code: "hey -z 300s -c 20 http://localhost:3000/",
+          lang: "bash"
+        },
+        {
+          title: "Inject a fault without watching the clock",
+          body: "Pick one and try not to note the exact second. Option A is a hard failure; option B is a brownout (needs <code>tc</code> and NET_ADMIN in the container).",
+          code: "# option A: kill a downstream dependency\ndocker kill serviceB\n\n# option B: inject 400ms of latency instead\n# docker exec serviceB tc qdisc add dev eth0 root netem delay 400ms",
+          lang: "bash"
+        },
+        {
+          title: "Detect: did an alert actually fire?",
+          code: "curl -s http://localhost:9090/api/v1/alerts | jq \".data.alerts[] | {name: .labels.alertname, state: .state}\"",
+          lang: "bash"
+        },
+        {
+          title: "Triage with a trace, not the container logs",
+          body: "In Jaeger filter service <code>gateway</code> with tag <code>error=true</code> and read which downstream span failed or slowed. No peeking at <code>docker logs</code> as a shortcut.",
+          code: "# browse to http://localhost:16686 and open a failing gateway trace",
+          lang: "bash"
+        },
+        {
+          title: "Mitigate and verify recovery",
+          body: "Restore the dependency, then confirm latency returns to baseline.",
+          code: "docker start serviceB\n# if you used option B: docker exec serviceB tc qdisc del dev eth0 root netem\ncurl -s -o /dev/null -w \"%{http_code} %{time_total}s\\n\" http://localhost:3000/",
+          lang: "bash"
+        }
+      ],
+      observe: "Whether the setup from the earlier lessons was actually enough to detect and localize a real injected failure without cheating. Any gap you hit (a missing alert, a dashboard without the right signal, a trace that stops short) is a direct, concrete lesson for what is still missing.",
       stretch: "Write a real blameless postmortem for the incident you just ran, following the Summary / Timeline / Root Cause / Impact / Action Items structure. Practice the artifact, not just the response."
     }
   },

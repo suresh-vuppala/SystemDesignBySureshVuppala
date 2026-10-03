@@ -64,11 +64,34 @@ window.COURSE_CONTENT["realtime-comparison"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The WebSocket lab and the SSE lab from the two prior lessons, both still running.",
-      setup: "Local and free: reuse both prior labs side by side.",
-      simulate: "Open both labs in two browser tabs, then throttle your network to \u201cSlow 3G\u201d in DevTools for both. Measure time-to-first-update and behavior under the throttle for each.",
-      observe: "Which one degrades more gracefully under a bad connection, and which reconnects faster after you toggle DevTools' \u201cOffline\u201d checkbox on and off: turning the Overview's numeric latency/overhead table into something you watched happen, not just read.",
-      stretch: "None. This lesson's value is the direct comparison of labs you have already built."
+      goal: "Run WebSocket and SSE side by side against one page, then throttle the network to watch which degrades gracefully and which reconnects faster.",
+      stack: "Node.js + Express + <code>ws</code> in one server, observed in browser DevTools. Local and free.",
+      steps: [
+        {
+          title: "Set up the project",
+          code: "mkdir realtime-compare && cd realtime-compare\nnpm init -y && npm install express ws",
+          lang: "bash"
+        },
+        {
+          title: "Serve both transports and a page that times each",
+          body: "One <code>/events</code> SSE stream and one WebSocket, plus a page that logs time-to-first-update for both. Save as <code>server.js</code>.",
+          code: "const express = require('express');\nconst { WebSocketServer } = require('ws');\nconst app = express();\n\napp.get('/events', (req, res) => {\n  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });\n  const t = setInterval(() => res.write('data: ' + Date.now() + '\\n\\n'), 1000);\n  req.on('close', () => clearInterval(t));\n});\n\napp.get('/', (req, res) => res.send(`\n  <script>\n    const sse = new EventSource('/events');\n    let sseFirst = 0;\n    sse.onmessage = () => { if (!sseFirst) { sseFirst = performance.now(); console.log('SSE first update', sseFirst.toFixed(0), 'ms'); } };\n    sse.onerror = () => console.log('SSE error, will auto-reconnect');\n    const ws = new WebSocket('ws://' + location.host);\n    let wsFirst = 0;\n    ws.onmessage = () => { if (!wsFirst) { wsFirst = performance.now(); console.log('WS first update', wsFirst.toFixed(0), 'ms'); } };\n    ws.onclose = () => console.log('WS closed (no auto-reconnect)');\n  </script>`));\n\nconst server = app.listen(3000, () => console.log('http://localhost:3000'));\nconst wss = new WebSocketServer({ server });\nsetInterval(() => wss.clients.forEach(c => c.send(String(Date.now()))), 1000);",
+          lang: "javascript"
+        },
+        {
+          title: "Run it and open the page",
+          code: "node server.js\n# open http://localhost:3000 and open the DevTools console",
+          lang: "bash"
+        },
+        {
+          title: "Throttle and go offline in DevTools",
+          body: "In the Network tab, switch to <strong>Slow 3G</strong>, then toggle the <strong>Offline</strong> checkbox on and back off. Watch the console logs.",
+          code: "# DevTools \u2192 Network \u2192 throttling: Slow 3G\n# DevTools \u2192 Network \u2192 Offline: on, then off",
+          lang: "bash"
+        }
+      ],
+      observe: "SSE logs <code>SSE error, will auto-reconnect</code> and resumes on its own after you toggle Offline back off, while the WebSocket logs <code>WS closed</code> and stays dead with no reconnect code. The first-update times turn the Overview's latency table (WebSocket \u2248 1-50ms, SSE \u2248 100-200ms) into something you watched happen.",
+      stretch: "Add exponential-backoff reconnect to the WebSocket client so it recovers like SSE does, then compare how much code each resilience story costs you."
     }
   },
   keyTakeaways: [

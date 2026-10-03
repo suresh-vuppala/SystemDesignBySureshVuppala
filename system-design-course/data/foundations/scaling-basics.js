@@ -96,11 +96,39 @@ window.COURSE_CONTENT["scaling-basics"] = {
       ]
     },
     handsOn: {
-      prerequisites: "Docker installed.",
-      setup: "Local/free: run 3 copies of a simple HTTP server in Docker (docker run -d -p 8081:80 nginx, -p 8082:80, -p 8083:80). Cloud free-tier: an AWS EC2 t2.micro / GCP e2-micro free-tier instance running the same app, resized up once (t2.micro \u2192 t2.medium) to feel the vertical ceiling directly.",
-      simulate: "Load-test a single instance with k6 or hey at increasing concurrency (100 \u2192 500 \u2192 2,000 concurrent) until latency degrades or it errors out. That's the vertical ceiling. Then put the 3 Docker instances behind a simple round-robin proxy (NGINX or HAProxy) and re-run the same 2,000 concurrent test.",
-      observe: "The single instance\u2019s p99 climbing sharply near its ceiling, versus the 3-instance setup handling the same load with flatter p99. The \u201croughly linear throughput growth\u201d claim, observed directly.",
-      stretch: "Kill one of the 3 backend containers mid-test and watch the load balancer keep serving from the other two. The survives-node-failure property vertical scaling structurally can\u2019t offer."
+      goal: "Find one server's vertical ceiling under load, then put three behind a round-robin load balancer and watch throughput scale roughly linearly.",
+      stack: "Docker (three <code>nginx</code> backends + one <code>nginx</code> load balancer) load-tested with <code>hey</code>. Local and free.",
+      steps: [
+        {
+          title: "Start one backend and push it to its ceiling",
+          body: "Ramp concurrency until p99 climbs and errors appear. That inflection point is the vertical ceiling of a single instance.",
+          code: "docker run -d --name web1 -p 8081:80 nginx\nhey -z 30s -c 2000 http://localhost:8081/",
+          lang: "bash"
+        },
+        {
+          title: "Bring up three backends on a shared network",
+          code: "docker rm -f web1\ndocker network create scaling-demo\ndocker run -d --name web1 --network scaling-demo nginx\ndocker run -d --name web2 --network scaling-demo nginx\ndocker run -d --name web3 --network scaling-demo nginx",
+          lang: "bash"
+        },
+        {
+          title: "Write a round-robin load balancer config",
+          body: "One <code>upstream</code> block naming the three backends; NGINX round-robins across them by default. Save it as <code>lb.conf</code>.",
+          code: "cat > lb.conf <<'EOF'\nevents {}\nhttp {\n  upstream app {\n    server web1:80;\n    server web2:80;\n    server web3:80;\n  }\n  server {\n    listen 80;\n    location / { proxy_pass http://app; }\n  }\n}\nEOF",
+          lang: "bash"
+        },
+        {
+          title: "Run the load balancer in front of the three backends",
+          code: "docker run -d --name lb --network scaling-demo -p 8080:80 \\\n  -v \"$PWD/lb.conf:/etc/nginx/nginx.conf:ro\" nginx",
+          lang: "bash"
+        },
+        {
+          title: "Re-run the identical test through the load balancer",
+          code: "hey -z 30s -c 2000 http://localhost:8080/",
+          lang: "bash"
+        }
+      ],
+      observe: "The single instance's p99 climbs sharply near its ceiling, while the three-instance setup absorbs the same 2,000 concurrent load with a flatter p99 and higher throughput. That is the \u201croughly linear throughput growth\u201d claim, observed directly.",
+      stretch: "Kill one backend mid-test with <code>docker kill web2</code> and watch the load balancer keep serving from the other two: the survives-node-failure property that vertical scaling structurally cannot offer."
     }
   },
   keyTakeaways: [

@@ -54,11 +54,78 @@ window.COURSE_CONTENT["cqrs"] = {
       ]
     },
     handsOn: {
-      prerequisites: "The Event Sourcing lab from 8.6; Docker (add Elasticsearch or Redis as the read side).",
-      setup: "Local and free: Postgres (write side, from 8.6) plus Redis or Elasticsearch (read side).",
-      simulate: "Keep writing `AccountOpened`/`MoneyDeposited` events to Postgres as commands arrive, and after each write publish a small projector update that recomputes and stores the current balance in Redis (`SET balance:acc1 <value>`). Build a read endpoint that reads only from Redis, never Postgres.",
-      observe: "The read path stays fast and simple (`GET balance:acc1`, no replay logic) while all the write-side complexity (validation, event emission) stays isolated in the command path. Then introduce a deliberate delay in the projector and watch a read immediately after a write briefly return a stale value: the eventually-consistent read model, caught live.",
-      stretch: "Add a second, differently-shaped read model (for example a \u201ctransaction history\u201d list in Elasticsearch) fed by the exact same event stream, and confirm both read models stay independently correct from one shared source of truth."
+      goal: "Split the write model (a Postgres event log) from a read model (a Redis balance) with an async projector, then catch the read side returning a stale value right after a write.",
+      stack: "Postgres + Redis in Docker + Node.js (<code>pg</code>, <code>ioredis</code>). Reuses the event log from 8.6. Local and free.",
+      steps: [
+        {
+          title: "Start Postgres and Redis",
+          code: "docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres\ndocker run -d --name redis -p 6379:6379 redis",
+          lang: "bash"
+        },
+        {
+          title: "Ensure the events table exists",
+          code: "docker exec -i pg psql -U postgres -c \"CREATE TABLE IF NOT EXISTS events(id serial primary key, aggregate_id text, event_type text, payload jsonb, version int, ts timestamptz default now());\"",
+          lang: "bash"
+        },
+        {
+          title: "Install the clients",
+          code: "npm init -y && npm install pg ioredis",
+          lang: "bash"
+        },
+        {
+          title: "Write command, projector, and query paths",
+          body: "Save as <code>cqrs.js</code>. The command appends an event; the projector recomputes the balance into Redis asynchronously; the query reads only Redis. A <code>LAG</code> knob slows the projector on purpose.",
+          code: `const { Pool } = require('pg');
+const Redis = require('ioredis');
+const pg = new Pool({ host: 'localhost', user: 'postgres', password: 'pw' });
+const redis = new Redis();
+const ACC = 'acc-1';
+let LAG = 0;
+
+// COMMAND SIDE: append event, then project asynchronously
+async function deposit(amount) {
+  const { rows } = await pg.query(
+    'SELECT COALESCE(MAX(version),0)+1 v FROM events WHERE aggregate_id=$1', [ACC]);
+  await pg.query(
+    'INSERT INTO events(aggregate_id,event_type,payload,version) VALUES($1,$2,$3,$4)',
+    [ACC, 'MoneyDeposited', { amount }, rows[0].v]);
+  project();
+}
+
+async function project() {
+  if (LAG) await new Promise(r => setTimeout(r, LAG));
+  const { rows } = await pg.query(
+    "SELECT COALESCE(SUM((payload->>'amount')::int),0) bal FROM events WHERE aggregate_id=$1 AND event_type='MoneyDeposited'",
+    [ACC]);
+  await redis.set('balance:' + ACC, rows[0].bal);
+}
+
+// QUERY SIDE: read only from Redis, never Postgres
+const getBalance = () => redis.get('balance:' + ACC);
+
+(async () => {
+  await deposit(100);
+  await new Promise(r => setTimeout(r, 200));
+  console.log('read model balance:', await getBalance());
+
+  LAG = 1000;
+  await deposit(50);
+  console.log('immediately after write:', await getBalance());
+  await new Promise(r => setTimeout(r, 1200));
+  console.log('after projection catches up:', await getBalance());
+  await pg.end();
+  redis.disconnect();
+})();`,
+          lang: "javascript"
+        },
+        {
+          title: "Run it",
+          code: "node cqrs.js",
+          lang: "bash"
+        }
+      ],
+      observe: "The read path is a single <code>GET balance:acc-1</code> with no replay logic, while validation and event emission stay isolated on the command side. With <code>LAG</code> set, the read immediately after the second deposit still prints 100 (stale), then catches up to 150 once the projector runs: the eventually-consistent read model, caught live.",
+      stretch: "Add a second, differently-shaped read model (a transaction-history list in a Redis LIST or in Elasticsearch) fed by the same events, and confirm both read models stay independently correct from one shared source of truth."
     }
   },
   keyTakeaways: [

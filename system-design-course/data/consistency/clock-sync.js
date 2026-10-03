@@ -53,11 +53,30 @@ window.COURSE_CONTENT["clock-sync"] = {
       ]
     },
     handsOn: {
-      prerequisites: "2 machines or 2 Docker containers on different hosts (a VM and your laptop work fine); `ntpdate`/`chronyc` for inspection.",
-      setup: "Local and free: 2 Docker containers with independent clocks, or 2 free-tier cloud VMs in different regions.",
-      simulate: "On both machines, log `Date.now()` (wall-clock, ms) every second for a minute alongside `process.hrtime()` (monotonic) measuring elapsed time for the same interval. Manually adjust one machine's clock backward by a few seconds mid-run (`date -s \"-5 seconds\"`, needs privileges, reversible) while both loggers run.",
-      observe: "The wall-clock log jumps backward at the moment you adjusted it, while the monotonic elapsed-time measurement never moves backward: the exact monotonic-vs-wall-clock distinction, forced to happen instead of described.",
-      stretch: "Write two events with wall-clock timestamps from your two machines only 2ms apart and try to determine which really happened first, then recognize you cannot be confident: typical LAN NTP accuracy (1-10ms) is larger than the gap you are trying to measure."
+      goal: "Force the monotonic-vs-wall-clock distinction to happen by moving the system clock backward while a Node logger records both clocks side by side.",
+      stack: "Node.js in a throwaway Docker container granted permission to set its own clock. Local and free.",
+      steps: [
+        {
+          title: "Write a logger that prints both clocks",
+          body: "Save as <code>clock-log.js</code>. The wall clock can jump; the monotonic elapsed time only ever moves forward.",
+          code: "const start = process.hrtime.bigint();\nsetInterval(() => {\n  const wall = new Date().toISOString();                          // wall clock: can jump\n  const monoMs = Number(process.hrtime.bigint() - start) / 1e6;   // monotonic: forward only\n  console.log('wall=' + wall + '  mono_elapsed_ms=' + monoMs.toFixed(0));\n}, 1000);",
+          lang: "javascript"
+        },
+        {
+          title: "Run it in a container allowed to change its clock",
+          body: "The <code>SYS_TIME</code> capability lets this container set its own time without touching your host clock.",
+          code: "docker run --rm -it --name clocklab --cap-add SYS_TIME -v \"$PWD\":/app -w /app node:20 bash\n# then, inside the container:\nnode clock-log.js",
+          lang: "bash"
+        },
+        {
+          title: "Jump the clock backward mid-run",
+          body: "From a second terminal, move the container's wall clock back 5 seconds while the logger keeps running.",
+          code: "docker exec clocklab date -s \"5 seconds ago\"",
+          lang: "bash"
+        }
+      ],
+      observe: "At the instant you move the clock, the <code>wall=</code> value jumps backward by about 5 seconds, while <code>mono_elapsed_ms</code> keeps climbing smoothly and never decreases. That is exactly why durations, timeouts, and lease expiry use the monotonic clock and wall-clock time is reserved for human-readable timestamps.",
+      stretch: "Stamp two events with <code>Date.now()</code> from two separate containers only 2ms apart and try to decide which happened first. You cannot be confident: typical LAN NTP error (1-10ms) is larger than the 2ms gap you are trying to measure."
     }
   },
   keyTakeaways: [

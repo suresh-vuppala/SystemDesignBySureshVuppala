@@ -78,13 +78,6 @@ window.COURSE_CONTENT["storage-numbers"] = {
         { label: "Replication multiplies everything", body: "A 3\u00d7 replication factor triples your raw storage bill, and indexes plus metadata add another ~30% overhead on top. Never quote the naked data size." },
         { label: "Growth is the number that surprises people", body: "A dataset at 15% monthly growth doubles roughly every 5 months by the Rule of 72, so \u201cfits today\u201d and \u201cfits next year\u201d are very different questions." }
       ]
-    },
-    handsOn: {
-      prerequisites: "None. This is a pure estimation exercise.",
-      setup: "No setup required, just paper or a scratch buffer.",
-      simulate: "Pick a real product (say a note-taking app with 10M users). Estimate its total stored data using only the anchors above: average note size \u00d7 notes per user \u00d7 user count. Then apply the Rule of 72 to estimate how long until that storage doubles at 15% monthly growth (72 \u00f7 15 \u2248 4.8 months).",
-      observe: "Check whether your estimate, built entirely from memorized anchors and one mental-math formula, lands in a sane order of magnitude. That gut-check is the actual interview skill this lesson trains.",
-      stretch: "Redo the estimate assuming average note size is 10\u00d7 larger (notes now embed images) and recompute both total storage and the doubling timeline. Practice how one changed assumption cascades through the whole estimate."
     }
   },
   keyTakeaways: [
