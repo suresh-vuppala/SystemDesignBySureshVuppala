@@ -31,6 +31,15 @@
 
 <div class="course-app">
 
+  <!-- Desktop collapse handles: minimize the left nav / right rail to widen
+       the reading column. State persists across lessons (localStorage). -->
+  <button class="cc-collapse cc-collapse-left" id="courseSidebarCollapse" aria-label="Hide course navigation" aria-expanded="true" title="Hide course navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <button class="cc-collapse cc-collapse-right" id="courseRailCollapse" aria-label="Hide lesson details" aria-expanded="true" title="Hide lesson details">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
   <!-- Left sidebar: full course navigation, all 15 modules -->
   <nav class="course-sidebar" id="courseSidebar" aria-label="Course navigation"></nav>
 
@@ -39,7 +48,6 @@
     <header class="cm-header">
       <div class="cm-breadcrumb" id="cmBreadcrumb"></div>
       <div class="cm-title-row">
-        <div class="cm-icon">SD</div>
         <div class="cm-title-block">
           <h1 id="cmTitle">Loading...</h1>
           <div class="cm-badges">

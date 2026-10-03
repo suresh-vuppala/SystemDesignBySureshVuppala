@@ -514,6 +514,102 @@
     }
   }
 
+  /* -- Sticky tab bar offset --
+     The title header and the tab bar are both sticky; the tabs need to pin
+     exactly below the header. Since the header's height is dynamic (the
+     lesson title can wrap to two lines, and it changes with viewport
+     width), we measure it and publish it as the --cm-header-h custom
+     property that the tabs' `top` reads in CSS. A ResizeObserver keeps it
+     correct through title changes (hash navigation) and reflows; a resize
+     listener covers browsers without ResizeObserver. */
+  function initStickyTabs(){
+    var header = document.querySelector('.cm-header');
+    var tabsEl = document.getElementById('cmTabs');
+    var main = document.querySelector('.course-main');
+    if(!header || !main) return;
+    function apply(){
+      var h = header.offsetHeight;
+      var t = tabsEl ? tabsEl.offsetHeight : 0;
+      // --cm-header-h: where the tab bar pins (just below the header).
+      // --cm-sticky-h: header + tabs combined, used to give the body a
+      // min-height so there's always room to scroll the tabs to the top,
+      // even for short tabs (otherwise the scroll clamps and switching to a
+      // short tab wouldn't bring the tabs up).
+      main.style.setProperty('--cm-header-h', h + 'px');
+      main.style.setProperty('--cm-sticky-h', (h + t) + 'px');
+    }
+    apply();
+    if(typeof ResizeObserver !== 'undefined'){
+      var ro = new ResizeObserver(apply);
+      ro.observe(header);
+      if(tabsEl) ro.observe(tabsEl);
+    }
+    window.addEventListener('resize', apply);
+  }
+
+  /* -- Desktop collapse handles (left nav + right rail) --
+     Lets a reader minimize either side panel to widen the center reading
+     column on wide screens. The choice is saved in localStorage and
+     restored on every page so it persists as you move between lessons
+     (each lesson is its own static page load). The CSS that actually hides
+     a column is scoped to wide breakpoints; at narrow widths the panels
+     are drawers and these handles are hidden, so toggling is a harmless
+     no-op there. */
+  function initCollapseToggles(){
+    var app = document.querySelector('.course-app');
+    if(!app) return;
+
+    var LS_SIDEBAR = 'sdc-sidebar-collapsed';
+    var LS_RAIL = 'sdc-rail-collapsed';
+
+    function readFlag(key){
+      try{ return localStorage.getItem(key) === '1'; }catch(e){ return false; }
+    }
+    function writeFlag(key, val){
+      try{ localStorage.setItem(key, val ? '1' : '0'); }catch(e){}
+    }
+
+    var sideBtn = document.getElementById('courseSidebarCollapse');
+    var railBtn = document.getElementById('courseRailCollapse');
+
+    function syncBtn(btn, collapsed, showLabel, hideLabel){
+      if(!btn) return;
+      var label = collapsed ? showLabel : hideLabel;
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      btn.setAttribute('title', label);
+      btn.setAttribute('aria-label', label);
+    }
+
+    // Restore saved state up front (before .cc-anim is added) so a kept-
+    // collapsed panel opens already closed, with no animation flash.
+    var sidebarCollapsed = readFlag(LS_SIDEBAR);
+    var railCollapsed = readFlag(LS_RAIL);
+    app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+    app.classList.toggle('rail-collapsed', railCollapsed);
+    syncBtn(sideBtn, sidebarCollapsed, 'Show course navigation', 'Hide course navigation');
+    syncBtn(railBtn, railCollapsed, 'Show lesson details', 'Hide lesson details');
+
+    // Enable slide transitions only after the restored state has painted.
+    requestAnimationFrame(function(){ app.classList.add('cc-anim'); });
+
+    if(sideBtn){
+      sideBtn.addEventListener('click', function(){
+        sidebarCollapsed = !app.classList.contains('sidebar-collapsed');
+        app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+        writeFlag(LS_SIDEBAR, sidebarCollapsed);
+        syncBtn(sideBtn, sidebarCollapsed, 'Show course navigation', 'Hide course navigation');
+      });
+    }
+    if(railBtn){
+      railBtn.addEventListener('click', function(){
+        railCollapsed = !app.classList.contains('rail-collapsed');
+        app.classList.toggle('rail-collapsed', railCollapsed);
+        writeFlag(LS_RAIL, railCollapsed);
+        syncBtn(railBtn, railCollapsed, 'Show lesson details', 'Hide lesson details');
+      });
+    }
+  }
+
   /* -- Breadcrumb -- */
   function renderBreadcrumb(mod, lesson){
     var el = document.getElementById("cmBreadcrumb");
@@ -584,6 +680,22 @@
     });
   }
 
+  /* When switching tabs, bring the (sticky) tab bar to the top so the new
+     tab's content starts right at the tabs, with the breadcrumb/title/
+     connects area scrolled out of view. tabsEl.offsetTop is its natural
+     layout offset inside the scroll container (.course-main is positioned),
+     unaffected by its sticky shift; subtracting the header height lands the
+     scroll exactly where the header + tabs pin together. */
+  function scrollTabsIntoView(){
+    var main = document.querySelector('.course-main');
+    var tabsEl = document.getElementById('cmTabs');
+    var header = document.querySelector('.cm-header');
+    if(!main || !tabsEl) return;
+    var headerH = header ? header.offsetHeight : 0;
+    var target = Math.max(0, tabsEl.offsetTop - headerH);
+    main.scrollTo({ top: target, behavior: 'smooth' });
+  }
+
   function renderTabs(lessonData){
     var tabsEl = document.getElementById("cmTabs");
     if(!tabsEl) return;
@@ -598,6 +710,7 @@
         tabsEl.querySelectorAll('.cm-tab').forEach(function(b){ b.classList.remove('cm-tab-active'); });
         btn.classList.add('cm-tab-active');
         renderTabBody(lessonData, btn.getAttribute('data-tab'));
+        scrollTabsIntoView();
       });
     });
     renderTabBody(lessonData, tabs[0] ? tabs[0].key : 'overview');
@@ -1239,6 +1352,7 @@
 
   function boot(){
     initMobileToggle();
+    initCollapseToggles();
     // Static lesson pages set window.CURRENT_LESSON_SLUG in an inline
     // script before course.js loads, so the lesson to render is known
     // upfront with no routing needed. The old hash-router
@@ -1246,6 +1360,7 @@
     // bookmarked "#/slug" links.
     var slug = window.CURRENT_LESSON_SLUG || currentSlugFromHash();
     renderLesson(slug);
+    initStickyTabs();
     if(!window.CURRENT_LESSON_SLUG){
       window.addEventListener('hashchange', function(){
         renderLesson(currentSlugFromHash());

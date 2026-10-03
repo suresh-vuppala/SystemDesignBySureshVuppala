@@ -62,6 +62,30 @@
 
 **In software:** the order service does the one critical thing — record the order, charge the card — returns success instantly with an order number, and everything else (email, SMS, warehouse, invoice, analytics) runs in the background.
 
+> 🗣️ "Here's the same click drawn two ways. In the synchronous version the user is tied to every single step. In the asynchronous version we do the one thing that must be true before we answer — money taken, order written — then we let go."
+
+```text
+SYNCHRONOUS  — user waits for the whole chain
+──────────────────────────────────────────────────────────
+ click ─► charge ─► inventory ─► email ─► SMS ─► warehouse ─► invoice ─► analytics ─► response
+   └──────────────────────  user is blocked this whole time  ──────────────────────┘
+                            (one slow link = everyone waits)
+
+
+ASYNCHRONOUS — user waits only for what matters
+──────────────────────────────────────────────────────────
+ click ─► charge + record order ─► response (order #1234)   ◄── user is done here
+                     │
+                     └─► [ queue ] ─┬─► email
+                                    ├─► SMS
+                                    ├─► warehouse
+                                    ├─► invoice
+                                    └─► analytics
+                     (these run in the background, retried on their own)
+```
+
+> 🗣️ "The response doesn't wait for the fan-out. The moment the order is safely recorded, the user gets their number and walks away. The five background jobs can take their time, fail, and retry without the customer ever feeling it."
+
 > Second example, same shape: a YouTube upload returns "upload successful" the moment the raw file lands. Transcoding, copyright checks, thumbnails, recommendations all trail behind it.
 
 ### ④ The Breakdown — the async options, and why most lose
@@ -113,6 +137,28 @@ This is exactly why queues have delivery tracking and retry behavior.
 
 So the queue isn’t just storage—it’s also responsible for “what happens next” if processing doesn’t complete.
 
+```text
+THE POST-BOX HANDOFF
+──────────────────────────────────────────────────────────
+  API                QUEUE                     WORKER
+ (producer)        (post box)                 (consumer)
+    │                  │                          │
+    │  put "send       │                          │
+    │  email #123" ───►│  [ msg #123 ]            │
+    │                  │                          │
+    │                  │◄──── pull ───────────────│  (1) receive
+    │                  │  msg now INVISIBLE        │      → do the work
+    │                  │  to other workers         │
+    │                  │                          │
+    │                  │◄──── ACK (done) ─────────│  (2) finished OK
+    │                  │  msg DELETED              │
+    │                  │                          │
+    │                  │   ✗ no ACK (crash)?      │
+    │                  │   msg reappears ─────────┘  → retried by someone
+```
+
+> 🗣️ "The message isn't gone when a worker grabs it — it's just hidden. It only truly disappears when the worker comes back and says 'done.' No 'done' means the task comes back for another try. That one rule is the whole safety net."
+
 ---
 
 ### ④ The Breakdown
@@ -158,6 +204,29 @@ Concrete email pattern:
   - If `email_send_log` already has a record for `(order_id=123, template=confirmation)`, skip sending.
   - Otherwise, send email and then write `email_send_log` with a unique key.
 
+```text
+IDEMPOTENT HANDLER — "have I already done this?"
+──────────────────────────────────────────────────────────
+  receive msg (order_id=123, template=confirmation)
+            │
+            ▼
+   is (123, confirmation) already in email_send_log?
+            │
+      ┌─────┴─────┐
+    YES          NO
+      │            │
+      ▼            ▼
+    skip      send email
+   (ACK)          │
+                  ▼
+          write email_send_log(123, confirmation)
+                  │
+                  ▼
+                 ACK
+```
+
+> 🗣️ "Before the worker sends anything, it asks one question: have I already done this exact job? If yes, it quietly skips. If no, it sends and writes down that it did. So a redelivery just hits the 'already done' branch — the customer never gets a second email."
+
 Now even if the queue redelivers, you don’t spam the customer.
 
 **Ordering (only when configured)**
@@ -175,6 +244,21 @@ Here’s the time conflict:
 - Worker A takes 45s to finish
 - At T0+30s the message becomes visible again
 - Worker B can pull the same message while A is still working
+
+```text
+VISIBILITY TIMEOUT EXPIRES MID-PROCESSING
+──────────────────────────────────────────────────────────
+ time ─────────────────────────────────────────────────►
+  T0            T0+30s                 T0+45s
+  │               │                      │
+  Worker A pulls  │                      Worker A finishes + ACK
+  (msg hidden)    │                      (too late — already re-handed out)
+  ├───────────────┤──────────────────────┤
+  │   hidden 30s  │  msg VISIBLE again    │
+  │               │                       │
+  │               Worker B pulls same msg │
+  │               └──► both A and B now processing #123  ⚠️ duplicate
+```
 
 So now you can get parallel processing of the same logical task.
 
@@ -236,6 +320,61 @@ Streaming solves this by treating events not just as work to be consumed, but as
 
 That’s the shift we’re going to explore next
 
+
+---
+
+
+
+## 3. Queue vs Stream — the Three Real Differences
+
+### ① The Problem — the same event, needed by everyone
+
+> 🗣️ "Go back to that order. The queue sent one email, perfectly. But now three more teams show up. Analytics wants every order. The fraud team wants every order. The recommendation team wants every order. And next week, a brand-new team is going to want *last month's* orders to train a model."
+>
+> ✋ **Pause.** "A queue is really good at 'hand this one job to one worker.' It is not built for 'let five different teams each read everything, at their own pace, including the stuff from before they existed.'"
+
+### ② The Question
+
+> ❓ **Ask the room:** "In a queue, once the worker ACKs the message, where did it go?"
+>
+> ✋ **Pause.** It's gone. Deleted. So if a new team joins tomorrow and asks "can I see yesterday's orders?" — the queue has no answer. The message did its job and vanished. That deletion is a feature for work, and a wall for history.
+
+### ③ The Fix — stop deleting; keep a log
+
+> 🗣️ "A stream flips one assumption: don't delete the event when someone reads it. Keep it in an append-only log, in order, for days or weeks. Readers don't *consume and destroy* — they each hold their own bookmark and read forward. Five teams, five bookmarks, one copy of the data."
+
+```text
+QUEUE                              STREAM (log)
+──────────────────────            ──────────────────────────────────
+ [m1][m2][m3]                       offset: 0   1   2   3   4   5
+   │                                        [e0][e1][e2][e3][e4][e5]
+   ▼  worker pulls m1                         ▲        ▲           ▲
+   m1 DELETED after ACK                       │        │           │
+   (one consumer, gone forever)         analytics  fraud      recommendations
+                                        (@2)       (@4)       (@5)
+                                        each reader has its OWN bookmark
+                                        new team? start at offset 0 and replay
+```
+
+### ④ The Breakdown — the three real differences
+
+| | **Queue** | **Stream (log)** |
+|---|---|---|
+| **On read** | message is removed after ACK | event stays; reader just advances its offset |
+| **Retention** | gone once processed | kept for a time/size window (hours → weeks) |
+| **Consumers** | work is split across workers (each msg to one) | every consumer group reads *everything* independently |
+
+> 🗣️ "Three differences, and they're all the same idea said three ways. Delivery: a queue divides the work; a stream broadcasts the history. Retention: a queue forgets; a stream remembers. Consumers: a queue has one logical reader per message; a stream lets any number of readers each see all of it."
+
+### ⑤ The Catch
+
+> ⚠️ "A stream isn't a free upgrade. You now store far more data, you manage retention windows, and *you* track who read what. A queue hands you back-pressure and 'this is done' for free; a stream makes you think about offsets, lag, and how long to keep history. If you genuinely have one consumer doing one job, a queue is the simpler, cheaper answer."
+
+### ⑥ The Bridge
+
+> 🔁 "So when the requirement is 'many independent readers, replay the past, keep the order' — we need the log. The most battle-tested version of that log, running at planet scale, is Apache Kafka. That's what we build next."
+
+🎯 **Key point:** a queue is a *to-do list* you cross items off; a stream is a *diary* everyone can keep re-reading.
 
 ---
 
@@ -1794,6 +1933,26 @@ Kafka is designed for:
 
 A publisher sends one message to a **topic**; the service **pushes an independent copy to every subscriber's endpoint** — SQS, Lambda, an HTTPS URL, email, SMS. One publish, N deliveries, and *the system* does the delivering. By name: **AWS SNS**, **Google Pub/Sub**.
 
+```text
+PUSH FAN-OUT — one publish, the service delivers N copies
+──────────────────────────────────────────────────────────
+                              ┌──► email inbox      (SMTP)
+                              │
+                              ├──► SMS gateway       (phone)
+   trip.completed             │
+   ──────────────►  [ TOPIC ] ─┼──► Lambda           (fraud check)
+     (publisher)       (SNS)   │
+                              ├──► HTTPS endpoint    (partner webhook)
+                              │
+                              └──► SQS queue         (your own worker)
+
+   publisher knows NONE of these targets.
+   subscribers can be added/removed without touching the publisher.
+   the SERVICE pushes — none of these run a Kafka consumer.
+```
+
+> 🗣️ "One publish goes in. The service makes a copy for every subscriber and reaches out to each one — the email, the SMS, the Lambda, the stranger's webhook. The publisher never knows who's listening, and none of those targets had to run consumer code. That's the thing Kafka structurally can't do."
+
 ### 10.1 Why Pub/Sub exists — the three things it does that Kafka structurally doesn't
 
 1. **Push, not pull.** Pub/Sub *delivers* to you; Kafka makes you *come and fetch*. For "wake up this endpoint when X happens," push is the whole point — no always-on consumer, no offset to babysit.
@@ -1870,6 +2029,32 @@ A publisher sends one message to a **topic**; the service **pushes an independen
 
 After **N** failed attempts, the message is moved out of the main flow into a **Dead Letter Queue** — a holding area for messages that couldn't be processed. Main queue keeps flowing; nothing is lost; failures become *visible*.
 
+```text
+WITHOUT A DLQ — one poison message jams the line
+──────────────────────────────────────────────────────────
+  [ good ][ good ][ ☠ poison ][ good ][ good ]  ◄── all blocked behind ☠
+                      │
+                      └─ retry → fail → retry → fail → forever
+                         (the whole partition stalls)
+
+
+WITH A DLQ — quarantine after N tries, keep flowing
+──────────────────────────────────────────────────────────
+  [ good ][ good ][ ☠ poison ][ good ][ good ]
+                      │
+             tried N times, still failing?
+                      │
+                      ▼
+                 ┌──────────┐        meanwhile the good messages
+                 │   DLQ    │        keep processing ──────────►
+                 │  (☠ held │
+                 │  for a   │        alarm fires on DLQ depth > 0
+                 │  human)  │        → peek → fix → redrive
+                 └──────────┘
+```
+
+> 🗣️ "The bad message steps out of line into the DLQ, and the good messages behind it move again. Nothing's deleted — the poison one is sitting in quarantine with an alarm on it, waiting for a human to look, fix the cause, and send it back through."
+
 ### 10.1 Why messages die — three categories (the fix differs per category)
 
 | Category | Examples | Right response |
@@ -1930,6 +2115,21 @@ After **N** failed attempts, the message is moved out of the main flow into a **
 
 Store **facts (events)** as the source of truth. **Never mutate — only append.** Derive current state by **replaying** the event log. The state is a *projection* of the events, not the other way around.
 
+```text
+TRADITIONAL TABLE                 EVENT SOURCING
+──────────────────────            ──────────────────────────────────
+ balance = 5000                    append-only log of facts:
+   ▲                                 [ +3000 ][ -500 ][ +2500 ]
+   │ UPDATE overwrites                   │
+   │ (previous value lost)               │  replay from left to right
+                                         ▼
+ "what was it on Mar 3?"           0 → 3000 → 2500 → 5000  = current balance
+   ✗ history gone                  "what was it on Mar 3?" ✓ replay up to Mar 3
+                                   the events ARE the truth; balance is derived
+```
+
+> 🗣️ "Instead of storing the answer, we store everything that happened and add it up. The balance isn't a thing we keep — it's a thing we replay. And because we never threw a fact away, we can replay to *any* point in time and know exactly what was true, and why."
+
 ### 11.1 The vocabulary (say these precisely)
 
 | Term | Meaning |
@@ -1974,6 +2174,28 @@ Store **facts (events)** as the source of truth. **Never mutate — only append.
 
 > Commands → Aggregate → **events persisted** → Projectors subscribe → **read models updated async.** The event store **is** the write model; projections **are** the read models. Rebuild any projection by replaying from the beginning.
 
+```text
+CQRS — writes and reads take separate paths
+──────────────────────────────────────────────────────────
+  WRITE SIDE (command)                         READ SIDE (query)
+
+  command                                      query
+  "deposit 2500"                               "orders over 1000 this month"
+     │                                             ▲
+     ▼                                             │
+  validate ─► append event ─► [ EVENT STORE ]      │
+                                   │                │
+                                   │ projectors     │  fast, denormalized
+                                   │ subscribe      │  views / caches / search
+                                   ▼                │
+                             build/update ─► [ READ MODEL ]──┘
+                                             (async — lags slightly)
+
+  one source of truth (events) → many read shapes, each tuned for its queries
+```
+
+> 🗣️ "The write side has one job: validate the command and append the fact. The read side is a totally separate world — pre-shaped views built by replaying those facts. They scale on their own, they can even use different databases, and the only link between them is the event log flowing left to right. The catch is the read side lags a beat behind, so it's eventually consistent."
+
 - **Consistency strategies:** pull-based (query checks projection position) · push-based (projector emits "ready") · hybrid (serve stale + "updating" badge) · inline (update synchronously — sacrifices scale for consistency).
 
 > ⚠️ **When NOT to:** a TODO app doesn't need this. CQRS/ES shine when audit, replay, or independent read/write scaling genuinely matter. **Anti-patterns:** querying the write model, bidirectional sync, sharing one DB for read+write, CQRS-for-everything.
@@ -2013,6 +2235,31 @@ A **central registry** of event schemas that enforces **compatibility** across p
 | **4. Fetch** | Consumer fetches that schema by ID (cached after first fetch) and deserializes |
 
 > The schema travels as a 4-byte ID, not a fat header — cheap on every single message.
+
+```text
+THE WIRE FORMAT — schema ID rides along, not the whole schema
+──────────────────────────────────────────────────────────
+   ┌────────────┬───────────────┬──────────────────────────┐
+   │ magic byte │  schema_id    │        data (payload)     │
+   │   1 byte   │   4 bytes     │     Avro/Protobuf bytes    │
+   └────────────┴───────────────┴──────────────────────────┘
+
+
+THE FLOW — registry sits between producer and consumer
+──────────────────────────────────────────────────────────
+  PRODUCER                SCHEMA REGISTRY               CONSUMER
+     │                         │                           │
+     │  register schema ──────►│                           │
+     │                    compat check vs existing         │
+     │                    ✓ ok → returns schema_id         │
+     │  ✗ breaking → REJECTED (ideally in CI)              │
+     │                         │                           │
+     │  send [id][data] ───────┼──────────────────────────►│  read schema_id
+     │                         │◄──── fetch schema by id ───│  (cached after 1st)
+     │                         │───── schema ─────────────►│  deserialize ✓
+```
+
+> 🗣️ "The message only carries a tiny ID, not the whole schema — that's cheap on billions of messages. The real work happens up front: when a producer registers a new schema, the registry checks it against what's already there and rejects anything that would break a consumer. Catch that in CI and the 2 a.m. outage never ships."
 
 ### 12.2 Compatibility modes (the heart of it)
 

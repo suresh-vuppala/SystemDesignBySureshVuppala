@@ -76,7 +76,7 @@ body.course-body{
 @media(max-width:520px){
   .cm-header{padding:14px 16px 16px}
   .cm-connects{margin:14px 16px 0}
-  .cm-tabs{margin:16px 16px 0}
+  .cm-tabs{margin:0;padding:12px 16px 0}
   .cm-body{padding:18px 0 90px;margin:0 16px}
   .cm-title-block h1{font-size:calc(var(--fs-xl) * 1.1)}
   .cm-icon{width:34px;height:34px;font-size:var(--fs-sm)}
@@ -372,15 +372,99 @@ body.course-body{
 }
 .cs-overlay.cs-overlay-visible{display:block}
 
+/* ── Desktop collapse handles (minimize left nav / right rail) ──────
+   On wide screens the left course nav and right lesson rail are grid
+   columns. These slim edge handles let the reader collapse either side to
+   widen the center reading column. The choice is remembered per browser
+   (see initCollapseToggles in js/course.js) so it carries across lessons.
+   On tablet/mobile the panels are slide-in drawers instead, so these
+   handles are hidden there and the existing drawer toggles take over. */
+.course-app{position:relative}
+
+/* Transitions are gated behind .cc-anim, which JS adds only AFTER the saved
+   state is restored on load — so a reader who keeps a panel collapsed
+   doesn't see it animate shut on every single page load, but manual
+   toggles still slide smoothly. */
+@media(min-width:861px){
+  .course-app.cc-anim{transition:grid-template-columns .22s ease}
+  .course-app.cc-anim .cc-collapse{
+    transition:left .22s ease,right .22s ease,
+               background .12s,color .12s,border-color .12s;
+  }
+  .course-app.cc-anim .cc-collapse svg{transition:transform .22s ease}
+}
+
+.cc-collapse{
+  display:none;
+  position:absolute;top:50%;transform:translateY(-50%);z-index:60;
+  width:22px;height:48px;
+  align-items:center;justify-content:center;
+  padding:0;cursor:pointer;
+  color:var(--text-2);
+  background:var(--card);
+  border:1px solid var(--border-strong);
+  border-radius:7px;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+  transition:background .12s,color .12s,border-color .12s;
+}
+.cc-collapse:hover{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.cc-collapse svg{width:15px;height:15px}
+[data-theme="dark"] .cc-collapse{box-shadow:0 2px 8px rgba(0,0,0,.4)}
+
+/* Left handle rides the sidebar/main border and snaps to the far left when
+   the nav is collapsed; its chevron flips to point the way it will open. */
+.cc-collapse-left{left:calc(var(--sidebar-w) - 11px)}
+.course-app.sidebar-collapsed .cc-collapse-left{left:0}
+.course-app.sidebar-collapsed .cc-collapse-left svg{transform:rotate(180deg)}
+
+/* Right handle rides the main/rail border and snaps to the far right when
+   the rail is collapsed. */
+.cc-collapse-right{right:calc(var(--rail-w) - 11px)}
+.course-app.rail-collapsed .cc-collapse-right{right:0}
+.course-app.rail-collapsed .cc-collapse-right svg{transform:rotate(180deg)}
+
+/* Collapsed layouts + hidden panels, scoped so they only apply where the
+   panel is actually a grid column (not a drawer at narrower widths). */
+@media(min-width:1201px){
+  .course-app.sidebar-collapsed{grid-template-columns:0 1fr var(--rail-w)}
+  .course-app.rail-collapsed{grid-template-columns:var(--sidebar-w) 1fr 0}
+  .course-app.sidebar-collapsed.rail-collapsed{grid-template-columns:0 1fr 0}
+  #courseSidebarCollapse,#courseRailCollapse{display:flex}
+}
+@media(min-width:861px) and (max-width:1200px){
+  /* Two-column layout here (rail is a drawer); only the nav collapses. */
+  .course-app.sidebar-collapsed{grid-template-columns:0 1fr}
+  #courseSidebarCollapse{display:flex}
+}
+
+/* Collapse a panel to zero width while KEEPING it as a grid item. Using
+   display:none would drop it out of the grid, which reflows the remaining
+   items into the wrong column tracks (the main content would land in the
+   0-width track and vanish). Clipping it to 0 width keeps every item in
+   its own track, so only the panel disappears. */
+@media(min-width:861px){
+  .course-app.sidebar-collapsed .course-sidebar{
+    width:0;min-width:0;padding-left:0;padding-right:0;
+    border-right-width:0;overflow:hidden;
+  }
+}
+@media(min-width:1201px){
+  .course-app.rail-collapsed .course-rail{
+    width:0;min-width:0;padding-left:0;padding-right:0;
+    border-left-width:0;overflow:hidden;
+  }
+}
+
 /* ── Main content column ──────────────────────────────────── */
 .course-main{
   overflow-y:auto;height:100%;
   background:var(--bg-2);
+  position:relative;
 }
 
 .cm-header{
   background:var(--bg);border-bottom:1px solid var(--border-strong);
-  padding:18px 32px 20px;
+  padding:12px 32px 12px;
   position:sticky;top:0;z-index:10;
   box-shadow:0 1px 4px rgba(0,0,0,.04);
 }
@@ -394,7 +478,7 @@ body.course-body{
 .cm-breadcrumb,.cm-title-row,.cm-connects,.cm-tabs,.cm-body{max-width:1212px}
 
 .cm-breadcrumb{
-  font-size:var(--fs-2xs);color:var(--muted);margin-bottom:12px;
+  font-size:var(--fs-2xs);color:var(--muted);margin-bottom:8px;
   display:flex;align-items:center;gap:6px;flex-wrap:wrap;
 }
 .cm-breadcrumb a{color:var(--muted);text-decoration:none}
@@ -403,7 +487,11 @@ body.course-body{
 .cm-breadcrumb .cm-current{color:var(--text-2)}
 .cm-breadcrumb .cm-current-module{color:var(--muted)}
 
-.cm-title-row{display:flex;align-items:flex-start;gap:14px}
+.cm-title-row{display:flex;align-items:center;gap:12px}
+/* Title and its badges share one line (badges flow to the right of the
+   title, wrapping under it only when space runs out) instead of stacking,
+   which trims the header's vertical footprint. */
+.cm-title-block{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .cm-icon{
   flex-shrink:0;width:40px;height:40px;border-radius:9px;
   background:linear-gradient(135deg,var(--brand),var(--brand-2));
@@ -413,7 +501,7 @@ body.course-body{
 .cm-title-block h1{
   font-family:'Doto','Inter',sans-serif;
   font-size:calc(var(--fs-2xl) * 1.15);font-weight:900;color:var(--text);
-  margin:0 0 8px;letter-spacing:.02em;line-height:var(--lh-tight);
+  margin:0;letter-spacing:.02em;line-height:var(--lh-tight);
   font-variation-settings:'ROND' 0;
 }
 .cm-badges{display:flex;gap:8px;flex-wrap:wrap}
@@ -462,12 +550,22 @@ body.course-body{
 }
 .cm-connects-text{margin:0}
 
-/* ── Tabs ──────────────────────────────────────────────────── */
+/* ── Tabs ──────────────────────────────────────────────────────
+   The tab bar stays pinned while the lesson body scrolls, so a reader can
+   switch tabs from anywhere in a long page. It sticks directly beneath the
+   (also sticky) title header; the header's live height is measured in JS
+   and published as --cm-header-h (see initStickyTabs in js/course.js), so
+   the two never overlap even when the title wraps to two lines. The bar
+   spans the full content column with a solid background so body content
+   scrolls cleanly underneath it. */
 .cm-tabs{
-  display:flex;gap:4px;margin:20px 32px 0;
-  max-width:1180px;
+  display:flex;gap:4px;
+  margin:0;padding:14px 32px 0;
+  max-width:none;
   border-bottom:1px solid var(--border-strong);
   overflow-x:auto;
+  position:sticky;top:var(--cm-header-h,0px);z-index:9;
+  background:var(--bg-2);
 }
 .cm-tab{
   display:flex;align-items:center;gap:6px;
@@ -480,7 +578,13 @@ body.course-body{
 .cm-tab.cm-tab-active{color:var(--brand);border-bottom-color:var(--brand)}
 .cm-tab svg{width:15px;height:15px}
 
-.cm-body{padding:24px 0 60px;margin:0 32px;max-width:1212px}
+.cm-body{
+  padding:24px 0 60px;margin:0 32px;max-width:1212px;
+  /* Always tall enough to scroll the sticky tab bar up to the top, so
+     switching to a short tab still pins the tabs (see scrollTabsIntoView /
+     initStickyTabs in js/course.js). */
+  min-height:calc(100vh - var(--site-header-h) - var(--cm-sticky-h, 140px));
+}
 
 /* ── Content cards inside a tab ────────────────────────────── */
 .cc-heading{
